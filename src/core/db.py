@@ -14,7 +14,10 @@ class PlexAniBridgeDB:
 
     def __setup_db(self) -> Engine:
         if not self.db_path.exists():
-            self.db_path.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                self.db_path.parent.mkdir(parents=True, exist_ok=True)
+            except PermissionError:
+                raise PermissionError(f"Cannot create {self.db_path.parent}.")
         elif not self.db_path.is_file():
             raise ValueError(f"Path {self.db_path} is not a file.")
 
