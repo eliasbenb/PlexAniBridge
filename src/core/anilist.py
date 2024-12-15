@@ -113,6 +113,10 @@ class AniListClient:
         }}
         """
 
+        log.debug(
+            f"{self.__class__.__name__}: Searching for anime with query '{search_str}'"
+        )
+
         response = self.__make_request(query, {"search": search_str, "limit": limit})
         return [AnilistMedia(**media) for media in response["data"]["Page"]["media"]]
 
@@ -135,6 +139,8 @@ class AniListClient:
             }}
         }}
         """
+
+        log.debug(f"{self.__class__.__name__}: Getting anime with ID '{media_id}'")
 
         response = self.__make_request(query, {"id": media_id})
         if relations:
