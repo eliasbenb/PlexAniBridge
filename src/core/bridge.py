@@ -1,10 +1,10 @@
 from datetime import datetime, timedelta
-from typing import Optional, Union
+from typing import Union
 
+import plexapi.exceptions
 from plexapi.library import MovieSection, ShowSection
 from plexapi.media import Guid
 from plexapi.video import Episode, Movie, Season, Show
-import plexapi.exceptions
 from thefuzz import fuzz
 
 from src import log
@@ -188,8 +188,168 @@ class BridgeClient:
             f"{self.__class__.__name__}: Syncing shows in section '{section.title}'"
         )
 
-    def _sync_show(self, show: Show, anilist_entry: dict):
-        log.debug(f"{self.__class__.__name__}: Syncing show '{show.title}'")
+        shows: list[Show] = section.all()
+
+        for show in shows:
+            title: str = show.title
+            guids = self.__format_guids(show.guids, is_movie=False)
+
+            animappings = self.animap_client.get_mappings(**guids)
+
+            should_title_search = False
+
+            if len(animappings) == 0:
+                log.debug(
+                    f"{self.__class__.__name__}: No mappings found for show '{title}'. Attempting to search Anilist for the title"
+                )
+                should_title_search = True
+            else:
+                log.debug(
+                    f"{self.__class__.__name__}: Found {len(animappings)} mappings for show '{title}' {{anidb_id: {[am.anidb_id for am in animappings]}}}"
+                )
+
+                for animapping in animappings:
+                    if not animapping.tvdb_season:
+                        continue
+
+                    try:
+                        season: Season = show.season(season=animapping.tvdb_season)
+                    except plexapi.exceptions.NotFound:
+                        continue
+                    if season is None:
+                        continue
+
+                    season_offset = animapping.tvdb_epoffset or 0
+
+                    season_episodes: list[Episode] = season.episodes(
+                        index__gt=season_offset
+                    )
+                    watched_episodes = [e for e in season_episodes if e.viewCount > 0]
+
+                    if len(watched_episodes) == 0:
+                        log.debug(
+                            f"{self.__class__.__name__}: No watched episodes found for show '{show.title}' season {season.index}. Skipping"
+                        )
+                        continue
+
+                    if animapping.anilist_id:
+                        anilist_media = self.anilist_client.get_anime(
+                            animapping.anilist_id[0]
+                        )
+                    elif animapping.mal_id:
+                        log.debug(
+                            f"{self.__class__.__name__}: No AniList ID found for show '{title}'. Attempting to search Anilist for the MAL ID {animapping.mal_id}"
+                        )
+
+                        anilist_media = self.anilist_client.get_anime(
+                            mal_id=animapping.mal_id[0]
+                        )
+
+                        if anilist_media is None:
+                            log.debug(
+                                f"{self.__class__.__name__}: No matches found for show '{title}' with the MAL ID {animapping.mal_id}. Attempting to search Anilist for the title"
+                            )
+                            should_title_search = True
+                    else:
+                        log.debug(
+                            f"{self.__class__.__name__}: No AniList ID or MAL ID found for show '{title}'. Attempting to search Anilist for the title"
+                        )
+                        should_title_search = True
+
+                    if should_title_search:
+                        continue
+
+                    if anilist_media and anilist_media.episodes:
+                        season_episodes = [
+                            e
+                            for e in season_episodes
+                            if e.index <= anilist_media.episodes + season_offset
+                        ]
+                        watched_episodes = [
+                            e for e in season_episodes if e.viewCount > 0
+                        ]
+
+                    self._sync_season(show, season, watched_episodes, anilist_media)
+
+    def _sync_season(
+        self,
+        show: Show,
+        season: Season,
+        episodes: list[Episode],
+        anilist_media: AnilistMedia,
+    ):
+        if anilist_media.mediaListEntry is None:
+            anilist_status = None
+            anilist_rating = None
+            anilist_progress = 0
+        else:
+            anilist_status = anilist_media.mediaListEntry.status or None
+            anilist_rating = anilist_media.mediaListEntry.score or None
+            anilist_progress = anilist_media.mediaListEntry.progress or 0
+
+        last_watched_episode: Episode = min(
+            episodes, key=lambda e: e.viewCount, default=None
+        )
+
+        plex_status: str = (
+            AnilistMediaListStatus.COMPLETED
+            if len(episodes) >= anilist_media.episodes
+            else AnilistMediaListStatus.PLANNING
+            if show.onWatchlist()
+            else AnilistMediaListStatus.DROPPED
+            if (
+                last_watched_episode.lastViewedAt is not None
+                and last_watched_episode.lastViewedAt
+                > datetime.now() - timedelta(days=90)
+            )
+            else AnilistMediaListStatus.PAUSED
+            if last_watched_episode.viewOffset > 0
+            else None
+        )
+
+        plex_rating: Union[float, None] = season.userRating or None
+        plex_progress: int = len(episodes)
+
+        if (
+            anilist_status == plex_status
+            and anilist_rating == plex_rating
+            and anilist_progress == plex_progress
+        ):
+            log.debug(
+                f"{self.__class__.__name__}: Show '{show.title}' season {season.seasonNumber} already synced with AniList"
+            )
+            return
+
+        was_synced_arr: list[str] = []
+        if plex_status is not None and (
+            (anilist_status is not None and plex_status > anilist_status)
+            or anilist_status is None
+        ):
+            log.debug(
+                f"{self.__class__.__name__}: Syncing Plex's watch status with AniList for show '{show.title}' season {season.seasonNumber} {{anilist_id: {anilist_media.id}}} (Plex: {plex_status} -> AniList: {anilist_status})"
+            )
+            was_synced_arr.append("status")
+        if plex_rating is not None and plex_rating != anilist_rating:
+            log.debug(
+                f"{self.__class__.__name__}: Syncing Plex's rating with AniList for show '{show.title}' season {season.seasonNumber} {{anilist_id: {anilist_media.id}}} (Plex: {plex_rating} -> AniList: {anilist_rating})"
+            )
+            was_synced_arr.append("rating")
+        if plex_progress > 0 and plex_progress > anilist_progress:
+            log.debug(
+                f"{self.__class__.__name__}: Syncing Plex's progress with AniList for show '{show.title}' season {season.seasonNumber} {{anilist_id: {anilist_media.id}}} (Plex: {plex_progress} -> AniList: {anilist_progress})"
+            )
+            was_synced_arr.append("progress")
+
+        if len(was_synced_arr) > 0:
+            self.anilist_client.update_anime_entry(
+                anilist_media.id,
+                status=plex_status,
+                score=plex_rating,
+                progress=plex_progress,
+            )
+            log.info(
+                f"{self.__class__.__name__}: Synced Plex {" and ".join(was_synced_arr)} with AniList for show '{show.title}' season {season.seasonNumber} {{anilist_id: {anilist_media.id}}}"
+            )
 
     def __fuzzy_search(self, search_str: str, episodes: int) -> AnilistMedia:
         search_results = self.anilist_client.search_anime(search_str)

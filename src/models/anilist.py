@@ -11,10 +11,10 @@ class AnilistBaseModel(BaseModel):
 
 
 class AnilistPageInfo(AnilistBaseModel):
-    total: int
-    perPage: int
-    currentPage: int
-    lastPage: int
+    total: Optional[int]
+    perPage: Optional[int]
+    currentPage: Optional[int]
+    lastPage: Optional[int]
     hasNextPage: bool
 
     @staticmethod
@@ -199,7 +199,7 @@ class AnilistMediaWithRelations(AnilistMedia):
     @staticmethod
     def as_graphql() -> str:
         return f"""
-        {super().as_graphql()}
+        {AnilistMedia.as_graphql()}
         relations{{
             {AnilistMediaConnection.as_graphql()}
         }}

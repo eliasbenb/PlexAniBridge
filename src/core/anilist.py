@@ -1,17 +1,16 @@
-from typing import Optional
+from time import sleep
+from typing import Optional, Union
 
 import requests
 
 from src import log
-from src.utils.rate_limitter import RateLimiter
-
-from time import sleep
-
 from src.models.anilist import (
-    AnilistMediaStatus,
     AnilistMedia,
     AnilistMediaList,
+    AnilistMediaStatus,
+    AnilistMediaWithRelations,
 )
+from src.utils.rate_limitter import RateLimiter
 
 
 class AniListClient:
@@ -86,7 +85,6 @@ class AniListClient:
             f"{self.__class__.__name__}: Updating anime entry with variables: {variables}"
         )
 
-        return
         query = f"""
         mutation ($mediaId: Int, $status: MediaListStatus, $score: Float, $progress: Int) {{
             SaveMediaListEntry(mediaId: $mediaId, status: $status, score: $score, progress: $progress) {{
@@ -115,7 +113,8 @@ class AniListClient:
         self,
         anilist_id: Optional[int] = None,
         mal_id: Optional[int] = None,
-    ) -> AnilistMedia:
+        relations: Optional[bool] = False,
+    ) -> Union[AnilistMedia, AnilistMediaWithRelations]:
         if anilist_id is None and mal_id is None:
             raise ValueError("Either an AniList ID or a MAL ID must be provided")
 
@@ -125,10 +124,13 @@ class AniListClient:
         query = f"""
         query ($id: Int) {{
             Media({id_type}: $id, type: ANIME) {{
-                {AnilistMedia.as_graphql()}
+                {AnilistMediaWithRelations.as_graphql() if relations else AnilistMedia.as_graphql()}
             }}
         }}
         """
 
         response = self.__make_request(query, {"id": media_id})
-        return AnilistMedia(**response["data"]["Media"])
+        if relations:
+            return AnilistMediaWithRelations(**response["data"]["Media"])
+        else:
+            return AnilistMedia(**response["data"]["Media"])
