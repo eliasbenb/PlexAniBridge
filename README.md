@@ -20,8 +20,9 @@ services:
       PLEX_TOKEN: 2Sb...
       PLEX_SECTIONS: '["Anime", "Anime Movies"]'
       PLEX_USER: username
-    # volumes:
-    #   - ./logs:/app/logs
+    volumes:
+      - ./db:/app/db
+      # - ./logs:/app/logs
     restart: unless-stopped
 ```
 
