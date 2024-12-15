@@ -46,12 +46,13 @@ python main.py
 - [x] Sync rating scores
 - [x] Match anime with Kometa mappings
 - [x] Match anime with titles
-- [x] Scheduled sync
-- [x] Docker
-- [ ] Sync reviews/notes
+- [x] Scheduled sync jobs
+- [x] Docker support
+- [ ] Sync text-based reviews/notes
 - [ ] Multi-directional sync
-- [ ] Partial scanning, only sync items in Plex's recent history
-- [ ] Cache AniList responses
+- [ ] Partial scanning, only consider items in Plex's recent watch history
+- [ ] Special/OVA/ONA support
+- [ ] Cache AniList responses to avoid rate limits
 - [ ] Use AniList relations for better and quicker matching
 
 ## Special Thanks/Dependencies
