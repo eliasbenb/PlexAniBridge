@@ -1,0 +1,10 @@
+{
+    "configurations": [
+        {
+            "type": "debugpy",
+            "request": "launch",
+            "name": "Run PlexAniBridge",
+            "program": "${workspaceFolder}/main.py"
+        }
+    ],
+}
