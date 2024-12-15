@@ -104,7 +104,11 @@ class PlexClient:
             },
         )
 
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except requests.HTTPError as e:
+            log.error(f"Failed to get review for item '{item.title}'", exc_info=e)
+            return None
 
         data = response.json()["data"]["metadataReviewV2"]
 
