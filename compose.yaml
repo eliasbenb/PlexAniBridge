@@ -3,7 +3,7 @@ services:
     image: ghcr.io/eliasbenb/plexanibridge:main
     environment:
       # SYNC_INTERVAL: 3600 # Time in seconds between each sync
-      # PARTIAL_SCAN: False # Set to True to only scan for media with activity since the last scan (recently watched or added)
+      # PARTIAL_SCAN: True # Set to False to scan all Plex items, regardless of if it has already been processed by previous runs
       # DESTRUCTIVE_SYNC: False # Set to True to destructively sync Plex progress, ratings, adn notes with AniList. E.g. if ratings already exist in AniList but not in Plex, they will be removed from AniList.
       ANILIST_TOKEN: eyJ0eXALOiJKV1DiLCJFbGciOiJSUzI...
       ANILIST_USER: username

@@ -6,7 +6,7 @@ from pydantic_settings import BaseSettings
 class Config(BaseSettings):
     # General
     SYNC_INTERVAL: Optional[int] = 3600
-    PARTIAL_SCAN: Optional[bool] = False
+    PARTIAL_SCAN: Optional[bool] = True
     DESTRUCTIVE_SYNC: Optional[bool] = False
 
     # Anilist
