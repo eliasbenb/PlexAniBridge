@@ -5,12 +5,16 @@ from pydantic_settings import BaseSettings
 
 class Config(BaseSettings):
     # General
-    LOG_LEVEL: str = "INFO"
-    DB_PATH: str = "plexanibridge.db"
+    LOG_LEVEL: Optional[str] = "INFO"
+    DB_PATH: Optional[str] = "plexanibridge.db"
+    DRY_RUN: Optional[bool] = True
 
     # Anilist
     ANILIST_TOKEN: str
     ANILIST_USER: str
+
+    # AniMap
+    ANIMAP_SYNC_INTERVAL: Optional[int] = 3600
 
     # Plex
     PLEX_URL: Optional[str] = "http://localhost:32400"

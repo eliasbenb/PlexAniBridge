@@ -16,9 +16,10 @@ from src.utils.rate_limitter import RateLimiter
 class AniListClient:
     API_URL = "https://graphql.anilist.co"
 
-    def __init__(self, anilist_token: str, anilist_user: str):
+    def __init__(self, anilist_token: str, anilist_user: str, dry_run: bool):
         self.anilist_token = anilist_token
         self.anilist_user = anilist_user
+        self.dry_run = dry_run
 
         self.rate_limiter = RateLimiter(self.__class__.__name__, requests_per_minute=90)
         self.__validate_auth()
@@ -93,7 +94,11 @@ class AniListClient:
         }}
         """
 
-        return self.__make_request(query, variables)["data"]["SaveMediaListEntry"]
+        if self.dry_run:
+            log.info(f"{self.__class__.__name__}: Dry run enabled, skipping request")
+            return {}
+        else:
+            return self.__make_request(query, variables)["data"]["SaveMediaListEntry"]
 
     def search_anime(self, search_str: str, limit: int = 10) -> list[AnilistMedia]:
         query = f"""

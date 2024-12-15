@@ -3,6 +3,7 @@ from src.settings import config
 
 if __name__ == "__main__":
     bridge = BridgeClient(
+        dry_run=config.DRY_RUN,
         anilist_token=config.ANILIST_TOKEN,
         anilist_user=config.ANILIST_USER,
         animap_sync_interval=config.ANIMAP_SYNC_INTERVAL,

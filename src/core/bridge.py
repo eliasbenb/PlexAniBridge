@@ -15,6 +15,7 @@ from src.models.anilist import AnilistMedia, AnilistMediaListStatus
 class BridgeClient:
     def __init__(
         self,
+        dry_run: bool,
         anilist_token: str,
         anilist_user: str,
         animap_sync_interval: int,
@@ -24,9 +25,10 @@ class BridgeClient:
         plex_user: str,
         fuzzy_search_threshold: int,
     ):
+        self.dry_run = dry_run
         self.animap_sync_interval = animap_sync_interval
 
-        self.anilist_client = AniListClient(anilist_token, anilist_user)
+        self.anilist_client = AniListClient(anilist_token, anilist_user, dry_run)
         self.animap_client = AniMapClient()
         self.plex_client = PlexClient(plex_url, plex_token, plex_sections, plex_user)
 
@@ -179,6 +181,12 @@ class BridgeClient:
             was_synced_arr.append("repeat")
 
         if len(was_synced_arr) > 0:
+            self.anilist_client.update_anime_entry(
+                anilist_media.id,
+                status=plex_status,
+                score=plex_rating,
+                progress=1,
+            )
             log.info(
                 f"{self.__class__.__name__}: Synced Plex {" and ".join(was_synced_arr)} with AniList for movie '{movie.title}' {{anilist_id: {anilist_media.id}}}"
             )
