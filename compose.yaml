@@ -1,0 +1,25 @@
+services:
+  plexanibridge:
+    build:
+      context: .
+    environment:
+      SYNC_INTERVAL: 3600 # Time in seconds between each sync
+      LOG_LEVEL: INFO # [DEBUG, INFO, WARNING, ERROR, CRITICAL]
+      DB_PATH: plexanibridge.db
+      DRY_RUN: False # Use this to test the script without making any permanent changes
+
+      # Anilist
+      ANILIST_TOKEN: eyJ0eXALOiJKV1DiLCJFbGciOiJSUzI...
+      ANILIST_USER: username
+
+      # Plex
+      PLEX_URL: http://localhost:32400
+      PLEX_TOKEN: 2Sb... # https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/
+      PLEX_SECTIONS: '["Anime", "Anime Movies"]'
+      PLEX_USER: username
+
+      # Advanced
+      FUZZY_SEARCH_THRESHOLD: 90 # [0-100] sets the strictness when matching anime title search results
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
