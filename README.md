@@ -38,6 +38,38 @@ cp .env.example .env # Edit the .env file
 python main.py
 ```
 
+## Configuration
+
+- `SYNC_INTERVAL`: Interval in seconds between each sync job. (default: `3600`)
+  - Set to `-1` to disable scheduled sync jobs. This will cause the script to run once and exit.
+  - When `PARTIAL_SCAN` is enabled, it is benificial to lower the interval. Recommended interval with `PARTIAL_SCAN` enabled is `300` (5 minutes).
+- `PARTIAL_SCAN`: Only consider items added/updated/rated since last sync. (default: `True`)
+  - The initial sync will always be a full sync, regardless of this setting.
+  - Any subsequent syncs will only consider items added/updated/rated since the last sync's start time.
+- `DESTRUCTIVE_SYNC`: Fully replace AniList data to match Plex regardless of existing data. (default: `False`)
+  - When syncing items, the script typically only updates fields on AniList that are less than the corresponding fields on Plex. With `DESTRUCTIVE_SYNC` enabled, the script will fully replace the data on AniList with the data on Plex.
+  - For example, if the watch progress on AniList is greater than the watch progress on Plex, the progress on AniList will be lowered to match the progress on Plex.
+  - Not recommended unless you know what you're doing.
+  - Still in development.
+- *`ANILIST_TOKEN`: AniList API access token [get one here](https://anilist.co/login?apiVersion=v2&client_id=23079&response_type=token)
+- *`ANILIST_USER`: The target AniList user to sync to
+- *`PLEX_URL`: URL to your Plex server (default: `http://localhost:32400`)
+- *`PLEX_TOKEN`: Plex API access token [get one here](https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/)
+- *`PLEX_SECTIONS`: List of Plex library sections to consider
+  - The syntax is the same as a Python list. E.g. `["Anime", "Anime Movies"]`
+- *`PLEX_USER`: The target Plex user to sync from
+- `DB_PATH`: Path to the SQLite database file (default: `./db/plexanibridge.db`)
+- `LOG_LEVEL`: Logging level (default: `INFO`)
+  - Possible values: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`
+- `DRY_RUN`: Disables modifying AniList data (default: `False`)
+  - When enabled, the script will only log what it would do, without actually doing it.
+  - Use it when running the script for the first time to make sure everything is working as expected.
+- `FUZZY_SEARCH_THRESHOLD`: Fuzzy search threshold for matching anime titles (default: `90`)
+  - Sometimes no match is found between Plex and AniList, in this case, the script will try to find a match by searching AniList for similar titles.
+  - The threshold is a percentage of similarity between two titles. Results below this threshold will be ignored.
+  - Lower values will result in more matches, but also more false positives.
+  - Higher values will result in fewer matches, but also fewer false positives.
+
 ## TODO
 
 > [!WARNING]
