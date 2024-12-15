@@ -5,35 +5,81 @@ import plexapi.exceptions
 from plexapi.library import MovieSection, ShowSection
 from plexapi.media import Guid
 from plexapi.video import Episode, Movie, Season, Show
+from sqlmodel import Session
 from thefuzz import fuzz
 
 from src import log
 from src.core import AniListClient, AniMapClient, PlexClient
 from src.models.anilist import AnilistMedia, AnilistMediaListStatus
+from src.models.housekeeping import Housekeeping
+
+from .db import db
 
 
 class BridgeClient:
     def __init__(
         self,
-        dry_run: bool,
+        # General
+        partial_scan: bool,
+        destructive_sync: bool,
+        # Anilist
         anilist_token: str,
         anilist_user: str,
+        # Plex
         plex_url: str,
         plex_token: str,
-        plex_sections: list[str],
+        plex_sections: set[str],
         plex_user: str,
+        # Advanced
+        dry_run: bool,
         fuzzy_search_threshold: int,
-    ):
+    ) -> None:
+        self.partial_scan = partial_scan
+        self.destructive_sync = destructive_sync
         self.dry_run = dry_run
+        self.fuzzy_search_threshold = fuzzy_search_threshold
 
         self.anilist_client = AniListClient(anilist_token, anilist_user, dry_run)
         self.animap_client = AniMapClient()
         self.plex_client = PlexClient(plex_url, plex_token, plex_sections, plex_user)
 
-        self.fuzzy_search_threshold = fuzzy_search_threshold
+        self.last_synced = self.__get_last_synced()
+        self.last_sections_synced = self.__get_last_sections_synced()
 
-    def sync(self):
+    def __get_last_synced(self) -> Optional[datetime]:
+        with Session(db) as session:
+            last_synced = session.get(Housekeeping, "last_synced")
+            if last_synced is None or last_synced.value is None:
+                return None
+            return datetime.fromisoformat(last_synced.value)
+
+    def __set_last_synced(self, last_synced: datetime) -> None:
+        with Session(db) as session:
+            session.merge(
+                Housekeeping(key="last_synced", value=last_synced.isoformat())
+            )
+            session.commit()
+
+    def __get_last_sections_synced(self) -> set[str]:
+        with Session(db) as session:
+            last_synced = session.get(Housekeeping, "last_sections_synced")
+            if last_synced is None or last_synced.value is None:
+                return set()
+            return set(last_synced.value.split(","))
+
+    def __set_last_sections_synced(self, last_sections_synced: set[str]) -> None:
+        with Session(db) as session:
+            session.merge(
+                Housekeeping(
+                    key="last_sections_synced", value=",".join(last_sections_synced)
+                )
+            )
+            session.commit()
+
+    def sync(self) -> None:
         log.info(f"{self.__class__.__name__}: Syncing Plex and AniList libraries")
+
+        tmp_last_synced = datetime.now()
 
         plex_sections = self.plex_client.get_sections()
 
@@ -43,12 +89,37 @@ class BridgeClient:
             elif self.plex_client.is_show(section):
                 self._sync_shows(section)
 
-    def _sync_movies(self, section: MovieSection):
+        self.__set_last_synced(tmp_last_synced)
+        self.__set_last_sections_synced({section.title for section in plex_sections})
+
+    def _sync_movies(self, section: MovieSection) -> None:
         log.debug(
             f"{self.__class__.__name__}: Syncing movies in section '{section.title}'"
         )
 
-        movies: list[Movie] = section.all()
+        if (
+            self.partial_scan
+            and self.last_synced
+            and self.last_sections_synced == self.plex_client.plex_sections
+        ):
+            movies: list[Movie] = section.search(
+                filters={
+                    "or": [
+                        {"updatedAt>>=": self.last_synced},
+                        {"lastViewedAt>>=": self.last_synced},
+                        {"lastRatedAt>>=": self.last_synced},
+                    ]
+                }
+            )
+            log.debug(
+                f"{self.__class__.__name__}: Found {len(movies)} movies with partial scanning from cutoff point {self.last_synced}"
+            )
+        else:
+            movies: list[Movie] = section.all()
+            log.debug(
+                f"{self.__class__.__name__}: Found {len(movies)} movies with full scanning"
+            )
+
         for movie in movies:
             title: str = movie.title
             if title != "Look Back":
@@ -112,7 +183,7 @@ class BridgeClient:
 
             self._sync_movie(movie, anilist_media)
 
-    def _sync_movie(self, movie: Movie, anilist_media: AnilistMedia):
+    def _sync_movie(self, movie: Movie, anilist_media: AnilistMedia) -> None:
         if anilist_media.mediaListEntry is None:
             anilist_status = None
             anilist_rating = None
@@ -187,12 +258,29 @@ class BridgeClient:
                 f"{self.__class__.__name__}: Synced Plex {" and ".join(was_synced_arr)} with AniList for movie '{movie.title}' {{anilist_id: {anilist_media.id}}}"
             )
 
-    def _sync_shows(self, section: ShowSection):
+    def _sync_shows(self, section: ShowSection) -> None:
         log.debug(
             f"{self.__class__.__name__}: Syncing shows in section '{section.title}'"
         )
 
-        shows: list[Show] = section.all()
+        if self.last_synced:
+            shows: list[Movie] = section.search(
+                filters={
+                    "or": [
+                        {"updatedAt>>=": self.last_synced},
+                        {"lastViewedAt>>=": self.last_synced},
+                        {"lastRatedAt>>=": self.last_synced},
+                    ]
+                }
+            )
+            log.debug(
+                f"{self.__class__.__name__}: Found {len(shows)} shows with partial scanning from cutoff point {self.last_synced}"
+            )
+        else:
+            shows: list[Movie] = section.all()
+            log.debug(
+                f"{self.__class__.__name__}: Found {len(shows)} shows with full scanning"
+            )
 
         for show in shows:
             title: str = show.title
@@ -281,7 +369,7 @@ class BridgeClient:
         season: Season,
         episodes: list[Episode],
         anilist_media: AnilistMedia,
-    ):
+    ) -> None:
         if anilist_media.mediaListEntry is None:
             anilist_status = None
             anilist_rating = None

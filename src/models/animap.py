@@ -14,10 +14,3 @@ class AniMap(SQLModel, table=True):
     tvdb_epoffset: Optional[int]
     tvdb_id: Optional[int] = Field(index=True)
     tvdb_season: Optional[int]
-
-
-class AniMapHouseKeeping(SQLModel, table=True):
-    __tablename__ = "animap_house_keeping"
-
-    key: str = Field(primary_key=True)
-    value: Optional[str]

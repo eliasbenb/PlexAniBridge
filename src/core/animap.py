@@ -6,7 +6,8 @@ from sqlmodel import Session, delete, select
 from sqlmodel.sql.expression import and_, or_
 
 from src import log
-from src.models.animap import AniMap, AniMapHouseKeeping
+from src.models.animap import AniMap
+from src.models.housekeeping import Housekeeping
 
 from .db import db
 
@@ -19,7 +20,7 @@ class AniMapClient:
 
     def __sync_db(self) -> None:
         with Session(db) as session:
-            last_cdn_hash = session.get(AniMapHouseKeeping, "cdn_hash")
+            last_cdn_hash = session.get(Housekeeping, "animap_cdn_hash")
 
         with requests.get(self.CDN_URL) as response:
             response.raise_for_status()
@@ -63,7 +64,7 @@ class AniMapClient:
 
                 session.merge(AniMap(**value))
 
-            session.merge(AniMapHouseKeeping(key="cdn_hash", value=curr_cdn_hash))
+            session.merge(Housekeeping(key="animap_cdn_hash", value=curr_cdn_hash))
 
             session.commit()
 
