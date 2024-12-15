@@ -24,5 +24,7 @@ class RateLimiter:
                     f"{self.log_name}: Rate limit hit, sleeping for {sleep_time:.2f} seconds"
                 )
                 sleep(sleep_time)
+        else:
+            sleep(1)
 
         self.request_times.append(now)
