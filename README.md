@@ -12,7 +12,8 @@ services:
   plexanibridge:
     image: ghcr.io/eliasbenb/plexanibridge
     environment:
-      SYNC_INTERVAL: 3600
+      # SYNC_INTERVAL: 3600
+      # PARTIAL_SCAN: False
       ANILIST_TOKEN: eyJ0eXALOiJKV1DiLCJFbGciOiJSUzI...
       ANILIST_USER: username
       PLEX_URL: http://localhost:32400
