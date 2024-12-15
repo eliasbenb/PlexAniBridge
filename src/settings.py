@@ -18,6 +18,9 @@ class Config(BaseSettings):
     PLEX_SECTIONS: list[str]
     PLEX_USER: str
 
+    # Advanced
+    FUZZY_SEARCH_THRESHOLD: Optional[int] = 90
+
     class Config:
         env_file = ".env"
 
