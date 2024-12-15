@@ -10,7 +10,7 @@
 ```yaml
 services:
   plexanibridge:
-    image: ghcr.io/eliasbenb/plexanibridge
+    image: ghcr.io/eliasbenb/plexanibridge:main
     environment:
       # SYNC_INTERVAL: 3600
       # PARTIAL_SCAN: False
