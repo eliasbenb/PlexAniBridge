@@ -18,7 +18,6 @@ class BridgeClient:
         dry_run: bool,
         anilist_token: str,
         anilist_user: str,
-        animap_sync_interval: int,
         plex_url: str,
         plex_token: str,
         plex_sections: list[str],
@@ -26,7 +25,6 @@ class BridgeClient:
         fuzzy_search_threshold: int,
     ):
         self.dry_run = dry_run
-        self.animap_sync_interval = animap_sync_interval
 
         self.anilist_client = AniListClient(anilist_token, anilist_user, dry_run)
         self.animap_client = AniMapClient()

@@ -1,1 +1,5 @@
 # PlexAniBridge
+
+## Quick Start
+
+### Docker
