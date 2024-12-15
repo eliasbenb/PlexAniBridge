@@ -1,5 +1,7 @@
-from typing import Union
+from typing import Optional, Union
 
+import requests
+from plexapi import BASE_HEADERS
 from plexapi.library import MovieSection, ShowSection
 from plexapi.server import PlexServer
 from plexapi.video import Movie, Show
@@ -63,6 +65,52 @@ class PlexClient:
         )
         section = self.get_section(section_name)
         return section.all()
+
+    def get_user_review(self, item: Union[Movie, Show]) -> Optional[str]:
+        log.debug(f"{self.__class__.__name__}: Getting reviews for item '{item.title}'")
+
+        query = """
+        query GetReview($metadataID: ID!) {
+            metadataReviewV2(metadata: {id: $metadataID}) {
+                ... on ActivityReview {
+                    message
+                }
+                ... on ActivityWatchReview {
+                    message
+                }
+            }
+        }
+        """
+
+        if item.type == "movie":
+            guid = item.guid[13:]
+        elif item.type == "show":
+            guid = item.guid[12:]
+        else:
+            return
+
+        headers = BASE_HEADERS.copy()
+        headers["X-Plex-Token"] = self.plex_token
+
+        response = requests.post(
+            "https://community.plex.tv/api",
+            headers=headers,
+            json={
+                "query": query,
+                "variables": {
+                    "metadataID": guid,
+                },
+                "operationName": "GetReview",
+            },
+        )
+
+        response.raise_for_status()
+
+        data = response.json()["data"]["metadataReviewV2"]
+
+        if not data or "message" not in data:
+            return None
+        return data["message"]
 
     def is_movie(self, item: Union[Movie, Show]) -> bool:
         return isinstance(item, (Movie, MovieSection))

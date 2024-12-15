@@ -48,7 +48,8 @@ python main.py
 - [x] Match anime with titles
 - [x] Scheduled sync jobs
 - [x] Docker support
-- [ ] Sync text-based reviews/notes
+- [x] Sync text-based reviews/notes
+- [x] Destructive sync (fully replace AniList data to match Plex regardless of existing data)
 - [ ] Multi-directional sync
 - [ ] Partial scanning, only consider items in Plex's recent watch history
 - [ ] Special/OVA/ONA support

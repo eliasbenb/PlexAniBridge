@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from typing import Union
+from typing import Optional, Union
 
 import plexapi.exceptions
 from plexapi.library import MovieSection, ShowSection
@@ -51,6 +51,8 @@ class BridgeClient:
         movies: list[Movie] = section.all()
         for movie in movies:
             title: str = movie.title
+            if title != "Look Back":
+                continue
             guids = self.__format_guids(movie.guids, is_movie=True)
 
             animappings = self.animap_client.get_mappings(**guids)
@@ -115,12 +117,14 @@ class BridgeClient:
             anilist_status = None
             anilist_rating = None
             anilist_repeat = None
+            anilist_notes = None
         else:
             anilist_status = anilist_media.mediaListEntry.status or None
             anilist_rating = anilist_media.mediaListEntry.score or None
             anilist_repeat = anilist_media.mediaListEntry.repeat or None
+            anilist_notes = anilist_media.mediaListEntry.notes or None
 
-        plex_status: str = (
+        plex_status = (
             AnilistMediaListStatus.COMPLETED
             if movie.viewCount >= 1
             else AnilistMediaListStatus.PLANNING
@@ -134,15 +138,17 @@ class BridgeClient:
             if movie.viewOffset is not None and movie.viewOffset > 0
             else None
         )
-        plex_rating: Union[float, None] = movie.userRating or None
-        plex_repeat: Union[int, None] = (
+        plex_rating: Optional[float] = movie.userRating or None
+        plex_repeat: Optional[int] = (
             movie.viewCount - 1 if movie.viewCount > 1 else None
         ) or None
+        plex_notes: Optional[str] = self.plex_client.get_user_review(movie) or None
 
         if (
             anilist_status == plex_status
             and anilist_rating == plex_rating
             and anilist_repeat == plex_repeat
+            and anilist_notes == plex_notes
         ):
             log.debug(
                 f"{self.__class__.__name__}: Movie '{movie.title}' already synced with AniList"
@@ -150,33 +156,24 @@ class BridgeClient:
             return
 
         was_synced_arr: list[str] = []
-        if (
-            plex_status is not None
-            and anilist_status is not None
-            and plex_status > anilist_status
+        if plex_status is not None and (
+            (anilist_status is not None and plex_status > anilist_status)
+            or anilist_status is None
         ):
             log.debug(
-                f"{self.__class__.__name__}: Syncing Plex's watch status with AniList for movie '{movie.title}' {{anilist_id: {anilist_media.id}}} (Plex: {plex_status} -> AniList: {anilist_status})"
+                f"{self.__class__.__name__}: Syncing Plex's watch status with AniList for movie '{movie.title}'  {{anilist_id: {anilist_media.id}}} (Plex: {plex_status} -> AniList: {anilist_status})"
             )
             was_synced_arr.append("status")
-        if (
-            plex_rating is not None
-            and anilist_rating is not None
-            and plex_rating != anilist_rating
-        ):
+        if plex_rating is not None and plex_rating != anilist_rating:
             log.debug(
                 f"{self.__class__.__name__}: Syncing Plex's rating with AniList for movie '{movie.title}' {{anilist_id: {anilist_media.id}}} (Plex: {plex_rating} -> AniList: {anilist_rating})"
             )
             was_synced_arr.append("rating")
-        if (
-            plex_repeat is not None
-            and anilist_repeat is not None
-            and plex_repeat != anilist_repeat
-        ):
+        if plex_notes and plex_notes != anilist_notes:
             log.debug(
-                f"{self.__class__.__name__}: Syncing Plex's repeat count with AniList for movie '{movie.title}' {{anilist_id: {anilist_media.id}}} (Plex: {plex_repeat} -> AniList: {anilist_repeat})"
+                f"{self.__class__.__name__}: Syncing Plex's review/notes with AniList for movie '{movie.title}' {{anilist_id: {anilist_media.id}}} (Plex: '{plex_notes}' -> AniList: '{anilist_notes}')"
             )
-            was_synced_arr.append("repeat")
+            was_synced_arr.append("progress")
 
         if len(was_synced_arr) > 0:
             self.anilist_client.update_anime_entry(
@@ -184,6 +181,7 @@ class BridgeClient:
                 status=plex_status,
                 score=plex_rating,
                 progress=1,
+                notes=plex_notes,
             )
             log.info(
                 f"{self.__class__.__name__}: Synced Plex {" and ".join(was_synced_arr)} with AniList for movie '{movie.title}' {{anilist_id: {anilist_media.id}}}"
@@ -288,16 +286,18 @@ class BridgeClient:
             anilist_status = None
             anilist_rating = None
             anilist_progress = 0
+            anilist_notes = None
         else:
             anilist_status = anilist_media.mediaListEntry.status or None
             anilist_rating = anilist_media.mediaListEntry.score or None
             anilist_progress = anilist_media.mediaListEntry.progress or 0
+            anilist_notes = anilist_media.mediaListEntry.notes or None
 
         last_watched_episode: Episode = min(
             episodes, key=lambda e: e.viewCount, default=None
         )
 
-        plex_status: str = (
+        plex_status = (
             AnilistMediaListStatus.COMPLETED
             if len(episodes) >= anilist_media.episodes
             else AnilistMediaListStatus.PLANNING
@@ -312,14 +312,19 @@ class BridgeClient:
             if last_watched_episode.viewOffset > 0
             else None
         )
-
         plex_rating: Union[float, None] = season.userRating or None
         plex_progress: int = len(episodes)
+        plex_notes: Optional[str] = (
+            self.plex_client.get_user_review(season)
+            or self.plex_client.get_user_review(show)
+            or None
+        )
 
         if (
             anilist_status == plex_status
             and anilist_rating == plex_rating
             and anilist_progress == plex_progress
+            and anilist_notes == plex_notes
         ):
             log.debug(
                 f"{self.__class__.__name__}: Show '{show.title}' season {season.seasonNumber} already synced with AniList"
@@ -345,6 +350,11 @@ class BridgeClient:
                 f"{self.__class__.__name__}: Syncing Plex's progress with AniList for show '{show.title}' season {season.seasonNumber} {{anilist_id: {anilist_media.id}}} (Plex: {plex_progress} -> AniList: {anilist_progress})"
             )
             was_synced_arr.append("progress")
+        if plex_notes and plex_notes != anilist_notes:
+            log.debug(
+                f"{self.__class__.__name__}: Syncing Plex's review/notes with AniList for show '{show.title}' season {season.seasonNumber} {{anilist_id: {anilist_media.id}}} (Plex: '{plex_notes}' -> AniList: '{anilist_notes}')"
+            )
+            was_synced_arr.append("progress")
 
         if len(was_synced_arr) > 0:
             self.anilist_client.update_anime_entry(
@@ -352,6 +362,7 @@ class BridgeClient:
                 status=plex_status,
                 score=plex_rating,
                 progress=plex_progress,
+                notes=plex_notes,
             )
             log.info(
                 f"{self.__class__.__name__}: Synced Plex {" and ".join(was_synced_arr)} with AniList for show '{show.title}' season {season.seasonNumber} {{anilist_id: {anilist_media.id}}}"

@@ -72,12 +72,14 @@ class AniListClient:
         status: Optional[AnilistMediaStatus] = None,
         score: Optional[float] = None,
         progress: Optional[int] = None,
+        notes: Optional[str] = None,
     ) -> dict:
         variables = {
             "mediaId": media_id,
             "status": status.value if status else None,
             "score": score,
             "progress": progress,
+            "notes": notes,
         }
 
         variables = {k: v for k, v in variables.items() if v is not None}
@@ -87,8 +89,8 @@ class AniListClient:
         )
 
         query = f"""
-        mutation ($mediaId: Int, $status: MediaListStatus, $score: Float, $progress: Int) {{
-            SaveMediaListEntry(mediaId: $mediaId, status: $status, score: $score, progress: $progress) {{
+        mutation ($mediaId: Int, $status: MediaListStatus, $score: Float, $progress: Int, $notes: String) {{
+            SaveMediaListEntry(mediaId: $mediaId, status: $status, score: $score, progress: $progress, notes: $notes) {{
                 {AnilistMediaList.as_graphql()}
             }}
         }}
