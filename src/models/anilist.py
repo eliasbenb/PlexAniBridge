@@ -103,11 +103,20 @@ class AnilistMediaListStatus(Enum):
         "PLANNING": 5,
     }
 
+    def __eq__(self, other: "AnilistMediaListStatus") -> bool:
+        return self.__priority[self.value] == self.__priority[other.value]
+
     def __lt__(self, other: "AnilistMediaListStatus") -> bool:
         return self.__priority[self.value] > self.__priority[other.value]
 
+    def __le__(self, other: "AnilistMediaListStatus") -> bool:
+        return self.__priority[self.value] >= self.__priority[other.value]
+
     def __gt__(self, other: "AnilistMediaListStatus") -> bool:
         return self.__priority[self.value] < self.__priority[other.value]
+
+    def __ge__(self, other: "AnilistMediaListStatus") -> bool:
+        return self.__priority[self.value] <= self.__priority[other.value]
 
 
 class AnilistMediaList(AnilistBaseModel):
