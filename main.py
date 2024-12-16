@@ -13,12 +13,10 @@ def run():
         destructive_sync=config.DESTRUCTIVE_SYNC,
         # Anilist
         anilist_token=config.ANILIST_TOKEN,
-        anilist_user=config.ANILIST_USER,
         # Plex
         plex_url=config.PLEX_URL,
         plex_token=config.PLEX_TOKEN,
         plex_sections=config.PLEX_SECTIONS,
-        plex_user=config.PLEX_USER,
         # Advanced
         dry_run=config.DRY_RUN,
         fuzzy_search_threshold=config.FUZZY_SEARCH_THRESHOLD,

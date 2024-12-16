@@ -16,13 +16,12 @@ from src.utils.rate_limitter import RateLimiter
 class AniListClient:
     API_URL = "https://graphql.anilist.co"
 
-    def __init__(self, anilist_token: str, anilist_user: str, dry_run: bool):
+    def __init__(self, anilist_token: str, dry_run: bool):
         self.anilist_token = anilist_token
-        self.anilist_user = anilist_user
         self.dry_run = dry_run
 
         self.rate_limiter = RateLimiter(self.__class__.__name__, requests_per_minute=90)
-        self.__validate_auth()
+        self.anilist_user = self.__get_user()
 
     def __make_request(self, query: str, variables: Optional[dict] = None) -> dict:
         self.rate_limiter.wait_if_needed()
@@ -48,7 +47,7 @@ class AniListClient:
         response.raise_for_status()
         return response.json()
 
-    def __validate_auth(self) -> None:
+    def __get_user(self) -> str:
         query = """
         query {
             Viewer {
@@ -59,12 +58,7 @@ class AniListClient:
         """
 
         response = self.__make_request(query)
-        viewer = response["data"]["Viewer"]
-
-        if viewer["name"] != self.anilist_user:
-            raise ValueError(
-                f"Authenticated user '{viewer['name']}' does not match configured user '{self.anilist_user}'"
-            )
+        return response["data"]["Viewer"]["name"]
 
     def update_anime_entry(
         self,

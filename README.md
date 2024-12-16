@@ -5,21 +5,19 @@
 ### Docker
 
 > [!TIP]
-> Have a look at [compose.yaml](./compose.yaml) for a full compose file with comments for each config option.
+> Have a look at [the configuration section](#Configuration) for a full list of configurable environment variables.
+>
+> Below is a minimal example of a Docker compose with only the required variables. For a full example, see [compose.yaml](./compose.yaml).
 
 ```yaml
 services:
   plexanibridge:
     image: ghcr.io/eliasbenb/plexanibridge:main
     environment:
-      # SYNC_INTERVAL: 3600
-      # PARTIAL_SCAN: True
       ANILIST_TOKEN: eyJ0eXALOiJKV1DiLCJFbGciOiJSUzI...
-      ANILIST_USER: username
       PLEX_URL: http://localhost:32400
       PLEX_TOKEN: 2Sb...
       PLEX_SECTIONS: '["Anime", "Anime Movies"]'
-      PLEX_USER: username
     volumes:
       - ./db:/app/db
       # - ./logs:/app/logs
@@ -40,9 +38,12 @@ python main.py
 
 ## Configuration
 
+> [!NOTE]
+> Any list item prefixed with `*` is required to be set for the script to run.
+
 - `SYNC_INTERVAL`: Interval in seconds between each sync job. (default: `3600`)
-  - Set to `-1` to disable scheduled sync jobs. This will cause the script to run once and exit.
-  - When `PARTIAL_SCAN` is enabled, it is benificial to lower the interval. Recommended interval with `PARTIAL_SCAN` enabled is `300` (5 minutes).
+  - Set as `-1` to disable scheduled sync jobs. This will cause the script to run only once and exit.
+  - When `PARTIAL_SCAN` is enabled, it can be benificial to lower the interval for quicker syncs. In this case, an interval of `300` (5 minutes) is recommended.
 - `PARTIAL_SCAN`: Only consider items added/updated/rated since last sync. (default: `True`)
   - The initial sync will always be a full sync, regardless of this setting.
   - Any subsequent syncs will only consider items added/updated/rated since the last sync's start time.
@@ -51,13 +52,11 @@ python main.py
   - For example, if the watch progress on AniList is greater than the watch progress on Plex, the progress on AniList will be lowered to match the progress on Plex.
   - Not recommended unless you know what you're doing.
   - Still in development.
-- *`ANILIST_TOKEN`: AniList API access token [get one here](https://anilist.co/login?apiVersion=v2&client_id=23079&response_type=token)
-- *`ANILIST_USER`: The target AniList user to sync to
-- *`PLEX_URL`: URL to your Plex server (default: `http://localhost:32400`)
-- *`PLEX_TOKEN`: Plex API access token [get one here](https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/)
-- *`PLEX_SECTIONS`: List of Plex library sections to consider
+- `*ANILIST_TOKEN`: AniList API access token [get one here](https://anilist.co/login?apiVersion=v2&client_id=23079&response_type=token)
+- `*PLEX_URL`: URL to your Plex server (default: `http://localhost:32400`)
+- `*PLEX_TOKEN`: Plex API access token [get one here](https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/)
+- `*PLEX_SECTIONS`: List of Plex library sections to consider
   - The syntax is the same as a Python list. E.g. `["Anime", "Anime Movies"]`
-- *`PLEX_USER`: The target Plex user to sync from
 - `DB_PATH`: Path to the SQLite database file (default: `./db/plexanibridge.db`)
 - `LOG_LEVEL`: Logging level (default: `INFO`)
   - Possible values: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`
@@ -85,7 +84,6 @@ python main.py
 - [x] Match anime with titles
 - [x] Docker support
 - [ ] Destructive sync (fully replace AniList data to match Plex regardless of existing data)
-- [ ] Multi-directional sync
 - [ ] Sync start/end dates
 - [ ] Sync repeat count
 - [ ] Special/OVA/ONA support

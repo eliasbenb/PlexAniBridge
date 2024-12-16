@@ -11,13 +11,11 @@ class Config(BaseSettings):
 
     # Anilist
     ANILIST_TOKEN: str
-    ANILIST_USER: str
 
     # Plex
     PLEX_URL: Optional[str] = "http://localhost:32400"
     PLEX_TOKEN: str
     PLEX_SECTIONS: set[str]
-    PLEX_USER: str
 
     # Advanced
     DB_PATH: Optional[str] = "db/plexanibridge.db"

@@ -24,12 +24,10 @@ class BridgeClient:
         destructive_sync: bool,
         # Anilist
         anilist_token: str,
-        anilist_user: str,
         # Plex
         plex_url: str,
         plex_token: str,
         plex_sections: set[str],
-        plex_user: str,
         # Advanced
         dry_run: bool,
         fuzzy_search_threshold: int,
@@ -39,9 +37,9 @@ class BridgeClient:
         self.dry_run = dry_run
         self.fuzzy_search_threshold = fuzzy_search_threshold
 
-        self.anilist_client = AniListClient(anilist_token, anilist_user, dry_run)
+        self.anilist_client = AniListClient(anilist_token, dry_run)
         self.animap_client = AniMapClient()
-        self.plex_client = PlexClient(plex_url, plex_token, plex_sections, plex_user)
+        self.plex_client = PlexClient(plex_url, plex_token, plex_sections)
 
         self.last_synced = self.__get_last_synced()
         self.last_sections_synced = self.__get_last_sections_synced()

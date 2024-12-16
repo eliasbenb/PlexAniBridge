@@ -10,13 +10,10 @@ from src import log
 
 
 class PlexClient:
-    def __init__(
-        self, plex_url: str, plex_token: str, plex_sections: list[str], plex_user: str
-    ):
+    def __init__(self, plex_url: str, plex_token: str, plex_sections: list[str]):
         self.plex_url = plex_url
         self.plex_token = plex_token
         self.plex_sections = plex_sections
-        self.plex_user = plex_user
 
         self.client = PlexServer(self.plex_url, self.plex_token)
         self.__validate_sections()
