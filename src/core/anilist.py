@@ -143,7 +143,9 @@ class AniListClient:
         }}
         """
 
-        log.debug(f"{self.__class__.__name__}: Getting anime with ID '{media_id}'")
+        log.debug(
+            f"{self.__class__.__name__}: Getting anime with {'AniList' if anilist_id else 'MAL'} ID '{media_id}'"
+        )
 
         response = self.__make_request(query, {"id": media_id})
         if relations:

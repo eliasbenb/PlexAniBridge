@@ -51,7 +51,7 @@ class MovieSyncClient(BaseSyncClient[Movie, MovieSection]):
                 f"{self.__class__.__name__}: Multiple mappings found for movie '{title}', using the first one"
             )
 
-        anilist_media = self._find_anilist_media_by_ids(title, animapping)
+        anilist_media = self.find_anilist_media_by_ids(title, animapping)
         return (
             anilist_media
             if anilist_media

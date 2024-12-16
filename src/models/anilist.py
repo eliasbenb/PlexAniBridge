@@ -102,12 +102,6 @@ class AniListMediaListStatus(Enum):
         "PLANNING": 5,
     }
 
-    def __eq__(self, other: "AniListMediaListStatus") -> bool:
-        return self.__priority[self.value] == self.__priority[other.value]
-
-    def __ne__(self, other: "AniListMediaListStatus") -> bool:
-        return self.__priority[self.value] != self.__priority[other.value]
-
     def __lt__(self, other: "AniListMediaListStatus") -> bool:
         return self.__priority[self.value] > self.__priority[other.value]
 

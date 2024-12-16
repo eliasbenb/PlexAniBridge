@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any, Optional
 
 import plexapi.exceptions
@@ -16,7 +16,7 @@ class ShowSyncClient(BaseSyncClient[Show, ShowSection]):
     def _get_media_to_sync(
         self, section: ShowSection, last_synced: Optional[datetime]
     ) -> list[Show]:
-        if last_synced:
+        if last_synced is not None:
             return section.search(
                 filters={
                     "or": [
@@ -29,12 +29,15 @@ class ShowSyncClient(BaseSyncClient[Show, ShowSection]):
         return section.all()
 
     def _process_media_item(self, show: Show) -> None:
+        for attr in ("_pab__review", "_pab__onWatchList"):
+            setattr(show, attr, None)
+
         title: str = show.title
         guids = self._format_guids(show.guids, is_movie=False)
 
         animappings = self.animap_client.get_mappings(**guids)
 
-        if not animappings:
+        if len(animappings) == 0:
             log.debug(
                 f"{self.__class__.__name__}: No mappings found for show '{title}'"
             )
@@ -45,6 +48,11 @@ class ShowSyncClient(BaseSyncClient[Show, ShowSection]):
             f"{{anidb_id: {[am.anidb_id for am in animappings]}}}"
         )
 
+        show_review = self.plex_client.get_user_review(show)
+
+        setattr(show, "_pab__review", show_review)
+        setattr(show, "_pab__onWatchList", show.onWatchlist())
+
         for animapping in animappings:
             self._process_show_mapping(show, animapping)
 
@@ -54,9 +62,16 @@ class ShowSyncClient(BaseSyncClient[Show, ShowSection]):
 
         try:
             season = self._get_season(show, animapping.tvdb_season)
-            if season:
-                show_review = self.plex_client.get_user_review(show)
-                self._process_season(show, season, show_review, animapping)
+            if season is not None:
+                anilist_media = self.find_anilist_media_by_ids(show.title, animapping)
+                if not anilist_media:
+                    return
+
+                self._process_season(show, season, animapping, anilist_media)
+            else:
+                log.debug(
+                    f"{self.__class__.__name__}: Season {animapping.tvdb_season} not found for show '{show.title}'"
+                )
         except plexapi.exceptions.NotFound:
             log.debug(
                 f"{self.__class__.__name__}: Season {animapping.tvdb_season} not found for show '{show.title}'"
@@ -69,38 +84,59 @@ class ShowSyncClient(BaseSyncClient[Show, ShowSection]):
             return None
 
     def _process_season(
-        self, show: Show, season: Season, show_review: Optional[str], animapping: AniMap
+        self,
+        show: Show,
+        season: Season,
+        animapping: AniMap,
+        anilist_media: AniListMedia,
     ) -> None:
+        for attr in (
+            "_pab__review",
+            "_pab__onDeck",
+            "_pab__onContinueWatching",
+            "_pab__isDropped",
+        ):
+            setattr(season, attr, None)
+
         season_offset = animapping.tvdb_epoffset or 0
 
-        season_episodes = self._get_filtered_episodes(season, season_offset)
-
-        if all(not episode.isPlayed for episode in season_episodes):
+        if season.viewedLeafCount == 0:
             log.debug(
-                f"{self.__class__.__name__}: No watched episodes found for show '{show.title}' "
-                f"season {season.index}. Skipping"
+                f"{self.__class__.__name__}: Season {season.index} has no watched episodes for show '{show.title}'. Skipping"
             )
-            return
 
-        # Find corresponding AniList media
-        anilist_media = self._find_anilist_media_by_ids(show.title, animapping)
-        if not anilist_media:
-            return
-
-        # Further filter episodes based on AniList episode count if available
         if anilist_media.episodes:
-            episodes = self._filter_episodes_by_count(
-                season_episodes, anilist_media.episodes, season_offset
+            episodes = season.episodes(
+                filters={
+                    "index>>=": season_offset,
+                    "index<=": season_offset + anilist_media.episodes,
+                }
             )
-        self._sync_media_data((show, season, episodes), anilist_media, show_review)
+        else:
+            episodes = season.episodes(index__gt=season_offset)
 
-    def _get_filtered_episodes(self, season: Season, offset: int) -> list[Episode]:
-        return season.episodes(index__gt=offset)
+        season_review = self.plex_client.get_user_review(season)
+        continue_watching_episodes = self.plex_client.get_continue_watching(season)
 
-    def _filter_episodes_by_count(
-        self, episodes: list[Episode], total_episodes: int, offset: int
-    ) -> list[Episode]:
-        return [e for e in episodes if e.index <= total_episodes + offset]
+        setattr(season, "_pab_review", season_review)
+        setattr(
+            season,
+            "_pab__onContinueWatching",
+            any(e in episodes for e in continue_watching_episodes),
+        )
+        setattr(season, "_pab__onDeck", season.onDeck() in episodes)
+        setattr(
+            season,
+            "_pab__isDropped",
+            (
+                not season._pab__onContinueWatching
+                and len(episodes) >= anilist_media.episodes
+                and len(episodes) < season.leafCount
+                and any(e.isPlayed for e in episodes)
+            ),
+        )
+
+        self._sync_media_data((show, season, episodes), anilist_media)
 
     def _determine_watch_status(
         self,
@@ -109,67 +145,43 @@ class ShowSyncClient(BaseSyncClient[Show, ShowSection]):
     ) -> Optional[AniListMediaListStatus]:
         show, season, episodes = media_tuple
 
-        last_watched_episode: Episode = max(
-            (e for e in episodes if e.isPlayed),
-            key=lambda e: e.lastViewedAt,
-            default=None,
-        )
-
-        on_deck = False
-        on_deck_episode: Episode = season.onDeck()
-        if on_deck_episode in episodes:
-            on_deck = True
-
-        was_dropped = False
-        if (
-            not on_deck
-            and last_watched_episode != episodes[-1]
-            and last_watched_episode.lastViewedAt
-            > datetime.now() - timedelta(weeks=self.plex_client.on_deck_window)
-        ):
-            was_dropped = True
-
         watched_episodes = [e for e in episodes if e.isPlayed]
 
-        if on_deck:
+        if season._pab__onContinueWatching:
             return AniListMediaListStatus.CURRENT
-        elif watched_episodes and len(watched_episodes) >= anilist_media.episodes:
+        elif len(watched_episodes) >= anilist_media.episodes:
             return AniListMediaListStatus.COMPLETED
-        elif was_dropped:
+        elif show._pab__onWatchList and season._pab__isDropped:
+            return AniListMediaListStatus.PAUSED
+        elif season._pab__isDropped:
             return AniListMediaListStatus.DROPPED
-        elif show.onWatchlist():
+        elif show._pab__onWatchList:
             return AniListMediaListStatus.PLANNING
         else:
             return None
 
     def _get_plex_season_data(
         self,
-        show: Show,
-        season: Season,
-        episodes: list[Episode],
+        media_tuple: tuple[Show, Season, list[Episode]],
         anilist_media: AniListMedia,
-        show_review: Optional[str],
     ) -> dict[str, Any]:
+        show, season, episodes = media_tuple
+
         return {
-            "status": self._determine_watch_status(
-                (show, season, episodes), anilist_media
-            ),
+            "status": self._determine_watch_status(media_tuple, anilist_media),
             "score": season.userRating,
-            "progress": sum(1 for e in episodes if e.viewCount),
-            "notes": self.plex_client.get_user_review(season) or show_review,
+            "progress": sum(1 for e in episodes if e.isPlayed),
+            "notes": season._pab__review or show._pab__review,
         }
 
     def _sync_media_data(
         self,
         media_tuple: tuple[Show, Season, list[Episode]],
         anilist_media: AniListMedia,
-        show_review: Optional[str] = None,
     ) -> None:
         show, season, episodes = media_tuple
 
-        plex_data = self._get_plex_season_data(
-            show, season, episodes, anilist_media, show_review
-        )
+        plex_data = self._get_plex_season_data(media_tuple, anilist_media)
         anilist_data = self._get_anilist_media_data(anilist_media)
 
         # Create sync update using base class helper

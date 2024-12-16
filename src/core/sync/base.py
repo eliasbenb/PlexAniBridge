@@ -1,5 +1,7 @@
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from datetime import datetime
+from functools import lru_cache
 from typing import Any, Generic, Optional, TypeVar
 
 from thefuzz import fuzz
@@ -11,6 +13,13 @@ from src.models.animap import AniMap
 
 T = TypeVar("T")  # Generic type for media item
 S = TypeVar("S")  # Generic type for section
+
+
+@dataclass(frozen=True)
+class MediaSearchKey:
+    title: str
+    anilist_id: Optional[int]
+    mal_id: Optional[int]
 
 
 class BaseSyncClient(ABC, Generic[T, S]):
@@ -28,6 +37,10 @@ class BaseSyncClient(ABC, Generic[T, S]):
         self.destructive_sync = destructive_sync
         self.fuzzy_search_threshold = fuzzy_search_threshold
 
+        self._find_anilist_media_by_ids_cached = lru_cache(maxsize=32)(
+            self._find_anilist_media_by_ids
+        )
+
     def sync_media(self, section: S, last_synced: Optional[datetime] = None) -> None:
         log.debug(
             f"{self.__class__.__name__}: Syncing media in section '{section.title}'"
@@ -37,7 +50,13 @@ class BaseSyncClient(ABC, Generic[T, S]):
         log.debug(f"{self.__class__.__name__}: Found {len(media_items)} items to sync")
 
         for item in media_items:
-            self._process_media_item(item)
+            try:
+                self._process_media_item(item)
+            except Exception as e:
+                log.error(
+                    f"{self.__class__.__name__}: Error processing media item with title '{item.title}'",
+                    exc_info=e,
+                )
 
     @abstractmethod
     def _get_media_to_sync(
@@ -68,20 +87,37 @@ class BaseSyncClient(ABC, Generic[T, S]):
 
         return formatted_guids
 
-    def _find_anilist_media_by_ids(
+    def find_anilist_media_by_ids(
         self, title: str, animapping: AniMap
     ) -> Optional[AniListMedia]:
+        """Wrapper method that creates a cache key and calls the cached implementation."""
+        # Create an immutable cache key from the search parameters
+        cache_key = MediaSearchKey(
+            title=title,
+            anilist_id=animapping.anilist_id[0] if animapping.anilist_id else None,
+            mal_id=animapping.mal_id[0] if animapping.mal_id else None,
+        )
+        return self._find_anilist_media_by_ids_cached(cache_key)
+
+    def _find_anilist_media_by_ids(
+        self, cache_key: MediaSearchKey
+    ) -> Optional[AniListMedia]:
+        """Implementation of the media search logic, now using the cache key."""
         try:
-            if animapping.anilist_id:
-                return self.anilist_client.get_anime(animapping.anilist_id[0])
-            elif animapping.mal_id:
+            if cache_key.anilist_id:
+                return self.anilist_client.get_anime(cache_key.anilist_id)
+            elif cache_key.mal_id:
                 log.debug(
-                    f"{self.__class__.__name__}: No AniList ID found for '{title}'. "
-                    f"Attempting to search AniList for the MAL ID {animapping.mal_id}"
+                    f"{self.__class__.__name__}: No AniList ID found for '{cache_key.title}'. "
+                    f"Attempting to search AniList for the MAL ID {cache_key.mal_id}"
                 )
-                return self.anilist_client.get_anime(mal_id=animapping.mal_id[0])
+                return self.anilist_client.get_anime(mal_id=cache_key.mal_id)
         except Exception as e:
-            log.error(f"{self.__class__.__name__}: Error finding anime: {e}")
+            log.error(
+                f"{self.__class__.__name__}: Error finding anime with "
+                f"{f'AniList ID {cache_key.anilist_id}' if cache_key.anilist_id else f'MAL ID {cache_key.mal_id}' if cache_key.mal_id else f'title {cache_key.title}'}",
+                exc_info=e,
+            )
             return None
         return None
 
@@ -170,7 +206,7 @@ class BaseSyncClient(ABC, Generic[T, S]):
             anilist_value = anilist_data.get(field)
 
             if self.destructive_sync is True:
-                if plex_value is not None and plex_value != anilist_value:
+                if plex_value and plex_value != anilist_value:
                     to_sync[field] = plex_value
                 continue
 
@@ -181,7 +217,6 @@ class BaseSyncClient(ABC, Generic[T, S]):
             elif (
                 field == "progress"
                 and plex_value is not None
-                and plex_value > 0
                 and plex_value > (anilist_value or 0)
             ):
                 to_sync[field] = plex_value
