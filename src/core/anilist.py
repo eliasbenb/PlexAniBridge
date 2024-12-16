@@ -5,11 +5,11 @@ import requests
 
 from src import log
 from src.models.anilist import (
-    AnilistFuzzyDate,
-    AnilistMedia,
-    AnilistMediaList,
-    AnilistMediaStatus,
-    AnilistMediaWithRelations,
+    AniListFuzzyDate,
+    AniListMedia,
+    AniListMediaList,
+    AniListMediaStatus,
+    AniListMediaWithRelations,
 )
 from src.utils.rate_limitter import RateLimiter
 
@@ -42,7 +42,7 @@ class AniListClient:
             log.warning(
                 f"{self.__class__.__name__}: Rate limit exceeded, waiting {retry_after} seconds"
             )
-            sleep(retry_after)
+            sleep(retry_after + 1)
             return self.__make_request(query, variables)
 
         response.raise_for_status()
@@ -64,13 +64,13 @@ class AniListClient:
     def update_anime_entry(
         self,
         media_id: int,
-        status: Optional[AnilistMediaStatus] = None,
+        status: Optional[AniListMediaStatus] = None,
         score: Optional[float] = None,
         progress: Optional[int] = None,
         repeat: Optional[int] = None,
         notes: Optional[str] = None,
-        started_at: Optional[AnilistFuzzyDate] = None,
-        completed_at: Optional[AnilistFuzzyDate] = None,
+        started_at: Optional[AniListFuzzyDate] = None,
+        completed_at: Optional[AniListFuzzyDate] = None,
     ) -> dict:
         variables = {
             "mediaId": media_id,
@@ -86,29 +86,31 @@ class AniListClient:
         variables = {k: v for k, v in variables.items() if v is not None}
 
         log.debug(
-            f"{self.__class__.__name__}: Updating anime entry with variables: {variables}"
+            f"{self.__class__.__name__}: Updating anime entry {{media_id: {media_id}}} with variables: {variables}"
         )
 
         query = f"""
         mutation ($mediaId: Int, $status: MediaListStatus, $score: Float, $progress: Int, $repeat: Int, $notes: String, $startedAt: FuzzyDateInput, $completedAt: FuzzyDateInput) {{
             SaveMediaListEntry(mediaId: $mediaId, status: $status, score: $score, progress: $progress, repeat: $repeat, notes: $notes, startedAt: $startedAt, completedAt: $completedAt) {{
-                {AnilistMediaList.as_graphql()}
+                {AniListMediaList.as_graphql()}
             }}
         }}
         """
 
         if self.dry_run:
-            log.info(f"{self.__class__.__name__}: Dry run enabled, skipping request")
+            log.info(
+                f"{self.__class__.__name__}: Dry run enabled, skipping list entry update for {{media_id: {media_id}}} with variables: {variables}"
+            )
             return {}
         else:
             return self.__make_request(query, variables)["data"]["SaveMediaListEntry"]
 
-    def search_anime(self, search_str: str, limit: int = 10) -> list[AnilistMedia]:
+    def search_anime(self, search_str: str, limit: int = 10) -> list[AniListMedia]:
         query = f"""
         query ($search: String, $limit: Int) {{
             Page(perPage: $limit) {{
                 media(search: $search, type: ANIME) {{
-                    {AnilistMedia.as_graphql()}
+                    {AniListMedia.as_graphql()}
                 }}
             }}
         }}
@@ -119,14 +121,14 @@ class AniListClient:
         )
 
         response = self.__make_request(query, {"search": search_str, "limit": limit})
-        return [AnilistMedia(**media) for media in response["data"]["Page"]["media"]]
+        return [AniListMedia(**media) for media in response["data"]["Page"]["media"]]
 
     def get_anime(
         self,
         anilist_id: Optional[int] = None,
         mal_id: Optional[int] = None,
         relations: Optional[bool] = False,
-    ) -> Union[AnilistMedia, AnilistMediaWithRelations]:
+    ) -> Union[AniListMedia, AniListMediaWithRelations]:
         if anilist_id is None and mal_id is None:
             raise ValueError("Either an AniList ID or a MAL ID must be provided")
 
@@ -136,7 +138,7 @@ class AniListClient:
         query = f"""
         query ($id: Int) {{
             Media({id_type}: $id, type: ANIME) {{
-                {AnilistMediaWithRelations.as_graphql() if relations else AnilistMedia.as_graphql()}
+                {AniListMediaWithRelations.as_graphql() if relations else AniListMedia.as_graphql()}
             }}
         }}
         """
@@ -145,6 +147,6 @@ class AniListClient:
 
         response = self.__make_request(query, {"id": media_id})
         if relations:
-            return AnilistMediaWithRelations(**response["data"]["Media"])
+            return AniListMediaWithRelations(**response["data"]["Media"])
         else:
-            return AnilistMedia(**response["data"]["Media"])
+            return AniListMedia(**response["data"]["Media"])

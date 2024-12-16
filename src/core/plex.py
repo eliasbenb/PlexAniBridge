@@ -4,7 +4,7 @@ import requests
 from plexapi import BASE_HEADERS
 from plexapi.library import MovieSection, ShowSection
 from plexapi.server import PlexServer
-from plexapi.video import Movie, Show
+from plexapi.video import Movie, Show, Season
 
 from src import log
 
@@ -17,7 +17,7 @@ class PlexClient:
 
         self.client = PlexServer(self.plex_url, self.plex_token)
         self.__validate_sections()
-        self.weeks_to_consider_continue_watching = self.__get_on_deck_window()
+        self.on_deck_window = self.__get_on_deck_window()
 
     def __validate_sections(self) -> None:
         log.debug(f"{self.__class__.__name__}: Validating configured sections")
@@ -41,7 +41,7 @@ class PlexClient:
         log.debug(f"{self.__class__.__name__}: All sections are valid")
 
     def __get_on_deck_window(self) -> int:
-        return self.client.settings.get("OnDeckWindow")
+        return self.client.settings.get("OnDeckWindow").value
 
     def get_section(self, section_name: str) -> Union[MovieSection, ShowSection]:
         log.debug(f"{self.__class__.__name__}: Getting section '{section_name}'")
@@ -67,7 +67,7 @@ class PlexClient:
         section = self.get_section(section_name)
         return section.all()
 
-    def get_user_review(self, item: Union[Movie, Show]) -> Optional[str]:
+    def get_user_review(self, item: Union[Movie, Show, Season]) -> Optional[str]:
         log.debug(f"{self.__class__.__name__}: Getting reviews for item '{item.title}'")
 
         query = """
@@ -116,6 +116,9 @@ class PlexClient:
         if not data or "message" not in data:
             return None
         return data["message"]
+
+    def is_on_deck(self, item: Union[Movie, Show]) -> bool:
+        return self.client.library.onDeck(item) is not None
 
     def is_movie(self, item: Union[Movie, Show]) -> bool:
         return isinstance(item, (Movie, MovieSection))

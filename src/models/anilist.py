@@ -1,17 +1,16 @@
-from datetime import datetime
 from enum import Enum
 from typing import Optional
 
 from pydantic import BaseModel
 
 
-class AnilistBaseModel(BaseModel):
+class AniListBaseModel(BaseModel):
     @staticmethod
     def as_graphql() -> str:
         raise NotImplementedError
 
 
-class AnilistPageInfo(AnilistBaseModel):
+class AniListPageInfo(AniListBaseModel):
     total: Optional[int]
     perPage: Optional[int]
     currentPage: Optional[int]
@@ -31,7 +30,7 @@ class AnilistPageInfo(AnilistBaseModel):
         """
 
 
-class AnilistMediaStatus(Enum):
+class AniListMediaStatus(Enum):
     FINISHED = "FINISHED"
     RELEASING = "RELEASING"
     NOT_YET_RELEASED = "NOT_YET_RELEASED"
@@ -39,12 +38,12 @@ class AnilistMediaStatus(Enum):
     HIATUS = "HIATUS"
 
 
-class AnilistMediaType(Enum):
+class AniListMediaType(Enum):
     ANIME = "ANIME"
     MANGA = "MANGA"
 
 
-class AnilistMediaTitle(AnilistBaseModel):
+class AniListMediaTitle(AniListBaseModel):
     romaji: Optional[str]
     english: Optional[str]
     native: Optional[str]
@@ -63,7 +62,7 @@ class AnilistMediaTitle(AnilistBaseModel):
         )
 
 
-class AnilistFuzzyDate(AnilistBaseModel):
+class AniListFuzzyDate(AniListBaseModel):
     year: Optional[int]
     month: Optional[int]
     day: Optional[int]
@@ -76,7 +75,7 @@ class AnilistFuzzyDate(AnilistBaseModel):
         day
         """
 
-    def __eq__(self, other: "AnilistFuzzyDate") -> bool:
+    def __eq__(self, other: "AniListFuzzyDate") -> bool:
         return (
             self.year == other.year
             and self.month == other.month
@@ -84,7 +83,7 @@ class AnilistFuzzyDate(AnilistBaseModel):
         )
 
 
-class AnilistMediaListStatus(Enum):
+class AniListMediaListStatus(Enum):
     _ignore_ = ["__priority"]
 
     CURRENT = "CURRENT"
@@ -103,32 +102,35 @@ class AnilistMediaListStatus(Enum):
         "PLANNING": 5,
     }
 
-    def __eq__(self, other: "AnilistMediaListStatus") -> bool:
+    def __eq__(self, other: "AniListMediaListStatus") -> bool:
         return self.__priority[self.value] == self.__priority[other.value]
 
-    def __lt__(self, other: "AnilistMediaListStatus") -> bool:
+    def __ne__(self, other: "AniListMediaListStatus") -> bool:
+        return self.__priority[self.value] != self.__priority[other.value]
+
+    def __lt__(self, other: "AniListMediaListStatus") -> bool:
         return self.__priority[self.value] > self.__priority[other.value]
 
-    def __le__(self, other: "AnilistMediaListStatus") -> bool:
+    def __le__(self, other: "AniListMediaListStatus") -> bool:
         return self.__priority[self.value] >= self.__priority[other.value]
 
-    def __gt__(self, other: "AnilistMediaListStatus") -> bool:
+    def __gt__(self, other: "AniListMediaListStatus") -> bool:
         return self.__priority[self.value] < self.__priority[other.value]
 
-    def __ge__(self, other: "AnilistMediaListStatus") -> bool:
+    def __ge__(self, other: "AniListMediaListStatus") -> bool:
         return self.__priority[self.value] <= self.__priority[other.value]
 
 
-class AnilistMediaList(AnilistBaseModel):
+class AniListMediaList(AniListBaseModel):
     id: int
     mediaId: int
-    status: AnilistMediaListStatus
+    status: AniListMediaListStatus
     score: Optional[float]
     progress: Optional[int]
     repeat: Optional[int]
     notes: Optional[str]
-    startedAt: AnilistFuzzyDate
-    completedAt: AnilistFuzzyDate
+    startedAt: AniListFuzzyDate
+    completedAt: AniListFuzzyDate
 
     @staticmethod
     def as_graphql() -> str:
@@ -141,25 +143,25 @@ class AnilistMediaList(AnilistBaseModel):
         repeat
         notes
         startedAt {{
-            {AnilistFuzzyDate.as_graphql()}
+            {AniListFuzzyDate.as_graphql()}
         }}
         completedAt {{
-            {AnilistFuzzyDate.as_graphql()}
+            {AniListFuzzyDate.as_graphql()}
         }}
         """
 
 
-class AnilistMedia(AnilistBaseModel):
+class AniListMedia(AniListBaseModel):
     id: int
     idMal: Optional[int]
-    title: AnilistMediaTitle
-    type: AnilistMediaType
-    status: AnilistMediaStatus
-    startDate: AnilistFuzzyDate
-    endDate: AnilistFuzzyDate
+    title: AniListMediaTitle
+    type: AniListMediaType
+    status: AniListMediaStatus
+    startDate: AniListFuzzyDate
+    endDate: AniListFuzzyDate
     seasonYear: Optional[int]
     episodes: Optional[int]
-    mediaListEntry: Optional[AnilistMediaList]
+    mediaListEntry: Optional[AniListMediaList]
 
     @property
     def best_title(self) -> str:
@@ -170,57 +172,57 @@ class AnilistMedia(AnilistBaseModel):
         return f"""
         id
         idMal
-        {AnilistMediaTitle.as_graphql()}
+        {AniListMediaTitle.as_graphql()}
         type
         status
         startDate {{
-            {AnilistFuzzyDate.as_graphql()}
+            {AniListFuzzyDate.as_graphql()}
         }}
         endDate {{
-            {AnilistFuzzyDate.as_graphql()}
+            {AniListFuzzyDate.as_graphql()}
         }}
         seasonYear
         episodes
         mediaListEntry {{
-            {AnilistMediaList.as_graphql()}
+            {AniListMediaList.as_graphql()}
         }}
         """
 
 
-class AnilistMediaEdge(AnilistBaseModel):
-    node: AnilistMedia
+class AniListMediaEdge(AniListBaseModel):
+    node: AniListMedia
 
     @staticmethod
     def as_graphql() -> str:
         return f"""
         node {{
-            {AnilistMedia.as_graphql()}
+            {AniListMedia.as_graphql()}
         }}
         """
 
 
-class AnilistMediaConnection(AnilistBaseModel):
-    nodes: Optional[list[AnilistMedia]]
-    pageInfo: Optional[AnilistPageInfo]
+class AniListMediaConnection(AniListBaseModel):
+    nodes: Optional[list[AniListMedia]]
+    pageInfo: Optional[AniListPageInfo]
 
     @staticmethod
     def as_graphql() -> str:
         return f"""
         nodes {{
-            {AnilistMedia.as_graphql()}
+            {AniListMedia.as_graphql()}
         }}
-        {AnilistPageInfo.as_graphql()}
+        {AniListPageInfo.as_graphql()}
         """
 
 
-class AnilistMediaWithRelations(AnilistMedia):
-    relations: AnilistMediaConnection
+class AniListMediaWithRelations(AniListMedia):
+    relations: AniListMediaConnection
 
     @staticmethod
     def as_graphql() -> str:
         return f"""
-        {AnilistMedia.as_graphql()}
+        {AniListMedia.as_graphql()}
         relations{{
-            {AnilistMediaConnection.as_graphql()}
+            {AniListMediaConnection.as_graphql()}
         }}
         """

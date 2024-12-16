@@ -78,14 +78,14 @@ python main.py
 - [x] Sync rating scores
 - [x] Sync text-based reviews/notes
 - [x] Sync status (watching, completed, dropped, paused, planning)
+- [x] Sync start/end dates
+- [x] Sync repeat count
 - [x] Partial scanning, only consider items added/updated/rated since last sync
 - [x] Scheduled sync jobs
 - [x] Match anime with Kometa mappings
 - [x] Match anime with titles
 - [x] Docker support
-- [ ] Destructive sync (fully replace AniList data to match Plex regardless of existing data)
-- [ ] Sync start/end dates
-- [ ] Sync repeat count
+- [x] Destructive sync (fully replace AniList data to match Plex regardless of existing data)
 - [ ] Special/OVA/ONA support
 - [ ] Cache AniList responses to avoid rate limits
 - [ ] Use AniList relations for better and quicker matching

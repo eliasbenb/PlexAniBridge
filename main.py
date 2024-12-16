@@ -21,6 +21,7 @@ def run():
         dry_run=config.DRY_RUN,
         fuzzy_search_threshold=config.FUZZY_SEARCH_THRESHOLD,
     )
+
     bridge.sync()
 
 
