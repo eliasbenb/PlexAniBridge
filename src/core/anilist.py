@@ -69,8 +69,8 @@ class AniListClient:
         score: Optional[float] = None,
         progress: Optional[int] = None,
         notes: Optional[str] = None,
-        started_at: Optional[datetime] = None,
-        completed_at: Optional[datetime] = None,
+        started_at: Optional[AnilistFuzzyDate] = None,
+        completed_at: Optional[AnilistFuzzyDate] = None,
     ) -> dict:
         variables = {
             "mediaId": media_id,
@@ -78,16 +78,8 @@ class AniListClient:
             "score": score,
             "progress": progress,
             "notes": notes,
-            "startedAt": AnilistFuzzyDate(
-                year=started_at.year, month=started_at.month, day=started_at.day
-            ).model_dump()
-            if started_at
-            else None,
-            "completedAt": AnilistFuzzyDate(
-                year=completed_at.year, month=completed_at.month, day=completed_at.day
-            ).model_dump()
-            if completed_at
-            else None,
+            "startedAt": started_at.model_dump() if started_at else None,
+            "completedAt": completed_at.model_dump() if completed_at else None,
         }
 
         variables = {k: v for k, v in variables.items() if v is not None}

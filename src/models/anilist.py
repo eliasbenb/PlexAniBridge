@@ -73,13 +73,11 @@ class AnilistFuzzyDate(AnilistBaseModel):
         day
         """
 
-    def to_datetime(self) -> Optional[datetime]:
-        if self.year is None:
-            return None
-        return datetime(
-            year=self.year,
-            month=self.month or 1,
-            day=self.day or 1,
+    def __eq__(self, other: "AnilistFuzzyDate") -> bool:
+        return (
+            self.year == other.year
+            and self.month == other.month
+            and self.day == other.day
         )
 
 

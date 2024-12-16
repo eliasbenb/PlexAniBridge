@@ -10,7 +10,7 @@ from thefuzz import fuzz
 
 from src import log
 from src.core import AniListClient, AniMapClient, PlexClient
-from src.models.anilist import AnilistMedia, AnilistMediaListStatus
+from src.models.anilist import AnilistMedia, AnilistMediaListStatus, AnilistFuzzyDate
 from src.models.housekeeping import Housekeeping
 
 from .db import db
@@ -194,16 +194,8 @@ class BridgeClient:
             anilist_rating = anilist_media.mediaListEntry.score or None
             anilist_repeat = anilist_media.mediaListEntry.repeat or None
             anilist_notes = anilist_media.mediaListEntry.notes or None
-            anilist_start_date = (
-                anilist_media.mediaListEntry.startedAt.to_datetime()
-                if anilist_media.mediaListEntry.startedAt
-                else None
-            )
-            anilist_end_date = (
-                anilist_media.mediaListEntry.completedAt.to_datetime()
-                if anilist_media.mediaListEntry.completedAt
-                else None
-            )
+            anilist_start_date = anilist_media.mediaListEntry.startedAt or None
+            anilist_end_date = anilist_media.mediaListEntry.completedAt or None
 
         plex_status = (
             AnilistMediaListStatus.COMPLETED
@@ -227,8 +219,10 @@ class BridgeClient:
 
         watch_history: list[MovieHistory] = movie.history()
         if watch_history:
-            plex_start_date: Optional[datetime] = watch_history[0].viewedAt
-            plex_end_date: Optional[datetime] = watch_history[-1].viewedAt
+            d1 = watch_history[0].viewedAt
+            d2 = watch_history[-1].viewedAt
+            plex_start_date = AnilistFuzzyDate(year=d1.year, month=d1.month, day=d1.day)
+            plex_end_date = AnilistFuzzyDate(year=d2.year, month=d2.month, day=d2.day)
         else:
             plex_start_date = None
             plex_end_date = None
