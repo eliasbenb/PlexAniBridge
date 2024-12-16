@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Optional
 
 from plexapi.library import MovieSection
@@ -18,9 +18,8 @@ class MovieSyncClient(BaseSyncClient[Movie, MovieSection]):
     def _get_media_to_sync(
         self, section: MovieSection, last_synced: Optional[datetime]
     ) -> list[Movie]:
-        if last_synced:  # We're able to do a partial scan
+        if last_synced is not None:
             return section.search(
-                # Filter movies that have been updated, viewed, or rated since the last sync
                 filters={
                     "or": [
                         {"updatedAt>>=": last_synced},
@@ -29,49 +28,55 @@ class MovieSyncClient(BaseSyncClient[Movie, MovieSection]):
                     ]
                 }
             )
-        return section.all()  # Otherwise, we need to do a full scan
+        return section.all()
 
     def _process_media_item(self, movie: Movie) -> None:
-        title: str = movie.title
+        for attr in ("_pab__review", "_pab__onWatchList"):
+            setattr(movie, attr, None)
+
         guids = self._format_guids(movie.guids, is_movie=True)
 
-        anilist_media = self._find_anilist_media(title, guids)
-        if anilist_media:
-            self._sync_media_data(movie, anilist_media)
+        anilist_media = self._find_anilist_media(movie, guids)
 
-    def _find_anilist_media(self, title: str, guids: dict) -> Optional[AniListMedia]:
-        animappings = self.animap_client.get_mappings(**guids)  # Search by GUIDs first
+        if anilist_media is None:
+            return
 
-        if not animappings:  # Fallback to searching by title
-            return self._search_by_title(title, episode_count=1)  # Movies are 1 episode
+        self._sync_media_data(movie, anilist_media)
 
-        animapping = animappings[0]  # The first mapping is typically the correct one
-        if len(animappings) > 1:
-            log.debug(
-                f"{self.__class__.__name__}: Multiple mappings found for movie '{title}', using the first one"
-            )
+    def _find_anilist_media(self, movie: Movie, guids: dict) -> Optional[AniListMedia]:
+        animappings = self.animap_client.get_mappings(**guids)
 
-        anilist_media = self.find_anilist_media_by_ids(title, animapping)
-        return (
-            anilist_media
-            if anilist_media
-            else self._search_by_title(title, episode_count=1)
+        if len(animappings) == 0:
+            return self._search_by_title(movie.title, episode_count=1)
+
+        animapping = animappings[0]
+        log.debug(
+            f"{self.__class__.__name__}: Multiple mappings found for movie '{movie.title}', using the first one"
         )
 
-    def _determine_watch_status(self, movie: Movie) -> Optional[AniListMediaListStatus]:
-        on_deck = self.plex_client.is_on_deck(movie)
-        was_dropped = False
-        if not on_deck and movie.lastViewedAt > datetime.now() - timedelta(
-            weeks=self.plex_client.on_deck_window
-        ):
-            was_dropped = True
+        anilist_media = self.find_anilist_media_by_ids(
+            movie.title, animapping
+        ) or self._search_by_title(movie.title, episode_count=1)
 
-        if movie.isPlayed:
+        return anilist_media
+
+    def _determine_watch_status(self, movie: Movie) -> Optional[AniListMediaListStatus]:
+        on_watchlist = movie.onWatchlist()
+        on_continue_watching = self.plex_client.get_continue_watching(movie)
+        is_dropped = not on_continue_watching and movie.viewOffset > 0
+
+        if movie.isPlayed and on_continue_watching:
+            return AniListMediaListStatus.REPEATING
+        elif on_continue_watching:
+            return AniListMediaListStatus.PAUSED
+        elif movie.isPlayed:
             return AniListMediaListStatus.COMPLETED
-        elif movie.onWatchlist():
-            return AniListMediaListStatus.PLANNING
-        elif was_dropped:
+        elif on_watchlist and is_dropped:
+            return AniListMediaListStatus.PAUSED
+        elif is_dropped:
             return AniListMediaListStatus.DROPPED
+        elif on_watchlist:
+            return AniListMediaListStatus.PLANNING
         else:
             return None
 
@@ -89,7 +94,7 @@ class MovieSyncClient(BaseSyncClient[Movie, MovieSection]):
         return {
             "status": self._determine_watch_status(movie),
             "score": movie.userRating,
-            "progress": 1 if movie.viewCount >= 1 else 0,
+            "progress": 1 if movie.isPlayed else None,
             "repeat": movie.viewCount - 1 if movie.viewCount > 1 else None,
             "notes": self.plex_client.get_user_review(movie),
             "start_date": start_date,
