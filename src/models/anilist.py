@@ -51,13 +51,16 @@ class AnilistMediaTitle(AnilistBaseModel):
 
     @staticmethod
     def as_graphql() -> str:
-        return """
+        return (
+            """
         title {
-            romaji
+            romaji"""
+            """
             english
             native
         }
         """
+        )
 
 
 class AnilistFuzzyDate(AnilistBaseModel):

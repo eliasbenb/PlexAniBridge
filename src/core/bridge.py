@@ -10,7 +10,7 @@ from thefuzz import fuzz
 
 from src import log
 from src.core import AniListClient, AniMapClient, PlexClient
-from src.models.anilist import AnilistMedia, AnilistMediaListStatus, AnilistFuzzyDate
+from src.models.anilist import AnilistFuzzyDate, AnilistMedia, AnilistMediaListStatus
 from src.models.housekeeping import Housekeeping
 
 from .db import db

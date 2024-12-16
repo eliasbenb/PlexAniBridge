@@ -1,5 +1,6 @@
-from sqlmodel import Field, SQLModel, JSON
 from typing import Optional
+
+from sqlmodel import JSON, Field, SQLModel
 
 
 class AniMap(SQLModel, table=True):
