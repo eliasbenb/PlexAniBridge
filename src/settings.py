@@ -19,7 +19,7 @@ class Config(BaseSettings):
 
     # Advanced
     DB_PATH: Optional[str] = "db/plexanibridge.db"
-    DRY_RUN: Optional[bool] = True
+    DRY_RUN: Optional[bool] = False
     LOG_LEVEL: Optional[str] = "INFO"
     FUZZY_SEARCH_THRESHOLD: Optional[int] = 90
 

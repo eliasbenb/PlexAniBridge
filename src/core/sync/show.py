@@ -32,19 +32,18 @@ class ShowSyncClient(BaseSyncClient[Show, ShowSection]):
         for attr in ("_pab__review", "_pab__onWatchList"):
             setattr(show, attr, None)
 
-        title: str = show.title
         guids = self._format_guids(show.guids, is_movie=False)
 
         animappings = self.animap_client.get_mappings(**guids)
 
         if len(animappings) == 0:
             log.debug(
-                f"{self.__class__.__name__}: No mappings found for show '{title}'"
+                f"{self.__class__.__name__}: No mappings found for show '{show.title}'"
             )
             return
 
         log.debug(
-            f"{self.__class__.__name__}: Found {len(animappings)} mappings for show '{title}' "
+            f"{self.__class__.__name__}: Found {len(animappings)} mappings for show '{show.title}' "
             f"{{anidb_id: {[am.anidb_id for am in animappings]}}}"
         )
 
