@@ -17,6 +17,7 @@ class PlexClient:
 
         self.client = PlexServer(self.plex_url, self.plex_token)
         self.__validate_sections()
+        self.weeks_to_consider_continue_watching = self.__get_on_deck_window()
 
     def __validate_sections(self) -> None:
         log.debug(f"{self.__class__.__name__}: Validating configured sections")
@@ -38,6 +39,9 @@ class PlexClient:
                 )
 
         log.debug(f"{self.__class__.__name__}: All sections are valid")
+
+    def __get_on_deck_window(self) -> int:
+        return self.client.settings.get("OnDeckWindow")
 
     def get_section(self, section_name: str) -> Union[MovieSection, ShowSection]:
         log.debug(f"{self.__class__.__name__}: Getting section '{section_name}'")
