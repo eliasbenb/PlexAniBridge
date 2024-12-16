@@ -68,6 +68,7 @@ class AniListClient:
         status: Optional[AnilistMediaStatus] = None,
         score: Optional[float] = None,
         progress: Optional[int] = None,
+        repeat: Optional[int] = None,
         notes: Optional[str] = None,
         started_at: Optional[AnilistFuzzyDate] = None,
         completed_at: Optional[AnilistFuzzyDate] = None,
@@ -77,6 +78,7 @@ class AniListClient:
             "status": status.value if status else None,
             "score": score,
             "progress": progress,
+            "repeat": repeat,
             "notes": notes,
             "startedAt": started_at.model_dump() if started_at else None,
             "completedAt": completed_at.model_dump() if completed_at else None,
@@ -89,8 +91,8 @@ class AniListClient:
         )
 
         query = f"""
-        mutation ($mediaId: Int, $status: MediaListStatus, $score: Float, $progress: Int, $notes: String, $startedAt: FuzzyDateInput, $completedAt: FuzzyDateInput) {{
-            SaveMediaListEntry(mediaId: $mediaId, status: $status, score: $score, progress: $progress, notes: $notes, startedAt: $startedAt, completedAt: $completedAt) {{
+        mutation ($mediaId: Int, $status: MediaListStatus, $score: Float, $progress: Int, $repeat: Int, $notes: String, $startedAt: FuzzyDateInput, $completedAt: FuzzyDateInput) {{
+            SaveMediaListEntry(mediaId: $mediaId, status: $status, score: $score, progress: $progress, repeat: $repeat, notes: $notes, startedAt: $startedAt, completedAt: $completedAt) {{
                 {AnilistMediaList.as_graphql()}
             }}
         }}

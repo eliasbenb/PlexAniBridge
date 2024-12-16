@@ -254,6 +254,11 @@ class BridgeClient:
                 f"{self.__class__.__name__}: Syncing Plex's rating with AniList for movie '{movie.title}' {{anilist_id: {anilist_media.id}}} (Plex: {plex_rating} -> AniList: {anilist_rating})"
             )
             to_sync["score"] = plex_rating
+        if plex_repeat is not None and plex_repeat > anilist_repeat:
+            log.debug(
+                f"{self.__class__.__name__}: Syncing Plex's repeat count with AniList for movie '{movie.title}' {{anilist_id: {anilist_media.id}}} (Plex: {plex_repeat} -> AniList: {anilist_repeat})"
+            )
+            to_sync["repeat"] = plex_repeat
         if plex_notes and plex_notes != anilist_notes:
             log.debug(
                 f"{self.__class__.__name__}: Syncing Plex's review/notes with AniList for movie '{movie.title}' {{anilist_id: {anilist_media.id}}} (Plex: '{plex_notes}' -> AniList: '{anilist_notes}')"
