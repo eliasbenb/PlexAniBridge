@@ -51,7 +51,6 @@ python main.py
   - When syncing items, the script typically only updates fields on AniList that are less than the corresponding fields on Plex. With `DESTRUCTIVE_SYNC` enabled, the script will fully replace the data on AniList with the data on Plex.
   - For example, if the watch progress on AniList is greater than the watch progress on Plex, the progress on AniList will be lowered to match the progress on Plex.
   - Not recommended unless you know what you're doing.
-  - Still in development.
 - `*ANILIST_TOKEN`: AniList API access token [get one here](https://anilist.co/login?apiVersion=v2&client_id=23079&response_type=token)
 - `*PLEX_URL`: URL to your Plex server (default: `http://localhost:32400`)
 - `*PLEX_TOKEN`: Plex API access token [get one here](https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/)
@@ -86,8 +85,8 @@ python main.py
 - [x] Match anime with titles
 - [x] Docker support
 - [x] Destructive sync (fully replace AniList data to match Plex regardless of existing data)
+- [x] Cache AniList responses to avoid rate limits
 - [ ] Special/OVA/ONA support
-- [ ] Cache AniList responses to avoid rate limits
 - [ ] Use AniList relations for better and quicker matching
 
 ## Special Thanks/Dependencies
