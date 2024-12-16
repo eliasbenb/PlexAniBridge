@@ -1,3 +1,4 @@
+from datetime import datetime
 from enum import Enum
 from typing import Optional
 
@@ -71,6 +72,15 @@ class AnilistFuzzyDate(AnilistBaseModel):
         month
         day
         """
+
+    def to_datetime(self) -> Optional[datetime]:
+        if self.year is None:
+            return None
+        return datetime(
+            year=self.year,
+            month=self.month or 1,
+            day=self.day or 1,
+        )
 
 
 class AnilistMediaListStatus(Enum):

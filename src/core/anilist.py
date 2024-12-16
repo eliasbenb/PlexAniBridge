@@ -1,3 +1,4 @@
+from datetime import datetime
 from time import sleep
 from typing import Optional, Union
 
@@ -5,6 +6,7 @@ import requests
 
 from src import log
 from src.models.anilist import (
+    AnilistFuzzyDate,
     AnilistMedia,
     AnilistMediaList,
     AnilistMediaStatus,
@@ -67,6 +69,8 @@ class AniListClient:
         score: Optional[float] = None,
         progress: Optional[int] = None,
         notes: Optional[str] = None,
+        started_at: Optional[datetime] = None,
+        completed_at: Optional[datetime] = None,
     ) -> dict:
         variables = {
             "mediaId": media_id,
@@ -74,6 +78,16 @@ class AniListClient:
             "score": score,
             "progress": progress,
             "notes": notes,
+            "startedAt": AnilistFuzzyDate(
+                year=started_at.year, month=started_at.month, day=started_at.day
+            ).model_dump()
+            if started_at
+            else None,
+            "completedAt": AnilistFuzzyDate(
+                year=completed_at.year, month=completed_at.month, day=completed_at.day
+            ).model_dump()
+            if completed_at
+            else None,
         }
 
         variables = {k: v for k, v in variables.items() if v is not None}
@@ -83,8 +97,8 @@ class AniListClient:
         )
 
         query = f"""
-        mutation ($mediaId: Int, $status: MediaListStatus, $score: Float, $progress: Int, $notes: String) {{
-            SaveMediaListEntry(mediaId: $mediaId, status: $status, score: $score, progress: $progress, notes: $notes) {{
+        mutation ($mediaId: Int, $status: MediaListStatus, $score: Float, $progress: Int, $notes: String, $startedAt: FuzzyDateInput, $completedAt: FuzzyDateInput) {{
+            SaveMediaListEntry(mediaId: $mediaId, status: $status, score: $score, progress: $progress, notes: $notes, startedAt: $startedAt, completedAt: $completedAt) {{
                 {AnilistMediaList.as_graphql()}
             }}
         }}
