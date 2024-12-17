@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel
 
@@ -78,11 +78,54 @@ class AniListFuzzyDate(AniListBaseModel):
         day
         """
 
-    def __eq__(self, other: "AniListFuzzyDate") -> bool:
+    def __lt__(self, other: Optional["AniListFuzzyDate"]) -> bool:
+        if other is None:
+            return False
+        return (
+            self.year < other.year or self.month < other.month or self.day < other.day
+        )
+
+    def __le__(self, other: Optional["AniListFuzzyDate"]) -> bool:
+        if other is None:
+            return False
+        return (
+            self.year <= other.year
+            or self.month <= other.month
+            or self.day <= other.day
+        )
+
+    def __gt__(self, other: Optional["AniListFuzzyDate"]) -> bool:
+        if other is None:
+            return True
+        return (
+            self.year > other.year or self.month > other.month or self.day > other.day
+        )
+
+    def __ge__(self, other: Optional["AniListFuzzyDate"]) -> bool:
+        if other is None:
+            return True
+        return (
+            self.year >= other.year
+            or self.month >= other.month
+            or self.day >= other.day
+        )
+
+    def __eq__(self, other) -> bool:
+        if not isinstance(other, AniListFuzzyDate):
+            return False
         return (
             self.year == other.year
             and self.month == other.month
             and self.day == other.day
+        )
+
+    def __ne__(self, other: Any) -> bool:
+        if not isinstance(other, AniListFuzzyDate):
+            return True
+        return (
+            self.year != other.year
+            or self.month != other.month
+            or self.day != other.day
         )
 
 
@@ -117,6 +160,16 @@ class AniListMediaListStatus(Enum):
 
     def __ge__(self, other: "AniListMediaListStatus") -> bool:
         return self.__priority[self.value] <= self.__priority[other.value]
+
+    def __eq__(self, other: Any) -> bool:
+        if isinstance(other, AniListMediaListStatus):
+            return self.value == other.value
+        return self.value == other
+
+    def __ne__(self, other: Any) -> bool:
+        if isinstance(other, AniListMediaListStatus):
+            return self.value != other.value
+        return self.value != other
 
 
 class AniListMediaList(AniListBaseModel):
