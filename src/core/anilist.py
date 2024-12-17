@@ -142,6 +142,37 @@ class AniListClient:
         else:
             return self.__make_request(query, variables)["data"]["SaveMediaListEntry"]
 
+    def delete_anime_entry(self, media_id: int) -> dict:
+        """Deletes an anime entry on the authenticated user's list
+
+        Args:
+            media_id (int): The AniList ID of the anime
+
+        Returns:
+            dict: The deleted anime entry
+        """
+        variables = {"id": media_id}
+
+        log.debug(
+            f"{self.__class__.__name__}: Deleting anime entry with variables: {variables}"
+        )
+
+        query = """
+        mutation ($id: Int) {
+            DeleteMediaListEntry(id: $id) {
+                deleted
+            }
+        }
+        """
+
+        if self.dry_run:
+            log.info(
+                f"{self.__class__.__name__}: Dry run enabled, skipping anime entry deletion with variables: {variables}"
+            )
+            return {}
+
+        return self.__make_request(query, variables)["data"]["DeleteMediaListEntry"]
+
     def search_anime(self, search_str: str, limit: int = 10) -> list[AniListMedia]:
         """Searches for anime on AniList
 
