@@ -224,10 +224,7 @@ class BaseSyncClient(ABC, Generic[T, S]):
         for field in fields:
             plex_value = plex_data.get(field)
             anilist_value = anilist_data.get(field)
-            to_sync[field] = (
-                plex_value
-                if self._should_update_field(field, plex_value, anilist_value)
-                else None
-            )
+            if self._should_update_field(field, plex_value, anilist_value):
+                to_sync[field] = plex_value
 
-        return {k: v for k, v in to_sync.items() if v is not None}
+        return to_sync
