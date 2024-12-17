@@ -49,6 +49,8 @@ class BaseSyncClient(ABC, Generic[T, S]):
         media_items = self._get_media_to_sync(section, last_synced)
         log.debug(f"{self.__class__.__name__}: Found {len(media_items)} items to sync")
 
+        success_count = 0
+        failure_count = 0
         for item in media_items:
             type_str = (
                 "movie"
@@ -62,11 +64,18 @@ class BaseSyncClient(ABC, Generic[T, S]):
             )
             try:
                 self._process_media_item(item)
+                success_count += 1
             except Exception as e:
                 log.error(
-                    f"{self.__class__.__name__}: Error processing media item with title '{item.title}'",
+                    f"{self.__class__.__name__}: Error processing {type_str} '{item.title}' {{plex_id: {item.guid}}}",
                     exc_info=e,
                 )
+                failure_count += 1
+
+        log.info(
+            f"{self.__class__.__name__}: Synced {success_count}/{len(media_items)} {type_str}s successfully "
+            f"with {failure_count} failures for section '{section.title}' {{section_key: {section.key}}}"
+        )
 
     @abstractmethod
     def _get_media_to_sync(
