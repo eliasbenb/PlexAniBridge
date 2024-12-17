@@ -99,7 +99,7 @@ class ShowSyncClient(BaseSyncClient[Show, ShowSection]):
 
         season_offset = animapping.tvdb_epoffset or 0
 
-        if season.viewedLeafCount == 0:
+        if season.viewedLeafCount == 0 and not self.destructive_sync:
             log.debug(
                 f"{self.__class__.__name__}: Season {season.index} has no watched episodes for show '{show.title}'. Skipping"
             )
