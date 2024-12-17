@@ -86,7 +86,7 @@ class AniListClient:
         variables = {k: v for k, v in variables.items() if v is not None}
 
         log.debug(
-            f"{self.__class__.__name__}: Updating anime entry {{media_id: {media_id}}} with variables: {variables}"
+            f"{self.__class__.__name__}: Updating anime entry with variables: {variables}"
         )
 
         query = f"""
@@ -99,7 +99,7 @@ class AniListClient:
 
         if self.dry_run:
             log.info(
-                f"{self.__class__.__name__}: Dry run enabled, skipping list entry update for {{media_id: {media_id}}} with variables: {variables}"
+                f"{self.__class__.__name__}: Dry run enabled, skipping anime entry update with variables: {variables}"
             )
             return {}
         else:

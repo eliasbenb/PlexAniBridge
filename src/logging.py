@@ -1,5 +1,4 @@
 import logging
-from datetime import datetime
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
@@ -53,10 +52,7 @@ def setup_logger(log_name: str, log_level: str, log_dir: str):
             datefmt="%Y-%m-%d %H:%M:%S",
         )
 
-        log_file = (
-            log_path
-            / f'{log_name}.{"." if log_level_literal == logging.INFO else f"{log_level}."}{datetime.now().strftime("%Y%m%d")}.log'
-        )
+        log_file = log_path / f"{log_name}.{log_level}.log"
         file_handler = RotatingFileHandler(
             log_file,
             maxBytes=10 * 1024 * 1024,  # 10MB
