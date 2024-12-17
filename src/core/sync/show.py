@@ -183,7 +183,14 @@ class ShowSyncClient(BaseSyncClient[Show, ShowSection]):
         plex_data = self._get_plex_season_data(media_tuple, anilist_media)
         anilist_data = self._get_anilist_media_data(anilist_media)
 
-        # Create sync update using base class helper
+        if (
+            self.destructive_sync is True
+            and plex_data["status"] is None
+            and anilist_media.mediaListEntry is not None
+        ):
+            self.anilist_client.delete_anime_entry(anilist_media.mediaListEntry.id)
+            return
+
         to_sync = self._create_sync_update(
             plex_data, anilist_data, fields=["status", "score", "progress", "notes"]
         )

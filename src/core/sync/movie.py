@@ -108,6 +108,14 @@ class MovieSyncClient(BaseSyncClient[Movie, MovieSection]):
         plex_data = self._get_plex_movie_data(movie)
         anilist_data = self._get_anilist_media_data(anilist_media)
 
+        if (
+            self.destructive_sync is True
+            and plex_data["status"] is None
+            and anilist_media.mediaListEntry is not None
+        ):
+            self.anilist_client.delete_anime_entry(anilist_media.mediaListEntry.id)
+            return
+
         to_sync = self._create_sync_update(
             plex_data,
             anilist_data,
