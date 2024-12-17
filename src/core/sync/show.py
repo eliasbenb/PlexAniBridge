@@ -176,7 +176,7 @@ class ShowSyncClient(BaseSyncClient[Show, ShowSection]):
         return {
             "status": status,
             "score": season.userRating,
-            "progress": sum(1 for e in episodes if e.isPlayed),
+            "progress": sum(1 for e in episodes if e.isPlayed) or None,
             "repeat": repeat,
             "notes": season._pab__review or show._pab__review,
         }
