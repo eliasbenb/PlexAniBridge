@@ -91,7 +91,10 @@ class BridgeClient:
 
     def sync(self) -> None:
         log.info(
-            f"{self.__class__.__name__}: Starting sync between Plex and AniList libraries"
+            f"{self.__class__.__name__}: Starting "
+            f"{'partial ' if self.partial_scan else ''}"
+            f"{'destructive ' if self.destructive_sync else ''}"
+            f"sync between Plex and AniList libraries"
         )
 
         tmp_last_synced = datetime.now()

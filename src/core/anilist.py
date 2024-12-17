@@ -69,8 +69,8 @@ class AniListClient:
         progress: Optional[int] = None,
         repeat: Optional[int] = None,
         notes: Optional[str] = None,
-        started_at: Optional[AniListFuzzyDate] = None,
-        completed_at: Optional[AniListFuzzyDate] = None,
+        start_date: Optional[AniListFuzzyDate] = None,
+        end_date: Optional[AniListFuzzyDate] = None,
     ) -> dict:
         variables = {
             "mediaId": media_id,
@@ -79,8 +79,8 @@ class AniListClient:
             "progress": progress,
             "repeat": repeat,
             "notes": notes,
-            "startedAt": started_at.model_dump() if started_at else None,
-            "completedAt": completed_at.model_dump() if completed_at else None,
+            "startedAt": start_date.model_dump() if start_date else None,
+            "completedAt": end_date.model_dump() if end_date else None,
         }
 
         variables = {k: v for k, v in variables.items() if v is not None}
