@@ -128,10 +128,6 @@ class MovieSyncClient(BaseSyncClient[Movie, MovieSection]):
             plex_data,
             anilist_data,
             fields=["status", "score", "repeat", "notes", "start_date", "end_date"],
-            additional_conditions={
-                "start_date": plex_data["start_date"] is not None,
-                "end_date": plex_data["end_date"] is not None,
-            },
         )
 
         if len(to_sync) > 0:

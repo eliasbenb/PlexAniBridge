@@ -185,19 +185,23 @@ class BaseSyncClient(ABC, Generic[T, S]):
             "end_date": entry.completedAt,
         }
 
-    def _should_update_status(
-        self,
-        plex_status: Optional[AniListMediaListStatus],
-        anilist_status: Optional[AniListMediaListStatus],
-    ) -> bool:
-        return (
-            self.destructive_sync is True
-            or plex_status is not None
-            and (
-                (anilist_status is not None and plex_status > anilist_status)
-                or anilist_status is None
+    def _should_update_field(self, field: str, plex_val: Any, anilist_val: Any) -> bool:
+        NE_FILDS = {"score", "notes"}
+        GT_FIELDS = {"status", "progress", "repeat", "start_date", "end_date"}
+        LT_FIELDS = {}
+
+        if field in NE_FILDS:
+            return (self.destructive_sync is True and plex_val != anilist_val) or (
+                plex_val is not None and plex_val != anilist_val
             )
-        )
+        elif field in GT_FIELDS:
+            return (self.destructive_sync is True and plex_val != anilist_val) or (
+                plex_val is not None and plex_val > anilist_val
+            )
+        elif field in LT_FIELDS:
+            return (self.destructive_sync is True and plex_val != anilist_val) or (
+                plex_val is not None and plex_val < anilist_val
+            )
 
     @abstractmethod
     def _determine_watch_status(
@@ -214,43 +218,16 @@ class BaseSyncClient(ABC, Generic[T, S]):
         plex_data: dict,
         anilist_data: dict,
         fields: list[str],
-        additional_conditions: dict = None,
     ) -> dict:
         to_sync = {}
-
-        if additional_conditions is None:
-            additional_conditions = {}
 
         for field in fields:
             plex_value = plex_data.get(field)
             anilist_value = anilist_data.get(field)
+            to_sync[field] = (
+                plex_value
+                if self._should_update_field(field, plex_value, anilist_value)
+                else None
+            )
 
-            if self.destructive_sync is True:
-                if plex_value and plex_value != anilist_value:
-                    to_sync[field] = plex_value
-                continue
-
-            if field == "status" and self._should_update_status(
-                plex_value, anilist_value
-            ):
-                to_sync[field] = plex_value
-            elif (
-                field == "progress"
-                and plex_value is not None
-                and plex_value > (anilist_value or 0)
-            ):
-                to_sync[field] = plex_value
-            elif (
-                field == "repeat"
-                and plex_value is not None
-                and plex_value > (anilist_value or 0)
-            ):
-                to_sync[field] = plex_value
-            elif (
-                plex_value is not None
-                and plex_value != anilist_value
-                and additional_conditions.get(field, True)
-            ):
-                to_sync[field] = plex_value
-
-        return to_sync
+        return {k: v for k, v in to_sync.items() if v is not None}
