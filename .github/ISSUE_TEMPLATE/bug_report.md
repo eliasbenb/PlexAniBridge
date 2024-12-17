@@ -33,7 +33,7 @@ If applicable, paste a trace logs/screenshots to help explain your problem. Plea
 > [!IMPORTANT]  
 > Do NOT share any secret keys/tokens
 
-**Environment (how are you running PlexAniBridge):
+**Environment (how are you running PlexAniBridge):**
 
 - OS (Ubuntu 24.04)
 - Docker [y/N]
