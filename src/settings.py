@@ -21,7 +21,6 @@ class Config(BaseSettings):
     # Advanced
     DB_PATH: Optional[str] = "db/plexanibridge.db"
     DRY_RUN: Optional[bool] = False
-    # in logging.getLevelNamesMapping().keys()
     LOG_LEVEL: Optional[str] = Field(
         "INFO", pattern="^(DEBUG|INFO|WARNING|ERROR|CRITICAL)$"
     )
@@ -31,6 +30,13 @@ class Config(BaseSettings):
         env_file = ".env"
 
     def __str__(self) -> str:
+        """Return a string representation of the config
+
+        Used to log the configuration before the program starts
+
+        Returns:
+            str: The string representation of the config
+        """
         secrets = ["ANILIST_TOKEN", "PLEX_TOKEN"]
         return ", ".join(
             [

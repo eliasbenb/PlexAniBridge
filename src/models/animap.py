@@ -4,6 +4,8 @@ from sqlmodel import JSON, Field, SQLModel
 
 
 class AniMap(SQLModel, table=True):
+    """Model for the animap table"""
+
     __tablename__ = "animap"
 
     anidb_id: int = Field(primary_key=True)

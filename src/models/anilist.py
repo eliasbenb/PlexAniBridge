@@ -5,8 +5,11 @@ from pydantic import BaseModel
 
 
 class AniListBaseModel(BaseModel):
+    """Base, abstract class for all AniList models to represent GraphQL objects"""
+
     @staticmethod
     def as_graphql() -> str:
+        """Return the GraphQL query string for the model"""
         raise NotImplementedError
 
 
@@ -93,6 +96,7 @@ class AniListMediaListStatus(Enum):
     PAUSED = "PAUSED"
     REPEATING = "REPEATING"
 
+    # A lower priority value means a higher priority/precedence
     __priority = {
         "REPEATING": 0,
         "COMPLETED": 1,
@@ -159,7 +163,8 @@ class AniListMedia(AniListBaseModel):
 
     @property
     def best_title(self) -> str:
-        return self.title.english or self.title.romaji or self.title.native
+        """Return the first available title in the order of English, Romaji, and Native"""
+        return self.title.english or self.title.romaji or self.title.native or ""
 
     @staticmethod
     def as_graphql() -> str:

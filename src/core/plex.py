@@ -12,7 +12,7 @@ from src import log
 
 @dataclass(frozen=True)
 class ReviewKey:
-    """Immutable class for creating cache keys for reviews."""
+    """Key used to cache API responses for user reviews"""
 
     rating_key: str
     item_type: str
@@ -21,7 +21,9 @@ class ReviewKey:
 
 
 class PlexClient:
-    def __init__(self, plex_url: str, plex_token: str, plex_sections: list[str]):
+    def __init__(
+        self, plex_url: str, plex_token: str, plex_sections: list[str]
+    ) -> None:
         self.plex_url = plex_url
         self.plex_token = plex_token
         self.plex_sections = plex_sections
@@ -32,6 +34,15 @@ class PlexClient:
         self._get_user_review_cached = lru_cache(maxsize=32)(self._get_user_review)
 
     def __validate_sections(self) -> None:
+        """Does basic validation of the configured Plex sections
+
+        The function checks if the configured sections:
+            1. Exist in the Plex server
+            2. Are of type 'movie' or 'show'
+
+        Raises:
+            ValueError: If any of the sections are invalid
+        """
         log.debug(f"{self.__class__.__name__}: Validating configured sections")
 
         sections = self.client.library.sections()
@@ -52,34 +63,33 @@ class PlexClient:
 
         log.debug(f"{self.__class__.__name__}: All sections are valid")
 
-    def get_section(self, section_name: str) -> Union[MovieSection, ShowSection]:
-        log.debug(f"{self.__class__.__name__}: Getting section '{section_name}'")
-        section = self.client.library.section(section_name)
-        if section.title not in self.plex_sections:
-            raise ValueError(
-                f"Section '{section_name}' was not set in the `PLEX_SECTIONS` config"
-            )
-        return section
-
     def get_sections(self) -> Union[list[MovieSection], list[ShowSection]]:
+        """Get all Plex sections that are configured
+
+        Returns:
+            Union[list[MovieSection], list[ShowSection]]: List of configured Plex sections
+        """
         log.debug(f"{self.__class__.__name__}: Getting all sections")
+
         return [
             section
             for section in self.client.library.sections()
             if section.title in self.plex_sections
         ]
 
-    def get_section_items(self, section_name: str) -> Union[list[Movie], list[Show]]:
-        log.debug(
-            f"{self.__class__.__name__}: Getting items from section '{section_name}'"
-        )
-        section = self.get_section(section_name)
-        return section.all()
-
     def get_user_review(self, item: Union[Movie, Show, Season]) -> Optional[str]:
+        """Get the user review for a movie or show
+
+        Args:
+            item (Union[Movie, Show, Season]): The target item
+
+        Returns:
+            Optional[str]: The user review or None if not found
+        """
         if item.type not in ("movie", "show"):
             return None
 
+        # To avoid making multiple requests for the same item, we cache the responses in an LRU cache
         cache_key = ReviewKey(
             rating_key=str(item.ratingKey),
             item_type=item.type,
@@ -87,9 +97,18 @@ class PlexClient:
             guid=item.guid,
         )
 
+        # We use the cached version if it exists or otherwise call `_get_user_review()`
         return self._get_user_review_cached(cache_key)
 
     def _get_user_review(self, cache_key: ReviewKey) -> Optional[str]:
+        """Get the user review for a movie or show cachelessly
+
+        Args:
+            cache_key (ReviewKey): The unique key to cache the response
+
+        Returns:
+            Optional[str]: The user review or None if not found
+        """
         query = """
         query GetReview($metadataID: ID!) {
             metadataReviewV2(metadata: {id: $metadataID}) {
@@ -154,6 +173,14 @@ class PlexClient:
     def get_continue_watching(
         self, item: Union[Movie, Season]
     ) -> Union[list[Movie], list[Episode]]:
+        """Get the items that are in the 'Continue Watching' hub for a movie or season
+
+        Args:
+            item (Union[Movie, Season]): The target item
+
+        Returns:
+            Union[list[Movie], list[Episode]]: The item(s) related to the target item that are in the 'Continue Watching' hub
+        """
         if item.type == "movie":
             return self.client.fetchItems(
                 "/hubs/continueWatching/items", ratingKey=item.ratingKey
@@ -166,4 +193,12 @@ class PlexClient:
             return []
 
     def is_on_deck(self, item: Union[Movie, Show]) -> bool:
+        """Check if a movie or show is on the 'On Deck' hub
+
+        Args:
+            item (Union[Movie, Show]): The target item
+
+        Returns:
+            bool: True if the item is on the 'On Deck' hub, False otherwise
+        """
         return self.client.library.onDeck(item) is not None
