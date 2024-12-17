@@ -2,8 +2,9 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
 from functools import lru_cache
-from typing import Any, Generic, Optional, TypeVar
+from typing import Any, Generic, Optional, TypeVar, Union
 
+from plexapi.media import Guid
 from thefuzz import fuzz
 
 from src import log
@@ -83,7 +84,9 @@ class BaseSyncClient(ABC, Generic[T, S]):
     def _process_media_item(self, media_item: T) -> None:
         pass
 
-    def _format_guids(self, guids: list, is_movie: bool = True) -> dict[str, Any]:
+    def _format_guids(
+        self, guids: list[Guid], is_movie: bool = True
+    ) -> dict[str, Optional[Union[int, str]]]:
         formatted_guids = {
             "tmdb_movie_id": None,
             "tmdb_show_id": None,

@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Union
 
 from plexapi.library import MovieSection
 from plexapi.video import Movie, MovieHistory
@@ -43,7 +43,9 @@ class MovieSyncClient(BaseSyncClient[Movie, MovieSection]):
 
         self._sync_media_data(movie, anilist_media)
 
-    def _find_anilist_media(self, movie: Movie, guids: dict) -> Optional[AniListMedia]:
+    def _find_anilist_media(
+        self, movie: Movie, guids: dict[str, Optional[Union[int, str]]]
+    ) -> Optional[AniListMedia]:
         animappings = self.animap_client.get_mappings(**guids)
 
         if len(animappings) == 0:
