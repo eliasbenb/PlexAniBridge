@@ -28,7 +28,6 @@ class PlexClient:
 
         self.client = PlexServer(self.plex_url, self.plex_token)
         self.__validate_sections()
-        self.on_deck_window = self.__get_on_deck_window()
 
         self._get_user_review_cached = lru_cache(maxsize=32)(self._get_user_review)
 
@@ -52,9 +51,6 @@ class PlexClient:
                 )
 
         log.debug(f"{self.__class__.__name__}: All sections are valid")
-
-    def __get_on_deck_window(self) -> int:
-        return self.client.settings.get("OnDeckWindow").value
 
     def get_section(self, section_name: str) -> Union[MovieSection, ShowSection]:
         log.debug(f"{self.__class__.__name__}: Getting section '{section_name}'")
