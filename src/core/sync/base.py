@@ -106,7 +106,6 @@ class BaseSyncClient(ABC, Generic[T, S]):
         self, title: str, animapping: AniMap
     ) -> Optional[AniListMedia]:
         """Wrapper method that creates a cache key and calls the cached implementation."""
-        # Create an immutable cache key from the search parameters
         cache_key = MediaSearchKey(
             title=title,
             anilist_id=animapping.anilist_id[0] if animapping.anilist_id else None,
@@ -188,9 +187,13 @@ class BaseSyncClient(ABC, Generic[T, S]):
         plex_status: Optional[AniListMediaListStatus],
         anilist_status: Optional[AniListMediaListStatus],
     ) -> bool:
-        return plex_status is not None and (
-            (anilist_status is not None and plex_status > anilist_status)
-            or anilist_status is None
+        return (
+            self.destructive_sync is True
+            or plex_status is not None
+            and (
+                (anilist_status is not None and plex_status > anilist_status)
+                or anilist_status is None
+            )
         )
 
     @abstractmethod

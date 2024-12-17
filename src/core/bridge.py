@@ -130,6 +130,7 @@ class BridgeClient:
         log.info(
             f"{self.__class__.__name__}: Starting "
             f"{'partial ' if self.partial_scan else ''}"
+            f"{'and ' if self.partial_scan and self.destructive_sync else ''}"
             f"{'destructive ' if self.destructive_sync else ''}"
             f"sync between Plex and AniList libraries"
         )
