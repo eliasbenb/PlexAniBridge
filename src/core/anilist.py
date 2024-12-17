@@ -129,8 +129,9 @@ class AniListClient:
         mal_id: Optional[int] = None,
         relations: Optional[bool] = False,
     ) -> Union[AniListMedia, AniListMediaWithRelations]:
-        media_id = anilist_id or mal_id
-        id_type = "id" if anilist_id else "idMal"
+        media_id = anilist_id or mal_id or None
+        id_type = "id" if anilist_id else "idMal" if mal_id else None
+        id_type_str = "anilist_id" if anilist_id else "mal_id" if mal_id else None
 
         if not media_id:
             raise ValueError("Either an AniList ID or a MAL ID must be provided")
@@ -144,7 +145,7 @@ class AniListClient:
         """
 
         log.debug(
-            f"{self.__class__.__name__}: Getting anime with {'AniList' if anilist_id else 'MAL'} ID '{media_id}'"
+            f"{self.__class__.__name__}: Getting anime data from AniList {{{id_type_str}: {media_id}}}"
         )
 
         response = self.__make_request(query, {id_type: media_id})

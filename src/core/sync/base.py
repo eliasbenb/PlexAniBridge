@@ -50,6 +50,16 @@ class BaseSyncClient(ABC, Generic[T, S]):
         log.debug(f"{self.__class__.__name__}: Found {len(media_items)} items to sync")
 
         for item in media_items:
+            type_str = (
+                "movie"
+                if section.type == "movie"
+                else "show"
+                if section.type == "show"
+                else "media"
+            )
+            log.debug(
+                f"{self.__class__.__name__}: Processing {type_str} '{item.title}' {{plex_id: {item.guid}}}"
+            )
             try:
                 self._process_media_item(item)
             except Exception as e:
@@ -105,7 +115,7 @@ class BaseSyncClient(ABC, Generic[T, S]):
         """Implementation of the media search logic, now using the cache key."""
         try:
             if cache_key.anilist_id:
-                return self.anilist_client.get_anime(cache_key.anilist_id)
+                return self.anilist_client.get_anime(anilist_id=cache_key.anilist_id)
             elif cache_key.mal_id:
                 log.debug(
                     f"{self.__class__.__name__}: No AniList ID found for '{cache_key.title}'. "
@@ -114,11 +124,10 @@ class BaseSyncClient(ABC, Generic[T, S]):
                 return self.anilist_client.get_anime(mal_id=cache_key.mal_id)
         except Exception as e:
             log.error(
-                f"{self.__class__.__name__}: Error finding anime with "
+                f"{self.__class__.__name__}: Error finding '{cache_key.title}' using "
                 f"{f'AniList ID {cache_key.anilist_id}' if cache_key.anilist_id else f'MAL ID {cache_key.mal_id}' if cache_key.mal_id else f'title {cache_key.title}'}",
                 exc_info=e,
             )
-            return None
         return None
 
     def _search_by_title(

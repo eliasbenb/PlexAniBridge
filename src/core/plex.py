@@ -16,6 +16,7 @@ class ReviewKey:
 
     rating_key: str
     item_type: str
+    title: str
     guid: str
 
 
@@ -84,7 +85,10 @@ class PlexClient:
             return None
 
         cache_key = ReviewKey(
-            rating_key=str(item.ratingKey), item_type=item.type, guid=item.guid
+            rating_key=str(item.ratingKey),
+            item_type=item.type,
+            title=item.title,
+            guid=item.guid,
         )
 
         return self._get_user_review_cached(cache_key)
@@ -115,7 +119,7 @@ class PlexClient:
         }
 
         log.debug(
-            f"{self.__class__.__name__}: Getting reviews for item with Plex GUID '{guid}'"
+            f"{self.__class__.__name__}: Getting reviews for '{cache_key.title}' {{plex_id: {cache_key.guid}}}"
         )
 
         try:

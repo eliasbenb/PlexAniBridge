@@ -51,7 +51,8 @@ class MovieSyncClient(BaseSyncClient[Movie, MovieSection]):
 
         animapping = animappings[0]
         log.debug(
-            f"{self.__class__.__name__}: Multiple mappings found for movie '{movie.title}', using the first one"
+            f"{self.__class__.__name__}: Found mapping for movie '{movie.title}' "
+            f"{{plex_id: {movie.guid}, anidb_id: {animapping.anidb_id}}}"
         )
 
         anilist_media = self.find_anilist_media_by_ids(

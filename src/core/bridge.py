@@ -107,7 +107,7 @@ class BridgeClient:
         log.info(f"{self.__class__.__name__}: Sync completed successfully")
 
     def _sync_section(self, section: Union[MovieSection, ShowSection]) -> None:
-        log.debug(f"{self.__class__.__name__}: Processing section '{section.title}'")
+        log.debug(f"{self.__class__.__name__}: Syncing section '{section.title}'")
 
         last_synced = self.last_synced if self._should_perform_partial_scan() else None
 
