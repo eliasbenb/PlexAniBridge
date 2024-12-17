@@ -12,7 +12,7 @@ def run() -> None:
         # General
         partial_scan=config.PARTIAL_SCAN,
         destructive_sync=config.DESTRUCTIVE_SYNC,
-        # Anilist
+        # AniList
         anilist_token=config.ANILIST_TOKEN,
         # Plex
         plex_url=config.PLEX_URL,

@@ -10,7 +10,7 @@ class Config(BaseSettings):
     PARTIAL_SCAN: Optional[bool] = True
     DESTRUCTIVE_SYNC: Optional[bool] = False
 
-    # Anilist
+    # AniList
     ANILIST_TOKEN: str
 
     # Plex

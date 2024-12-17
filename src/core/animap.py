@@ -15,7 +15,7 @@ from .db import db
 class AniMapClient:
     """Client for managing the AniMap database (Kometa's anime ID mapping)
 
-    The AniMap database allows for mapping between Anilist IDs and other sources, including TVDB and IMDB.
+    The AniMap database allows for mapping between AniList IDs and other sources, including TVDB and IMDB.
     This class is responsible for syncing the local database with the CDN source and querying the database.
 
     Mapping Source: https://github.com/Kometa-Team/Anime-IDs/

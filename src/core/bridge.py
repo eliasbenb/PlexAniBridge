@@ -24,7 +24,7 @@ class BridgeClient:
         # General
         partial_scan: bool,
         destructive_sync: bool,
-        # Anilist
+        # AniList
         anilist_token: str,
         # Plex
         plex_url: str,
