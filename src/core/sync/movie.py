@@ -86,13 +86,21 @@ class MovieSyncClient(BaseSyncClient[Movie, MovieSection]):
     def _get_plex_movie_data(self, movie: Movie) -> dict:
         watch_history: list[MovieHistory] = movie.history()
 
-        start_date = None
-        end_date = None
+        start_date: Optional[AniListFuzzyDate] = None
+        end_date: Optional[AniListFuzzyDate] = None
         if watch_history:
-            d1 = watch_history[0].viewedAt
-            d2 = watch_history[-1].viewedAt
-            start_date = AniListFuzzyDate(year=d1.year, month=d1.month, day=d1.day)
-            end_date = AniListFuzzyDate(year=d2.year, month=d2.month, day=d2.day)
+            first_viewed_at = watch_history[0].viewedAt
+            last_viewed_at = watch_history[-1].viewedAt
+            start_date = AniListFuzzyDate(
+                year=first_viewed_at.year,
+                month=first_viewed_at.month,
+                day=first_viewed_at.day,
+            )
+            end_date = AniListFuzzyDate(
+                year=last_viewed_at.year,
+                month=last_viewed_at.month,
+                day=last_viewed_at.day,
+            )
 
         return {
             "status": self._determine_watch_status(movie),
@@ -126,11 +134,9 @@ class MovieSyncClient(BaseSyncClient[Movie, MovieSection]):
             },
         )
 
-        if to_sync:
+        if len(to_sync) > 0:
             self.anilist_client.update_anime_entry(
-                anilist_media.id,
-                progress=1,  # Movies always have progress=1 when watched
-                **to_sync,
+                anilist_media.id, progress=1, **to_sync
             )
             log.info(
                 f"{self.__class__.__name__}: Synced Plex {' and '.join(to_sync.keys())} "

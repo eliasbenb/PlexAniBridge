@@ -166,10 +166,18 @@ class ShowSyncClient(BaseSyncClient[Show, ShowSection]):
     ) -> dict[str, Any]:
         show, season, episodes = media_tuple
 
+        status = self._determine_watch_status(media_tuple, anilist_media)
+        repeat = None
+        if status == AniListMediaListStatus.REPEATING:
+            min_view_count = min(e.viewCount for e in episodes)
+            if min_view_count is not None:
+                repeat = min_view_count - 1 if min_view_count > 0 else 0
+
         return {
-            "status": self._determine_watch_status(media_tuple, anilist_media),
+            "status": status,
             "score": season.userRating,
             "progress": sum(1 for e in episodes if e.isPlayed),
+            "repeat": repeat,
             "notes": season._pab__review or show._pab__review,
         }
 
@@ -178,7 +186,7 @@ class ShowSyncClient(BaseSyncClient[Show, ShowSection]):
         media_tuple: tuple[Show, Season, list[Episode]],
         anilist_media: AniListMedia,
     ) -> None:
-        show, season, episodes = media_tuple
+        show, season, _ = media_tuple
 
         plex_data = self._get_plex_season_data(media_tuple, anilist_media)
         anilist_data = self._get_anilist_media_data(anilist_media)
@@ -192,10 +200,12 @@ class ShowSyncClient(BaseSyncClient[Show, ShowSection]):
             return
 
         to_sync = self._create_sync_update(
-            plex_data, anilist_data, fields=["status", "score", "progress", "notes"]
+            plex_data,
+            anilist_data,
+            fields=["status", "score", "progress", "repeat", "notes"],
         )
 
-        if len(to_sync):
+        if len(to_sync) > 0:
             self.anilist_client.update_anime_entry(anilist_media.id, **to_sync)
             log.info(
                 f"{self.__class__.__name__}: Synced Plex {' and '.join(to_sync.keys())} "
