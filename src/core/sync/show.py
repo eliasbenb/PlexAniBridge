@@ -33,8 +33,8 @@ class ShowSyncClient(BaseSyncClient[Show, ShowSection]):
 
         show_review = self.plex_client.get_user_review(show)
 
-        setattr(show, "_pab__review", show_review)
-        setattr(show, "_pab__onWatchList", show.onWatchlist())
+        show._pab__review = show_review
+        show._pab__onWatchList = show.onWatchlist()
 
         for animapping in animappings:
             self._process_show_mapping(show, animapping)
@@ -99,22 +99,16 @@ class ShowSyncClient(BaseSyncClient[Show, ShowSection]):
         season_review = self.plex_client.get_user_review(season)
         continue_watching_episodes = self.plex_client.get_continue_watching(season)
 
-        setattr(season, "_pab_review", season_review)
-        setattr(
-            season,
-            "_pab__onContinueWatching",
-            any(e in episodes for e in continue_watching_episodes),
+        season._pab_review = season_review
+        season._pab__onContinueWatching = any(
+            e in episodes for e in continue_watching_episodes
         )
-        setattr(season, "_pab__onDeck", season.onDeck() in episodes)
-        setattr(
-            season,
-            "_pab__isDropped",
-            (
-                not season._pab__onContinueWatching
-                and len(episodes) >= anilist_media.episodes
-                and len(episodes) < season.leafCount
-                and any(e.isPlayed for e in episodes)
-            ),
+        season._pab__onDeck = season.onDeck() in episodes
+        season._pab__isDropped = (
+            not season._pab__onContinueWatching
+            and len(episodes) >= anilist_media.episodes
+            and len(episodes) < season.leafCount
+            and any(e.isPlayed for e in episodes)
         )
 
         self._sync_media_data((show, season, episodes), anilist_media)
