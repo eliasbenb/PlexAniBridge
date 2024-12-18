@@ -67,22 +67,29 @@ class BaseSyncClient(ABC, Generic[T, S]):
         )
 
         for subitem, animapping in self.map_media(item):
-            if not animapping:
-                anilist_media = self.search_media(item)
-            else:
-                anilist_media = self.anilist_client.get_anime(
-                    anilist_id=next(iter(animapping.anilist_id), None),
-                    mal_id=next(iter(animapping.mal_id), None),
-                )
+            try:
+                if not animapping:
+                    anilist_media = self.search_media(item)
+                else:
+                    anilist_media = self.anilist_client.get_anime(
+                        anilist_id=next(iter(animapping.anilist_id or ()), None),
+                        mal_id=next(iter(animapping.mal_id or ()), None),
+                    )
 
-            if not anilist_media:
-                log.warning(
-                    f"{self.__class__.__name__}: No suitable AniList media found for {item.type} "
-                    f"'{self._clean_item_title(item, subitem)}' {{plex_id: {item.guid}}}"
-                )
-                continue
+                if not anilist_media:
+                    log.warning(
+                        f"{self.__class__.__name__}: No suitable AniList media found for {item.type} "
+                        f"'{self._clean_item_title(item, subitem)}' {{plex_id: {item.guid}}}"
+                    )
+                    continue
 
-            self.sync_media(item, subitem, anilist_media, animapping)
+                self.sync_media(item, subitem, anilist_media, animapping)
+            except Exception as e:
+                log.exception(
+                    f"{self.__class__.__name__}: Failed to process {item.type} "
+                    f"'{self._clean_item_title(item, subitem)}' {{plex_id: {item.guid}}}",
+                    exc_info=e,
+                )
 
     @abstractmethod
     def map_media(self, item: T) -> Iterator[tuple[S, Optional[AniMap]]]:
