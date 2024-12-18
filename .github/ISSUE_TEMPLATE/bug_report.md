@@ -30,8 +30,11 @@ If applicable, paste a trace logs/screenshots to help explain your problem. Plea
 
 **Config (please list all config sections you set):**
 
-> [!IMPORTANT]  
-> Do NOT share any secret keys/tokens
+<!-- [!IMPORTANT] Do NOT share any secret keys/tokens -->
+
+- DESTRUCTIVE_SYNC=[True/False]
+- PARTIAL_SCAN=[True/False]
+- ...
 
 **Environment (how are you running PlexAniBridge):**
 
