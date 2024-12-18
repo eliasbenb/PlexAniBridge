@@ -15,9 +15,6 @@ from .base import BaseSyncClient
 
 class MovieSyncClient(BaseSyncClient[Movie, MovieSection]):
     def _process_media_item(self, movie: Movie) -> None:
-        for attr in ("_pab__review", "_pab__onWatchList"):
-            setattr(movie, attr, None)
-
         guids = self._format_guids(movie.guids, is_movie=True)
 
         anilist_media = self._find_anilist_media(movie, guids)
