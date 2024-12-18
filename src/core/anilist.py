@@ -179,7 +179,8 @@ class AniListClient:
         variables = {"search": search_str, "limit": limit, "episods": episodes}
 
         log.debug(
-            f"{self.__class__.__name__}: Searching for anime with query '{search_str}'{f' that has {episodes} episodes'}"
+            f"{self.__class__.__name__}: Searching for anime with query '{search_str}' "
+            f"that has {episodes or 'unknown'} episodes"
         )
 
         response = self._make_request(query, variables)

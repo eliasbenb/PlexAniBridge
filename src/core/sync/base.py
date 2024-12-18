@@ -103,7 +103,7 @@ class BaseSyncClient(ABC, Generic[T, S]):
             if r.episodes == episodes
         ]
         best_result, best_ratio = max(
-            ((r, fuzz.ratio(item.title, r.title)) for r in results),
+            ((r, fuzz.ratio(item.title, r.title)) for r in results if r.title),
             default=(None, 0),
             key=lambda x: x[1],
         )
@@ -163,6 +163,10 @@ class BaseSyncClient(ABC, Generic[T, S]):
         log.debug(f"\t\t{final_media_list}")
 
         self.anilist_client.update_anime_entry(final_media_list)
+
+        log.info(
+            f"{self.__class__.__name__}: Synced {item.type} '{self._clean_item_title(item, subitem)}' {{plex_id: {item.guid}}}"
+        )
 
     def _get_plex_media_list(
         self, item: T, subitem: S, anilist_media: Media, animapping: AniMap

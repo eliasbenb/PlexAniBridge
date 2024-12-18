@@ -2,7 +2,7 @@ from typing import Iterator, Optional
 
 from plexapi.video import Movie
 
-from src.models.anilist import Media, MediaListStatus
+from src.models.anilist import FuzzyDate, Media, MediaListStatus
 from src.models.animap import AniMap
 
 from .base import BaseSyncClient, ParsedGuids
@@ -15,7 +15,7 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie]):
         result = next(iter(animapping), None)
 
         if result:
-            yield item, animapping
+            yield item, result
 
     def _calculate_status(
         self,
@@ -61,7 +61,7 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie]):
         anilist_media: Media,
         animapping: AniMap,
     ) -> Optional[Media]:
-        return Media.from_date(item.lastViewedAt)
+        return FuzzyDate.from_date(item.lastViewedAt) if item.lastViewedAt else None
 
     def _calculate_completed_date(
         self,
@@ -70,4 +70,4 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie]):
         anilist_media: Media,
         animapping: AniMap,
     ) -> Optional[Media]:
-        return Media.from_date(item.lastViewedAt)
+        return FuzzyDate.from_date(item.lastViewedAt) if item.lastViewedAt else None
