@@ -8,21 +8,7 @@ from src.settings import config
 
 def run() -> None:
     """The main sync loop function"""
-    bridge = BridgeClient(
-        # General
-        partial_scan=config.PARTIAL_SCAN,
-        destructive_sync=config.DESTRUCTIVE_SYNC,
-        # AniList
-        anilist_token=config.ANILIST_TOKEN,
-        # Plex
-        plex_url=config.PLEX_URL,
-        plex_token=config.PLEX_TOKEN,
-        plex_sections=config.PLEX_SECTIONS,
-        # Advanced
-        dry_run=config.DRY_RUN,
-        fuzzy_search_threshold=config.FUZZY_SEARCH_THRESHOLD,
-    )
-
+    bridge = BridgeClient(config)
     bridge.sync()
 
 

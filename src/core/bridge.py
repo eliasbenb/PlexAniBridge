@@ -7,6 +7,7 @@ from sqlmodel import Session
 from src import log
 from src.core import AniListClient, AniMapClient, PlexClient
 from src.models.housekeeping import Housekeeping
+from src.settings import Config
 
 from .db import db
 from .sync.movie import MovieSyncClient
@@ -19,36 +20,21 @@ class BridgeClient:
     All components of the program are managed and initialized by this class.
     """
 
-    def __init__(
-        self,
-        # General
-        partial_scan: bool,
-        destructive_sync: bool,
-        # AniList
-        anilist_token: str,
-        # Plex
-        plex_url: str,
-        plex_token: str,
-        plex_sections: set[str],
-        # Advanced
-        dry_run: bool,
-        fuzzy_search_threshold: int,
-    ) -> None:
-        self.partial_scan = partial_scan
-        self.destructive_sync = destructive_sync
-        self.dry_run = dry_run
-        self.fuzzy_search_threshold = fuzzy_search_threshold
+    def __init__(self, config: Config) -> None:
+        self.config = config
 
-        self.anilist_client = AniListClient(anilist_token, dry_run)
+        self.anilist_client = AniListClient(config.ANILIST_TOKEN, config.DRY_RUN)
         self.animap_client = AniMapClient()
-        self.plex_client = PlexClient(plex_url, plex_token, plex_sections)
+        self.plex_client = PlexClient(
+            config.PLEX_URL, config.PLEX_TOKEN, config.PLEX_SECTIONS
+        )
 
         sync_client_args = {
             "anilist_client": self.anilist_client,
             "animap_client": self.animap_client,
             "plex_client": self.plex_client,
-            "destructive_sync": destructive_sync,
-            "fuzzy_search_threshold": fuzzy_search_threshold,
+            "destructive_sync": config.DESTRUCTIVE_SYNC,
+            "fuzzy_search_threshold": config.FUZZY_SEARCH_THRESHOLD,
         }
         self.movie_sync = MovieSyncClient(**sync_client_args)
         self.show_sync = ShowSyncClient(**sync_client_args)
@@ -90,7 +76,7 @@ class BridgeClient:
         """
         with Session(db) as session:
             last_synced = session.get(Housekeeping, "last_sections_synced")
-            if last_synced is None or last_synced.value is None:
+            if last_synced is None:
                 return set()
             return set(last_synced.value.split(","))
 
@@ -108,30 +94,13 @@ class BridgeClient:
             )
             session.commit()
 
-    def _should_perform_partial_scan(self) -> bool:
-        """Check if a partial scan can be performed
-
-        A partial scan can only be performed if the following conditions are met:
-            1. The `PARTIAL_SCAN` setting is enabled
-            2. The last sync timestamp is not None
-            3. The last synced sections match the configured Plex sections
-
-        Returns:
-            bool: True if a partial scan can be performed, False otherwise
-        """
-        return (
-            self.partial_scan
-            and self.last_synced is not None
-            and self.last_sections_synced == self.plex_client.plex_sections
-        )
-
     def sync(self) -> None:
         """Sync the Plex and AniList libraries"""
         log.info(
             f"{self.__class__.__name__}: Starting "
-            f"{'partial ' if self.partial_scan else ''}"
-            f"{'and ' if self.partial_scan and self.destructive_sync else ''}"
-            f"{'destructive ' if self.destructive_sync else ''}"
+            f"{'partial ' if self.config.PARTIAL_SCAN else ''}"
+            f"{'and ' if self.config.PARTIAL_SCAN and self.config.DESTRUCTIVE_SYNC else ''}"
+            f"{'destructive ' if self.config.DESTRUCTIVE_SYNC else ''}"
             f"sync between Plex and AniList libraries"
         )
 
@@ -145,7 +114,9 @@ class BridgeClient:
         self._set_last_synced(tmp_last_synced)
         self._set_last_sections_synced({section.title for section in plex_sections})
 
-        log.info(f"{self.__class__.__name__}: Sync completed successfully")
+        log.info(
+            f"{self.__class__.__name__}: Anime mappings sync completed successfully"
+        )
 
     def _sync_section(self, section: Union[MovieSection, ShowSection]) -> None:
         """Sync a Plex section with the AniList library
@@ -165,3 +136,20 @@ class BridgeClient:
             log.warning(
                 f"{self.__class__.__name__}: Unknown section type for '{section.title}', skipping"
             )
+
+    def _should_perform_partial_scan(self) -> bool:
+        """Check if a partial scan can be performed
+
+        A partial scan can only be performed if the following conditions are met:
+            1. The `PARTIAL_SCAN` setting is enabled
+            2. The last sync timestamp is not None
+            3. The last synced sections match the configured Plex sections
+
+        Returns:
+            bool: True if a partial scan can be performed, False otherwise
+        """
+        return (
+            self.config.PARTIAL_SCAN
+            and self.last_synced is not None
+            and self.last_sections_synced == self.plex_client.plex_sections
+        )
