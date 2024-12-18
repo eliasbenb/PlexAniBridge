@@ -1,4 +1,3 @@
-from datetime import datetime
 from typing import Optional, Union
 
 from plexapi.library import MovieSection
@@ -15,21 +14,6 @@ from .base import BaseSyncClient
 
 
 class MovieSyncClient(BaseSyncClient[Movie, MovieSection]):
-    def _get_media_to_sync(
-        self, section: MovieSection, last_synced: Optional[datetime]
-    ) -> list[Movie]:
-        if last_synced is not None:
-            return section.search(
-                filters={
-                    "or": [
-                        {"updatedAt>>=": last_synced},
-                        {"lastViewedAt>>=": last_synced},
-                        {"lastRatedAt>>=": last_synced},
-                    ]
-                }
-            )
-        return section.all()
-
     def _process_media_item(self, movie: Movie) -> None:
         for attr in ("_pab__review", "_pab__onWatchList"):
             setattr(movie, attr, None)

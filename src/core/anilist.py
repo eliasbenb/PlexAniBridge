@@ -153,7 +153,7 @@ class AniListClient:
         """
         variables = {"id": media_id}
 
-        log.debug(
+        log.info(
             f"{self.__class__.__name__}: Deleting anime entry with variables: {variables}"
         )
 

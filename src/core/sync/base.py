@@ -4,7 +4,9 @@ from datetime import datetime
 from functools import lru_cache
 from typing import Any, Generic, Optional, TypeVar, Union
 
+from plexapi.library import MovieSection, ShowSection
 from plexapi.media import Guid
+from plexapi.video import Movie, Show
 from thefuzz import fuzz
 
 from src import log
@@ -74,11 +76,20 @@ class BaseSyncClient(ABC, Generic[T, S]):
             f"{self.__class__.__name__}: Synced section '{section.title}' {{section_key: {section.key}}}"
         )
 
-    @abstractmethod
     def _get_media_to_sync(
-        self, section: S, last_synced: Optional[datetime]
-    ) -> list[T]:
-        pass
+        self, section: Union[MovieSection, ShowSection], last_synced: Optional[datetime]
+    ) -> Union[list[Movie], list[Show]]:
+        if last_synced is not None:
+            return section.search(
+                filters={
+                    "or": [
+                        {"updatedAt>>=": last_synced},
+                        {"lastViewedAt>>=": last_synced},
+                        {"lastRatedAt>>=": last_synced},
+                    ]
+                }
+            )
+        return section.all()
 
     @abstractmethod
     def _process_media_item(self, media_item: T) -> None:
@@ -222,9 +233,7 @@ class BaseSyncClient(ABC, Generic[T, S]):
         to_sync = {}
 
         for field in fields:
-            plex_value = plex_data.get(field)
-            anilist_value = anilist_data.get(field)
-            if self._should_update_field(field, plex_value, anilist_value):
-                to_sync[field] = plex_value
+            if self._should_update_field(field, plex_data[field], anilist_data[field]):
+                to_sync[field] = plex_data[field]
 
         return to_sync

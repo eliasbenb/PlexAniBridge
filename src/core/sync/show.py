@@ -1,4 +1,3 @@
-from datetime import datetime
 from typing import Any, Optional
 
 import plexapi.exceptions
@@ -13,21 +12,6 @@ from .base import BaseSyncClient
 
 
 class ShowSyncClient(BaseSyncClient[Show, ShowSection]):
-    def _get_media_to_sync(
-        self, section: ShowSection, last_synced: Optional[datetime]
-    ) -> list[Show]:
-        if last_synced is not None:
-            return section.search(
-                filters={
-                    "or": [
-                        {"updatedAt>>=": last_synced},
-                        {"lastViewedAt>>=": last_synced},
-                        {"lastRatedAt>>=": last_synced},
-                    ]
-                }
-            )
-        return section.all()
-
     def _process_media_item(self, show: Show) -> None:
         for attr in ("_pab__review", "_pab__onWatchList"):
             setattr(show, attr, None)
