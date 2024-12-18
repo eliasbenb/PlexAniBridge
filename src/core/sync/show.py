@@ -90,10 +90,8 @@ class ShowSyncClient(BaseSyncClient[Show, ShowSection]):
 
         if anilist_media.episodes:
             episodes = season.episodes(
-                filters={
-                    "index>>=": season_offset,
-                    "index<=": season_offset + anilist_media.episodes,
-                }
+                index_gt=season_offset,
+                index_lte=season_offset + anilist_media.episodes,
             )
         else:
             episodes = season.episodes(index__gt=season_offset)
