@@ -1,28 +1,49 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from datetime import datetime
-from functools import lru_cache
-from typing import Any, Generic, Optional, TypeVar, Union
+from functools import cache
+from typing import Generic, Iterator, Optional, TypeVar, Union
 
-from plexapi.library import MovieSection, ShowSection
 from plexapi.media import Guid
-from plexapi.video import Movie, Show
+from plexapi.video import Movie, Season, Show
 from thefuzz import fuzz
 
 from src import log
 from src.core import AniListClient, AniMapClient, PlexClient
-from src.models.anilist import AniListMedia, AniListMediaListStatus
+from src.models.anilist import (
+    Media,
+    MediaList,
+    MediaListStatus,
+)
 from src.models.animap import AniMap
 
-T = TypeVar("T")  # Generic type for media item
-S = TypeVar("S")  # Generic type for section
+T = TypeVar("T", bound=Union[Movie, Show])  # Section item
+S = TypeVar("S", bound=Union[Movie, Season])  # Item child (season)
 
 
-@dataclass(frozen=True)
-class MediaSearchKey:
-    title: str
-    anilist_id: Optional[int]
-    mal_id: Optional[int]
+@dataclass
+class ParsedGuids:
+    tvdb: Optional[int] = None
+    tmdb: Optional[int] = None
+    imdb: Optional[str] = None
+
+    @staticmethod
+    def from_guids(guids: list[Guid]) -> "ParsedGuids":
+        parsed_guids = ParsedGuids()
+        for guid in guids:
+            split_guid = guid.id.split("://")
+            if len(split_guid) != 2 or not hasattr(parsed_guids, split_guid[0]):
+                continue
+
+            try:
+                split_guid[1] = int(split_guid[1])
+            except ValueError:
+                split_guid[1] = str(split_guid[1])
+
+            setattr(parsed_guids, split_guid[0], split_guid[1])
+        return parsed_guids
+
+    def __iter__(self) -> Iterator[tuple[str, Optional[Union[int, str]]]]:
+        return iter(self.__dict__.items())
 
 
 class BaseSyncClient(ABC, Generic[T, S]):
@@ -33,207 +54,203 @@ class BaseSyncClient(ABC, Generic[T, S]):
         plex_client: PlexClient,
         destructive_sync: bool,
         fuzzy_search_threshold: int,
-    ):
+    ) -> None:
         self.anilist_client = anilist_client
         self.animap_client = animap_client
         self.plex_client = plex_client
         self.destructive_sync = destructive_sync
         self.fuzzy_search_threshold = fuzzy_search_threshold
 
-        self._find_anilist_media_by_ids_cached = lru_cache(maxsize=32)(
-            self._find_anilist_media_by_ids
-        )
-
-    def sync_media(self, section: S, last_synced: Optional[datetime] = None) -> None:
+    def process_media(self, item: T) -> None:
         log.debug(
-            f"{self.__class__.__name__}: Syncing media in section '{section.title}'"
+            f"{self.__class__.__name__}: Processing {item.type} '{item.title}' {{plex_id: {item.guid}}}"
         )
 
-        media_items = self._get_media_to_sync(section, last_synced)
-        log.debug(f"{self.__class__.__name__}: Found {len(media_items)} items to sync")
-
-        type_str = (
-            "movie"
-            if section.type == "movie"
-            else "show"
-            if section.type == "show"
-            else "media"
-        )
-
-        for item in media_items:
-            log.debug(
-                f"{self.__class__.__name__}: Processing {type_str} '{item.title}' {{plex_id: {item.guid}}}"
-            )
-            try:
-                self._process_media_item(item)
-            except Exception as e:
-                log.error(
-                    f"{self.__class__.__name__}: Error processing {type_str} '{item.title}' {{plex_id: {item.guid}}}",
-                    exc_info=e,
+        for subitem, animapping in self.map_media(item):
+            if not animapping:
+                anilist_media = self.search_media(item)
+            else:
+                anilist_media = self.anilist_client.get_anime(
+                    anilist_id=next(iter(animapping.anilist_id), None),
+                    mal_id=next(iter(animapping.mal_id), None),
                 )
 
-        log.info(
-            f"{self.__class__.__name__}: Synced section '{section.title}' {{section_key: {section.key}}}"
-        )
-
-    def _get_media_to_sync(
-        self, section: Union[MovieSection, ShowSection], last_synced: Optional[datetime]
-    ) -> Union[list[Movie], list[Show]]:
-        if last_synced is not None:
-            return section.search(
-                filters={
-                    "or": [
-                        {"updatedAt>>=": last_synced},
-                        {"lastViewedAt>>=": last_synced},
-                        {"lastRatedAt>>=": last_synced},
-                    ]
-                }
-            )
-        return section.all()
-
-    @abstractmethod
-    def _process_media_item(self, media_item: T) -> None:
-        pass
-
-    def _format_guids(
-        self, guids: list[Guid], is_movie: bool = True
-    ) -> dict[str, Optional[Union[int, str]]]:
-        formatted_guids = {
-            "tmdb_movie_id": None,
-            "tmdb_show_id": None,
-            "tvdb_id": None,
-            "imdb_id": None,
-        }
-
-        for guid in guids:
-            if guid.id.startswith("tmdb://"):
-                key = "tmdb_movie_id" if is_movie else "tmdb_show_id"
-                formatted_guids[key] = int(guid.id.split("://")[1])
-            elif guid.id.startswith("tvdb://"):
-                formatted_guids["tvdb_id"] = int(guid.id.split("://")[1])
-            elif guid.id.startswith("imdb://"):
-                formatted_guids["imdb_id"] = guid.id.split("://")[1]
-
-        return formatted_guids
-
-    def find_anilist_media_by_ids(
-        self, title: str, animapping: AniMap
-    ) -> Optional[AniListMedia]:
-        """Wrapper method that creates a cache key and calls the cached implementation."""
-        cache_key = MediaSearchKey(
-            title=title,
-            anilist_id=animapping.anilist_id[0] if animapping.anilist_id else None,
-            mal_id=animapping.mal_id[0] if animapping.mal_id else None,
-        )
-        return self._find_anilist_media_by_ids_cached(cache_key)
-
-    def _find_anilist_media_by_ids(
-        self, cache_key: MediaSearchKey
-    ) -> Optional[AniListMedia]:
-        """Implementation of the media search logic, now using the cache key."""
-        try:
-            if cache_key.anilist_id:
-                return self.anilist_client.get_anime(anilist_id=cache_key.anilist_id)
-            elif cache_key.mal_id:
-                log.debug(
-                    f"{self.__class__.__name__}: No AniList ID found for '{cache_key.title}'. "
-                    f"Attempting to search AniList for the MAL ID {cache_key.mal_id}"
+            if not anilist_media:
+                log.warning(
+                    f"{self.__class__.__name__}: No suitable AniList media found for {item.type} "
+                    f"'{self._clean_item_title(item, subitem)}' {{plex_id: {item.guid}}}"
                 )
-                return self.anilist_client.get_anime(mal_id=cache_key.mal_id)
-        except Exception as e:
-            log.error(
-                f"{self.__class__.__name__}: Error finding '{cache_key.title}' using "
-                f"{f'AniList ID {cache_key.anilist_id}' if cache_key.anilist_id else f'MAL ID {cache_key.mal_id}' if cache_key.mal_id else f'title {cache_key.title}'}",
-                exc_info=e,
-            )
-        return None
-
-    def _search_by_title(
-        self, title: str, episode_count: Optional[int] = None
-    ) -> Optional[AniListMedia]:
-        log.debug(
-            f"{self.__class__.__name__}: Attempting to search AniList for title '{title}'"
-        )
-        search_results = self.anilist_client.search_anime(title)
-
-        for result in search_results:
-            if episode_count is not None and result.episodes != episode_count:
                 continue
 
-            ratio = fuzz.ratio(title, result.best_title)
-            if ratio >= self.fuzzy_search_threshold:
-                log.info(
-                    f"{self.__class__.__name__}: Matched '{title}' to AniList entry '{result.best_title}' "
-                    f"{{anilist_id: {result.id}}} with a ratio of {ratio}"
-                )
-                return result
+            self.sync_media(item, subitem, anilist_media, animapping)
 
-        log.warning(
-            f"{self.__class__.__name__}: No suitable results found for '{title}' using title search"
+    @abstractmethod
+    def map_media(self, item: T) -> Iterator[tuple[S, Optional[AniMap]]]:
+        pass
+
+    @cache
+    def search_media(self, item: T, episodes: int = 1) -> Optional[Media]:
+        results = [
+            r
+            for r in self.anilist_client.search_anime(item.title)
+            if r.episodes == episodes
+        ]
+        best_result, best_ratio = max(
+            ((r, fuzz.ratio(item.title, r.title)) for r in results),
+            default=(None, 0),
+            key=lambda x: x[1],
         )
-        return None
 
-    def _get_anilist_media_data(self, anilist_media: AniListMedia) -> dict:
-        if not anilist_media.mediaListEntry:
-            return {
-                "status": None,
-                "score": None,
-                "progress": None,
-                "repeat": None,
-                "notes": None,
-                "start_date": None,
-                "end_date": None,
-            }
-
-        entry = anilist_media.mediaListEntry
-        return {
-            "status": entry.status,
-            "score": entry.score,
-            "progress": entry.progress,
-            "repeat": entry.repeat,
-            "notes": entry.notes,
-            "start_date": entry.startedAt,
-            "end_date": entry.completedAt,
-        }
-
-    def _should_update_field(self, field: str, plex_val: Any, anilist_val: Any) -> bool:
-        NE_FILDS = {"score", "notes"}
-        GT_FIELDS = {"status", "progress", "repeat", "start_date", "end_date"}
-        LT_FIELDS = {}
-
-        if field in NE_FILDS:
-            return (self.destructive_sync is True and plex_val != anilist_val) or (
-                plex_val is not None and plex_val != anilist_val
+        if not best_result or best_ratio < self.fuzzy_search_threshold:
+            log.warning(
+                f"{self.__class__.__name__}: No suitable results found during title search "
+                f"for {item.type} '{item.title}' {{plex_id: {item.guid}}}"
             )
-        elif field in GT_FIELDS:
-            return (self.destructive_sync is True and plex_val != anilist_val) or (
-                plex_val is not None and plex_val > anilist_val
+            return []
+
+        log.info(
+            f"{self.__class__.__name__}: Matched '{item.title}' {{plex_id: {item.ratingKey}}} to "
+            f"AniList media '{{anilist_id: {best_result.id}}}' with a ratio of "
+            f"{fuzz.ratio(item.title, best_result.title)}"
+        )
+
+    def sync_media(
+        self, item: T, subitem: S, anilist_media: Media, animapping: AniMap
+    ) -> None:
+        log.debug(
+            f"{self.__class__.__name__}: Syncing {item.type} "
+            f"'{self._clean_item_title(item, subitem)}' {{plex_id: {item.guid}}}"
+        )
+
+        anilist_media_list = anilist_media.media_list_entry
+        plex_media_list = self._get_plex_media_list(
+            item, subitem, anilist_media, animapping
+        )
+
+        final_media_list = self._merge_media_lists(anilist_media_list, plex_media_list)
+
+        if final_media_list == anilist_media_list:
+            log.debug(
+                f"{self.__class__.__name__}: Entry already up to date for "
+                f"{item.type} '{self._clean_item_title(item, subitem)}' {{plex_id: {item.guid}}}"
             )
-        elif field in LT_FIELDS:
-            return (self.destructive_sync is True and plex_val != anilist_val) or (
-                plex_val is not None and plex_val < anilist_val
+            return
+        if self.destructive_sync and anilist_media_list and not plex_media_list.status:
+            log.info(
+                f"{self.__class__.__name__}: Deleting AniList entry with variables:"
             )
+            log.info(f"\t\t{anilist_media_list}")
+            self.anilist_client.delete_anime_entry(
+                anilist_media.media_list_entry.id,
+                anilist_media.media_list_entry.media_id,
+            )
+            return
+        if not final_media_list.status:
+            log.info(
+                f"{self.__class__.__name__}: Skipping {item.type} due to no activity "
+                f"'{self._clean_item_title(item, subitem)}' {{plex_id: {item.guid}}} "
+            )
+            return
+
+        log.debug(f"{self.__class__.__name__}: Syncing AniList entry with variables:")
+        log.debug(f"\t\t{final_media_list}")
+
+        self.anilist_client.update_anime_entry(final_media_list)
+
+    def _get_plex_media_list(
+        self, item: T, subitem: S, anilist_media: Media, animapping: AniMap
+    ) -> MediaList:
+        return MediaList(
+            id=anilist_media.media_list_entry
+            and anilist_media.media_list_entry.id
+            or -1,
+            user_id=self.anilist_client.anilist_user.id,
+            media_id=anilist_media.id,
+            status=self._calculate_status(item, subitem, anilist_media, animapping),
+            score=self._calculate_score(item, subitem, anilist_media, animapping),
+            progress=self._calculate_progress(item, subitem, anilist_media, animapping),
+            repeat=self._calculate_repeats(item, subitem, anilist_media, animapping),
+            notes=self.plex_client.get_user_review(subitem),
+            started_at=self._calculate_started_date(
+                item, subitem, anilist_media, animapping
+            ),
+            completed_at=self._calculate_completed_date(
+                item, subitem, anilist_media, animapping
+            ),
+        )
 
     @abstractmethod
-    def _determine_watch_status(
-        self, media_item: T
-    ) -> Optional[AniListMediaListStatus]:
+    def _calculate_status(
+        self, item: T, subitem: S, anilist_media: Media, animapping: AniMap
+    ) -> Optional[MediaListStatus]:
         pass
 
     @abstractmethod
-    def _sync_media_data(self, media_item: T, anilist_media: AniListMedia) -> None:
+    def _calculate_score(
+        self, item: T, subitem: S, anilist_media: Media, animapping: AniMap
+    ) -> int:
         pass
 
-    def _create_sync_update(
+    @abstractmethod
+    def _calculate_progress(
+        self, item: T, subitem: S, anilist_media: Media, animapping: AniMap
+    ) -> int:
+        pass
+
+    @abstractmethod
+    def _calculate_repeats(
+        self, item: T, subitem: S, anilist_media: Media, animapping: AniMap
+    ) -> int:
+        pass
+
+    @abstractmethod
+    def _calculate_started_date(
+        self, item: T, subitem: S, anilist_media: Media, animapping: AniMap
+    ) -> Optional[Media]:
+        pass
+
+    @abstractmethod
+    def _calculate_completed_date(
+        self, item: T, subitem: S, anilist_media: Media, animapping: AniMap
+    ) -> Optional[Media]:
+        pass
+
+    def _merge_media_lists(
         self,
-        plex_data: dict,
-        anilist_data: dict,
-        fields: list[str],
-    ) -> dict:
-        to_sync = {}
+        anilist_media_list: Optional[MediaList],
+        plex_media_list: MediaList,
+    ) -> MediaList:
+        if not anilist_media_list:
+            return plex_media_list.model_copy()
+        res_media_list = anilist_media_list.model_copy()
 
-        for field in fields:
-            if self._should_update_field(field, plex_data[field], anilist_data[field]):
-                to_sync[field] = plex_data[field]
+        NE_KEYS = ("score", "notes")
+        GT_KEYS = ("status", "progress", "repeat")
+        LT_KEYS = ()
 
-        return to_sync
+        for key in NE_KEYS:
+            plex_val = getattr(plex_media_list, key)
+            anilist_val = getattr(anilist_media_list, key)
+            if plex_val is not None and plex_val != anilist_val:
+                setattr(res_media_list, key, plex_val)
+        for key in GT_KEYS:
+            plex_val = getattr(plex_media_list, key)
+            anilist_val = getattr(anilist_media_list, key)
+            if plex_val is None:
+                continue
+            if self.destructive_sync or plex_val > anilist_val:
+                setattr(res_media_list, key, plex_val)
+        for key in LT_KEYS:
+            plex_val = getattr(plex_media_list, key)
+            anilist_val = getattr(anilist_media_list, key)
+            if plex_val is None:
+                continue
+            if self.destructive_sync or plex_val < anilist_val:
+                setattr(res_media_list, key, plex_val)
+
+        return res_media_list
+
+    def _clean_item_title(self, item: T, subitem: Optional[S] = None) -> str:
+        if subitem and item != subitem:
+            return f"{item.title} | {subitem.title}"
+        return item.title

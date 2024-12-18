@@ -5,11 +5,10 @@ import requests
 
 from src import log
 from src.models.anilist import (
-    AniListFuzzyDate,
-    AniListMedia,
-    AniListMediaList,
-    AniListMediaStatus,
-    AniListMediaWithRelations,
+    Media,
+    MediaList,
+    MediaWithRelations,
+    User,
 )
 from src.utils.rate_limitter import RateLimiter
 
@@ -24,9 +23,11 @@ class AniListClient:
         self.dry_run = dry_run
 
         self.rate_limiter = RateLimiter(self.__class__.__name__, requests_per_minute=90)
-        self.anilist_user = self.__get_user()
+        self.anilist_user = self.get_user()
 
-    def __make_request(self, query: str, variables: Optional[dict] = None) -> dict:
+    def _make_request(
+        self, query: str, variables: Optional[Union[dict, str]] = None
+    ) -> dict:
         """Makes a request to the AniList API
 
         All requests are rate limited to 90 requests per minute.
@@ -59,12 +60,20 @@ class AniListClient:
                 f"{self.__class__.__name__}: Rate limit exceeded, waiting {retry_after} seconds"
             )
             sleep(retry_after + 1)
-            return self.__make_request(query, variables)
+            return self._make_request(query, variables)
 
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except requests.HTTPError as e:
+            log.error(
+                f"{self.__class__.__name__}: Failed to make request to AniList API:",
+                exc_info=e,
+            )
+            log.error(f"\t\t{response.text}")
+            raise e
         return response.json()
 
-    def __get_user(self) -> str:
+    def get_user(self) -> User:
         """Gets the authenticated user's username
 
         Returns:
@@ -79,83 +88,53 @@ class AniListClient:
         }
         """
 
-        response = self.__make_request(query)
-        return response["data"]["Viewer"]["name"]
+        response = self._make_request(query)["data"]["Viewer"]
+        return User(**response)
 
-    def update_anime_entry(
-        self,
-        media_id: int,
-        status: Optional[AniListMediaStatus] = None,
-        score: Optional[float] = None,
-        progress: Optional[int] = None,
-        repeat: Optional[int] = None,
-        notes: Optional[str] = None,
-        start_date: Optional[AniListFuzzyDate] = None,
-        end_date: Optional[AniListFuzzyDate] = None,
-    ) -> dict:
+    def update_anime_entry(self, media_list_entry: MediaList) -> MediaList:
         """Updates an anime entry on the authenticated user's list
 
         Args:
-            media_id (int): The AniList ID of the anime
-            status (Optional[AniListMediaStatus], optional): The status of the anime. Defaults to None.
-            score (Optional[float], optional): The user's score for the anime. Defaults to None.
-            progress (Optional[int], optional): The user's progress in the anime. Defaults to None.
-            repeat (Optional[int], optional): The number of times the anime has been rewatched. Defaults to None.
-            notes (Optional[str], optional): The user's notes for the anime. Defaults to None.
-            start_date (Optional[AniListFuzzyDate], optional): The date the anime was started. Defaults to None.
-            end_date (Optional[AniListFuzzyDate], optional): The date the anime was completed. Defaults to None.
+            media_list_entry (MediaList): The media list entry with the updated values
 
         Returns:
-            dict: The updated anime entry
+            MediaList: The updated media list entry
         """
-        variables = {
-            "mediaId": media_id,
-            "status": status.value if status else None,
-            "score": score,
-            "progress": progress,
-            "repeat": repeat,
-            "notes": notes,
-            "startedAt": start_date.model_dump() if start_date else None,
-            "completedAt": end_date.model_dump() if end_date else None,
-        }
-
-        # Remove None values
-        variables = {k: v for k, v in variables.items() if v is not None}
-
-        log.debug(
-            f"{self.__class__.__name__}: Updating anime entry with variables: {variables}"
-        )
+        variables = media_list_entry.model_dump_json()
 
         query = f"""
         mutation ($mediaId: Int, $status: MediaListStatus, $score: Float, $progress: Int, $repeat: Int, $notes: String, $startedAt: FuzzyDateInput, $completedAt: FuzzyDateInput) {{
             SaveMediaListEntry(mediaId: $mediaId, status: $status, score: $score, progress: $progress, repeat: $repeat, notes: $notes, startedAt: $startedAt, completedAt: $completedAt) {{
-                {AniListMediaList.as_graphql()}
+                {MediaList.model_dump_graphql()}
             }}
         }}
         """
 
         if self.dry_run:  # Skip the request, only log the variables
             log.info(
-                f"{self.__class__.__name__}: Dry run enabled, skipping anime entry update with variables: {variables}"
+                f"{self.__class__.__name__}: Dry run enabled, skipping anime entry update {{anilist_id: {media_list_entry.media_id}}}"
             )
-            return {}
-        else:
-            return self.__make_request(query, variables)["data"]["SaveMediaListEntry"]
+            return MediaList(
+                id=-1,
+                media_id=media_list_entry.media_id,
+                user_id=-media_list_entry.user_id,
+            )
 
-    def delete_anime_entry(self, media_id: int) -> dict:
+        response = self._make_request(query, variables)["data"]["SaveMediaListEntry"]
+        return MediaList(**response)
+
+    def delete_anime_entry(self, entry_id: int, media_id: int) -> bool:
         """Deletes an anime entry on the authenticated user's list
 
         Args:
             media_id (int): The AniList ID of the anime
 
         Returns:
-            dict: The deleted anime entry
+            bool: True if the entry was deleted, False otherwise
         """
-        variables = {"id": media_id}
-
-        log.info(
-            f"{self.__class__.__name__}: Deleting anime entry with variables: {variables}"
-        )
+        variables = MediaList(
+            id=entry_id, media_id=media_id, user_id=self.anilist_user.id
+        ).model_dump()
 
         query = """
         mutation ($id: Int) {
@@ -167,45 +146,51 @@ class AniListClient:
 
         if self.dry_run:
             log.info(
-                f"{self.__class__.__name__}: Dry run enabled, skipping anime entry deletion with variables: {variables}"
+                f"{self.__class__.__name__}: Dry run enabled, skipping anime entry deletion {{anilist_id: {media_id}}}"
             )
-            return {}
+            return False
 
-        return self.__make_request(query, variables)["data"]["DeleteMediaListEntry"]
+        response = self._make_request(query, variables)["data"]["DeleteMediaListEntry"]
+        return response["deleted"]
 
-    def search_anime(self, search_str: str, limit: int = 10) -> list[AniListMedia]:
+    def search_anime(
+        self, search_str: str, episodes: Optional[int] = None, limit: int = 10
+    ) -> list[Media]:
         """Searches for anime on AniList
 
         Args:
             search_str (str): The search query
+            episodes (Optional[int], optional): The number of episodes in the anime. Defaults to None.
             limit (int, optional): The maximum number of results to return. Defaults to 10.
 
         Returns:
-            list[AniListMedia]: The search results
+            list[Media]: The search results
         """
         query = f"""
-        query ($search: String, $limit: Int) {{
+        query ($search: String, $limit: Int, $episodes: Int) {{
             Page(perPage: $limit) {{
-                media(search: $search, type: ANIME) {{
-                    {AniListMedia.as_graphql()}
+                media(search: $search, type: ANIME, episodes: $episodes) {{
+                    {Media.model_dump_graphql()}
                 }}
             }}
         }}
         """
 
+        variables = {"search": search_str, "limit": limit, "episods": episodes}
+
         log.debug(
-            f"{self.__class__.__name__}: Searching for anime with query '{search_str}'"
+            f"{self.__class__.__name__}: Searching for anime with query '{search_str}'{f' that has {episodes} episodes'}"
         )
 
-        response = self.__make_request(query, {"search": search_str, "limit": limit})
-        return [AniListMedia(**media) for media in response["data"]["Page"]["media"]]
+        response = self._make_request(query, variables)
+        return [Media(**media) for media in response["data"]["Page"]["media"]]
 
     def get_anime(
         self,
         anilist_id: Optional[int] = None,
         mal_id: Optional[int] = None,
         relations: Optional[bool] = False,
-    ) -> Union[AniListMedia, AniListMediaWithRelations]:
+    ) -> Union[Media, MediaWithRelations]:
         """Gets anime data from AniList
 
         Either an AniList ID or a MAL ID must be provided. If both are provided, the AniList ID will be used.
@@ -216,7 +201,7 @@ class AniListClient:
             relations (Optional[bool], optional): Whether to include relations in the response. Defaults to False.
 
         Returns:
-            Union[AniListMedia, AniListMediaWithRelations]: The AniList Media object
+            Union[Media, MediaWithRelations]: The AniList Media object
         """
         media_id = anilist_id or mal_id or None
         id_type = "id" if anilist_id else "idMal" if mal_id else None
@@ -228,17 +213,17 @@ class AniListClient:
         query = f"""
         query ($id: Int) {{
             Media({id_type}: $id, type: ANIME) {{
-                {AniListMediaWithRelations.as_graphql() if relations else AniListMedia.as_graphql()}
+                {MediaWithRelations.model_dump_graphql() if relations else Media.model_dump_graphql()}
             }}
         }}
         """
 
         log.debug(
-            f"{self.__class__.__name__}: Getting anime data from AniList {{{id_type_str}: {media_id}}}"
+            f"{self.__class__.__name__}: Getting AniList media object {{{id_type_str}: {media_id}}}"
         )
 
-        response = self.__make_request(query, {id_type: media_id})
+        response = self._make_request(query, {id_type: media_id})
         if relations:
-            return AniListMediaWithRelations(**response["data"]["Media"])
+            return MediaWithRelations(**response["data"]["Media"])
         else:
-            return AniListMedia(**response["data"]["Media"])
+            return Media(**response["data"]["Media"])

@@ -126,16 +126,19 @@ class BridgeClient:
         """
         log.debug(f"{self.__class__.__name__}: Syncing section '{section.title}'")
 
-        last_synced = self.last_synced if self._should_perform_partial_scan() else None
+        items = self.plex_client.get_section_items(
+            section,
+            min_last_modified=self.last_synced
+            if self._should_perform_partial_scan()
+            else None,
+        )
 
         if section.type == "movie":
-            self.movie_sync.sync_media(section, last_synced)
+            for item in items:
+                self.movie_sync.process_media(item)
         elif section.type == "show":
-            self.show_sync.sync_media(section, last_synced)
-        else:
-            log.warning(
-                f"{self.__class__.__name__}: Unknown section type for '{section.title}', skipping"
-            )
+            for item in items:
+                self.show_sync.process_media(item)
 
     def _should_perform_partial_scan(self) -> bool:
         """Check if a partial scan can be performed

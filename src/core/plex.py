@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime
 from functools import lru_cache
 from typing import Optional, Union
 
@@ -76,6 +77,42 @@ class PlexClient:
             for section in self.client.library.sections()
             if section.title in self.plex_sections
         ]
+
+    def get_section_items(
+        self,
+        section: Union[MovieSection, ShowSection],
+        min_last_modified: Optional[datetime] = None,
+        require_watched: bool = False,
+    ) -> list[Union[Movie, Show]]:
+        """Get all items in a Plex section
+
+        Args:
+            section (Union[MovieSection, ShowSection]): The target section
+            min_last_modified (Optional[datetime], optional): The minimum last update, view, or rating time. Defaults to None.
+
+        Returns:
+            list[Union[Movie, Show]]: List of items in the section
+        """
+        filters = {}
+        if min_last_modified:
+            log.debug(
+                f"{self.__class__.__name__}: `PARTIAL_SCAN` is set. Filtering '{section.title}' "
+                f"by items last updated, viewed, or rated after {min_last_modified}"
+            )
+            filters |= {
+                "or": [
+                    {"updatedAt>>=": min_last_modified},
+                    {"lastViewedAt>>=": min_last_modified},
+                    {"lastRatedAt>>=": min_last_modified},
+                ]
+            }
+        if require_watched:
+            log.debug(
+                f"{self.__class__.__name__}: Filtering '{section.title}' by items that have been watched"
+            )
+            filters |= {"viewCount>>=": 0}
+
+        return section.search(filters=filters)
 
     def get_user_review(self, item: Union[Movie, Show, Season]) -> Optional[str]:
         """Get the user review for a movie or show

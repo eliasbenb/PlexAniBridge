@@ -1,5 +1,5 @@
 from hashlib import md5
-from typing import Optional, Union
+from typing import Literal, Optional, Union
 
 import requests
 from sqlmodel import Session, delete, select
@@ -83,12 +83,12 @@ class AniMapClient:
 
     def get_mappings(
         self,
-        imdb_id: Optional[str] = None,
-        tmdb_movie_id: Optional[int] = None,
-        tmdb_show_id: Optional[int] = None,
-        tvdb_id: Optional[int] = None,
-        tvdb_season: Optional[int] = None,
-        tvdb_epoffset: Optional[int] = None,
+        type: Literal["movie", "show"],
+        imdb: Optional[str] = None,
+        tmdb: Optional[int] = None,
+        tvdb: Optional[int] = None,
+        season: Optional[int] = None,
+        epoffset: Optional[int] = None,
     ) -> list[AniMap]:
         """Get the AniMap entries that match the provided criteria
 
@@ -96,36 +96,39 @@ class AniMapClient:
         The TVDB season and episode offset must be exact matches for an entry to be returned.
 
         Args:
-            imdb_id (Optional[str], optional): The IMDB ID to match. Defaults to None.
-            tmdb_movie_id (Optional[int], optional): The TMDB movie ID to match. Defaults to None.
-            tmdb_show_id (Optional[int], optional): The TMDB show ID to match. Defaults to None.
-            tvdb_id (Optional[int], optional): The TVDB ID to match. Defaults to None.
-            tvdb_season (Optional[int], optional): The TVDB season number to match. Defaults to None.
-            tvdb_epoffset (Optional[int], optional): The TVDB episode offset to match. Defaults to None.
+            imdb (Optional[str], optional): The IMDB ID to match. Defaults to None.
+            tmdb (Optional[int], optional): The TMDB movie ir show ID to match. Defaults to None.
+            tvdb (Optional[int], optional): The TVDB ID to match. Defaults to None.
+            season (Optional[int], optional): The TVDB season number to match. Defaults to None.
+            epoffset (Optional[int], optional): The TVDB episode offset to match. Defaults to None.
 
         Returns:
             list[AniMap]: The list of AniMap entries that match the criteria
         """
         with Session(db) as session:
-            matching_conditions = []  # Conditions that are optional for matching (or_ operator)
-            if imdb_id is not None:
-                # The IMDB ID is stored as a list in the database, so we need to use the 'contains' operator
-                matching_conditions.append(AniMap.imdb_id.contains(imdb_id))
-            if tmdb_movie_id is not None:
-                matching_conditions.append(AniMap.tmdb_movie_id == tmdb_movie_id)
-            if tmdb_show_id is not None:
-                matching_conditions.append(AniMap.tmdb_show_id == tmdb_show_id)
-            if tvdb_id is not None:
-                matching_conditions.append(AniMap.tvdb_id == tvdb_id)
+            partial_matches = {AniMap.imdb_id.contains: imdb}
+            exact_matches = {}
+            if type == "movie":
+                partial_matches |= {AniMap.tmdb_movie_id.__eq__: tmdb}
+            elif type == "show":
+                partial_matches |= {
+                    AniMap.tmdb_show_id.__eq__: tmdb,
+                    AniMap.tvdb_id.__eq__: tvdb,
+                }
+                exact_matches |= {
+                    AniMap.tvdb_season.__eq__: season,
+                    AniMap.tvdb_epoffset.__eq__: epoffset,
+                }
 
-            ordering_conditions = []  # Conditions that are required for ordering (and_ operator)
-            if tvdb_season is not None:
-                ordering_conditions.append(AniMap.tvdb_season == tvdb_season)
-            if tvdb_epoffset is not None:
-                ordering_conditions.append(AniMap.tvdb_epoffset == tvdb_epoffset)
+            query = select(AniMap)
+            if any(v is not None for v in partial_matches.values()):
+                query = query.where(
+                    or_(*(op(v) for op, v in partial_matches.items() if v is not None))
+                )
+            if any(v is not None for v in exact_matches.values()):
+                query = query.where(
+                    and_(*(op(v) for op, v in exact_matches.items() if v is not None))
+                )
 
-            query = select(AniMap).where(or_(*matching_conditions))
-            if len(ordering_conditions) > 0:
-                query = query.where(and_(*ordering_conditions))
-
-            return session.exec(query).all()
+            res = session.exec(query).all()
+        return [r for r in res if r.anilist_id or r.mal_id]
