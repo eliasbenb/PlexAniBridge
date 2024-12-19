@@ -47,7 +47,7 @@ class AniListClient:
         response = self._make_request(query)["data"]["Viewer"]
         return User(**response)
 
-    def update_anime_entry(self, media_list_entry: MediaList) -> MediaList:
+    def update_anime_entry(self, media_list_entry: MediaList) -> Optional[MediaList]:
         """Updates an anime entry on the authenticated user's list
 
         Args:
@@ -70,11 +70,7 @@ class AniListClient:
             log.info(
                 f"{self.__class__.__name__}: Dry run enabled, skipping anime entry update {{anilist_id: {media_list_entry.media_id}}}"
             )
-            return MediaList(
-                id=-1,
-                media_id=media_list_entry.media_id,
-                user_id=-media_list_entry.user_id,
-            )
+            None
 
         response = self._make_request(query, variables)["data"]["SaveMediaListEntry"]
         return MediaList(**response)
