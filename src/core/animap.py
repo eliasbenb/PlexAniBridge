@@ -1,5 +1,5 @@
 from hashlib import md5
-from typing import Literal, Optional, Union
+from typing import Optional, Union
 
 import requests
 from sqlmodel import Session, delete, select
