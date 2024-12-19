@@ -46,6 +46,7 @@ class Config(BaseSettings):
     SYNC_INTERVAL: Optional[int] = Field(3600, ge=-1)
     PARTIAL_SCAN: Optional[bool] = True
     DESTRUCTIVE_SYNC: Optional[bool] = False
+
     SYNC_FIELDS: Optional[set[SyncField]] = {
         SyncField.STATUS,
         SyncField.SCORE,
