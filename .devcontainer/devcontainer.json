@@ -9,8 +9,7 @@
 			"extensions": [
 				"ms-python.python",
 				"charliermarsh.ruff",
-				"qwtel.sqlite-viewer",
-				"LinJun.sqlite-support"
+				"cweijan.vscode-database-client2"
 			]
 		}
 	},
