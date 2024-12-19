@@ -45,6 +45,22 @@ class ParsedGuids:
         return iter(self.__dict__.items())
 
 
+@dataclass
+class SyncStats:
+    synced: int = 0
+    deleted: int = 0
+    skipped: int = 0
+    failed: int = 0
+
+    def __add__(self, other: "SyncStats") -> "SyncStats":
+        return SyncStats(
+            self.synced + other.synced,
+            self.deleted + other.deleted,
+            self.skipped + other.skipped,
+            self.failed + other.failed,
+        )
+
+
 class BaseSyncClient(ABC, Generic[T, S]):
     def __init__(
         self,
@@ -60,7 +76,9 @@ class BaseSyncClient(ABC, Generic[T, S]):
         self.destructive_sync = destructive_sync
         self.fuzzy_search_threshold = fuzzy_search_threshold
 
-    def process_media(self, item: T) -> None:
+        self.sync_stats = SyncStats()
+
+    def process_media(self, item: T) -> SyncStats:
         log.debug(
             f"{self.__class__.__name__}: Processing {item.type} '{item.title}' {{plex_id: {item.guid}}}"
         )
@@ -97,6 +115,9 @@ class BaseSyncClient(ABC, Generic[T, S]):
                     f"'{self._clean_item_title(item, subitem)}' {{plex_id: {item.guid}}}",
                     exc_info=e,
                 )
+                self.sync_stats.failed += 1
+
+        return self.sync_stats
 
     @abstractmethod
     def map_media(self, item: T) -> Iterator[tuple[S, Optional[AniMap]]]:
@@ -141,6 +162,7 @@ class BaseSyncClient(ABC, Generic[T, S]):
                 f"{self.__class__.__name__}: Entry already up to date for "
                 f"{item.type} '{self._clean_item_title(item, subitem)}' {{plex_id: {item.guid}}}"
             )
+            self.sync_stats.skipped += 1
             return
         if self.destructive_sync and anilist_media_list and not plex_media_list.status:
             log.info(
@@ -151,12 +173,14 @@ class BaseSyncClient(ABC, Generic[T, S]):
                 anilist_media.media_list_entry.id,
                 anilist_media.media_list_entry.media_id,
             )
+            self.sync_stats.deleted += 1
             return
         if not final_media_list.status:
             log.info(
                 f"{self.__class__.__name__}: Skipping {item.type} due to no activity "
                 f"'{self._clean_item_title(item, subitem)}' {{plex_id: {item.guid}}} "
             )
+            self.sync_stats.skipped += 1
             return
 
         log.debug(f"{self.__class__.__name__}: Syncing AniList entry with variables:")
@@ -167,6 +191,7 @@ class BaseSyncClient(ABC, Generic[T, S]):
         log.info(
             f"{self.__class__.__name__}: Synced {item.type} '{self._clean_item_title(item, subitem)}' {{plex_id: {item.guid}}}"
         )
+        self.sync_stats.synced += 1
 
     def _get_plex_media_list(
         self, item: T, subitem: S, anilist_media: Media, animapping: AniMap

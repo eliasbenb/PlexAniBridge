@@ -10,6 +10,7 @@ from src.models.housekeeping import Housekeeping
 from src.settings import Config
 
 from .db import db
+from .sync.base import SyncStats
 from .sync.movie import MovieSyncClient
 from .sync.show import ShowSyncClient
 
@@ -107,18 +108,21 @@ class BridgeClient:
         tmp_last_synced = datetime.now()  # We'll store this if the sync is successful
         plex_sections = self.plex_client.get_sections()
 
+        sync_stats = SyncStats()
         for section in plex_sections:
-            self._sync_section(section)
+            sync_stats += self._sync_section(section)
 
         # Update the sync state
         self._set_last_synced(tmp_last_synced)
         self._set_last_sections_synced({section.title for section in plex_sections})
 
+        log.info(f"{self.__class__.__name__}: Anime mappings sync completed")
         log.info(
-            f"{self.__class__.__name__}: Anime mappings sync completed successfully"
+            f"{self.__class__.__name__}: {sync_stats.synced} items synced, {sync_stats.deleted} items deleted, "
+            f"{sync_stats.skipped} items skipped, {sync_stats.failed} items failed"
         )
 
-    def _sync_section(self, section: Union[MovieSection, ShowSection]) -> None:
+    def _sync_section(self, section: Union[MovieSection, ShowSection]) -> SyncStats:
         """Sync a Plex section with the AniList library
 
         Args:
@@ -134,12 +138,12 @@ class BridgeClient:
             require_watched=True,
         )
 
-        if section.type == "movie":
-            for item in items:
-                self.movie_sync.process_media(item)
-        elif section.type == "show":
-            for item in items:
-                self.show_sync.process_media(item)
+        sync_stats = SyncStats()
+        sync_client = self.movie_sync if section.type == "movie" else self.show_sync
+        for item in items:
+            sync_stats += sync_client.process_media(item)
+
+        return sync_stats
 
     def _should_perform_partial_scan(self) -> bool:
         """Check if a partial scan can be performed

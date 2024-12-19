@@ -91,24 +91,26 @@ class PlexClient:
         Returns:
             list[Union[Movie, Show]]: List of items in the section
         """
-        filters = {}
+        filters = {"and": []}
         if min_last_modified:
             log.debug(
                 f"{self.__class__.__name__}: `PARTIAL_SCAN` is set. Filtering section '{section.title}' "
                 f"by items last updated, viewed, or rated after {min_last_modified}"
             )
-            filters |= {
-                "or": [
-                    {"updatedAt>>=": min_last_modified},
-                    {"lastViewedAt>>=": min_last_modified},
-                    {"lastRatedAt>>=": min_last_modified},
-                ]
-            }
+            filters["and"].append(
+                {
+                    "or": [
+                        {"updatedAt>>=": min_last_modified},
+                        {"lastViewedAt>>=": min_last_modified},
+                        {"lastRatedAt>>=": min_last_modified},
+                    ]
+                }
+            )
         if require_watched:
             log.debug(
                 f"{self.__class__.__name__}: Filtering section '{section.title}' by items that have been watched"
             )
-            filters |= {"viewCount>>=": 0}
+            filters["and"].append({"viewCount>>=": 0})
 
         return section.search(filters=filters)
 
@@ -147,7 +149,8 @@ class PlexClient:
         }
 
         log.debug(
-            f"{self.__class__.__name__}: Getting reviews for '{item.title}' {{plex_id: {item.guid}}}"
+            f"{self.__class__.__name__}: Getting reviews for {item.type} "
+            f"'{item.title}' {{plex_id: {item.guid}}}"
         )
 
         try:
