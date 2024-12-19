@@ -234,6 +234,16 @@ class FuzzyDate(AniListBaseModel):
         """
         return FuzzyDate(year=date.year, month=date.month, day=date.day)
 
+    def to_datetime(self) -> Optional[datetime]:
+        """Convert the FuzzyDate to a datetime object
+
+        Returns:
+            Optional[datetime]: A datetime object or None if the FuzzyDate is incomplete
+        """
+        if not self.year:
+            return None
+        return datetime(year=self.year, month=self.month or 1, day=self.day or 1)
+
     def __eq__(self, other) -> bool:
         if not isinstance(other, FuzzyDate):
             return False
