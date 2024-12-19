@@ -48,9 +48,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
         else:
             return None
 
-    def _calculate_score(
-        self, item: Show, subitem: Season, anilist_media: Media, animapping: AniMap
-    ) -> int:
+    def _calculate_score(self, item: Show, subitem: Season, *_) -> int:
         return subitem.userRating or item.userRating or 0.0
 
     def _calculate_progress(
@@ -96,7 +94,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
 
     def __filter_mapped_episodes(
         self,
-        item: Show,
+        _: Show,
         subitem: Season,
         anilist_media: Media,
         animapping: AniMap,
@@ -108,7 +106,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
 
     def __filter_watched_episodes(
         self,
-        item: Show,
+        _: Show,
         subitem: Season,
         anilist_media: Media,
         animapping: AniMap,

@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from functools import cache
 from typing import Generic, Iterator, Optional, TypeVar, Union
 
 from plexapi.media import Guid
