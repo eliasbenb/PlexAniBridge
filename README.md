@@ -87,7 +87,6 @@ python main.py
 - [x] Destructive sync (fully replace AniList data to match Plex regardless of existing data)
 - [x] Cache AniList responses to avoid rate limits
 - [ ] Special/OVA/ONA support
-- [ ] Use AniList relations for better and quicker matching
 - [ ] Config option for users to choose which fields to sync (status, progress, repeats, rating, notes, start/end dates)
 
 ## Special Thanks/Dependencies
