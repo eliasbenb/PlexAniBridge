@@ -103,7 +103,7 @@ class BaseSyncClient(ABC, Generic[T, S]):
             if r.episodes == episodes
         ]
         best_result, best_ratio = max(
-            ((r, fuzz.ratio(item.title, r.title)) for r in results if r.title),
+            ((r, fuzz.ratio(item.title, str(r.title))) for r in results if r.title),
             default=(None, 0),
             key=lambda x: x[1],
         )
@@ -113,13 +113,13 @@ class BaseSyncClient(ABC, Generic[T, S]):
                 f"{self.__class__.__name__}: No suitable results found during title search "
                 f"for {item.type} '{item.title}' {{plex_id: {item.guid}}}"
             )
-            return []
+            return None
 
         log.info(
             f"{self.__class__.__name__}: Matched '{item.title}' {{plex_id: {item.ratingKey}}} to "
-            f"AniList media '{{anilist_id: {best_result.id}}}' with a ratio of "
-            f"{fuzz.ratio(item.title, best_result.title)}"
+            f"AniList media '{{anilist_id: {best_result.id}}}' with a ratio of {best_ratio}"
         )
+        return best_result
 
     def sync_media(
         self, item: T, subitem: S, anilist_media: Media, animapping: AniMap
