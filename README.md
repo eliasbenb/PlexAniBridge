@@ -12,7 +12,7 @@
 ```yaml
 services:
   plexanibridge:
-    image: ghcr.io/eliasbenb/plexanibridge:main
+    image: ghcr.io/eliasbenb/plexanibridge:latest # :main, :develop, :v0.1.0, etc.
     environment:
       ANILIST_TOKEN: eyJ0eXALOiJKV1DiLCJFbGciOiJSUzI...
       PLEX_URL: http://localhost:32400
