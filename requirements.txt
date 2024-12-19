@@ -18,5 +18,6 @@ smmap==5.0.1
 SQLAlchemy==2.0.36
 sqlmodel==0.0.22
 thefuzz==0.22.1
+tomlkit==0.13.2
 typing_extensions==4.12.2
 urllib3==2.2.3

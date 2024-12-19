@@ -1,5 +1,17 @@
 # PlexAniBridge
 
+PlexAniBridge is a synchronization tool that automatically keeps your AniList profile up-to-date based on your Plex watching activity. The tool is designed to be extremely light-weight and work with both movies and shows.
+
+## Features
+
+- Synchronize watch progress, rating scores, text reviews or notes, watch status, start/end dates, repeat counts
+- Mapping Plex movies, shows, seasons, and episode ranges to AniList using [Kometa mappings](https://github.com/Kometa-Team/Anime-IDs) with fuzzy title search as a fallback
+- Partial scanning support — only consider items added/updated/rated since last the sync
+- Scheduled sync jobs with configurable polling capabilities
+- Configurable safe/destructive syncs — decide between making only progressive (increasing) updates or potentially regressive (decreasing) updates
+- Intelligent caching of Plex and AniList requests to reduce rate limits
+- [Docker](#docker) 🐳 deployments
+
 ## Quick Start
 
 ### Docker
@@ -12,7 +24,7 @@
 ```yaml
 services:
   plexanibridge:
-    image: ghcr.io/eliasbenb/plexanibridge:main
+    image: ghcr.io/eliasbenb/plexanibridge:latest # :main, :develop, :v0.1.0, etc.
     environment:
       ANILIST_TOKEN: eyJ0eXALOiJKV1DiLCJFbGciOiJSUzI...
       PLEX_URL: http://localhost:32400
@@ -73,21 +85,8 @@ python main.py
 ## TODO
 
 > [!WARNING]
-> This project is still in development, while it is usable, I cannot guarantee that it will always work as expected.
+> This project is still in development, while it is usable, I cannot guarantee that it will be stable for every release.
 
-- [x] Sync watch progress
-- [x] Sync rating scores
-- [x] Sync text-based reviews/notes
-- [x] Sync status (current, completed, planning) (TODO: dropped, paused)
-- [x] Sync start/end dates (TODO: support for shows)
-- [x] Sync repeat count
-- [x] Partial scanning, only consider items added/updated/rated since last sync
-- [x] Scheduled sync jobs
-- [x] Match anime with Kometa mappings
-- [x] Match anime with titles
-- [x] Docker support
-- [x] Destructive sync (fully replace AniList data to match Plex regardless of existing data)
-- [x] Cache AniList responses to avoid rate limits
 - [ ] Special/OVA/ONA support
 - [ ] Custom mapping support
 - [ ] Config option for users to choose which fields to sync (status, progress, repeats, rating, notes, start/end dates)

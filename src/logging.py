@@ -1,4 +1,5 @@
 import logging
+import re
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
@@ -27,6 +28,19 @@ class ColorFormatter(logging.Formatter):
         """
         orig_levelname = record.levelname
         record.levelname = f"{self.COLORS.get(record.levelname, '')}{record.levelname}{Style.RESET_ALL}"
+
+        if isinstance(record.msg, str):
+            # Color strings in quotes
+            record.msg = re.sub(
+                r"\u2018.*?\u2019",
+                f"{Fore.LIGHTBLUE_EX}\\g<0>{Style.RESET_ALL}",
+                record.msg,
+            )
+            # Color curly brace values
+            record.msg = re.sub(
+                r"({[^}]*})", f"{Style.DIM}\\1{Style.RESET_ALL}", record.msg
+            )
+
         result = super().format(record)
         record.levelname = orig_levelname
         return result

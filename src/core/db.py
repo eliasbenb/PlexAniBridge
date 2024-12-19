@@ -24,9 +24,14 @@ class PlexAniBridgeDB:
             try:
                 self.db_path.parent.mkdir(parents=True, exist_ok=True)
             except PermissionError:
-                raise PermissionError(f"Cannot create {self.db_path.parent}.")
+                raise PermissionError(
+                    f"{self.__class__.__name__}: You do not have permissions to create "
+                    f"database files at '{self.db_path.parent}'"
+                )
         elif not self.db_path.is_file():
-            raise ValueError(f"Path {self.db_path} is not a file.")
+            raise ValueError(
+                f"{self.__class__.__name__}: The database path '{self.db_path}' is not a file"
+            )
 
         engine = create_engine(f"sqlite:///{self.db_path}")
         SQLModel.metadata.create_all(engine)

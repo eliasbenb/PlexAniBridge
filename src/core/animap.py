@@ -1,8 +1,8 @@
 from hashlib import md5
-from typing import Literal, Optional, Union
+from typing import Optional, Union
 
 import requests
-from sqlmodel import Session, delete, select
+from sqlmodel import Session, delete, func, select
 from sqlmodel.sql.expression import and_, or_
 
 from src import log
@@ -62,15 +62,11 @@ class AniMapClient:
             )  # Delete any mappings that are no longer in the CDN data
 
             for value in values:  # Insert or update the mappings
-                if "anilist_id" in value and value["anilist_id"]:
-                    value["anilist_id"] = [
-                        int(id) for id in str(value["anilist_id"]).split(",")
-                    ]
-                if "mal_id" in value and value["mal_id"]:
+                if value.get("mal_id"):
                     value["mal_id"] = [
                         int(id) for id in str(value["mal_id"]).split(",")
                     ]
-                if "imdb_id" in value and value["imdb_id"]:
+                if value.get("imdb_id"):
                     value["imdb_id"] = str(value["imdb_id"]).split(",")
 
                 session.merge(AniMap(**value))
@@ -83,12 +79,12 @@ class AniMapClient:
 
     def get_mappings(
         self,
-        type: Literal["movie", "show"],
         imdb: Optional[str] = None,
         tmdb: Optional[int] = None,
         tvdb: Optional[int] = None,
         season: Optional[int] = None,
         epoffset: Optional[int] = None,
+        is_movie: bool = True,
     ) -> list[AniMap]:
         """Get the AniMap entries that match the provided criteria
 
@@ -108,9 +104,9 @@ class AniMapClient:
         with Session(db) as session:
             partial_matches = {AniMap.imdb_id.contains: imdb}
             exact_matches = {}
-            if type == "movie":
+            if is_movie:
                 partial_matches |= {AniMap.tmdb_movie_id.__eq__: tmdb}
-            elif type == "show":
+            else:
                 partial_matches |= {
                     AniMap.tmdb_show_id.__eq__: tmdb,
                     AniMap.tvdb_id.__eq__: tvdb,
@@ -120,7 +116,16 @@ class AniMapClient:
                     AniMap.tvdb_epoffset.__eq__: epoffset,
                 }
 
-            query = select(AniMap)
+            # There is an edge case of about ~120 entries where the entry does not map directly to an AniList ID and
+            # is instead mapped to multiple MAL IDs. Handling this would vastly increase complexity and computation.
+            # So, I'm simply ignoring those ~120 entries by forcing there to be a 1:1 mapping.
+            query = select(AniMap).where(
+                or_(
+                    AniMap.anilist_id.is_not(None),
+                    AniMap.mal_id.is_(None),
+                    func.json_array_length(AniMap.mal_id) == 1,
+                )
+            )
             if any(v is not None for v in partial_matches.values()):
                 query = query.where(
                     or_(*(op(v) for op, v in partial_matches.items() if v is not None))
@@ -130,5 +135,4 @@ class AniMapClient:
                     and_(*(op(v) for op, v in exact_matches.items() if v is not None))
                 )
 
-            res = session.exec(query).all()
-        return [r for r in res if r.anilist_id or r.mal_id]
+            return session.exec(query).all()

@@ -1,6 +1,7 @@
 import json
 from datetime import date, datetime, timedelta, timezone
 from enum import StrEnum
+from functools import total_ordering
 from typing import Annotated, Any, ClassVar, Optional, Union, get_args, get_origin
 
 from pydantic import AfterValidator, AliasGenerator, BaseModel, ConfigDict
@@ -88,6 +89,7 @@ class MediaSort(AniListBaseEnum):
     FAVOURITES_DESC = "FAVOURITES_DESC"
 
 
+@total_ordering
 class MediaListStatus(AniListBaseEnum):
     _ignore_ = ["__priority"]
 
@@ -111,24 +113,10 @@ class MediaListStatus(AniListBaseEnum):
     def __lt__(self, other: "MediaListStatus") -> bool:
         return self.__priority[self.value] > self.__priority[other.value]
 
-    def __le__(self, other: "MediaListStatus") -> bool:
-        return self.__priority[self.value] >= self.__priority[other.value]
-
-    def __gt__(self, other: "MediaListStatus") -> bool:
-        return self.__priority[self.value] < self.__priority[other.value]
-
-    def __ge__(self, other: "MediaListStatus") -> bool:
-        return self.__priority[self.value] <= self.__priority[other.value]
-
     def __eq__(self, other: Any) -> bool:
         if isinstance(other, MediaListStatus):
             return self.value == other.value
         return self.value == other
-
-    def __ne__(self, other: Any) -> bool:
-        if isinstance(other, MediaListStatus):
-            return self.value != other.value
-        return self.value != other
 
 
 class AniListBaseModel(BaseModel):
@@ -137,6 +125,13 @@ class AniListBaseModel(BaseModel):
     _processed_models: ClassVar[set] = set()
 
     def model_dump_json(self, **kwargs: Any) -> str:
+        """Serialize the model to JSON, converting all keys to camelCase
+
+        Because AniList uses camelCase for its GraphQL API, we need to convert all the keys to camelCase.
+
+        Returns:
+            str: JSON serialized string of the model
+        """
         json_str = super().model_dump_json(**kwargs)
         data = json.loads(json_str)
         camel_data = {to_camel(k): v for k, v in data.items()}
@@ -144,7 +139,17 @@ class AniListBaseModel(BaseModel):
 
     @classmethod
     def model_dump_graphql(cls, indent_level: int = 0) -> str:
-        """Generate GraphQL query fields with proper indentation"""
+        """Generate GraphQL query fields with proper indentation
+
+        This is a class method that converts all the avaiilable fields into a GraphQL query with support for nested fields.
+        This allows us to dynamically generate GraphQL queries without having to manually write them for each model.
+
+        Args:
+            indent_level (int, optional): How many levels to indent. Defaults to 0.
+
+        Returns:
+            str: The GraphQL query fields with proper indentation
+        """
         if cls.__name__ in cls._processed_models:
             return ""
 
@@ -195,12 +200,23 @@ class MediaTitle(AniListBaseModel):
     native: Optional[str] = None
 
     def titles(self) -> list[str]:
+        """Return a list of all the available titles
+
+        Returns:
+            list[str]: All the available titles
+        """
         return [getattr(self, t) for t in self.model_fields if t]
 
     def __str__(self) -> str:
+        """Return the first available title or an empty string
+
+        Returns:
+            str: A title or an empty string
+        """
         return self.english or self.romaji or self.native or ""
 
 
+@total_ordering
 class FuzzyDate(AniListBaseModel):
     year: Optional[int] = None
     month: Optional[int] = None
@@ -208,39 +224,25 @@ class FuzzyDate(AniListBaseModel):
 
     @staticmethod
     def from_date(date: Union[date, datetime]) -> "FuzzyDate":
+        """Create a FuzzyDate from a date or datetime object
+
+        Args:
+            date (Union[date, datetime]): A date or datetime object
+
+        Returns:
+            FuzzyDate: An equivalent FuzzyDate object
+        """
         return FuzzyDate(year=date.year, month=date.month, day=date.day)
 
-    def __lt__(self, other: Optional["FuzzyDate"]) -> bool:
-        if other is None:
-            return False
-        return (
-            self.year < other.year or self.month < other.month or self.day < other.day
-        )
+    def to_datetime(self) -> Optional[datetime]:
+        """Convert the FuzzyDate to a datetime object
 
-    def __le__(self, other: Optional["FuzzyDate"]) -> bool:
-        if other is None:
-            return False
-        return (
-            self.year <= other.year
-            or self.month <= other.month
-            or self.day <= other.day
-        )
-
-    def __gt__(self, other: Optional["FuzzyDate"]) -> bool:
-        if other is None:
-            return True
-        return (
-            self.year > other.year or self.month > other.month or self.day > other.day
-        )
-
-    def __ge__(self, other: Optional["FuzzyDate"]) -> bool:
-        if other is None:
-            return True
-        return (
-            self.year >= other.year
-            or self.month >= other.month
-            or self.day >= other.day
-        )
+        Returns:
+            Optional[datetime]: A datetime object or None if the FuzzyDate is incomplete
+        """
+        if not self.year:
+            return None
+        return datetime(year=self.year, month=self.month or 1, day=self.day or 1)
 
     def __eq__(self, other) -> bool:
         if not isinstance(other, FuzzyDate):
@@ -251,14 +253,17 @@ class FuzzyDate(AniListBaseModel):
             and self.day == other.day
         )
 
-    def __ne__(self, other: Any) -> bool:
-        if not isinstance(other, FuzzyDate):
-            return True
-        return (
-            self.year != other.year
-            or self.month != other.month
-            or self.day != other.day
+    def __lt__(self, other: Optional["FuzzyDate"]) -> bool:
+        if other is None:
+            return False
+        return ((self.year or 0), (self.month or 0), (self.day or 0)) < (
+            (other.year or 0),
+            (other.month or 0),
+            (other.day or 0),
         )
+
+    def __str__(self) -> str:
+        return self.__repr__()
 
     def __repr__(self) -> str:
         return (
@@ -281,6 +286,17 @@ class MediaList(AniListBaseModel):
     completed_at: Optional[FuzzyDate] = None
     created_at: Optional[UTCDateTime] = None
     updated_at: Optional[UTCDateTime] = None
+
+    def __str__(self) -> str:
+        notes_truncated = None
+        if self.notes:
+            notes_truncated = self.notes[:50].replace("\n", "  ") + "..."
+
+        return (
+            f"(status={self.status}, score={self.score}, progress={self.progress}, "
+            f"repeat={self.repeat}, notes={notes_truncated}, started_at={self.started_at}, "
+            f"completed_at={self.completed_at})"
+        )
 
 
 class AiringSchedule(AniListBaseModel):

@@ -8,11 +8,7 @@ from thefuzz import fuzz
 
 from src import log
 from src.core import AniListClient, AniMapClient, PlexClient
-from src.models.anilist import (
-    Media,
-    MediaList,
-    MediaListStatus,
-)
+from src.models.anilist import FuzzyDate, Media, MediaList, MediaListStatus
 from src.models.animap import AniMap
 from src.settings import SyncField
 
@@ -84,14 +80,14 @@ class BaseSyncClient(ABC, Generic[T, S]):
 
     def process_media(self, item: T) -> SyncStats:
         log.debug(
-            f"{self.__class__.__name__}: Processing {item.type} '{item.title}' {{plex_id: {item.guid}}}"
+            f"{self.__class__.__name__}: Processing {item.type} \u2018{item.title}\u2019 {{plex_id: {item.guid}}}"
         )
 
         for subitem, animapping in self.map_media(item):
             try:
                 if animapping and (animapping.anilist_id or animapping.mal_id):
                     anilist_media = self.anilist_client.get_anime(
-                        anilist_id=next(iter(animapping.anilist_id or ()), None),
+                        anilist_id=animapping.anilist_id,
                         mal_id=next(iter(animapping.mal_id or ()), None),
                     )
                     match_method = "mapping lookup"
@@ -102,21 +98,29 @@ class BaseSyncClient(ABC, Generic[T, S]):
                 if not anilist_media:
                     log.warning(
                         f"{self.__class__.__name__}: No suitable AniList results found during mapping "
-                        f"lookup or title search for {item.type} '{self._clean_item_title(item, subitem)}' "
+                        f"lookup or title search for {item.type} \u2018{self._clean_item_title(item, subitem)}\u2019 "
                         f"{{plex_id: {item.guid}}}"
                     )
                     continue
 
+                animapping = animapping or AniMap(
+                    anilist_id=anilist_media.id,
+                    tvdb_epoffset=0 if isinstance(subitem, Season) else None,
+                    tvdb_season=subitem.seasonNumber
+                    if isinstance(subitem, Season)
+                    else None,
+                )
+
                 log.debug(
                     f"{self.__class__.__name__}: Found AniList entry using {match_method} for {item.type} "
-                    f"'{self._clean_item_title(item, subitem)}' {{plex_id: {item.guid}}}"
+                    f"\u2018{self._clean_item_title(item, subitem)}\u2019 {{plex_id: {item.guid}, anilist_id: {anilist_media.id}}}"
                 )
 
                 self.sync_media(item, subitem, anilist_media, animapping)
             except Exception as e:
                 log.exception(
                     f"{self.__class__.__name__}: Failed to process {item.type} "
-                    f"'{self._clean_item_title(item, subitem)}' {{plex_id: {item.guid}}}",
+                    f"\u2018{self._clean_item_title(item, subitem)}\u2019 {{plex_id: {item.guid}}}",
                     exc_info=e,
                 )
                 self.sync_stats.failed += 1
@@ -149,11 +153,6 @@ class BaseSyncClient(ABC, Generic[T, S]):
     def sync_media(
         self, item: T, subitem: S, anilist_media: Media, animapping: AniMap
     ) -> None:
-        log.debug(
-            f"{self.__class__.__name__}: Syncing {item.type} "
-            f"'{self._clean_item_title(item, subitem)}' {{plex_id: {item.guid}}}"
-        )
-
         anilist_media_list = anilist_media.media_list_entry
         plex_media_list = self._get_plex_media_list(
             item, subitem, anilist_media, animapping
@@ -162,9 +161,9 @@ class BaseSyncClient(ABC, Generic[T, S]):
         final_media_list = self._merge_media_lists(anilist_media_list, plex_media_list)
 
         if final_media_list == anilist_media_list:
-            log.debug(
-                f"{self.__class__.__name__}: Entry already up to date for "
-                f"{item.type} '{self._clean_item_title(item, subitem)}' {{plex_id: {item.guid}}}"
+            log.info(
+                f"{self.__class__.__name__}: Skipping {item.type} because it is already up to date "
+                f"\u2018{self._clean_item_title(item, subitem)}\u2019 {{plex_id: {item.guid}}}"
             )
             self.sync_stats.skipped += 1
             return
@@ -184,25 +183,29 @@ class BaseSyncClient(ABC, Generic[T, S]):
         if not final_media_list.status:
             log.info(
                 f"{self.__class__.__name__}: Skipping {item.type} due to no activity "
-                f"'{self._clean_item_title(item, subitem)}' {{plex_id: {item.guid}}} "
+                f"\u2018{self._clean_item_title(item, subitem)}\u2019 {{plex_id: {item.guid}}} "
             )
             self.sync_stats.skipped += 1
             return
 
-        log.debug(f"{self.__class__.__name__}: Syncing AniList entry with variables:")
-        log.debug(f"\t\t{final_media_list}")
+        log.debug(
+            f"{self.__class__.__name__}: Syncing AniList entry for {item.type} "
+            f"\u2018{self._clean_item_title(item, subitem)}\u2019 {{plex_id: {item.guid}}}"
+        )
+        log.debug(f"\t\tBEFORE => {anilist_media_list}")
+        log.debug(f"\t\tAFTER  => {final_media_list}")
 
         self.anilist_client.update_anime_entry(final_media_list)
 
         log.info(
-            f"{self.__class__.__name__}: Synced {item.type} '{self._clean_item_title(item, subitem)}' {{plex_id: {item.guid}}}"
+            f"{self.__class__.__name__}: Synced {item.type} \u2018{self._clean_item_title(item, subitem)}\u2019 {{plex_id: {item.guid}}}"
         )
         self.sync_stats.synced += 1
 
     def _get_plex_media_list(
         self, item: T, subitem: S, anilist_media: Media, animapping: AniMap
     ) -> MediaList:
-        return MediaList(
+        media_list = MediaList(
             id=anilist_media.media_list_entry
             and anilist_media.media_list_entry.id
             or -1,
@@ -214,13 +217,18 @@ class BaseSyncClient(ABC, Generic[T, S]):
             repeat=self._calculate_repeats(item, subitem, anilist_media, animapping),
             notes=self.plex_client.get_user_review(subitem)
             or self.plex_client.get_user_review(item),
-            started_at=self._calculate_started_date(
+            started_at=self._calculate_started_at(
                 item, subitem, anilist_media, animapping
             ),
-            completed_at=self._calculate_completed_date(
+            completed_at=self._calculate_completed_at(
                 item, subitem, anilist_media, animapping
             ),
         )
+
+        if media_list.status != MediaListStatus.COMPLETED:
+            media_list.completed_at = None
+
+        return media_list
 
     @abstractmethod
     def _calculate_status(
@@ -247,15 +255,15 @@ class BaseSyncClient(ABC, Generic[T, S]):
         pass
 
     @abstractmethod
-    def _calculate_started_date(
+    def _calculate_started_at(
         self, item: T, subitem: S, anilist_media: Media, animapping: AniMap
-    ) -> Optional[Media]:
+    ) -> Optional[FuzzyDate]:
         pass
 
     @abstractmethod
-    def _calculate_completed_date(
+    def _calculate_completed_at(
         self, item: T, subitem: S, anilist_media: Media, animapping: AniMap
-    ) -> Optional[Media]:
+    ) -> Optional[FuzzyDate]:
         pass
 
     def _merge_media_lists(
@@ -269,7 +277,7 @@ class BaseSyncClient(ABC, Generic[T, S]):
 
         NE_KEYS = ("score", "notes")
         GT_KEYS = ("status", "progress", "repeat")
-        LT_KEYS = ()
+        LT_KEYS = ("started_at", "completed_at")
 
         for key in NE_KEYS:
             plex_val = getattr(plex_media_list, key)

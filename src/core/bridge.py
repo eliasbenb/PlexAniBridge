@@ -129,7 +129,9 @@ class BridgeClient:
         Args:
             section (Union[MovieSection, ShowSection]): The Plex section to sync
         """
-        log.debug(f"{self.__class__.__name__}: Syncing section '{section.title}'")
+        log.debug(
+            f"{self.__class__.__name__}: Syncing section \u2018{section.title}\u2019"
+        )
 
         items = self.plex_client.get_section_items(
             section,
