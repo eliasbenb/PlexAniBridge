@@ -132,10 +132,10 @@ class AniListBaseModel(BaseModel):
         Returns:
             str: JSON serialized string of the model
         """
-        json_str = super().model_dump_json(**kwargs)
+        json_str = super().model_dump_json()
         data = json.loads(json_str)
         camel_data = {to_camel(k): v for k, v in data.items()}
-        return json.dumps(camel_data)
+        return json.dumps(camel_data, **kwargs)
 
     @classmethod
     def model_dump_graphql(cls, indent_level: int = 0) -> str:
