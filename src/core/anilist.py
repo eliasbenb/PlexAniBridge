@@ -42,7 +42,7 @@ class AniListClient:
                 name
             }
         }
-        """)
+        """).strip()
 
         response = self._make_request(query)["data"]["Viewer"]
         return User(**response)
@@ -64,7 +64,7 @@ class AniListClient:
 {MediaList.model_dump_graphql(indent_level=3)}
             }}
         }}
-        """)
+        """).strip()
 
         if self.dry_run:  # Skip the request, only log the variables
             log.info(
@@ -98,7 +98,7 @@ class AniListClient:
                 deleted
             }
         }
-        """)
+        """).strip()
 
         if self.dry_run:
             log.info(
@@ -136,7 +136,7 @@ class AniListClient:
                     }}
                 }}
             }}
-        """)
+        """).strip()
 
         formats = (
             [MediaFormat.MOVIE, MediaFormat.SPECIAL]
@@ -200,7 +200,7 @@ class AniListClient:
 {MediaWithRelations.model_dump_graphql(indent_level=3) if relations else Media.model_dump_graphql(indent_level=3)}
             }}
         }}
-        """)
+        """).strip()
 
         log.debug(
             f"{self.__class__.__name__}: Getting AniList media object {{{id_type_str}: {media_id}}}"
