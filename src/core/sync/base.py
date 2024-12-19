@@ -107,6 +107,12 @@ class BaseSyncClient(ABC, Generic[T, S]):
                     )
                     continue
 
+                animapping = animapping or AniMap(
+                    anilist_id=[anilist_media.id],
+                    tvdb_epoffset=0,
+                    tvdb_season=subitem.seasonNumber,
+                )
+
                 log.debug(
                     f"{self.__class__.__name__}: Found AniList entry using {match_method} for {item.type} "
                     f"'{self._clean_item_title(item, subitem)}' {{plex_id: {item.guid}}}"
