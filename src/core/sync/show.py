@@ -12,30 +12,13 @@ from .base import BaseSyncClient, ParsedGuids
 class ShowSyncClient(BaseSyncClient[Show, Season]):
     def map_media(self, item: Show) -> Iterator[tuple[Season, Optional[AniMap]]]:
         guids = ParsedGuids.from_guids(item.guids)
-
         seasons: list[Season] = item.seasons(index__gt=0)
         season_map = {s.index: s for s in seasons}
 
-        animappings = self.animap_client.get_mappings(**dict(guids), is_movie=False)
-
-        for animapping in animappings:
+        for animapping in self.animap_client.get_mappings(item.type, **dict(guids)):
             if animapping.tvdb_season is None:
                 continue
             if animapping.tvdb_season in season_map:
-                if guids.imdb and animapping.imdb_id:
-                    try:
-                        idx = animapping.imdb_id.index(guids.imdb)
-                        animapping.anilist_id = (
-                            [animapping.anilist_id[idx]]
-                            if animapping.anilist_id
-                            else None
-                        )
-                        animapping.mal_id = (
-                            [animapping.mal_id[idx]] if animapping.mal_id else None
-                        )
-                    except (ValueError, IndexError):
-                        pass
-
                 yield season_map.pop(animapping.tvdb_season), animapping
 
         for season in season_map.values():
