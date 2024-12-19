@@ -216,11 +216,11 @@ class PlexClient:
     @cache
     def get_history(
         self,
-        item: Union[Movie, Show, Season],
+        item: Union[Movie, Show, Season, Episode],
         min_date: Optional[datetime] = None,
         max_results: Optional[int] = None,
         sort_asc: bool = True,
-    ) -> Union[MovieHistory, EpisodeHistory]:
+    ) -> Union[list[MovieHistory], list[EpisodeHistory]]:
         """Get the history for a movie, show, or season
 
         Args:

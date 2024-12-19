@@ -26,8 +26,7 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie]):
             return MediaListStatus.COMPLETED
         elif item.onWatchlist():
             return MediaListStatus.PLANNING
-        else:
-            return None
+        return None
 
     def _calculate_score(self, item: Movie, *_) -> int:
         return item.userRating or 0.0
