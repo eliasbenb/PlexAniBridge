@@ -68,15 +68,15 @@ class BaseSyncClient(ABC, Generic[T, S]):
 
         for subitem, animapping in self.map_media(item):
             try:
-                if not animapping or animapping.anilist_id:
-                    anilist_media = self.search_media(item, subitem)
-                    match_method = "title search"
-                else:
+                if animapping and (animapping.anilist_id or animapping.mal_id):
                     anilist_media = self.anilist_client.get_anime(
                         anilist_id=next(iter(animapping.anilist_id or ()), None),
                         mal_id=next(iter(animapping.mal_id or ()), None),
                     )
                     match_method = "mapping lookup"
+                else:
+                    anilist_media = self.search_media(item, subitem)
+                    match_method = "title search"
 
                 if not anilist_media:
                     log.warning(
