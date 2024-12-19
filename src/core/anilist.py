@@ -1,3 +1,4 @@
+from textwrap import dedent
 from time import sleep
 from typing import Optional, Union
 
@@ -25,68 +26,20 @@ class AniListClient:
         self.rate_limiter = RateLimiter(self.__class__.__name__, requests_per_minute=90)
         self.anilist_user = self.get_user()
 
-    def _make_request(
-        self, query: str, variables: Optional[Union[dict, str]] = None
-    ) -> dict:
-        """Makes a request to the AniList API
-
-        All requests are rate limited to 90 requests per minute.
-
-        Args:
-            query (str): The GraphQL query
-            variables (Optional[dict], optional): The variables for the query. Defaults to None.
-
-        Returns:
-            dict: The JSON response from the API
-
-        Raises:
-            requests.HTTPError: If the request fails
-        """
-        self.rate_limiter.wait_if_needed()  # Rate limit the requests
-
-        response = requests.post(
-            self.API_URL,
-            headers={
-                "Authorization": f"Bearer {self.anilist_token}",
-                "Content-Type": "application/json",
-                "Accept": "application/json",
-            },
-            json={"query": query, "variables": variables or {}},
-        )
-
-        if response.status_code == 429:  # Handle rate limit retries
-            retry_after = int(response.headers.get("Retry-After", 60))
-            log.warning(
-                f"{self.__class__.__name__}: Rate limit exceeded, waiting {retry_after} seconds"
-            )
-            sleep(retry_after + 1)
-            return self._make_request(query, variables)
-
-        try:
-            response.raise_for_status()
-        except requests.HTTPError as e:
-            log.error(
-                f"{self.__class__.__name__}: Failed to make request to AniList API:",
-                exc_info=e,
-            )
-            log.error(f"\t\t{response.text}")
-            raise e
-        return response.json()
-
     def get_user(self) -> User:
         """Gets the authenticated user's username
 
         Returns:
             str: The username associated with the AniList token
         """
-        query = """
+        query = dedent("""
         query {
             Viewer {
                 id
                 name
             }
         }
-        """
+        """)
 
         response = self._make_request(query)["data"]["Viewer"]
         return User(**response)
@@ -102,13 +55,13 @@ class AniListClient:
         """
         variables = media_list_entry.model_dump_json()
 
-        query = f"""
+        query = dedent(f"""
         mutation ($mediaId: Int, $status: MediaListStatus, $score: Float, $progress: Int, $repeat: Int, $notes: String, $startedAt: FuzzyDateInput, $completedAt: FuzzyDateInput) {{
             SaveMediaListEntry(mediaId: $mediaId, status: $status, score: $score, progress: $progress, repeat: $repeat, notes: $notes, startedAt: $startedAt, completedAt: $completedAt) {{
-                {MediaList.model_dump_graphql()}
+{MediaList.model_dump_graphql(indent_level=3)}
             }}
         }}
-        """
+        """)
 
         if self.dry_run:  # Skip the request, only log the variables
             log.info(
@@ -136,13 +89,13 @@ class AniListClient:
             id=entry_id, media_id=media_id, user_id=self.anilist_user.id
         ).model_dump()
 
-        query = """
+        query = dedent("""
         mutation ($id: Int) {
             DeleteMediaListEntry(id: $id) {
                 deleted
             }
         }
-        """
+        """)
 
         if self.dry_run:
             log.info(
@@ -166,15 +119,15 @@ class AniListClient:
         Returns:
             list[Media]: The search results
         """
-        query = f"""
+        query = dedent(f"""
         query ($search: String, $limit: Int, $episodes: Int) {{
             Page(perPage: $limit) {{
                 media(search: $search, type: ANIME, episodes: $episodes) {{
-                    {Media.model_dump_graphql()}
+{Media.model_dump_graphql(indent_level=4)}
                 }}
             }}
         }}
-        """
+        """)
 
         variables = {"search": search_str, "limit": limit, "episods": episodes}
 
@@ -211,13 +164,13 @@ class AniListClient:
         if not media_id:
             raise ValueError("Either an AniList ID or a MAL ID must be provided")
 
-        query = f"""
+        query = dedent(f"""
         query ($id: Int) {{
             Media({id_type}: $id, type: ANIME) {{
-                {MediaWithRelations.model_dump_graphql() if relations else Media.model_dump_graphql()}
+{MediaWithRelations.model_dump_graphql(indent_level=3) if relations else Media.model_dump_graphql(indent_level=3)}
             }}
         }}
-        """
+        """)
 
         log.debug(
             f"{self.__class__.__name__}: Getting AniList media object {{{id_type_str}: {media_id}}}"
@@ -228,3 +181,50 @@ class AniListClient:
             return MediaWithRelations(**response["data"]["Media"])
         else:
             return Media(**response["data"]["Media"])
+
+    def _make_request(
+        self, query: str, variables: Optional[Union[dict, str]] = None
+    ) -> dict:
+        """Makes a request to the AniList API
+
+        All requests are rate limited to 90 requests per minute.
+
+        Args:
+            query (str): The GraphQL query
+            variables (Optional[dict], optional): The variables for the query. Defaults to None.
+
+        Returns:
+            dict: The JSON response from the API
+
+        Raises:
+            requests.HTTPError: If the request fails
+        """
+        self.rate_limiter.wait_if_needed()  # Rate limit the requests
+        response = requests.post(
+            self.API_URL,
+            headers={
+                "Authorization": f"Bearer {self.anilist_token}",
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            },
+            json={"query": query, "variables": variables or {}},
+        )
+
+        if response.status_code == 429:  # Handle rate limit retries
+            retry_after = int(response.headers.get("Retry-After", 60))
+            log.warning(
+                f"{self.__class__.__name__}: Rate limit exceeded, waiting {retry_after} seconds"
+            )
+            sleep(retry_after + 1)
+            return self._make_request(query, variables)
+
+        try:
+            response.raise_for_status()
+        except requests.HTTPError as e:
+            log.error(
+                f"{self.__class__.__name__}: Failed to make request to AniList API:",
+                exc_info=e,
+            )
+            log.error(f"\t\t{response.text}")
+            raise e
+        return response.json()

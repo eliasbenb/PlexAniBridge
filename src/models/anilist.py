@@ -143,13 +143,15 @@ class AniListBaseModel(BaseModel):
         return json.dumps(camel_data)
 
     @classmethod
-    def model_dump_graphql(cls) -> str:
+    def model_dump_graphql(cls, indent_level: int = 0) -> str:
+        """Generate GraphQL query fields with proper indentation"""
         if cls.__name__ in cls._processed_models:
             return ""
 
         cls._processed_models.add(cls.__name__)
         fields = cls.model_fields
         graphql_fields = []
+        indent = "    " * indent_level
 
         for field_name, field in fields.items():
             field_type = (
@@ -163,14 +165,13 @@ class AniListBaseModel(BaseModel):
             if isinstance(field_type, type) and issubclass(
                 field_type, AniListBaseModel
             ):
-                nested_fields = field_type.model_dump_graphql()
+                nested_fields = field_type.model_dump_graphql(indent_level + 1)
                 if nested_fields:
-                    graphql_fields.append(f"""
-                    {camel_field_name} {{
-                        {nested_fields}
-                    }}""")
+                    graphql_fields.append(
+                        f"{indent}{camel_field_name} {{\n{nested_fields}\n{indent}}}"
+                    )
             else:
-                graphql_fields.append(camel_field_name)
+                graphql_fields.append(f"{indent}{camel_field_name}")
 
         cls._processed_models.remove(cls.__name__)
         return "\n".join(graphql_fields)
