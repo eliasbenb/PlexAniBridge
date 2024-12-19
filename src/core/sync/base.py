@@ -87,7 +87,7 @@ class BaseSyncClient(ABC, Generic[T, S]):
             try:
                 if animapping and (animapping.anilist_id or animapping.mal_id):
                     anilist_media = self.anilist_client.get_anime(
-                        anilist_id=next(iter(animapping.anilist_id or ()), None),
+                        anilist_id=animapping.anilist_id,
                         mal_id=next(iter(animapping.mal_id or ()), None),
                     )
                     match_method = "mapping lookup"
@@ -104,14 +104,16 @@ class BaseSyncClient(ABC, Generic[T, S]):
                     continue
 
                 animapping = animapping or AniMap(
-                    anilist_id=[anilist_media.id],
-                    tvdb_epoffset=0,
-                    tvdb_season=subitem.seasonNumber,
+                    anilist_id=anilist_media.id,
+                    tvdb_epoffset=0 if isinstance(subitem, Season) else None,
+                    tvdb_season=subitem.seasonNumber
+                    if isinstance(subitem, Season)
+                    else None,
                 )
 
                 log.debug(
                     f"{self.__class__.__name__}: Found AniList entry using {match_method} for {item.type} "
-                    f"\u2018{self._clean_item_title(item, subitem)}\u2019 {{plex_id: {item.guid}}}"
+                    f"\u2018{self._clean_item_title(item, subitem)}\u2019 {{plex_id: {item.guid}, anilist_id: {anilist_media.id}}}"
                 )
 
                 self.sync_media(item, subitem, anilist_media, animapping)
@@ -151,11 +153,6 @@ class BaseSyncClient(ABC, Generic[T, S]):
     def sync_media(
         self, item: T, subitem: S, anilist_media: Media, animapping: AniMap
     ) -> None:
-        log.debug(
-            f"{self.__class__.__name__}: Syncing {item.type} "
-            f"\u2018{self._clean_item_title(item, subitem)}\u2019 {{plex_id: {item.guid}}}"
-        )
-
         anilist_media_list = anilist_media.media_list_entry
         plex_media_list = self._get_plex_media_list(
             item, subitem, anilist_media, animapping

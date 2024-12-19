@@ -11,11 +11,11 @@ from .base import BaseSyncClient, ParsedGuids
 class MovieSyncClient(BaseSyncClient[Movie, Movie]):
     def map_media(self, item: Movie) -> Iterator[tuple[Movie, Optional[AniMap]]]:
         guids = ParsedGuids.from_guids(item.guids)
-        animapping = self.animap_client.get_mappings(item.type, **dict(guids))
-        result = next(iter(animapping), None)
+        animapping = next(
+            iter(self.animap_client.get_mappings(**dict(guids), is_movie=True)), None
+        )
 
-        if result:
-            yield item, result
+        yield item, animapping
 
     def search_media(self, item: Movie, *_) -> Optional[Media]:
         results = self.anilist_client.search_anime(item.title, True, 1)

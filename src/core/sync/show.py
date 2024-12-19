@@ -15,7 +15,9 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
         seasons: list[Season] = item.seasons(index__gt=0)
         season_map = {s.index: s for s in seasons}
 
-        for animapping in self.animap_client.get_mappings(item.type, **dict(guids)):
+        for animapping in self.animap_client.get_mappings(
+            **dict(guids), is_movie=False
+        ):
             if animapping.tvdb_season is None:
                 continue
             if animapping.tvdb_season in season_map:
