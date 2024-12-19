@@ -1,6 +1,7 @@
 import json
 from datetime import date, datetime, timedelta, timezone
 from enum import StrEnum
+from functools import total_ordering
 from typing import Annotated, Any, ClassVar, Optional, Union, get_args, get_origin
 
 from pydantic import AfterValidator, AliasGenerator, BaseModel, ConfigDict
@@ -88,6 +89,7 @@ class MediaSort(AniListBaseEnum):
     FAVOURITES_DESC = "FAVOURITES_DESC"
 
 
+@total_ordering
 class MediaListStatus(AniListBaseEnum):
     _ignore_ = ["__priority"]
 
@@ -111,24 +113,10 @@ class MediaListStatus(AniListBaseEnum):
     def __lt__(self, other: "MediaListStatus") -> bool:
         return self.__priority[self.value] > self.__priority[other.value]
 
-    def __le__(self, other: "MediaListStatus") -> bool:
-        return self.__priority[self.value] >= self.__priority[other.value]
-
-    def __gt__(self, other: "MediaListStatus") -> bool:
-        return self.__priority[self.value] < self.__priority[other.value]
-
-    def __ge__(self, other: "MediaListStatus") -> bool:
-        return self.__priority[self.value] <= self.__priority[other.value]
-
     def __eq__(self, other: Any) -> bool:
         if isinstance(other, MediaListStatus):
             return self.value == other.value
         return self.value == other
-
-    def __ne__(self, other: Any) -> bool:
-        if isinstance(other, MediaListStatus):
-            return self.value != other.value
-        return self.value != other
 
 
 class AniListBaseModel(BaseModel):
@@ -212,7 +200,7 @@ class MediaTitle(AniListBaseModel):
     native: Optional[str] = None
 
     def titles(self) -> list[str]:
-        """"Return a list of all the available titles
+        """Return a list of all the available titles
 
         Returns:
             list[str]: All the available titles
@@ -228,6 +216,7 @@ class MediaTitle(AniListBaseModel):
         return self.english or self.romaji or self.native or ""
 
 
+@total_ordering
 class FuzzyDate(AniListBaseModel):
     year: Optional[int] = None
     month: Optional[int] = None
@@ -245,38 +234,6 @@ class FuzzyDate(AniListBaseModel):
         """
         return FuzzyDate(year=date.year, month=date.month, day=date.day)
 
-    def __lt__(self, other: Optional["FuzzyDate"]) -> bool:
-        if other is None:
-            return False
-        return (
-            self.year < other.year or self.month < other.month or self.day < other.day
-        )
-
-    def __le__(self, other: Optional["FuzzyDate"]) -> bool:
-        if other is None:
-            return False
-        return (
-            self.year <= other.year
-            or self.month <= other.month
-            or self.day <= other.day
-        )
-
-    def __gt__(self, other: Optional["FuzzyDate"]) -> bool:
-        if other is None:
-            return True
-        return (
-            self.year > other.year or self.month > other.month or self.day > other.day
-        )
-
-    def __ge__(self, other: Optional["FuzzyDate"]) -> bool:
-        if other is None:
-            return True
-        return (
-            self.year >= other.year
-            or self.month >= other.month
-            or self.day >= other.day
-        )
-
     def __eq__(self, other) -> bool:
         if not isinstance(other, FuzzyDate):
             return False
@@ -286,13 +243,13 @@ class FuzzyDate(AniListBaseModel):
             and self.day == other.day
         )
 
-    def __ne__(self, other: Any) -> bool:
-        if not isinstance(other, FuzzyDate):
-            return True
-        return (
-            self.year != other.year
-            or self.month != other.month
-            or self.day != other.day
+    def __lt__(self, other: Optional["FuzzyDate"]) -> bool:
+        if other is None:
+            return False
+        return ((self.year or 0), (self.month or 0), (self.day or 0)) < (
+            (other.year or 0),
+            (other.month or 0),
+            (other.day or 0),
         )
 
     def __repr__(self) -> str:
