@@ -6,7 +6,8 @@ from typing import Optional, Union
 import requests
 from plexapi.library import MovieSection, ShowSection
 from plexapi.server import PlexServer
-from plexapi.video import Episode, Movie, Season, Show
+from plexapi.utils import joinArgs
+from plexapi.video import Episode, EpisodeHistory, Movie, MovieHistory, Season, Show
 
 from src import log
 
@@ -211,6 +212,35 @@ class PlexClient:
             )
         else:
             return []
+
+    @cache
+    def get_history(
+        self,
+        item: Union[Movie, Show, Season],
+        min_date: Optional[datetime] = None,
+        max_results: Optional[int] = None,
+        sort_asc: bool = True,
+    ) -> Union[MovieHistory, EpisodeHistory]:
+        """Get the history for a movie, show, or season
+
+        Args:
+            item (Union[Movie, Show, Season]): The target item
+            min_date (Optional[datetime], optional): The minimum date to include in the history. Defaults to None.
+            max_results (Optional[int], optional): The maximum number of results to return. Defaults to None.
+            sort_asc (bool, optional): Sort the history in ascending order. Defaults to True.
+
+        Returns:
+                list[PlexHistory]: The history for the target item
+        """
+        args = {
+            "metadataItemID": item.ratingKey,
+            "sort": f"viewedAt:{'asc' if sort_asc else 'desc'}",
+        }
+        if min_date:
+            args["viewedAt>"] = int(min_date.timestamp())
+
+        key = f"/status/sessions/history/all{joinArgs(args)}"
+        return self.client.fetchItems(key, maxresults=max_results)
 
     def is_on_deck(self, item: Union[Movie, Show]) -> bool:
         """Check if a movie or show is on the 'On Deck' hub

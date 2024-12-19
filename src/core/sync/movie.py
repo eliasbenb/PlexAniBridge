@@ -1,6 +1,6 @@
 from typing import Iterator, Optional
 
-from plexapi.video import Movie
+from plexapi.video import Movie, MovieHistory
 
 from src.models.anilist import FuzzyDate, Media, MediaListStatus
 from src.models.animap import AniMap
@@ -38,8 +38,13 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie]):
     def _calculate_repeats(self, item: Movie, *_) -> int:
         return (item.viewCount or 1) - 1
 
-    def _calculate_started_date(self, item: Movie, *_) -> Optional[Media]:
-        return FuzzyDate.from_date(item.lastViewedAt) if item.lastViewedAt else None
+    def _calculate_started_date(self, item: Movie, *_) -> Optional[FuzzyDate]:
+        history: list[MovieHistory] = self.plex_client.get_history(
+            item, max_results=1, sort_asc=True
+        )
+        if not history:
+            return None
+        return FuzzyDate.from_date(history[0].viewedAt)
 
-    def _calculate_completed_date(self, item: Movie, *_) -> Optional[Media]:
-        return FuzzyDate.from_date(item.lastViewedAt) if item.lastViewedAt else None
+    def _calculate_completed_date(self, item: Movie, *_) -> Optional[FuzzyDate]:
+        return self._calculate_started_date(item)

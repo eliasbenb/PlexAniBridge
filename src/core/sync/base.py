@@ -275,7 +275,7 @@ class BaseSyncClient(ABC, Generic[T, S]):
 
         NE_KEYS = ("score", "notes")
         GT_KEYS = ("status", "progress", "repeat")
-        LT_KEYS = ()
+        LT_KEYS = ("started_at", "completed_at")
 
         for key in NE_KEYS:
             plex_val = getattr(plex_media_list, key)

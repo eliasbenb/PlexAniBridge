@@ -1,8 +1,8 @@
 from typing import Iterator, Optional
 
-from plexapi.video import Episode, Season, Show
+from plexapi.video import Episode, EpisodeHistory, Season, Show
 
-from src.models.anilist import Media, MediaListStatus
+from src.models.anilist import FuzzyDate, Media, MediaListStatus
 from src.models.animap import AniMap
 
 from .base import BaseSyncClient, ParsedGuids
@@ -76,21 +76,50 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
 
     def _calculate_started_date(
         self,
-        item: Show,
+        _: Show,
         subitem: Season,
         anilist_media: Media,
         animapping: AniMap,
-    ) -> Optional[Media]:
-        return None
+    ) -> Optional[FuzzyDate]:
+        history: list[EpisodeHistory] = [
+            h
+            for h in self.plex_client.get_history(subitem, sort_asc=True)
+            if h.index > animapping.tvdb_epoffset
+            and h.index <= animapping.tvdb_epoffset + anilist_media.episodes
+        ]
+        if history:
+            return FuzzyDate.from_date(history[0].viewedAt)
+        else:
+            return None
 
     def _calculate_completed_date(
         self,
-        item: Show,
+        _: Show,
         subitem: Season,
         anilist_media: Media,
         animapping: AniMap,
-    ) -> Optional[Media]:
-        return None
+    ) -> Optional[FuzzyDate]:
+        history = [
+            h
+            for h in self.plex_client.get_history(subitem, sort_asc=False)
+            if animapping.tvdb_epoffset
+            < h.index
+            <= animapping.tvdb_epoffset + anilist_media.episodes
+        ]
+
+        deduplicated_history = {
+            h.ratingKey: max(
+                filter(lambda x: x.ratingKey == h.ratingKey, history),
+                key=lambda x: x.viewedAt,
+            )
+            for h in history
+        }
+
+        return (
+            FuzzyDate.from_date(min(h.viewedAt for h in deduplicated_history.values()))
+            if deduplicated_history
+            else None
+        )
 
     def __filter_mapped_episodes(
         self,
