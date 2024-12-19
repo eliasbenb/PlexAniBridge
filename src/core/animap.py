@@ -50,7 +50,7 @@ class AniMapClient:
             values = [
                 {
                     "anidb_id": anidb_id,
-                    **{key: data.get(key) for key in AniMap.__fields__.keys()},
+                    **{key: data.get(key) for key in AniMap.model_fields},
                 }
                 for anidb_id, data in cdn_data.items()
             ]  # Convert the CDN data to a format that can be inserted into the database
@@ -83,12 +83,12 @@ class AniMapClient:
 
     def get_mappings(
         self,
-        type: Literal["movie", "show"],
         imdb: Optional[str] = None,
         tmdb: Optional[int] = None,
         tvdb: Optional[int] = None,
         season: Optional[int] = None,
         epoffset: Optional[int] = None,
+        is_movie: bool = True,
     ) -> list[AniMap]:
         """Get the AniMap entries that match the provided criteria
 
@@ -108,9 +108,10 @@ class AniMapClient:
         with Session(db) as session:
             partial_matches = {AniMap.imdb_id.contains: imdb}
             exact_matches = {}
-            if type == "movie":
+
+            if is_movie:
                 partial_matches |= {AniMap.tmdb_movie_id.__eq__: tmdb}
-            elif type == "show":
+            else:
                 partial_matches |= {
                     AniMap.tmdb_show_id.__eq__: tmdb,
                     AniMap.tvdb_id.__eq__: tvdb,
@@ -130,5 +131,4 @@ class AniMapClient:
                     and_(*(op(v) for op, v in exact_matches.items() if v is not None))
                 )
 
-            res = session.exec(query).all()
-        return [r for r in res if r.anilist_id or r.mal_id]
+            return session.exec(query).all()
