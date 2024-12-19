@@ -76,8 +76,8 @@ python main.py
 - [x] Sync watch progress
 - [x] Sync rating scores
 - [x] Sync text-based reviews/notes
-- [x] Sync status (watching, completed, dropped, paused, planning)
-- [x] Sync start/end dates
+- [x] Sync status (current, completed, planning) (TODO: dropped, paused)
+- [x] Sync start/end dates (TODO: support for shows)
 - [x] Sync repeat count
 - [x] Partial scanning, only consider items added/updated/rated since last sync
 - [x] Scheduled sync jobs
@@ -88,6 +88,7 @@ python main.py
 - [x] Cache AniList responses to avoid rate limits
 - [ ] Special/OVA/ONA support
 - [ ] Use AniList relations for better and quicker matching
+- [ ] Config option for users to choose which fields to sync (status, progress, repeats, rating, notes, start/end dates)
 
 ## Special Thanks/Dependencies
 
