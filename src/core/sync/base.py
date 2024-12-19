@@ -208,7 +208,7 @@ class BaseSyncClient(ABC, Generic[T, S]):
     def _get_plex_media_list(
         self, item: T, subitem: S, anilist_media: Media, animapping: AniMap
     ) -> MediaList:
-        return MediaList(
+        media_list = MediaList(
             id=anilist_media.media_list_entry
             and anilist_media.media_list_entry.id
             or -1,
@@ -227,6 +227,11 @@ class BaseSyncClient(ABC, Generic[T, S]):
                 item, subitem, anilist_media, animapping
             ),
         )
+
+        if media_list.status != MediaListStatus.COMPLETED:
+            media_list.completed_at = None
+
+        return media_list
 
     @abstractmethod
     def _calculate_status(
