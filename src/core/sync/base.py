@@ -68,20 +68,28 @@ class BaseSyncClient(ABC, Generic[T, S]):
 
         for subitem, animapping in self.map_media(item):
             try:
-                if not animapping:
-                    anilist_media = self.search_media(item)
+                if not animapping or animapping.anilist_id:
+                    anilist_media = self.search_media(item, subitem)
+                    match_method = "title search"
                 else:
                     anilist_media = self.anilist_client.get_anime(
                         anilist_id=next(iter(animapping.anilist_id or ()), None),
                         mal_id=next(iter(animapping.mal_id or ()), None),
                     )
+                    match_method = "mapping lookup"
 
                 if not anilist_media:
                     log.warning(
-                        f"{self.__class__.__name__}: No suitable AniList media found for {item.type} "
-                        f"'{self._clean_item_title(item, subitem)}' {{plex_id: {item.guid}}}"
+                        f"{self.__class__.__name__}: No suitable AniList results found during mapping "
+                        f"lookup or title search for {item.type} '{self._clean_item_title(item, subitem)}' "
+                        f"{{plex_id: {item.guid}}}"
                     )
                     continue
+
+                log.debug(
+                    f"{self.__class__.__name__}: Found AniList entry using {match_method} for {item.type} "
+                    f"'{self._clean_item_title(item, subitem)}' {{plex_id: {item.guid}}}"
+                )
 
                 self.sync_media(item, subitem, anilist_media, animapping)
             except Exception as e:
@@ -95,30 +103,19 @@ class BaseSyncClient(ABC, Generic[T, S]):
     def map_media(self, item: T) -> Iterator[tuple[S, Optional[AniMap]]]:
         pass
 
-    @cache
-    def search_media(self, item: T, episodes: int = 1) -> Optional[Media]:
-        results = [
-            r
-            for r in self.anilist_client.search_anime(item.title)
-            if r.episodes == episodes
-        ]
+    @abstractmethod
+    def search_media(self, item: T, subitem: S) -> Optional[Media]:
+        pass
+
+    def _best_search_result(self, title: str, results: list[Media]) -> Optional[Media]:
         best_result, best_ratio = max(
-            ((r, fuzz.ratio(item.title, str(r.title))) for r in results if r.title),
+            ((r, fuzz.ratio(title, str(r.title))) for r in results if r.title),
             default=(None, 0),
             key=lambda x: x[1],
         )
 
-        if not best_result or best_ratio < self.fuzzy_search_threshold:
-            log.warning(
-                f"{self.__class__.__name__}: No suitable results found during title search "
-                f"for {item.type} '{item.title}' {{plex_id: {item.guid}}}"
-            )
+        if best_ratio < self.fuzzy_search_threshold:
             return None
-
-        log.info(
-            f"{self.__class__.__name__}: Matched '{item.title}' {{plex_id: {item.ratingKey}}} to "
-            f"AniList media '{{anilist_id: {best_result.id}}}' with a ratio of {best_ratio}"
-        )
         return best_result
 
     def sync_media(

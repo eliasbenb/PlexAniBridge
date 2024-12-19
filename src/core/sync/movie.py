@@ -17,6 +17,10 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie]):
         if result:
             yield item, result
 
+    def search_media(self, item: Movie, subitem: Movie) -> Optional[Media]:
+        results = self.anilist_client.search_anime(item.title, True, 1)
+        return self._best_search_result(item.title, results)
+
     def _calculate_status(
         self,
         item: Movie,

@@ -23,6 +23,11 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
         for season in season_map.values():
             yield season, None
 
+    def search_media(self, item: Show, subitem: Season) -> Optional[Media]:
+        episodes = subitem.leafCount
+        results = self.anilist_client.search_anime(item.title, False, episodes)
+        return self._best_search_result(item.title, results)
+
     def _calculate_status(
         self,
         item: Show,

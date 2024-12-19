@@ -1,3 +1,4 @@
+from functools import cache
 from textwrap import dedent
 from time import sleep
 from typing import Optional, Union
@@ -7,6 +8,7 @@ import requests
 from src import log
 from src.models.anilist import (
     Media,
+    MediaFormat,
     MediaList,
     MediaWithRelations,
     User,
@@ -106,13 +108,19 @@ class AniListClient:
         response = self._make_request(query, variables)["data"]["DeleteMediaListEntry"]
         return response["deleted"]
 
+    @cache
     def search_anime(
-        self, search_str: str, episodes: Optional[int] = None, limit: int = 10
+        self,
+        search_str: str,
+        is_movie: bool,
+        episodes: Optional[int] = None,
+        limit: int = 10,
     ) -> list[Media]:
         """Searches for anime on AniList
 
         Args:
             search_str (str): The search query
+            is_movie (bool): Whether the anime is a movie
             episodes (Optional[int], optional): The number of episodes in the anime. Defaults to None.
             limit (int, optional): The maximum number of results to return. Defaults to 10.
 
@@ -120,16 +128,32 @@ class AniListClient:
             list[Media]: The search results
         """
         query = dedent(f"""
-        query ($search: String, $limit: Int, $episodes: Int) {{
-            Page(perPage: $limit) {{
-                media(search: $search, type: ANIME, episodes: $episodes) {{
+            query ($search: String, $formats: [MediaFormat], $episodes: Int, $limit: Int) {{
+                Page(perPage: $limit) {{
+                    media(search: $search, type: ANIME, format_in: $formats, episodes: $episodes) {{
 {Media.model_dump_graphql(indent_level=4)}
+                    }}
                 }}
             }}
-        }}
         """)
 
-        variables = {"search": search_str, "limit": limit, "episods": episodes}
+        formats = (
+            [MediaFormat.MOVIE, MediaFormat.SPECIAL]
+            if is_movie
+            else [
+                MediaFormat.TV,
+                MediaFormat.TV_SHORT,
+                MediaFormat.ONA,
+                MediaFormat.OVA,
+            ]
+        )
+
+        variables = {
+            "search": search_str,
+            "formats": formats,
+            "episods": episodes,
+            "limit": limit,
+        }
 
         log.debug(
             f"{self.__class__.__name__}: Searching for anime with query '{search_str}' "
@@ -165,8 +189,8 @@ class AniListClient:
             raise ValueError("Either an AniList ID or a MAL ID must be provided")
 
         query = dedent(f"""
-        query ($id: Int) {{
-            Media({id_type}: $id, type: ANIME) {{
+        query (${id_type}: Int) {{
+            Media({id_type}: ${id_type}, type: ANIME) {{
 {MediaWithRelations.model_dump_graphql(indent_level=3) if relations else Media.model_dump_graphql(indent_level=3)}
             }}
         }}
