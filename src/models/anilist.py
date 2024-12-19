@@ -186,6 +186,11 @@ class AniListBaseModel(BaseModel):
     )
 
 
+class User(AniListBaseModel):
+    id: int
+    name: str
+
+
 class PageInfo(AniListBaseModel):
     total: Optional[int] = None
     per_page: Optional[int] = None
@@ -299,6 +304,20 @@ class MediaList(AniListBaseModel):
         )
 
 
+class MediaListGroup(AniListBaseModel):
+    entries: list[MediaList] = []
+    name: Optional[str] = None
+    is_custom_list: Optional[bool] = None
+    is_split_completed_list: Optional[bool] = None
+    status: Optional[MediaListStatus] = None
+
+
+class MediaListCollection(AniListBaseModel):
+    user: Optional[User] = None
+    lists: list[MediaListGroup] = []
+    has_next_chunk: Optional[bool] = None
+
+
 class AiringSchedule(AniListBaseModel):
     id: int
     airing_at: UTCDateTime
@@ -337,8 +356,3 @@ class MediaConnection(AniListBaseModel):
 
 class MediaWithRelations(Media):
     relations: MediaConnection
-
-
-class User(AniListBaseModel):
-    id: int
-    name: str
