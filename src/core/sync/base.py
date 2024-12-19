@@ -109,7 +109,11 @@ class BaseSyncClient(ABC, Generic[T, S]):
 
     def _best_search_result(self, title: str, results: list[Media]) -> Optional[Media]:
         best_result, best_ratio = max(
-            ((r, fuzz.ratio(title, str(r.title))) for r in results if r.title),
+            (
+                (r, max(fuzz.ratio(title, t) for t in r.title.titles() if t))
+                for r in results
+                if r.title
+            ),
             default=(None, 0),
             key=lambda x: x[1],
         )

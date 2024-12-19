@@ -194,6 +194,9 @@ class MediaTitle(AniListBaseModel):
     english: Optional[str] = None
     native: Optional[str] = None
 
+    def titles(self) -> list[str]:
+        return [getattr(self, t) for t in self.model_fields if t]
+
     def __str__(self) -> str:
         return self.english or self.romaji or self.native or ""
 
