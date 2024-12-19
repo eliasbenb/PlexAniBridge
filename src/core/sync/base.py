@@ -84,7 +84,7 @@ class BaseSyncClient(ABC, Generic[T, S]):
 
     def process_media(self, item: T) -> SyncStats:
         log.debug(
-            f"{self.__class__.__name__}: Processing {item.type} '{item.title}' {{plex_id: {item.guid}}}"
+            f"{self.__class__.__name__}: Processing {item.type} \u2018{item.title}\u2019 {{plex_id: {item.guid}}}"
         )
 
         for subitem, animapping in self.map_media(item):
@@ -102,7 +102,7 @@ class BaseSyncClient(ABC, Generic[T, S]):
                 if not anilist_media:
                     log.warning(
                         f"{self.__class__.__name__}: No suitable AniList results found during mapping "
-                        f"lookup or title search for {item.type} '{self._clean_item_title(item, subitem)}' "
+                        f"lookup or title search for {item.type} \u2018{self._clean_item_title(item, subitem)}\u2019 "
                         f"{{plex_id: {item.guid}}}"
                     )
                     continue
@@ -115,14 +115,14 @@ class BaseSyncClient(ABC, Generic[T, S]):
 
                 log.debug(
                     f"{self.__class__.__name__}: Found AniList entry using {match_method} for {item.type} "
-                    f"'{self._clean_item_title(item, subitem)}' {{plex_id: {item.guid}}}"
+                    f"\u2018{self._clean_item_title(item, subitem)}\u2019 {{plex_id: {item.guid}}}"
                 )
 
                 self.sync_media(item, subitem, anilist_media, animapping)
             except Exception as e:
                 log.exception(
                     f"{self.__class__.__name__}: Failed to process {item.type} "
-                    f"'{self._clean_item_title(item, subitem)}' {{plex_id: {item.guid}}}",
+                    f"\u2018{self._clean_item_title(item, subitem)}\u2019 {{plex_id: {item.guid}}}",
                     exc_info=e,
                 )
                 self.sync_stats.failed += 1
@@ -157,7 +157,7 @@ class BaseSyncClient(ABC, Generic[T, S]):
     ) -> None:
         log.debug(
             f"{self.__class__.__name__}: Syncing {item.type} "
-            f"'{self._clean_item_title(item, subitem)}' {{plex_id: {item.guid}}}"
+            f"\u2018{self._clean_item_title(item, subitem)}\u2019 {{plex_id: {item.guid}}}"
         )
 
         anilist_media_list = anilist_media.media_list_entry
@@ -170,7 +170,7 @@ class BaseSyncClient(ABC, Generic[T, S]):
         if final_media_list == anilist_media_list:
             log.debug(
                 f"{self.__class__.__name__}: Entry already up to date for "
-                f"{item.type} '{self._clean_item_title(item, subitem)}' {{plex_id: {item.guid}}}"
+                f"{item.type} \u2018{self._clean_item_title(item, subitem)}\u2019 {{plex_id: {item.guid}}}"
             )
             self.sync_stats.skipped += 1
             return
@@ -190,7 +190,7 @@ class BaseSyncClient(ABC, Generic[T, S]):
         if not final_media_list.status:
             log.info(
                 f"{self.__class__.__name__}: Skipping {item.type} due to no activity "
-                f"'{self._clean_item_title(item, subitem)}' {{plex_id: {item.guid}}} "
+                f"\u2018{self._clean_item_title(item, subitem)}\u2019 {{plex_id: {item.guid}}} "
             )
             self.sync_stats.skipped += 1
             return
@@ -201,7 +201,7 @@ class BaseSyncClient(ABC, Generic[T, S]):
         self.anilist_client.update_anime_entry(final_media_list)
 
         log.info(
-            f"{self.__class__.__name__}: Synced {item.type} '{self._clean_item_title(item, subitem)}' {{plex_id: {item.guid}}}"
+            f"{self.__class__.__name__}: Synced {item.type} \u2018{self._clean_item_title(item, subitem)}\u2019 {{plex_id: {item.guid}}}"
         )
         self.sync_stats.synced += 1
 
