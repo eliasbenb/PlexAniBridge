@@ -252,6 +252,9 @@ class FuzzyDate(AniListBaseModel):
             (other.day or 0),
         )
 
+    def __str__(self) -> str:
+        return self.__repr__()
+
     def __repr__(self) -> str:
         return (
             f"{self.year or '????'}-"
@@ -273,6 +276,17 @@ class MediaList(AniListBaseModel):
     completed_at: Optional[FuzzyDate] = None
     created_at: Optional[UTCDateTime] = None
     updated_at: Optional[UTCDateTime] = None
+
+    def __str__(self) -> str:
+        notes_truncated = None
+        if self.notes:
+            notes_truncated = self.notes[:50].replace("\n", "  ") + "..."
+
+        return (
+            f"(status={self.status}, score={self.score}, progress={self.progress}, "
+            f"repeat={self.repeat}, notes={notes_truncated}, started_at={self.started_at}, "
+            f"completed_at={self.completed_at})"
+        )
 
 
 class AiringSchedule(AniListBaseModel):

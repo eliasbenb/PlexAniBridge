@@ -195,8 +195,12 @@ class BaseSyncClient(ABC, Generic[T, S]):
             self.sync_stats.skipped += 1
             return
 
-        log.debug(f"{self.__class__.__name__}: Syncing AniList entry with variables:")
-        log.debug(f"\t\t{final_media_list}")
+        log.debug(
+            f"{self.__class__.__name__}: Syncing AniList entry for {item.type} "
+            f"\u2018{self._clean_item_title(item, subitem)}\u2019 {{plex_id: {item.guid}}}"
+        )
+        log.debug(f"\t\tBEFORE => {anilist_media_list}")
+        log.debug(f"\t\tAFTER  => {final_media_list}")
 
         self.anilist_client.update_anime_entry(final_media_list)
 
