@@ -7,12 +7,19 @@ from src.settings import config
 
 
 class PlexAniBridgeDB:
+    """A class to manage the creation and initialization of the database"""
+
     def __init__(self, db_path: str) -> None:
         self.db_path: Path = Path(db_path)
 
         self.engine = self.__setup_db()
 
     def __setup_db(self) -> Engine:
+        """Creates and initializes the database
+
+        Returns:
+            Engine: The database engine
+        """
         if not self.db_path.exists():
             try:
                 self.db_path.parent.mkdir(parents=True, exist_ok=True)

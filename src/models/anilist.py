@@ -1,37 +1,39 @@
-from datetime import datetime
-from enum import Enum
-from typing import Optional
+import json
+from datetime import date, datetime, timedelta, timezone
+from enum import StrEnum
+from typing import Annotated, Any, ClassVar, Optional, Union, get_args, get_origin
 
-from pydantic import BaseModel
+from pydantic import AfterValidator, AliasGenerator, BaseModel, ConfigDict
+from pydantic.alias_generators import to_camel
 
-
-class AnilistBaseModel(BaseModel):
-    @staticmethod
-    def as_graphql() -> str:
-        raise NotImplementedError
-
-
-class AnilistPageInfo(AnilistBaseModel):
-    total: Optional[int]
-    perPage: Optional[int]
-    currentPage: Optional[int]
-    lastPage: Optional[int]
-    hasNextPage: bool
-
-    @staticmethod
-    def as_graphql() -> str:
-        return """
-        pageInfo {
-            total
-            perPage
-            currentPage
-            lastPage
-            hasNextPage
-        }
-        """
+UTCDateTime = Annotated[
+    datetime, AfterValidator(lambda dt: dt.astimezone(timezone.utc))
+]
 
 
-class AnilistMediaStatus(Enum):
+class AniListBaseEnum(StrEnum):
+    pass
+
+
+class MediaType(AniListBaseEnum):
+    ANIME = "ANIME"
+    MANGA = "MANGA"
+
+
+class MediaFormat(AniListBaseEnum):
+    TV = "TV"
+    TV_SHORT = "TV_SHORT"
+    MOVIE = "MOVIE"
+    SPECIAL = "SPECIAL"
+    OVA = "OVA"
+    ONA = "ONA"
+    MUSIC = "MUSIC"
+    MANGA = "MANGA"
+    NOVEL = "NOVEL"
+    ONE_SHOT = "ONE_SHOT"
+
+
+class MediaStatus(AniListBaseEnum):
     FINISHED = "FINISHED"
     RELEASING = "RELEASING"
     NOT_YET_RELEASED = "NOT_YET_RELEASED"
@@ -39,52 +41,54 @@ class AnilistMediaStatus(Enum):
     HIATUS = "HIATUS"
 
 
-class AnilistMediaType(Enum):
-    ANIME = "ANIME"
-    MANGA = "MANGA"
+class MediaSeason(AniListBaseEnum):
+    WINTER = "WINTER"
+    SPRING = "SPRING"
+    SUMMER = "SUMMER"
+    FALL = "FALL"
 
 
-class AnilistMediaTitle(AnilistBaseModel):
-    romaji: Optional[str]
-    english: Optional[str]
-    native: Optional[str]
+class MediaSort(AniListBaseEnum):
+    ID = "ID"
+    ID_DESC = "ID_DESC"
+    TITLE_ROMAJI = "TITLE_ROMAJI"
+    TITLE_ROMAJI_DESC = "TITLE_ROMAJI_DESC"
+    TITLE_ENGLISH = "TITLE_ENGLISH"
+    TITLE_ENGLISH_DESC = "TITLE_ENGLISH_DESC"
+    TITLE_NATIVE = "TITLE_NATIVE"
+    TITLE_NATIVE_DESC = "TITLE_NATIVE_DESC"
+    TYPE = "TYPE"
+    TYPE_DESC = "TYPE_DESC"
+    FORMAT = "FORMAT"
+    FORMAT_DESC = "FORMAT_DESC"
+    START_DATE = "START_DATE"
+    START_DATE_DESC = "START_DATE_DESC"
+    END_DATE = "END_DATE"
+    END_DATE_DESC = "END_DATE_DESC"
+    SCORE = "SCORE"
+    SCORE_DESC = "SCORE_DESC"
+    POPULARITY = "POPULARITY"
+    POPULARITY_DESC = "POPULARITY_DESC"
+    TRENDING = "TRENDING"
+    TRENDING_DESC = "TRENDING_DESC"
+    EPISODES = "EPISODES"
+    EPISODES_DESC = "EPISODES_DESC"
+    DURATION = "DURATION"
+    DURATION_DESC = "DURATION_DESC"
+    STATUS = "STATUS"
+    STATUS_DESC = "STATUS_DESC"
+    CHAPTERS = "CHAPTERS"
+    CHAPTERS_DESC = "CHAPTERS_DESC"
+    VOLUMES = "VOLUMES"
+    VOLUMES_DESC = "VOLUMES_DESC"
+    UPDATED_AT = "UPDATED_AT"
+    UPDATED_AT_DESC = "UPDATED_AT_DESC"
+    SEARCH_MATCH = "SEARCH_MATCH"
+    FAVOURITES = "FAVOURITES"
+    FAVOURITES_DESC = "FAVOURITES_DESC"
 
-    @staticmethod
-    def as_graphql() -> str:
-        return (
-            """
-        title {
-            romaji"""
-            """
-            english
-            native
-        }
-        """
-        )
 
-
-class AnilistFuzzyDate(AnilistBaseModel):
-    year: Optional[int]
-    month: Optional[int]
-    day: Optional[int]
-
-    @staticmethod
-    def as_graphql() -> str:
-        return """
-        year
-        month
-        day
-        """
-
-    def __eq__(self, other: "AnilistFuzzyDate") -> bool:
-        return (
-            self.year == other.year
-            and self.month == other.month
-            and self.day == other.day
-        )
-
-
-class AnilistMediaListStatus(Enum):
+class MediaListStatus(AniListBaseEnum):
     _ignore_ = ["__priority"]
 
     CURRENT = "CURRENT"
@@ -94,6 +98,7 @@ class AnilistMediaListStatus(Enum):
     PAUSED = "PAUSED"
     REPEATING = "REPEATING"
 
+    # A lower priority value means a higher priority/precedence
     __priority = {
         "REPEATING": 0,
         "COMPLETED": 1,
@@ -103,124 +108,221 @@ class AnilistMediaListStatus(Enum):
         "PLANNING": 5,
     }
 
-    def __eq__(self, other: "AnilistMediaListStatus") -> bool:
-        return self.__priority[self.value] == self.__priority[other.value]
-
-    def __lt__(self, other: "AnilistMediaListStatus") -> bool:
+    def __lt__(self, other: "MediaListStatus") -> bool:
         return self.__priority[self.value] > self.__priority[other.value]
 
-    def __le__(self, other: "AnilistMediaListStatus") -> bool:
+    def __le__(self, other: "MediaListStatus") -> bool:
         return self.__priority[self.value] >= self.__priority[other.value]
 
-    def __gt__(self, other: "AnilistMediaListStatus") -> bool:
+    def __gt__(self, other: "MediaListStatus") -> bool:
         return self.__priority[self.value] < self.__priority[other.value]
 
-    def __ge__(self, other: "AnilistMediaListStatus") -> bool:
+    def __ge__(self, other: "MediaListStatus") -> bool:
         return self.__priority[self.value] <= self.__priority[other.value]
 
+    def __eq__(self, other: Any) -> bool:
+        if isinstance(other, MediaListStatus):
+            return self.value == other.value
+        return self.value == other
 
-class AnilistMediaList(AnilistBaseModel):
+    def __ne__(self, other: Any) -> bool:
+        if isinstance(other, MediaListStatus):
+            return self.value != other.value
+        return self.value != other
+
+
+class AniListBaseModel(BaseModel):
+    """Base, abstract class for all AniList models to represent GraphQL objects"""
+
+    _processed_models: ClassVar[set] = set()
+
+    def model_dump_json(self, **kwargs: Any) -> str:
+        json_str = super().model_dump_json(**kwargs)
+        data = json.loads(json_str)
+        camel_data = {to_camel(k): v for k, v in data.items()}
+        return json.dumps(camel_data)
+
+    @classmethod
+    def model_dump_graphql(cls, indent_level: int = 0) -> str:
+        """Generate GraphQL query fields with proper indentation"""
+        if cls.__name__ in cls._processed_models:
+            return ""
+
+        cls._processed_models.add(cls.__name__)
+        fields = cls.model_fields
+        graphql_fields = []
+        indent = "    " * indent_level
+
+        for field_name, field in fields.items():
+            field_type = (
+                get_args(field.annotation)[0]
+                if get_origin(field.annotation)
+                else field.annotation
+            )
+
+            camel_field_name = to_camel(field_name)
+
+            if isinstance(field_type, type) and issubclass(
+                field_type, AniListBaseModel
+            ):
+                nested_fields = field_type.model_dump_graphql(indent_level + 1)
+                if nested_fields:
+                    graphql_fields.append(
+                        f"{indent}{camel_field_name} {{\n{nested_fields}\n{indent}}}"
+                    )
+            else:
+                graphql_fields.append(f"{indent}{camel_field_name}")
+
+        cls._processed_models.remove(cls.__name__)
+        return "\n".join(graphql_fields)
+
+    model_config = ConfigDict(
+        alias_generator=AliasGenerator(to_camel), populate_by_name=True
+    )
+
+
+class PageInfo(AniListBaseModel):
+    total: Optional[int] = None
+    per_page: Optional[int] = None
+    current_page: Optional[int] = None
+    last_page: Optional[int] = None
+    has_next_page: Optional[bool] = None
+
+
+class MediaTitle(AniListBaseModel):
+    romaji: Optional[str] = None
+    english: Optional[str] = None
+    native: Optional[str] = None
+
+    def titles(self) -> list[str]:
+        return [getattr(self, t) for t in self.model_fields if t]
+
+    def __str__(self) -> str:
+        return self.english or self.romaji or self.native or ""
+
+
+class FuzzyDate(AniListBaseModel):
+    year: Optional[int] = None
+    month: Optional[int] = None
+    day: Optional[int] = None
+
+    @staticmethod
+    def from_date(date: Union[date, datetime]) -> "FuzzyDate":
+        return FuzzyDate(year=date.year, month=date.month, day=date.day)
+
+    def __lt__(self, other: Optional["FuzzyDate"]) -> bool:
+        if other is None:
+            return False
+        return (
+            self.year < other.year or self.month < other.month or self.day < other.day
+        )
+
+    def __le__(self, other: Optional["FuzzyDate"]) -> bool:
+        if other is None:
+            return False
+        return (
+            self.year <= other.year
+            or self.month <= other.month
+            or self.day <= other.day
+        )
+
+    def __gt__(self, other: Optional["FuzzyDate"]) -> bool:
+        if other is None:
+            return True
+        return (
+            self.year > other.year or self.month > other.month or self.day > other.day
+        )
+
+    def __ge__(self, other: Optional["FuzzyDate"]) -> bool:
+        if other is None:
+            return True
+        return (
+            self.year >= other.year
+            or self.month >= other.month
+            or self.day >= other.day
+        )
+
+    def __eq__(self, other) -> bool:
+        if not isinstance(other, FuzzyDate):
+            return False
+        return (
+            self.year == other.year
+            and self.month == other.month
+            and self.day == other.day
+        )
+
+    def __ne__(self, other: Any) -> bool:
+        if not isinstance(other, FuzzyDate):
+            return True
+        return (
+            self.year != other.year
+            or self.month != other.month
+            or self.day != other.day
+        )
+
+    def __repr__(self) -> str:
+        return (
+            f"{self.year or '????'}-"
+            f"{str(self.month).zfill(2) if self.month else '??'}-"
+            f"{str(self.day).zfill(2) if self.day else '??'}"
+        )
+
+
+class MediaList(AniListBaseModel):
     id: int
-    mediaId: int
-    status: AnilistMediaListStatus
-    score: Optional[float]
-    progress: Optional[int]
-    repeat: Optional[int]
-    notes: Optional[str]
-    startedAt: AnilistFuzzyDate
-    completedAt: AnilistFuzzyDate
-
-    @staticmethod
-    def as_graphql() -> str:
-        return f"""
-        id
-        mediaId
-        status
-        score
-        progress
-        repeat
-        notes
-        startedAt {{
-            {AnilistFuzzyDate.as_graphql()}
-        }}
-        completedAt {{
-            {AnilistFuzzyDate.as_graphql()}
-        }}
-        """
+    user_id: int
+    media_id: int
+    status: Optional[MediaListStatus] = None
+    score: Optional[float] = None
+    progress: Optional[int] = None
+    repeat: Optional[int] = None
+    notes: Optional[str] = None
+    started_at: Optional[FuzzyDate] = None
+    completed_at: Optional[FuzzyDate] = None
+    created_at: Optional[UTCDateTime] = None
+    updated_at: Optional[UTCDateTime] = None
 
 
-class AnilistMedia(AnilistBaseModel):
+class AiringSchedule(AniListBaseModel):
     id: int
-    idMal: Optional[int]
-    title: AnilistMediaTitle
-    type: AnilistMediaType
-    status: AnilistMediaStatus
-    startDate: AnilistFuzzyDate
-    endDate: AnilistFuzzyDate
-    seasonYear: Optional[int]
-    episodes: Optional[int]
-    mediaListEntry: Optional[AnilistMediaList]
-
-    @property
-    def best_title(self) -> str:
-        return self.title.english or self.title.romaji or self.title.native
-
-    @staticmethod
-    def as_graphql() -> str:
-        return f"""
-        id
-        idMal
-        {AnilistMediaTitle.as_graphql()}
-        type
-        status
-        startDate {{
-            {AnilistFuzzyDate.as_graphql()}
-        }}
-        endDate {{
-            {AnilistFuzzyDate.as_graphql()}
-        }}
-        seasonYear
-        episodes
-        mediaListEntry {{
-            {AnilistMediaList.as_graphql()}
-        }}
-        """
+    airing_at: UTCDateTime
+    time_until_airing: timedelta
+    episode: int
+    media_id: int
 
 
-class AnilistMediaEdge(AnilistBaseModel):
-    node: AnilistMedia
-
-    @staticmethod
-    def as_graphql() -> str:
-        return f"""
-        node {{
-            {AnilistMedia.as_graphql()}
-        }}
-        """
-
-
-class AnilistMediaConnection(AnilistBaseModel):
-    nodes: Optional[list[AnilistMedia]]
-    pageInfo: Optional[AnilistPageInfo]
-
-    @staticmethod
-    def as_graphql() -> str:
-        return f"""
-        nodes {{
-            {AnilistMedia.as_graphql()}
-        }}
-        {AnilistPageInfo.as_graphql()}
-        """
+class Media(AniListBaseModel):
+    id: int
+    id_mal: Optional[int] = None
+    type: Optional[MediaType] = None
+    format: Optional[MediaFormat] = None
+    status: Optional[MediaStatus] = None
+    season: Optional[MediaSeason] = None
+    season_year: Optional[int] = None
+    episodes: Optional[int] = None
+    duration: Optional[int] = None
+    synonyms: Optional[list[str]] = None
+    is_locked: Optional[bool] = None
+    title: Optional[MediaTitle] = None
+    start_date: Optional[FuzzyDate] = None
+    end_date: Optional[FuzzyDate] = None
+    next_airing_episode: Optional[AiringSchedule] = None
+    media_list_entry: Optional[MediaList] = None
 
 
-class AnilistMediaWithRelations(AnilistMedia):
-    relations: AnilistMediaConnection
+class MediaEdge(AniListBaseModel):
+    node: Media
 
-    @staticmethod
-    def as_graphql() -> str:
-        return f"""
-        {AnilistMedia.as_graphql()}
-        relations{{
-            {AnilistMediaConnection.as_graphql()}
-        }}
-        """
+
+class MediaConnection(AniListBaseModel):
+    nodes: list[Media]
+    pageInfo: PageInfo = PageInfo()
+
+
+class MediaWithRelations(Media):
+    relations: MediaConnection
+
+
+class User(AniListBaseModel):
+    id: int
+    name: str

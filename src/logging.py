@@ -1,5 +1,4 @@
 import logging
-from datetime import datetime
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
@@ -20,7 +19,12 @@ class ColorFormatter(logging.Formatter):
         "CRITICAL": Fore.RED + Style.BRIGHT,
     }
 
-    def format(self, record):
+    def format(self, record: logging.LogRecord) -> str:
+        """Format the log record with colors
+
+        Args:
+            record (logging.LogRecord): The log record to format
+        """
         orig_levelname = record.levelname
         record.levelname = f"{self.COLORS.get(record.levelname, '')}{record.levelname}{Style.RESET_ALL}"
         result = super().format(record)
@@ -28,7 +32,17 @@ class ColorFormatter(logging.Formatter):
         return result
 
 
-def setup_logger(log_name: str, log_level: str, log_dir: str):
+def setup_logger(log_name: str, log_level: str, log_dir: str) -> logging.Logger:
+    """Setup a logger with a file and console handler
+
+    Args:
+        log_name (str): The name of the logger
+        log_level (str): The logging level
+        log_dir (str): The directory to store the log files
+
+    Returns:
+        logging.Logger: The configured logger
+    """
     log_level_literal = getattr(logging, log_level)
     log_path = Path(log_dir)
     log_path.mkdir(parents=True, exist_ok=True)
@@ -53,10 +67,7 @@ def setup_logger(log_name: str, log_level: str, log_dir: str):
             datefmt="%Y-%m-%d %H:%M:%S",
         )
 
-        log_file = (
-            log_path
-            / f'{log_name}.{"." if log_level_literal == logging.INFO else f"{log_level}."}{datetime.now().strftime("%Y%m%d")}.log'
-        )
+        log_file = log_path / f"{log_name}.{log_level}.log"
         file_handler = RotatingFileHandler(
             log_file,
             maxBytes=10 * 1024 * 1024,  # 10MB
