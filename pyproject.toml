@@ -12,4 +12,5 @@ dependencies = [
     "sqlmodel>=0.0.22",
     "thefuzz>=0.22.1",
     "colorama>=0.4.6",
+    "tomlkit>=0.13.2",
 ]

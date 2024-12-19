@@ -1,9 +1,10 @@
 import sched
 import time
 
-from src import __version__, log
+from src import log
 from src.core import BridgeClient
 from src.settings import config
+from src.utils.header import plexanibridge_header
 
 
 def run() -> None:
@@ -33,7 +34,7 @@ def schedule_sync(scheduler: sched.scheduler) -> None:
 
 
 if __name__ == "__main__":
-    log.info(f"PlexAniBridge: [VERSION] => {__version__}")
+    log.info(f"\n{plexanibridge_header}")
     log.info(f"PlexAniBridge: [CONFIG] => {config}")
 
     if config.SYNC_INTERVAL == -1:  # Disable the scheduler

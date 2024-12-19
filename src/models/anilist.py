@@ -137,6 +137,13 @@ class AniListBaseModel(BaseModel):
     _processed_models: ClassVar[set] = set()
 
     def model_dump_json(self, **kwargs: Any) -> str:
+        """Serialize the model to JSON, converting all keys to camelCase
+
+        Because AniList uses camelCase for its GraphQL API, we need to convert all the keys to camelCase.
+
+        Returns:
+            str: JSON serialized string of the model
+        """
         json_str = super().model_dump_json(**kwargs)
         data = json.loads(json_str)
         camel_data = {to_camel(k): v for k, v in data.items()}
@@ -144,7 +151,17 @@ class AniListBaseModel(BaseModel):
 
     @classmethod
     def model_dump_graphql(cls, indent_level: int = 0) -> str:
-        """Generate GraphQL query fields with proper indentation"""
+        """Generate GraphQL query fields with proper indentation
+
+        This is a class method that converts all the avaiilable fields into a GraphQL query with support for nested fields.
+        This allows us to dynamically generate GraphQL queries without having to manually write them for each model.
+
+        Args:
+            indent_level (int, optional): How many levels to indent. Defaults to 0.
+
+        Returns:
+            str: The GraphQL query fields with proper indentation
+        """
         if cls.__name__ in cls._processed_models:
             return ""
 
@@ -195,9 +212,19 @@ class MediaTitle(AniListBaseModel):
     native: Optional[str] = None
 
     def titles(self) -> list[str]:
+        """"Return a list of all the available titles
+
+        Returns:
+            list[str]: All the available titles
+        """
         return [getattr(self, t) for t in self.model_fields if t]
 
     def __str__(self) -> str:
+        """Return the first available title or an empty string
+
+        Returns:
+            str: A title or an empty string
+        """
         return self.english or self.romaji or self.native or ""
 
 
@@ -208,6 +235,14 @@ class FuzzyDate(AniListBaseModel):
 
     @staticmethod
     def from_date(date: Union[date, datetime]) -> "FuzzyDate":
+        """Create a FuzzyDate from a date or datetime object
+
+        Args:
+            date (Union[date, datetime]): A date or datetime object
+
+        Returns:
+            FuzzyDate: An equivalent FuzzyDate object
+        """
         return FuzzyDate(year=date.year, month=date.month, day=date.day)
 
     def __lt__(self, other: Optional["FuzzyDate"]) -> bool:
