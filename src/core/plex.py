@@ -96,7 +96,7 @@ class PlexClient:
         filters = {}
         if min_last_modified:
             log.debug(
-                f"{self.__class__.__name__}: `PARTIAL_SCAN` is set. Filtering '{section.title}' "
+                f"{self.__class__.__name__}: `PARTIAL_SCAN` is set. Filtering section '{section.title}' "
                 f"by items last updated, viewed, or rated after {min_last_modified}"
             )
             filters |= {
@@ -108,7 +108,7 @@ class PlexClient:
             }
         if require_watched:
             log.debug(
-                f"{self.__class__.__name__}: Filtering '{section.title}' by items that have been watched"
+                f"{self.__class__.__name__}: Filtering section '{section.title}' by items that have been watched"
             )
             filters |= {"viewCount>>=": 0}
 
