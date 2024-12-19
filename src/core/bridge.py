@@ -131,6 +131,7 @@ class BridgeClient:
             min_last_modified=self.last_synced
             if self._should_perform_partial_scan()
             else None,
+            require_watched=True,
         )
 
         if section.type == "movie":
