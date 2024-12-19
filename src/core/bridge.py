@@ -4,15 +4,11 @@ from typing import Optional, Union
 from plexapi.library import MovieSection, ShowSection
 from sqlmodel import Session
 
-from src import log
+from src import db, log
 from src.core import AniListClient, AniMapClient, PlexClient
+from src.core.sync import MovieSyncClient, ShowSyncClient, SyncStats
 from src.models.housekeeping import Housekeeping
-from src.settings import Config
-
-from .db import db
-from .sync.base import SyncStats
-from .sync.movie import MovieSyncClient
-from .sync.show import ShowSyncClient
+from src.settings import PlexAnibridgeConfig
 
 
 class BridgeClient:
@@ -21,7 +17,7 @@ class BridgeClient:
     All components of the program are managed and initialized by this class.
     """
 
-    def __init__(self, config: Config) -> None:
+    def __init__(self, config: PlexAnibridgeConfig) -> None:
         self.config = config
 
         self.anilist_client = AniListClient(config.ANILIST_TOKEN, config.DRY_RUN)

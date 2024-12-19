@@ -8,6 +8,7 @@ from pydantic_settings import BaseSettings
 
 class SyncField(StrEnum):
     """AniList fields that PlexAniBridge is able to sync"""
+
     STATUS = "status"
     SCORE = "score"
     PROGRESS = "progress"
@@ -17,7 +18,7 @@ class SyncField(StrEnum):
     COMPLETED_AT = "completed_at"
 
     def to_camel(self) -> str:
-        """"Converts the enum value to camel case, which is the format AniList uses
+        """ "Converts the enum value to camel case, which is the format AniList uses
 
         Returns:
             str: The sync field in camel case
@@ -35,6 +36,7 @@ class SyncField(StrEnum):
 
 class LogLevel(StrEnum):
     """The available logging levels"""
+
     DEBUG = "DEBUG"
     INFO = "INFO"
     WARNING = "WARNING"
@@ -50,8 +52,9 @@ class LogLevel(StrEnum):
         return f"'{self.value}'"
 
 
-class Config(BaseSettings):
+class PlexAnibridgeConfig(BaseSettings):
     """Reads, validdates and stores the configuration settings from env vars"""
+
     # AniList
     ANILIST_TOKEN: str
 
@@ -101,6 +104,3 @@ class Config(BaseSettings):
                 for key in self.model_fields
             ]
         )
-
-
-config = Config()

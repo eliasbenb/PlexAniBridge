@@ -1,5 +1,6 @@
+from .database import PlexAniBridgeDB
 from .logging import setup_logger
-from .settings import config as __config
+from .settings import PlexAnibridgeConfig
 from .utils.version import get_git_hash, get_pyproject_version
 
 __author__ = "Elias Benbourenane <eliasbenbourenane@gmail.com>"
@@ -10,6 +11,22 @@ __email__ = "eliasbenbourenane@gmail.com"
 __version__ = get_pyproject_version()
 __git_hash__ = get_git_hash()
 
-log = setup_logger(
-    log_name="PlexAniBridge", log_level=__config.LOG_LEVEL, log_dir="logs"
-)
+PLEX_ANIBDRIGE_HEADER = f"""
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                           P L E X A N I B R I D G E                           ║
+╠═══════════════════════════════════════════════════════════════════════════════╣
+║                                                                               ║
+║  Version: {__version__:<68}║
+║  Git Hash: {__git_hash__:<67}║
+║  Author: {f"{__author__ } @{__maintainer__}":<69}║
+║  License: {__license__:<68}║
+║  Repository: https://github.com/eliasbenb/PlexAniBridge                       ║
+║                                                                               ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+""".strip()
+
+config = PlexAnibridgeConfig()
+
+log = setup_logger(log_name="PlexAniBridge", log_level=config.LOG_LEVEL, log_dir="logs")
+
+db = PlexAniBridgeDB(config.DB_PATH).engine
