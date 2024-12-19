@@ -8,11 +8,7 @@ from thefuzz import fuzz
 
 from src import log
 from src.core import AniListClient, AniMapClient, PlexClient
-from src.models.anilist import (
-    Media,
-    MediaList,
-    MediaListStatus,
-)
+from src.models.anilist import FuzzyDate, Media, MediaList, MediaListStatus
 from src.models.animap import AniMap
 from src.settings import SyncField
 
@@ -224,10 +220,10 @@ class BaseSyncClient(ABC, Generic[T, S]):
             repeat=self._calculate_repeats(item, subitem, anilist_media, animapping),
             notes=self.plex_client.get_user_review(subitem)
             or self.plex_client.get_user_review(item),
-            started_at=self._calculate_started_date(
+            started_at=self._calculate_started_at(
                 item, subitem, anilist_media, animapping
             ),
-            completed_at=self._calculate_completed_date(
+            completed_at=self._calculate_completed_at(
                 item, subitem, anilist_media, animapping
             ),
         )
@@ -262,15 +258,15 @@ class BaseSyncClient(ABC, Generic[T, S]):
         pass
 
     @abstractmethod
-    def _calculate_started_date(
+    def _calculate_started_at(
         self, item: T, subitem: S, anilist_media: Media, animapping: AniMap
-    ) -> Optional[Media]:
+    ) -> Optional[FuzzyDate]:
         pass
 
     @abstractmethod
-    def _calculate_completed_date(
+    def _calculate_completed_at(
         self, item: T, subitem: S, anilist_media: Media, animapping: AniMap
-    ) -> Optional[Media]:
+    ) -> Optional[FuzzyDate]:
         pass
 
     def _merge_media_lists(

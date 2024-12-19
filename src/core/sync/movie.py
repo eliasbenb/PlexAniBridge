@@ -37,7 +37,7 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie]):
     def _calculate_repeats(self, item: Movie, *_) -> int:
         return (item.viewCount or 1) - 1
 
-    def _calculate_started_date(self, item: Movie, *_) -> Optional[FuzzyDate]:
+    def _calculate_started_at(self, item: Movie, *_) -> Optional[FuzzyDate]:
         history: list[MovieHistory] = self.plex_client.get_history(
             item, max_results=1, sort_asc=True
         )
@@ -45,5 +45,5 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie]):
             return None
         return FuzzyDate.from_date(history[0].viewedAt)
 
-    def _calculate_completed_date(self, item: Movie, *_) -> Optional[FuzzyDate]:
-        return self._calculate_started_date(item)
+    def _calculate_completed_at(self, item: Movie, *_) -> Optional[FuzzyDate]:
+        return self._calculate_started_at(item)

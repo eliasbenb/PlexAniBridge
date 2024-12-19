@@ -75,7 +75,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
         )
         return (min((e.viewCount for e in episodes), default=1) or 1) - 1
 
-    def _calculate_started_date(
+    def _calculate_started_at(
         self,
         _: Show,
         subitem: Season,
@@ -92,7 +92,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
 
         return FuzzyDate.from_date(history.viewedAt)
 
-    def _calculate_completed_date(
+    def _calculate_completed_at(
         self,
         _: Show,
         subitem: Season,
