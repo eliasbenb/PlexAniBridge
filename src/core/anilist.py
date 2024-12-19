@@ -10,6 +10,7 @@ from src.models.anilist import (
     Media,
     MediaFormat,
     MediaList,
+    MediaStatus,
     MediaWithRelations,
     User,
 )
@@ -128,9 +129,9 @@ class AniListClient:
             list[Media]: The search results
         """
         query = dedent(f"""
-            query ($search: String, $formats: [MediaFormat], $episodes: Int, $limit: Int) {{
+            query ($search: String, $formats: [MediaFormat], $limit: Int) {{
                 Page(perPage: $limit) {{
-                    media(search: $search, type: ANIME, format_in: $formats, episodes: $episodes) {{
+                    media(search: $search, type: ANIME, format_in: $formats) {{
 {Media.model_dump_graphql(indent_level=4)}
                     }}
                 }}
@@ -151,7 +152,6 @@ class AniListClient:
         variables = {
             "search": search_str,
             "formats": formats,
-            "episods": episodes,
             "limit": limit,
         }
 
@@ -161,7 +161,13 @@ class AniListClient:
         )
 
         response = self._make_request(query, variables)
-        return [Media(**media) for media in response["data"]["Page"]["media"]]
+        return [
+            Media(**media)
+            for media in response["data"]["Page"]["media"]
+            if media["status"] == MediaStatus.RELEASING
+            or media["episodes"] == episodes
+            or not episodes
+        ]
 
     def get_anime(
         self,
