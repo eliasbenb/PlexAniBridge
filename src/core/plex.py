@@ -192,7 +192,10 @@ class PlexClient:
             return None
 
     def get_continue_watching(
-        self, item: Union[Movie, Season]
+        self,
+        item: Union[Movie, Season],
+        season_lower: Optional[int] = None,
+        season_upper: Optional[int] = None,
     ) -> Union[list[Movie], list[Episode]]:
         """Get the items that are in the 'Continue Watching' hub for a movie or season
 
@@ -207,11 +210,13 @@ class PlexClient:
                 "/hubs/continueWatching/items", ratingKey=item.ratingKey
             )
         elif item.type == "season":
-            return self.client.fetchItems(
-                "/hubs/continueWatching/items", parentRatingKey=item.ratingKey
-            )
-        else:
-            return []
+            kwargs = {"parentRatingKey": item.ratingKey}
+            if season_lower is not None:
+                kwargs["index__gte"] = season_lower
+            if season_upper is not None:
+                kwargs["index__lte"] = season_upper
+            return self.client.fetchItems("/hubs/continueWatching/items", **kwargs)
+        return []
 
     @cache
     def get_history(

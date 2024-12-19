@@ -164,9 +164,9 @@ class BaseSyncClient(ABC, Generic[T, S]):
         final_media_list = self._merge_media_lists(anilist_media_list, plex_media_list)
 
         if final_media_list == anilist_media_list:
-            log.debug(
-                f"{self.__class__.__name__}: Entry already up to date for "
-                f"{item.type} \u2018{self._clean_item_title(item, subitem)}\u2019 {{plex_id: {item.guid}}}"
+            log.info(
+                f"{self.__class__.__name__}: Skipping {item.type} because it is already up to date "
+                f"\u2018{self._clean_item_title(item, subitem)}\u2019 {{plex_id: {item.guid}}}"
             )
             self.sync_stats.skipped += 1
             return

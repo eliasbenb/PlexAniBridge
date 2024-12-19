@@ -22,10 +22,29 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie]):
         return self._best_search_result(item.title, results)
 
     def _calculate_status(self, item: Movie, *_) -> Optional[MediaListStatus]:
-        if item.viewCount > 0:
+        is_viewed = item.viewCount > 0
+        is_partially_viewed = item.viewOffset > 0
+        is_on_continue_watching = self.plex_client.get_continue_watching(item) and True
+        is_on_watchlist = item.onWatchlist()
+
+        # We've already watched it and are in the process of watching it again
+        if is_viewed and is_on_continue_watching:
+            return MediaListStatus.REPEATING
+        # We've watched it, so it's complete
+        if is_viewed:
             return MediaListStatus.COMPLETED
-        elif item.onWatchlist():
+        # We've watched part of it recently
+        if is_on_continue_watching:
+            return MediaListStatus.PAUSED
+        # We've watched part of it and it's not on continue watching. However, we've watchlisted it
+        if is_on_watchlist and is_partially_viewed:
+            return MediaListStatus.PAUSED
+        # It's on our watchlist and we haven't watched it yet
+        if is_on_watchlist:
             return MediaListStatus.PLANNING
+        # We've watched it, but we don't want to continue watching it
+        if is_partially_viewed:
+            return MediaListStatus.DROPPED
         return None
 
     def _calculate_score(self, item: Movie, *_) -> int:
