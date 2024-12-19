@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
-from functools import lru_cache
+from functools import cache
 from typing import Optional, Union
 
 import requests
@@ -31,8 +31,6 @@ class PlexClient:
 
         self.client = PlexServer(self.plex_url, self.plex_token)
         self.__validate_sections()
-
-        self._get_user_review_cached = lru_cache(maxsize=32)(self._get_user_review)
 
     def __validate_sections(self) -> None:
         """Does basic validation of the configured Plex sections
@@ -114,6 +112,7 @@ class PlexClient:
 
         return section.search(filters=filters)
 
+    @cache
     def get_user_review(self, item: Union[Movie, Show, Season]) -> Optional[str]:
         """Get the user review for a movie or show
 
@@ -123,29 +122,9 @@ class PlexClient:
         Returns:
             Optional[str]: The user review or None if not found
         """
-        if item.type not in ("movie", "show"):
+        if item.type not in ("movie", "show", "season"):
             return None
 
-        # To avoid making multiple requests for the same item, we cache the responses in an LRU cache
-        cache_key = ReviewKey(
-            rating_key=str(item.ratingKey),
-            item_type=item.type,
-            title=item.title,
-            guid=item.guid,
-        )
-
-        # We use the cached version if it exists or otherwise call `_get_user_review()`
-        return self._get_user_review_cached(cache_key)
-
-    def _get_user_review(self, cache_key: ReviewKey) -> Optional[str]:
-        """Get the user review for a movie or show cachelessly
-
-        Args:
-            cache_key (ReviewKey): The unique key to cache the response
-
-        Returns:
-            Optional[str]: The user review or None if not found
-        """
         query = """
         query GetReview($metadataID: ID!) {
             metadataReviewV2(metadata: {id: $metadataID}) {
@@ -159,10 +138,7 @@ class PlexClient:
         }
         """
 
-        if cache_key.item_type == "movie":
-            guid = cache_key.guid[13:]
-        else:
-            guid = cache_key.guid[12:]
+        guid = item.guid[13:] if item.type == "movie" else item.guid[12:]
 
         headers = {
             "Content-Type": "application/json",
@@ -171,7 +147,7 @@ class PlexClient:
         }
 
         log.debug(
-            f"{self.__class__.__name__}: Getting reviews for '{cache_key.title}' {{plex_id: {cache_key.guid}}}"
+            f"{self.__class__.__name__}: Getting reviews for '{item.title}' {{plex_id: {item.guid}}}"
         )
 
         try:
@@ -196,13 +172,13 @@ class PlexClient:
 
         except requests.HTTPError as e:
             log.error(
-                f"Failed to get review for item with rating key '{cache_key.rating_key}'",
+                f"Failed to get review for item with rating key '{item.ratingKey}'",
                 exc_info=e,
             )
             return None
         except (KeyError, ValueError) as e:
             log.error(
-                f"Failed to parse review response for item with rating key '{cache_key.rating_key}'",
+                f"Failed to parse review response for item with rating key '{item.ratingKey}'",
                 exc_info=e,
             )
             return None

@@ -181,7 +181,8 @@ class BaseSyncClient(ABC, Generic[T, S]):
             score=self._calculate_score(item, subitem, anilist_media, animapping),
             progress=self._calculate_progress(item, subitem, anilist_media, animapping),
             repeat=self._calculate_repeats(item, subitem, anilist_media, animapping),
-            notes=self.plex_client.get_user_review(subitem),
+            notes=self.plex_client.get_user_review(subitem)
+            or self.plex_client.get_user_review(item),
             started_at=self._calculate_started_date(
                 item, subitem, anilist_media, animapping
             ),
