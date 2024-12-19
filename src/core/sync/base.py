@@ -14,6 +14,7 @@ from src.models.anilist import (
     MediaListStatus,
 )
 from src.models.animap import AniMap
+from src.settings import SyncField
 
 T = TypeVar("T", bound=Union[Movie, Show])  # Section item
 S = TypeVar("S", bound=Union[Movie, Season])  # Item child (season)
@@ -67,12 +68,15 @@ class BaseSyncClient(ABC, Generic[T, S]):
         anilist_client: AniListClient,
         animap_client: AniMapClient,
         plex_client: PlexClient,
+        sync_fields: set[SyncField],
         destructive_sync: bool,
         fuzzy_search_threshold: int,
     ) -> None:
         self.anilist_client = anilist_client
         self.animap_client = animap_client
         self.plex_client = plex_client
+
+        self.sync_fields = sync_fields
         self.destructive_sync = destructive_sync
         self.fuzzy_search_threshold = fuzzy_search_threshold
 
@@ -164,6 +168,7 @@ class BaseSyncClient(ABC, Generic[T, S]):
             )
             self.sync_stats.skipped += 1
             return
+
         if self.destructive_sync and anilist_media_list and not plex_media_list.status:
             log.info(
                 f"{self.__class__.__name__}: Deleting AniList entry with variables:"
@@ -175,6 +180,7 @@ class BaseSyncClient(ABC, Generic[T, S]):
             )
             self.sync_stats.deleted += 1
             return
+
         if not final_media_list.status:
             log.info(
                 f"{self.__class__.__name__}: Skipping {item.type} due to no activity "

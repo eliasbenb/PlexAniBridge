@@ -34,6 +34,7 @@ class BridgeClient:
             "anilist_client": self.anilist_client,
             "animap_client": self.animap_client,
             "plex_client": self.plex_client,
+            "sync_fields": config.SYNC_FIELDS,
             "destructive_sync": config.DESTRUCTIVE_SYNC,
             "fuzzy_search_threshold": config.FUZZY_SEARCH_THRESHOLD,
         }
