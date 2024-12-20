@@ -85,13 +85,14 @@ class BaseSyncClient(ABC, Generic[T, S]):
 
         for subitem, animapping in self.map_media(item):
             try:
+                anilist_media = None
                 if animapping and (animapping.anilist_id or animapping.mal_id):
                     anilist_media = self.anilist_client.get_anime(
                         anilist_id=animapping.anilist_id,
                         mal_id=next(iter(animapping.mal_id or ()), None),
                     )
                     match_method = "mapping lookup"
-                else:
+                elif subitem.type == "season" and subitem.seasonNumber > 0:
                     anilist_media = self.search_media(item, subitem)
                     match_method = "title search"
 
@@ -105,10 +106,8 @@ class BaseSyncClient(ABC, Generic[T, S]):
 
                 animapping = animapping or AniMap(
                     anilist_id=anilist_media.id,
-                    tvdb_epoffset=0 if isinstance(subitem, Season) else None,
-                    tvdb_season=subitem.seasonNumber
-                    if isinstance(subitem, Season)
-                    else None,
+                    tvdb_epoffset=0 if item.type == "show" else None,
+                    tvdb_season=subitem.seasonNumber if item.type == "show" else None,
                 )
 
                 log.debug(

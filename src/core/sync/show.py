@@ -12,7 +12,7 @@ from .base import BaseSyncClient, ParsedGuids
 class ShowSyncClient(BaseSyncClient[Show, Season]):
     def map_media(self, item: Show) -> Iterator[tuple[Season, Optional[AniMap]]]:
         guids = ParsedGuids.from_guids(item.guids)
-        seasons: list[Season] = item.seasons(index__gt=0)
+        seasons: list[Season] = item.seasons()
         season_map = {s.index: s for s in seasons}
 
         for animapping in self.animap_client.get_mappings(
