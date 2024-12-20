@@ -61,11 +61,11 @@ class AniMapClient:
             )
 
             for value in values:
-                if "mal_id" in value:
+                if "mal_id" in value and value["mal_id"] is not None:
                     value["mal_id"] = [
                         int(id) for id in str(value["mal_id"]).split(",")
                     ]
-                if "imdb_id" in value:
+                if "imdb_id" in value and value["imdb_id"] is not None:
                     value["imdb_id"] = str(value["imdb_id"]).split(",")
 
                 session.merge(AniMap(**value))

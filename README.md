@@ -90,6 +90,7 @@ python main.py
 - [ ] Special/OVA/ONA support
 - [ ] Custom mapping support
 - [ ] Config option for users to choose which fields to sync (status, progress, repeats, rating, notes, start/end dates)
+- [ ] Backup recovery script to restore from the automatically created backups in the data folder
 
 ## Special Thanks/Dependencies
 

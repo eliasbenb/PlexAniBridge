@@ -20,7 +20,9 @@ class BridgeClient:
     def __init__(self, config: PlexAnibridgeConfig) -> None:
         self.config = config
 
-        self.anilist_client = AniListClient(config.ANILIST_TOKEN, config.DRY_RUN)
+        self.anilist_client = AniListClient(
+            config.ANILIST_TOKEN, config.DATA_PATH / "backups", config.DRY_RUN
+        )
         self.animap_client = AniMapClient()
         self.plex_client = PlexClient(
             config.PLEX_URL, config.PLEX_TOKEN, config.PLEX_SECTIONS

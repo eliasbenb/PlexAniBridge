@@ -1,4 +1,6 @@
+from datetime import datetime
 from functools import cache
+from pathlib import Path
 from textwrap import dedent
 from time import sleep
 from typing import Optional, Union
@@ -10,6 +12,7 @@ from src.models.anilist import (
     Media,
     MediaFormat,
     MediaList,
+    MediaListCollection,
     MediaStatus,
     MediaWithRelations,
     User,
@@ -21,13 +24,16 @@ class AniListClient:
     """Client for interacting with the AniList GraphQL API"""
 
     API_URL = "https://graphql.anilist.co"
+    MAX_BACKUPS = 15
 
-    def __init__(self, anilist_token: str, dry_run: bool) -> None:
+    def __init__(self, anilist_token: str, backup_dir: Path, dry_run: bool) -> None:
         self.anilist_token = anilist_token
+        self.backup_dir = backup_dir
         self.dry_run = dry_run
 
         self.rate_limiter = RateLimiter(self.__class__.__name__, requests_per_minute=90)
         self.anilist_user = self.get_user()
+        self.backup_anilist()
 
     def get_user(self) -> User:
         """Gets the owner user of the AniList token
@@ -208,6 +214,47 @@ class AniListClient:
         if relations:
             return MediaWithRelations(**response["data"]["Media"])
         return Media(**response["data"]["Media"])
+
+    def backup_anilist(self) -> None:
+        query = dedent(f"""
+        query MediaListCollection($userId: Int, $type: MediaType, $chunk: Int) {{
+            MediaListCollection(userId: $userId, type: $type, chunk: $chunk) {{
+{MediaListCollection.model_dump_graphql(indent_level=3)}
+            }}
+        }}
+        """).strip()
+
+        data = MediaListCollection(user=self.anilist_user, has_next_chunk=True)
+        variables = {"userId": self.anilist_user.id, "type": "ANIME", "chunk": 0}
+
+        while data.has_next_chunk:
+            response = self._make_request(query, variables)["data"][
+                "MediaListCollection"
+            ]
+            new_data = MediaListCollection(**response)
+
+            data.has_next_chunk = new_data.has_next_chunk
+            data.lists.extend(new_data.lists)
+
+            variables["chunk"] += 1
+
+        backup_file = (
+            self.backup_dir
+            / f"{self.anilist_user.name}-{datetime.now().strftime("%Y%m%dT%H%M%S")}.bak.json"
+        )
+
+        if not backup_file.parent.exists():
+            backup_file.parent.mkdir(parents=True)
+
+        backup_file.write_text(data.model_dump_json(indent=2))
+        log.info(f"{self.__class__.__name__}: Exported AniList data to '{backup_file}'")
+
+        for file in sorted(
+            self.backup_dir.glob("*.bak.json"),
+            key=lambda f: f.stat().st_mtime,
+            reverse=True,
+        )[self.MAX_BACKUPS :]:
+            file.unlink()
 
     def _make_request(
         self, query: str, variables: Optional[Union[dict, str]] = None
