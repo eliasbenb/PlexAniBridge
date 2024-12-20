@@ -27,6 +27,8 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
             yield season, None
 
     def search_media(self, item: Show, subitem: Season) -> Optional[Media]:
+        if subitem.seasonNumber == 0:
+            return None
         episodes = subitem.leafCount
         results = self.anilist_client.search_anime(item.title, False, episodes)
         return self._best_search_result(item.title, results)
