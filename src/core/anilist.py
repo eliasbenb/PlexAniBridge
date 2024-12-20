@@ -30,18 +30,17 @@ class AniListClient:
         self.anilist_user = self.get_user()
 
     def get_user(self) -> User:
-        """Gets the authenticated user's username
+        """Gets the owner user of the AniList token
 
         Returns:
-            str: The username associated with the AniList token
+            User: The anilist user object
         """
-        query = dedent("""
-        query {
-            Viewer {
-                id
-                name
-            }
-        }
+        query = dedent(f"""
+        query {{
+            Viewer {{
+{User.model_dump_graphql(indent_level=3)}
+            }}
+        }}
         """).strip()
 
         response = self._make_request(query)["data"]["Viewer"]
@@ -54,7 +53,7 @@ class AniListClient:
             media_list_entry (MediaList): The media list entry with the updated values
 
         Returns:
-            MediaList: The updated media list entry
+            Optional[MediaList]: The updated media list entry
         """
         variables = media_list_entry.model_dump_json()
 
@@ -79,6 +78,7 @@ class AniListClient:
         """Deletes an anime entry on the authenticated user's list
 
         Args:
+            entry_id (int): The AniList ID of the list entry to delete
             media_id (int): The AniList ID of the anime
 
         Returns:
@@ -157,11 +157,12 @@ class AniListClient:
         )
 
         response = self._make_request(query, variables)
+        medias = [Media(**m) for m in response["data"]["Page"]["media"]]
         return [
-            Media(**media)
-            for media in response["data"]["Page"]["media"]
-            if media["status"] == MediaStatus.RELEASING
-            or media["episodes"] == episodes
+            m
+            for m in medias
+            if m.status == MediaStatus.RELEASING
+            or m.episodes == episodes
             or not episodes
         ]
 
@@ -203,10 +204,10 @@ class AniListClient:
         )
 
         response = self._make_request(query, {id_type: media_id})
+
         if relations:
             return MediaWithRelations(**response["data"]["Media"])
-        else:
-            return Media(**response["data"]["Media"])
+        return Media(**response["data"]["Media"])
 
     def _make_request(
         self, query: str, variables: Optional[Union[dict, str]] = None
@@ -226,6 +227,7 @@ class AniListClient:
             requests.HTTPError: If the request fails
         """
         self.rate_limiter.wait_if_needed()  # Rate limit the requests
+
         response = requests.post(
             self.API_URL,
             headers={
@@ -253,4 +255,5 @@ class AniListClient:
             )
             log.error(f"\t\t{response.text}")
             raise e
+
         return response.json()
