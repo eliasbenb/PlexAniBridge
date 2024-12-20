@@ -13,4 +13,5 @@ dependencies = [
     "thefuzz>=0.22.1",
     "colorama>=0.4.6",
     "tomlkit>=0.13.2",
+    "PyYAML>=6.0.2",
 ]

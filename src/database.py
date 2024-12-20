@@ -7,8 +7,9 @@ from sqlmodel import SQLModel, create_engine
 class PlexAniBridgeDB:
     """A class to manage the creation and initialization of the database"""
 
-    def __init__(self, db_path: str) -> None:
-        self.db_path: Path = Path(db_path)
+    def __init__(self, data_path: Path) -> None:
+        self.data_path = data_path
+        self.db_path = data_path / "plexanibridge.db"
 
         self.engine = self.__setup_db()
 
@@ -18,17 +19,21 @@ class PlexAniBridgeDB:
         Returns:
             Engine: The database engine
         """
-        if not self.db_path.exists():
+        import src.models.animap  # noqa: F401
+        import src.models.housekeeping  # noqa: F401
+
+        if not self.data_path.exists():
             try:
-                self.db_path.parent.mkdir(parents=True, exist_ok=True)
+                self.data_path.mkdir(parents=True, exist_ok=True)
             except PermissionError:
                 raise PermissionError(
                     f"{self.__class__.__name__}: You do not have permissions to create "
-                    f"database files at '{self.db_path.parent}'"
+                    f"files at '{self.data_path}'"
                 )
-        elif not self.db_path.is_file():
+        elif self.data_path.is_file():
             raise ValueError(
-                f"{self.__class__.__name__}: The database path '{self.db_path}' is not a file"
+                f"{self.__class__.__name__}: The path '{self.data_path}' is a file, "
+                f"please delete it first or choose a different data folder path"
             )
 
         engine = create_engine(f"sqlite:///{self.db_path}")

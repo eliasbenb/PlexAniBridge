@@ -70,7 +70,7 @@ python main.py
   - The only exception to the above rule is when the Plex value is 0 or None. E.g. if the watch progress on Plex is 0, the watch progress on AniList will not be destructively updated.
   - Destructive syncs apply to every field (e.g. status, watch progress, score, repeat, notes, start date, end date, etc.).
   - Not recommended unless you know what you're doing.
-- `DB_PATH`: Path to the SQLite database file (default: `./db/plexanibridge.db`)
+- `DATA_PATH`: Path to the data folder that will store the database and custom mappings (default: `./data`)
 - `LOG_LEVEL`: Logging level (default: `INFO`)
   - Possible values: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`
 - `DRY_RUN`: Disables modifying AniList data (default: `False`)

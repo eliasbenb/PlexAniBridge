@@ -46,7 +46,7 @@ class BridgeClient:
         Returns:
             Optional[datetime]: The timestamp of the last sync, or None if it has never been synced
         """
-        with Session(db) as session:
+        with Session(db.engine) as session:
             last_synced = session.get(Housekeeping, "last_synced")
             if last_synced is None or last_synced.value is None:
                 return None
@@ -58,7 +58,7 @@ class BridgeClient:
         Args:
             last_synced (datetime): The timestamp of the last sync
         """
-        with Session(db) as session:
+        with Session(db.engine) as session:
             session.merge(
                 Housekeeping(key="last_synced", value=last_synced.isoformat())
             )
@@ -72,7 +72,7 @@ class BridgeClient:
         Returns:
             set[str]: The set of Plex section titles that were last synced
         """
-        with Session(db) as session:
+        with Session(db.engine) as session:
             last_synced = session.get(Housekeeping, "last_sections_synced")
             if last_synced is None:
                 return set()
@@ -84,7 +84,7 @@ class BridgeClient:
         Args:
             last_sections_synced (set[str]): The set of Plex section titles that were last synced
         """
-        with Session(db) as session:
+        with Session(db.engine) as session:
             session.merge(
                 Housekeeping(
                     key="last_sections_synced", value=",".join(last_sections_synced)

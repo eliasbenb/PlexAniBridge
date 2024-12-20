@@ -29,4 +29,4 @@ config = PlexAnibridgeConfig()
 
 log = setup_logger(log_name="PlexAniBridge", log_level=config.LOG_LEVEL, log_dir="logs")
 
-db = PlexAniBridgeDB(config.DB_PATH).engine
+db = PlexAniBridgeDB(config.DATA_PATH)

@@ -26,7 +26,7 @@ class AniMapClient:
 
     def __sync_db(self) -> None:
         """Sync the local AniMap database with the CDN source"""
-        with Session(db) as session:
+        with Session(db.engine) as session:
             # First check if the CDN data has changed. If not, we can skip the sync
             last_cdn_hash = session.get(Housekeeping, "animap_cdn_hash")
 
@@ -48,7 +48,7 @@ class AniMapClient:
             values = [
                 {
                     "anidb_id": anidb_id,
-                    **{key: data.get(key) for key in AniMap.__fields__.keys()},
+                    **{field: data.get(field) for field in AniMap.model_fields},
                 }
                 for anidb_id, data in cdn_data.items()
             ]  # Convert the CDN data to a format that can be inserted into the database
@@ -99,7 +99,7 @@ class AniMapClient:
         Returns:
             list[AniMap]: The list of AniMap entries that match the criteria
         """
-        with Session(db) as session:
+        with Session(db.engine) as session:
             partial_matches = {AniMap.imdb_id.contains: imdb}
             exact_matches = {}
             if is_movie:

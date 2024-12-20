@@ -1,4 +1,5 @@
 from enum import StrEnum
+from pathlib import Path
 from typing import Optional
 
 from pydantic import Field
@@ -59,16 +60,16 @@ class PlexAnibridgeConfig(BaseSettings):
     ANILIST_TOKEN: str
 
     # Plex
-    PLEX_URL: Optional[str] = "http://localhost:32400"
+    PLEX_URL: str = "http://localhost:32400"
     PLEX_TOKEN: str
     PLEX_SECTIONS: set[str]
 
     # General
-    SYNC_INTERVAL: Optional[int] = Field(3600, ge=-1)
-    PARTIAL_SCAN: Optional[bool] = True
-    DESTRUCTIVE_SYNC: Optional[bool] = False
+    SYNC_INTERVAL: int = Field(3600, ge=-1)
+    PARTIAL_SCAN: bool = True
+    DESTRUCTIVE_SYNC: bool = False
 
-    SYNC_FIELDS: Optional[set[SyncField]] = {
+    SYNC_FIELDS: set[SyncField] = {
         SyncField.STATUS,
         SyncField.SCORE,
         SyncField.PROGRESS,
@@ -79,10 +80,10 @@ class PlexAnibridgeConfig(BaseSettings):
     }
 
     # Advanced
-    DB_PATH: Optional[str] = "db/plexanibridge.db"
-    DRY_RUN: Optional[bool] = False
-    LOG_LEVEL: Optional[LogLevel] = LogLevel.INFO
-    FUZZY_SEARCH_THRESHOLD: Optional[int] = Field(90, ge=0, le=100)
+    DATA_PATH: Path = "./data"
+    DRY_RUN: bool = False
+    LOG_LEVEL: LogLevel = LogLevel.INFO
+    FUZZY_SEARCH_THRESHOLD: int = Field(90, ge=0, le=100)
 
     class Config:
         env_file = ".env"
