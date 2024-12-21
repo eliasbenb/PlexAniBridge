@@ -95,9 +95,6 @@ python main.py
 
 ## TODO
 
-> [!WARNING]
-> This project is still in development, while it is usable, I cannot guarantee that it will be stable for every release.
-
 - [ ] Custom mapping support
 - [ ] AniList recovery script to restore from the automatically created backups in the data folder
 
