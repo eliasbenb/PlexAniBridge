@@ -1,10 +1,10 @@
 # PlexAniBridge
 
-PlexAniBridge is a synchronization tool that automatically keeps your AniList profile up-to-date based on your Plex watching activity. The tool is designed to be extremely light-weight and work with both movies and shows.
+PlexAniBridge is a synchronization tool that automatically keeps your AniList profile up-to-date based on your Plex watching activity. The tool is designed to be extremely lightweight and work with both movies and shows.
 
 ## Features
 
-- Synchronize watch statusm, watch progress, repeat counts, rating scores, text reviews, and start/end dates
+- Synchronize watch status, watch progress, repeat counts, rating scores, text reviews, and start/end dates
 - Mapping Plex movies, shows, seasons, episode ranges, and specials to AniList using [Kometa mappings](https://github.com/Kometa-Team/Anime-IDs) with fuzzy title search as a fallback
 - Partial scanning support — only consider items added/updated/rated since the last sync
 - Scheduled sync jobs with configurable polling capabilities
@@ -30,7 +30,7 @@ services:
       PLEX_TOKEN: 2Sb...
       PLEX_SECTIONS: '["Anime", "Anime Movies"]'
     volumes:
-      - ./data:/app/data
+ - ./data:/app/data
       # - ./logs:/app/logs
     restart: unless-stopped
 ```
@@ -50,7 +50,7 @@ python main.py
 ## Configuration
 
 > [!NOTE]
-> Any list item prefixed with `*` is required to be set for the script to run.
+> Any list item prefixed with `*` must be set for the script to run.
 
 - `*ANILIST_TOKEN`: AniList API access token [get one here](https://anilist.co/login?apiVersion=v2&client_id=23079&response_type=token)
 - `*PLEX_URL`: URL to your Plex server (default: `http://localhost:32400`)
@@ -59,7 +59,7 @@ python main.py
   - The syntax is the same as a Python list. E.g. `["Anime", "Anime Movies"]`
 - `SYNC_INTERVAL`: Interval in seconds between each sync job. (default: `3600`)
   - Set as `-1` to disable scheduled sync jobs. This will cause the script to run only once and exit.
-  - When `PARTIAL_SCAN` is enabled, it can be benificial to lower the interval for quicker syncs. In this case, an interval of `300` (5 minutes) is recommended.
+  - When `PARTIAL_SCAN` is enabled, it can be beneficial to lower the interval for quicker syncs. In this case, an interval of `300` (5 minutes) is recommended.
 - `PARTIAL_SCAN`: Only consider items added/updated/rated since last sync. (default: `True`)
   - The initial sync will always be a full sync, regardless of this setting.
   - Any subsequent syncs will only consider items added/updated/rated since the last sync's start time.
@@ -67,10 +67,10 @@ python main.py
   - When syncing items, the script typically only updates fields on AniList that are less than the corresponding fields on Plex. With `DESTRUCTIVE_SYNC` enabled, this is no longer the case.
   - For example, if the watch progress on AniList is greater than the watch progress on Plex, the progress on AniList will be lowered to match the progress on Plex.
   - Destructive syncs apply to every field (e.g. status, watch progress, score, repeat, notes, start date, end date, etc.).
-  - In addition to regressive updates, destructive syncs also allow for deleting items from AniList lists. This can occur if the item exists in the Plex library but has no status (no watch history and is not watchlisted).
+  - In addition to regressive updates, destructive syncs allow for deleting items from AniList lists. This can occur if the item exists in the Plex library but has no status (no watch history and is not watchlisted).
   - Not recommended unless you know what you're doing.
 - `EXCLUDED_SYNC_FIELDS`: List of fields to exclude from sync (default: `["notes", "score"]`)
-  - The syntax is the same as a Python list. E.g. `["started_at", "completed_at"]`
+  - The syntax is the same as that of a Python list. E.g. `["started_at", "completed_at"]`
   - This is useful if you don't want to sync certain fields, such as notes or scores.
   - All available fields are: `["status", "score", "progress", "repeat", "notes", "started_at", "completed_at"]`
 - `DATA_PATH`: Path to the data folder that will store the database and custom mappings (default: `./data`)
@@ -91,9 +91,9 @@ python main.py
 > This project is still in development, while it is usable, I cannot guarantee that it will be stable for every release.
 
 > [!IMPORTANT]
-> To prevent data loss, PlexAniBridge automatically creates backups of your AniList data before syncing. These backups are stored under the data folder (set in `DATA_PATH`) in the `backups` directory. These backups are automatically deleted after 7 days.
+> To prevent data loss, PlexAniBridge automatically creates backups of your AniList data before syncing. These backups are stored under the data folder (defined in`DATA_PATH`) in the `backups` directory. These backups are automatically deleted after 7 days.
 >
-> To restore from a backup, use the [restore script](./scripts/anilist_restore.py) in the `scripts` folder. You will need to pass the backup file and anilist token as arguments:
+> To restore from a backup, use the [restore script](./scripts/anilist_restore.py) in the `scripts` folder. You will need to pass the backup file and AniList token as arguments:
 > 
 > ```shell
 > # pip install requests pydantic
