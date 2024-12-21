@@ -220,18 +220,23 @@ class BaseSyncClient(ABC, Generic[T, S]):
             score=self._calculate_score(item, subitem, anilist_media, animapping),
             progress=self._calculate_progress(item, subitem, anilist_media, animapping),
             repeat=self._calculate_repeats(item, subitem, anilist_media, animapping),
-            notes=self.plex_client.get_user_review(subitem)
-            or self.plex_client.get_user_review(item),
-            started_at=self._calculate_started_at(
-                item, subitem, anilist_media, animapping
-            ),
-            completed_at=self._calculate_completed_at(
-                item, subitem, anilist_media, animapping
-            ),
         )
 
-        if media_list.status != MediaListStatus.COMPLETED:
-            media_list.completed_at = None
+        if media_list.status is None:
+            return media_list
+
+        media_list.notes = self.plex_client.get_user_review(
+            subitem
+        ) or self.plex_client.get_user_review(item)
+
+        if media_list.status > MediaListStatus.PLANNING:
+            media_list.started_at = self._calculate_started_at(
+                item, subitem, anilist_media, animapping
+            )
+        if media_list.status >= MediaListStatus.COMPLETED:
+            media_list.completed_at = self._calculate_completed_at(
+                item, subitem, anilist_media, animapping
+            )
 
         return media_list
 
