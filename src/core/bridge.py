@@ -1,4 +1,5 @@
 from datetime import datetime
+from hashlib import md5
 from typing import Optional, Union
 
 from plexapi.library import MovieSection, ShowSection
@@ -19,6 +20,7 @@ class BridgeClient:
 
     def __init__(self, config: PlexAnibridgeConfig) -> None:
         self.config = config
+        self.config_hash = md5(self.config.model_dump_json().encode()).hexdigest()
 
         self.anilist_client = AniListClient(
             config.ANILIST_TOKEN, config.DATA_PATH / "backups", config.DRY_RUN
@@ -40,7 +42,7 @@ class BridgeClient:
         self.show_sync = ShowSyncClient(**sync_client_args)
 
         self.last_synced = self._get_last_synced()
-        self.last_sections_synced = self._get_last_sections_synced()
+        self.last_config_hash = self._get_last_config_hash()
 
     def _get_last_synced(self) -> Optional[datetime]:
         """Get the timestamp of the last sync
@@ -66,32 +68,26 @@ class BridgeClient:
             )
             session.commit()
 
-    def _get_last_sections_synced(self) -> set[str]:
-        """Get the configured Plex sections that were last synced
-
-        If the sections have been changed since the last sync, a full scan will need to be performed (ignoring the `PARTIAL_SCAN` setting)
+    def _get_last_config_hash(self) -> Optional[str]:
+        """Get the hash of the JSON serialized version of last config
 
         Returns:
-            set[str]: The set of Plex section titles that were last synced
+            Optional[str]: The hash of the JSON serialized version of last config, or None if it has never been synced
         """
         with Session(db.engine) as session:
-            last_synced = session.get(Housekeeping, "last_sections_synced")
-            if last_synced is None:
-                return set()
-            return set(last_synced.value.split(","))
+            last_config_hash = session.get(Housekeeping, "last_config_hash")
+            if last_config_hash is None:
+                return None
+            return last_config_hash.value
 
-    def _set_last_sections_synced(self, last_sections_synced: set[str]) -> None:
-        """Store the configured Plex sections that were last synced
+    def _set_last_config_hash(self, last_config_hash: str) -> None:
+        """Store the hash of the JSON serialized version of last config
 
         Args:
-            last_sections_synced (set[str]): The set of Plex section titles that were last synced
+            last_config_hash (str): The hash of the JSON serialized version of last config
         """
         with Session(db.engine) as session:
-            session.merge(
-                Housekeeping(
-                    key="last_sections_synced", value=",".join(last_sections_synced)
-                )
-            )
+            session.merge(Housekeeping(key="last_config_hash", value=last_config_hash))
             session.commit()
 
     def sync(self) -> None:
@@ -113,7 +109,7 @@ class BridgeClient:
 
         # Update the sync state
         self._set_last_synced(tmp_last_synced)
-        self._set_last_sections_synced({section.title for section in plex_sections})
+        self._set_last_config_hash(self.config_hash)
 
         log.info(f"{self.__class__.__name__}: Anime mappings sync completed")
         log.info(
@@ -129,11 +125,19 @@ class BridgeClient:
         """
         log.debug(f"{self.__class__.__name__}: Syncing section $$'{section.title}'$$")
 
+        should_perform_partial_scan = self._should_perform_partial_scan()
+        if should_perform_partial_scan:
+            log.info(
+                f"{self.__class__.__name__}: Performing partial scan for section $$'{section.title}'$$"
+            )
+        else:
+            log.info(
+                f"{self.__class__.__name__}: Performing full scan for section $$'{section.title}'$$"
+            )
+
         items = self.plex_client.get_section_items(
             section,
-            min_last_modified=self.last_synced
-            if self._should_perform_partial_scan()
-            else None,
+            min_last_modified=self.last_synced if should_perform_partial_scan else None,
             require_watched=not self.config.DESTRUCTIVE_SYNC,
         )
 
@@ -157,5 +161,5 @@ class BridgeClient:
         return (
             self.config.PARTIAL_SCAN
             and self.last_synced is not None
-            and self.last_sections_synced == self.plex_client.plex_sections
+            and self.last_config_hash == self.config_hash
         )
