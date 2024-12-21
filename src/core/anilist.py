@@ -61,8 +61,6 @@ class AniListClient:
         Returns:
             Optional[MediaList]: The updated media list entry
         """
-        variables = media_list_entry.model_dump_json()
-
         query = dedent(f"""
         mutation ($mediaId: Int, $status: MediaListStatus, $score: Float, $progress: Int, $repeat: Int, $notes: String, $startedAt: FuzzyDateInput, $completedAt: FuzzyDateInput) {{
             SaveMediaListEntry(mediaId: $mediaId, status: $status, score: $score, progress: $progress, repeat: $repeat, notes: $notes, startedAt: $startedAt, completedAt: $completedAt) {{
@@ -77,6 +75,8 @@ class AniListClient:
             )
             None
 
+        variables = media_list_entry.model_dump_json()
+
         response = self._make_request(query, variables)["data"]["SaveMediaListEntry"]
         return MediaList(**response)
 
@@ -90,10 +90,6 @@ class AniListClient:
         Returns:
             bool: True if the entry was deleted, False otherwise
         """
-        variables = MediaList(
-            id=entry_id, media_id=media_id, user_id=self.anilist_user.id
-        ).model_dump()
-
         query = dedent("""
         mutation ($id: Int) {
             DeleteMediaListEntry(id: $id) {
@@ -107,6 +103,10 @@ class AniListClient:
                 f"{self.__class__.__name__}: Dry run enabled, skipping anime entry deletion {{anilist_id: {media_id}}}"
             )
             return False
+
+        variables = MediaList(
+            id=entry_id, media_id=media_id, user_id=self.anilist_user.id
+        ).model_dump_json()
 
         response = self._make_request(query, variables)["data"]["DeleteMediaListEntry"]
         return response["deleted"]
