@@ -111,7 +111,6 @@ class AniListClient:
         response = self._make_request(query, variables)["data"]["DeleteMediaListEntry"]
         return response["deleted"]
 
-    @cache
     def search_anime(
         self,
         search_str: str,
@@ -121,10 +120,44 @@ class AniListClient:
     ) -> list[Media]:
         """Searches for anime on AniList
 
+        This function is a wrapper of the cached `_search_anime()` it handles filtering while `_search_anime()`
+        actually makes and caches the request.
+
         Args:
             search_str (str): The search query
             is_movie (bool): Whether the anime is a movie
             episodes (Optional[int], optional): The number of episodes in the anime. Defaults to None.
+            limit (int, optional): The maximum number of results to return. Defaults to 10.
+
+        Returns:
+            list[Media]: The filtered search results
+        """
+        log.debug(
+            f"{self.__class__.__name__}: Searching for anime {'movie' if is_movie else 'show'} "
+            f"with title \u2018{search_str}\u2019 that has {episodes or 'unknown'} episodes"
+        )
+
+        res = self._search_anime(search_str, is_movie, limit)
+        return [
+            m
+            for m in res
+            if m.status == MediaStatus.RELEASING
+            or m.episodes == episodes
+            or not episodes
+        ]
+
+    @cache
+    def _search_anime(
+        self,
+        search_str: str,
+        is_movie: bool,
+        limit: int = 10,
+    ) -> list[Media]:
+        """Helper function to `search_anime()` that caches AniList GraphQL results
+
+        Args:
+            search_str (str): The search query
+            is_movie (bool): Whether the anime is a movie
             limit (int, optional): The maximum number of results to return. Defaults to 10.
 
         Returns:
@@ -157,20 +190,8 @@ class AniListClient:
             "limit": limit,
         }
 
-        log.debug(
-            f"{self.__class__.__name__}: Searching for anime {'movie' if is_movie else 'show'} "
-            f"with title \u2018{search_str}\u2019 that has {episodes or 'unknown'} episodes"
-        )
-
         response = self._make_request(query, variables)
-        medias = [Media(**m) for m in response["data"]["Page"]["media"]]
-        return [
-            m
-            for m in medias
-            if m.status == MediaStatus.RELEASING
-            or m.episodes == episodes
-            or not episodes
-        ]
+        return [Media(**m) for m in response["data"]["Page"]["media"]]
 
     def get_anime(
         self,
