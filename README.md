@@ -72,7 +72,7 @@ python main.py
 - `EXCLUDED_SYNC_FIELDS`: List of fields to exclude from sync (default: `[]`)
   - The syntax is the same as a Python list. E.g. `["notes", "score"]`
   - This is useful if you don't want to sync certain fields, such as notes or scores.
-  - All available are: `["status", "score", "progress", "repeat", "notes", "started_at", "completed_at"]`
+  - All available fields are: `["status", "score", "progress", "repeat", "notes", "started_at", "completed_at"]`
 - `DATA_PATH`: Path to the data folder that will store the database and custom mappings (default: `./data`)
 - `LOG_LEVEL`: Logging level (default: `INFO`)
   - Possible values: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`
