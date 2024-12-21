@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from sqlalchemy.engine import Engine
-from sqlmodel import SQLModel, create_engine
+from sqlmodel import create_engine
 
 from src import config
 
@@ -40,7 +40,6 @@ class PlexAniBridgeDB:
             )
 
         engine = create_engine(f"sqlite:///{self.db_path}")
-        SQLModel.metadata.create_all(engine)
 
         return engine
 
