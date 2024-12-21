@@ -1,5 +1,4 @@
 from datetime import datetime
-from hashlib import md5
 from typing import Optional, Union
 
 from plexapi.library import MovieSection, ShowSection
@@ -20,7 +19,6 @@ class BridgeClient:
 
     def __init__(self, config: PlexAnibridgeConfig) -> None:
         self.config = config
-        self.config_hash = md5(self.config.model_dump_json().encode()).hexdigest()
 
         self.anilist_client = AniListClient(
             config.ANILIST_TOKEN, config.DATA_PATH / "backups", config.DRY_RUN
@@ -42,7 +40,7 @@ class BridgeClient:
         self.show_sync = ShowSyncClient(**sync_client_args)
 
         self.last_synced = self._get_last_synced()
-        self.last_config_hash = self._get_last_config_hash()
+        self.last_config_encoded = self._get_last_config_encoded()
 
     def _get_last_synced(self) -> Optional[datetime]:
         """Get the timestamp of the last sync
@@ -68,26 +66,26 @@ class BridgeClient:
             )
             session.commit()
 
-    def _get_last_config_hash(self) -> Optional[str]:
-        """Get the hash of the JSON serialized version of last config
+    def _get_last_config_encoded(self) -> Optional[str]:
+        """Get the encoded version of the last config
 
         Returns:
-            Optional[str]: The hash of the JSON serialized version of last config, or None if it has never been synced
+            Optional[str]: The encoded config
         """
         with Session(db.engine) as session:
-            last_config_hash = session.get(Housekeeping, "last_config_hash")
-            if last_config_hash is None:
+            last_config_encoded = session.get(Housekeeping, "last_config_encoded")
+            if last_config_encoded is None:
                 return None
-            return last_config_hash.value
+            return last_config_encoded.value
 
-    def _set_last_config_hash(self, last_config_hash: str) -> None:
-        """Store the hash of the JSON serialized version of last config
+    def _set_last_config_encoded(self, config_encoded: str) -> None:
+        """Store the encoded version of the config
 
         Args:
-            last_config_hash (str): The hash of the JSON serialized version of last config
+            config_encoded (str): The encoded config
         """
         with Session(db.engine) as session:
-            session.merge(Housekeeping(key="last_config_hash", value=last_config_hash))
+            session.merge(Housekeeping(key="last_config_encoded", value=config_encoded))
             session.commit()
 
     def sync(self) -> None:
@@ -109,7 +107,7 @@ class BridgeClient:
 
         # Update the sync state
         self._set_last_synced(tmp_last_synced)
-        self._set_last_config_hash(self.config_hash)
+        self._set_last_config_encoded(self.config.encode())
 
         log.info(f"{self.__class__.__name__}: Anime mappings sync completed")
         log.info(
@@ -161,5 +159,5 @@ class BridgeClient:
         return (
             self.config.PARTIAL_SCAN
             and self.last_synced is not None
-            and self.last_config_hash == self.config_hash
+            and self.last_config_encoded == self.config.encode()
         )

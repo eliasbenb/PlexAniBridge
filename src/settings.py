@@ -1,4 +1,5 @@
 from enum import StrEnum
+from hashlib import md5
 from pathlib import Path
 
 from pydantic import Field, model_validator
@@ -81,6 +82,27 @@ class PlexAnibridgeConfig(BaseSettings):
         """Ensures `DATA_PATH` is always absolute"""
         self.DATA_PATH = Path(self.DATA_PATH).resolve()
         return self
+
+    def encode(self) -> str:
+        """Returns a reproducible encoded string of the config. Used to determine if the config has changed
+
+        Returns:
+            str: The encoded config
+        """
+
+        def sort_value(value):
+            if isinstance(value, (list, set, tuple)):
+                return sorted(value)
+            elif isinstance(value, dict):
+                return {k: sort_value(v) for k, v in sorted(value.items())}
+            return value
+
+        config_str = "".join(
+            str(sort_value(getattr(self, key)))
+            for key in sorted(self.model_fields.keys())
+            if key not in ("LOG_LEVEL", "DRY_RUN", "SYNC_INTERVAL")
+        )
+        return md5(config_str.encode()).hexdigest()
 
     def __str__(self) -> str:
         """Return a string representation of the config
