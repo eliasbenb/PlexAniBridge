@@ -1,4 +1,3 @@
-import json
 from datetime import date, datetime, timedelta, timezone
 from enum import StrEnum
 from functools import total_ordering
@@ -124,7 +123,17 @@ class AniListBaseModel(BaseModel):
 
     _processed_models: ClassVar[set] = set()
 
-    def model_dump_json(self, **kwargs: Any) -> str:
+    def model_dump(self, **kwargs) -> dict:
+        """Convert the model to a dictionary, converting all keys to camelCase
+
+        Because AniList uses camelCase for its GraphQL API, we need to convert all the keys to camelCase.
+
+        Returns:
+            dict: Dictionary representation of the model
+        """
+        return super().model_dump(by_alias=True, **kwargs)
+
+    def model_dump_json(self, **kwargs) -> str:
         """Serialize the model to JSON, converting all keys to camelCase
 
         Because AniList uses camelCase for its GraphQL API, we need to convert all the keys to camelCase.
@@ -132,10 +141,7 @@ class AniListBaseModel(BaseModel):
         Returns:
             str: JSON serialized string of the model
         """
-        json_str = super().model_dump_json()
-        data = json.loads(json_str)
-        camel_data = {to_camel(k): v for k, v in data.items()}
-        return json.dumps(camel_data, **kwargs)
+        return super().model_dump_json(by_alias=True, **kwargs)
 
     def clear(self) -> None:
         """Clear all the fields of the model"""
