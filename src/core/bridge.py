@@ -21,12 +21,22 @@ class BridgeClient:
     def __init__(self, config: PlexAnibridgeConfig) -> None:
         self.config = config
 
-        self.anilist_client = AniListClient(
-            config.ANILIST_TOKEN, config.DATA_PATH / "backups", config.DRY_RUN
+        anilist_tokens = (
+            config.ANILIST_TOKEN
+            if isinstance(config.ANILIST_TOKEN, list)
+            else [config.ANILIST_TOKEN]
         )
+        plex_users = config.PLEX_USERS or ["default"]
+        plex_anilist_pairs = list(zip(plex_users, anilist_tokens))
+
         self.animap_client = AniMapClient()
+
+        plex_user, anilist_token = plex_anilist_pairs.pop(0)
         self.plex_client = PlexClient(
             config.PLEX_URL, config.PLEX_TOKEN, config.PLEX_SECTIONS
+        )
+        self.anilist_client = AniListClient(
+            anilist_token, config.DATA_PATH / "backups", config.DRY_RUN
         )
 
         sync_client_args = {
@@ -37,8 +47,18 @@ class BridgeClient:
             "destructive_sync": config.DESTRUCTIVE_SYNC,
             "fuzzy_search_threshold": config.FUZZY_SEARCH_THRESHOLD,
         }
+
         self.movie_sync = MovieSyncClient(**sync_client_args)
         self.show_sync = ShowSyncClient(**sync_client_args)
+
+        while plex_anilist_pairs:
+            plex_user, anilist_token = plex_anilist_pairs.pop(0)
+
+            self.plex_client.switch_user(plex_user)
+            self.anilist_client.switch_user(anilist_token)
+
+            self.movie_sync = MovieSyncClient(**sync_client_args)
+            self.show_sync = ShowSyncClient(**sync_client_args)
 
         self.last_synced = self._get_last_synced()
         self.last_config_encoded = self._get_last_config_encoded()
