@@ -1,5 +1,4 @@
 from datetime import datetime, timedelta
-from functools import cache
 from pathlib import Path
 from textwrap import dedent
 from time import sleep
@@ -17,6 +16,7 @@ from src.models.anilist import (
     MediaWithRelations,
     User,
 )
+from src.utils.cache import user_cache
 from src.utils.rate_limitter import RateLimiter
 
 
@@ -27,12 +27,25 @@ class AniListClient:
     BACKUP_RETENTION_DAYS = 7
 
     def __init__(self, anilist_token: str, backup_dir: Path, dry_run: bool) -> None:
-        self.anilist_token = anilist_token
         self.backup_dir = backup_dir
         self.dry_run = dry_run
 
         self.rate_limiter = RateLimiter(self.__class__.__name__, requests_per_minute=90)
-        self.anilist_user = self.get_user()
+
+        self.switch_user(anilist_token)
+
+    def switch_user(self, anilist_token: str) -> User:
+        """Switches the authenticated user to the specified user
+
+        Args:
+            token (str): The AniList token of the user to switch to
+            Returns:
+        User: The new anilist user object
+        """
+        self.anilist_token = anilist_token
+        self.user = self.get_user()
+        log.debug(f"{self.__class__.__name__}: Switched to user $$'{self.user.name}'$$")
+
         self.backup_anilist()
 
     def get_user(self) -> User:
@@ -105,7 +118,7 @@ class AniListClient:
             return False
 
         variables = MediaList(
-            id=entry_id, media_id=media_id, user_id=self.anilist_user.id
+            id=entry_id, media_id=media_id, user_id=self.user.id
         ).model_dump_json(exclude_none=True)
 
         response = self._make_request(query, variables)["data"]["DeleteMediaListEntry"]
@@ -146,7 +159,7 @@ class AniListClient:
             or not episodes
         ]
 
-    @cache
+    @user_cache
     def _search_anime(
         self,
         search_str: str,
@@ -245,8 +258,8 @@ class AniListClient:
         }}
         """).strip()
 
-        data = MediaListCollection(user=self.anilist_user, has_next_chunk=True)
-        variables = {"userId": self.anilist_user.id, "type": "ANIME", "chunk": 0}
+        data = MediaListCollection(user=self.user, has_next_chunk=True)
+        variables = {"userId": self.user.id, "type": "ANIME", "chunk": 0}
 
         while data.has_next_chunk:
             response = self._make_request(query, variables)["data"][
@@ -260,14 +273,10 @@ class AniListClient:
             variables["chunk"] += 1
 
         n = 1
-        backup_file = (
-            self.backup_dir / f"plexanibridge-{self.anilist_user.name}.{n}.json"
-        )
+        backup_file = self.backup_dir / f"plexanibridge-{self.user.name}.{n}.json"
         while backup_file.exists():
             n += 1
-            backup_file = (
-                self.backup_dir / f"plexanibridge-{self.anilist_user.name}.{n}.json"
-            )
+            backup_file = self.backup_dir / f"plexanibridge-{self.user.name}.{n}.json"
 
         if not backup_file.parent.exists():
             backup_file.parent.mkdir(parents=True)
