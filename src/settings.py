@@ -1,8 +1,7 @@
 from enum import StrEnum
 from pathlib import Path
-from typing import Optional
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic.alias_generators import to_camel
 from pydantic_settings import BaseSettings
 
@@ -77,8 +76,11 @@ class PlexAnibridgeConfig(BaseSettings):
     LOG_LEVEL: LogLevel = LogLevel.INFO
     FUZZY_SEARCH_THRESHOLD: int = Field(90, ge=0, le=100)
 
-    class Config:
-        env_file = ".env"
+    @model_validator(mode="after")
+    def absolute_data_path(self) -> "PlexAnibridgeConfig":
+        """Ensures `DATA_PATH` is always absolute"""
+        self.DATA_PATH = Path(self.DATA_PATH).resolve()
+        return self
 
     def __str__(self) -> str:
         """Return a string representation of the config
@@ -97,3 +99,6 @@ class PlexAnibridgeConfig(BaseSettings):
                 for key in self.model_fields
             ]
         )
+
+    class Config:
+        env_file = ".env"
