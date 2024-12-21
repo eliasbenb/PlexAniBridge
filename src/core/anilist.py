@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import cache
 from pathlib import Path
 from textwrap import dedent
@@ -24,7 +24,7 @@ class AniListClient:
     """Client for interacting with the AniList GraphQL API"""
 
     API_URL = "https://graphql.anilist.co"
-    MAX_BACKUPS = 15
+    BACKUP_RETENTION_DAYS = 7
 
     def __init__(self, anilist_token: str, backup_dir: Path, dry_run: bool) -> None:
         self.anilist_token = anilist_token
@@ -238,10 +238,15 @@ class AniListClient:
 
             variables["chunk"] += 1
 
+        n = 1
         backup_file = (
-            self.backup_dir
-            / f"{self.anilist_user.name}-{datetime.now().strftime("%Y%m%dT%H%M%S")}.bak.json"
+            self.backup_dir / f"plexanibridge-{self.anilist_user.name}.{n}.json"
         )
+        while backup_file.exists():
+            n += 1
+            backup_file = (
+                self.backup_dir / f"plexanibridge-{self.anilist_user.name}.{n}.json"
+            )
 
         if not backup_file.parent.exists():
             backup_file.parent.mkdir(parents=True)
@@ -249,12 +254,13 @@ class AniListClient:
         backup_file.write_text(data.model_dump_json(indent=2))
         log.info(f"{self.__class__.__name__}: Exported AniList data to '{backup_file}'")
 
-        for file in sorted(
-            self.backup_dir.glob("*.bak.json"),
-            key=lambda f: f.stat().st_mtime,
-            reverse=True,
-        )[self.MAX_BACKUPS :]:
-            file.unlink()
+        cutoff_date = datetime.now() - timedelta(days=self.BACKUP_RETENTION_DAYS)
+
+        for file in self.backup_dir.glob("plexanibridge-*.json"):
+            file_mtime = datetime.fromtimestamp(file.stat().st_mtime)
+            if file_mtime < cutoff_date:
+                file.unlink()
+                log.debug(f"{self.__class__.__name__}: Deleted old backup '{file}'")
 
     def _make_request(
         self, query: str, variables: Optional[Union[dict, str]] = None
