@@ -1,5 +1,4 @@
 from datetime import datetime
-from functools import cache
 from typing import Optional, Union
 
 import requests
@@ -9,6 +8,7 @@ from plexapi.utils import joinArgs
 from plexapi.video import Episode, EpisodeHistory, Movie, MovieHistory, Season, Show
 
 from src import log
+from src.utils.cache import user_cache
 
 
 class PlexClient:
@@ -20,37 +20,19 @@ class PlexClient:
         self.plex_sections = plex_sections
 
         self.client = PlexServer(self.plex_url, self.plex_token)
-        self.__validate_sections()
+        self.user = self.client.myPlexAccount()
 
-    def __validate_sections(self) -> None:
-        """Does basic validation of the configured Plex sections
+    def switch_user(self, user: str) -> None:
+        """Switch the Plex client to a different user
 
-        The function checks if the configured sections:
-            1. Exist in the Plex server
-            2. Are of type 'movie' or 'show'
-
-        Raises:
-            ValueError: If any of the sections are invalid
+        Args:
+            user (str): The username, email, or user ID to switch to
         """
-        log.debug(f"{self.__class__.__name__}: Validating configured sections")
-
-        sections = self.client.library.sections()
-        section_name_map = {section.title: section for section in sections}
-
-        for section_name in self.plex_sections:
-            try:
-                section = section_name_map[section_name]
-            except KeyError:
-                raise ValueError(
-                    f"Section $$'{section_name}'$$ was not found in the Plex server"
-                )
-
-            if section.type not in ["movie", "show"]:
-                raise ValueError(
-                    f"Section $$'{section_name}'$$ is not a movie or show section"
-                )
-
-        log.debug(f"{self.__class__.__name__}: All sections are valid")
+        self.client.switchUser(user)
+        self.user = self.client.myPlexAccount()
+        log.debug(
+            f"{self.__class__.__name__}: Switched to user $$'{self.user.username}'$$"
+        )
 
     def get_sections(self) -> Union[list[MovieSection], list[ShowSection]]:
         """Get all Plex sections that are configured
@@ -107,7 +89,7 @@ class PlexClient:
 
         return section.search(filters=filters)
 
-    @cache
+    @user_cache
     def get_user_review(self, item: Union[Movie, Show, Season]) -> Optional[str]:
         """Get the user review for a movie or show
 
@@ -208,7 +190,7 @@ class PlexClient:
             return self.client.fetchItems("/hubs/continueWatching/items", **kwargs)
         return []
 
-    @cache
+    @user_cache
     def get_history(
         self,
         item: Union[Movie, Show, Season, Episode],
