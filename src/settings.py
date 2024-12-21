@@ -1,6 +1,7 @@
 from enum import StrEnum
 from hashlib import md5
 from pathlib import Path
+from typing import Optional, Union
 
 from pydantic import Field, model_validator
 from pydantic.alias_generators import to_camel
@@ -57,12 +58,13 @@ class PlexAnibridgeConfig(BaseSettings):
     """Reads, validdates and stores the configuration settings from env vars"""
 
     # AniList
-    ANILIST_TOKEN: str
+    ANILIST_TOKEN: Union[str, list[str]]
 
     # Plex
     PLEX_URL: str = "http://localhost:32400"
     PLEX_TOKEN: str
     PLEX_SECTIONS: set[str]
+    PLEX_USERS: Optional[list[str]] = None
 
     # General
     SYNC_INTERVAL: int = Field(3600, ge=-1)
@@ -81,6 +83,22 @@ class PlexAnibridgeConfig(BaseSettings):
     def absolute_data_path(self) -> "PlexAnibridgeConfig":
         """Ensures `DATA_PATH` is always absolute"""
         self.DATA_PATH = Path(self.DATA_PATH).resolve()
+        return self
+
+    @model_validator(mode="after")
+    def validate_token_users_match(self) -> "PlexAnibridgeConfig":
+        """Ensures ANILIST_TOKEN and PLEX_USERS lists match in length when using multiple tokens"""
+        if self.PLEX_USERS:
+            if isinstance(self.ANILIST_TOKEN, str):
+                raise ValueError(
+                    "`ANILIST_TOKEN` must be a list when using multiple Plex users"
+                )
+            if len(self.ANILIST_TOKEN) != len(self.PLEX_USERS):
+                raise ValueError(
+                    "`ANILIST_TOKEN` and `PLEX_USERS` must be the same length when using multiple Plex users"
+                )
+        if not self.ANILIST_TOKEN:
+            raise ValueError("`ANILIST_TOKEN` must be set")
         return self
 
     def encode(self) -> str:
