@@ -244,19 +244,19 @@ class BaseSyncClient(ABC, Generic[T, S]):
     @abstractmethod
     def _calculate_score(
         self, item: T, subitem: S, anilist_media: Media, animapping: AniMap
-    ) -> int:
+    ) -> Optional[int]:
         pass
 
     @abstractmethod
     def _calculate_progress(
         self, item: T, subitem: S, anilist_media: Media, animapping: AniMap
-    ) -> int:
+    ) -> Optional[int]:
         pass
 
     @abstractmethod
     def _calculate_repeats(
         self, item: T, subitem: S, anilist_media: Media, animapping: AniMap
-    ) -> int:
+    ) -> Optional[int]:
         pass
 
     @abstractmethod

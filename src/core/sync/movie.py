@@ -47,14 +47,14 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie]):
             return MediaListStatus.DROPPED
         return None
 
-    def _calculate_score(self, item: Movie, *_) -> int:
-        return item.userRating or 0.0
+    def _calculate_score(self, item: Movie, *_) -> Optional[int]:
+        return item.userRating
 
-    def _calculate_progress(self, item: Movie, *_) -> int:
-        return 1 if item.viewCount > 0 else 0
+    def _calculate_progress(self, item: Movie, *_) -> Optional[int]:
+        return 1 if item.viewCount else None
 
-    def _calculate_repeats(self, item: Movie, *_) -> int:
-        return (item.viewCount or 1) - 1
+    def _calculate_repeats(self, item: Movie, *_) -> Optional[int]:
+        return item.viewCount - 1 if item.viewCount else None
 
     def _calculate_started_at(self, item: Movie, *_) -> Optional[FuzzyDate]:
         history: list[MovieHistory] = self.plex_client.get_history(
