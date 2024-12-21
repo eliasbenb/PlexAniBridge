@@ -299,9 +299,9 @@ class MediaList(AniListBaseModel):
     user_id: int
     media_id: int
     status: Optional[MediaListStatus] = None
-    score: Optional[float] = 0.0
-    progress: Optional[int] = 0
-    repeat: Optional[int] = 0
+    score: Optional[float] = None
+    progress: Optional[int] = None
+    repeat: Optional[int] = None
     notes: Optional[str] = None
     started_at: Optional[FuzzyDate] = None
     completed_at: Optional[FuzzyDate] = None
