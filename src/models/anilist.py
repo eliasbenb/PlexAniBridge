@@ -137,6 +137,16 @@ class AniListBaseModel(BaseModel):
         camel_data = {to_camel(k): v for k, v in data.items()}
         return json.dumps(camel_data, **kwargs)
 
+    def clear(self) -> None:
+        """Clear all the fields of the model"""
+        for field, field_info in self.model_fields.items():
+            if field_info.default_factory:
+                default_value = field_info.default_factory()
+            else:
+                default_value = field_info.default
+            setattr(self, field, default_value)
+        self.model_fields_set.clear()
+
     @classmethod
     def model_dump_graphql(cls, indent_level: int = 0) -> str:
         """Generate GraphQL query fields with proper indentation
@@ -283,14 +293,22 @@ class MediaList(AniListBaseModel):
     user_id: int
     media_id: int
     status: Optional[MediaListStatus] = None
-    score: Optional[float] = None
-    progress: Optional[int] = None
-    repeat: Optional[int] = None
+    score: Optional[float] = 0.0
+    progress: Optional[int] = 0
+    repeat: Optional[int] = 0
     notes: Optional[str] = None
     started_at: Optional[FuzzyDate] = None
     completed_at: Optional[FuzzyDate] = None
     created_at: Optional[UTCDateTime] = None
     updated_at: Optional[UTCDateTime] = None
+
+    def keep_fields(self, fields: set[str]) -> None:
+        excluded_fields = (
+            set(self.model_fields) - {"id", "user_id", "media_id"} - fields
+        )
+        for field, field_info in self.model_fields.items():
+            if field in excluded_fields:
+                setattr(self, field, field_info.default)
 
     def __str__(self) -> str:
         notes_truncated = None

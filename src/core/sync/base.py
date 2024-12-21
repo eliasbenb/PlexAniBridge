@@ -152,10 +152,16 @@ class BaseSyncClient(ABC, Generic[T, S]):
     def sync_media(
         self, item: T, subitem: S, anilist_media: Media, animapping: AniMap
     ) -> None:
-        anilist_media_list = anilist_media.media_list_entry
+        anilist_media_list = (
+            anilist_media.media_list_entry if anilist_media.media_list_entry else None
+        )
         plex_media_list = self._get_plex_media_list(
             item, subitem, anilist_media, animapping
         )
+
+        if anilist_media_list:
+            anilist_media_list.keep_fields(self.sync_fields)
+        plex_media_list.keep_fields(self.sync_fields)
 
         final_media_list = self._merge_media_lists(anilist_media_list, plex_media_list)
 
