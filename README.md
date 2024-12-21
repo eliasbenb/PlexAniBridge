@@ -4,11 +4,10 @@ PlexAniBridge is a synchronization tool that automatically keeps your AniList pr
 
 ## Features
 
-- Synchronize watch progress, rating scores, text reviews or notes, watch status, start/end dates, repeat counts
-- Mapping Plex movies, shows, seasons, and episode ranges to AniList using [Kometa mappings](https://github.com/Kometa-Team/Anime-IDs) with fuzzy title search as a fallback
-- Partial scanning support — only consider items added/updated/rated since last the sync
+- Synchronize watch statusm, watch progress, repeat counts, rating scores, text reviews, and start/end dates
+- Mapping Plex movies, shows, seasons, episode ranges, and specials to AniList using [Kometa mappings](https://github.com/Kometa-Team/Anime-IDs) with fuzzy title search as a fallback
+- Partial scanning support — only consider items added/updated/rated since the last sync
 - Scheduled sync jobs with configurable polling capabilities
-- Configurable safe/destructive syncs — decide between making only progressive (increasing) updates or potentially regressive (decreasing) updates
 - Intelligent caching of Plex and AniList requests to reduce rate limits
 - [Docker](#docker) 🐳 deployments
 
@@ -31,7 +30,7 @@ services:
       PLEX_TOKEN: 2Sb...
       PLEX_SECTIONS: '["Anime", "Anime Movies"]'
     volumes:
-      - ./db:/app/db
+      - ./data:/app/data
       # - ./logs:/app/logs
     restart: unless-stopped
 ```
