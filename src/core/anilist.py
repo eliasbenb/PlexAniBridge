@@ -227,7 +227,7 @@ class AniListClient:
         """).strip()
 
         log.debug(
-            f"$${self.__class__.__name__}: Getting AniList media object $${{{id_type_str}: {media_id}}}$$"
+            f"{self.__class__.__name__}: Getting AniList media object $${{{id_type_str}: {media_id}}}$$"
         )
 
         response = self._make_request(query, {id_type: media_id})

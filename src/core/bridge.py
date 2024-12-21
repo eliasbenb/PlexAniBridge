@@ -41,7 +41,7 @@ class BridgeClient:
         self.show_sync = ShowSyncClient(**sync_client_args)
 
         self.last_synced = self._get_last_synced()
-        self.last_sections_synced = self._get_last_sections_synced()
+        self.last_config_encoded = self._get_last_config_encoded()
 
     def _get_last_synced(self) -> Optional[datetime]:
         """Get the timestamp of the last sync
@@ -67,32 +67,26 @@ class BridgeClient:
             )
             session.commit()
 
-    def _get_last_sections_synced(self) -> set[str]:
-        """Get the configured Plex sections that were last synced
-
-        If the sections have been changed since the last sync, a full scan will need to be performed (ignoring the `PARTIAL_SCAN` setting)
+    def _get_last_config_encoded(self) -> Optional[str]:
+        """Get the encoded version of the last config
 
         Returns:
-            set[str]: The set of Plex section titles that were last synced
+            Optional[str]: The encoded config
         """
         with Session(db.engine) as session:
-            last_synced = session.get(Housekeeping, "last_sections_synced")
-            if last_synced is None:
-                return set()
-            return set(last_synced.value.split(","))
+            last_config_encoded = session.get(Housekeeping, "last_config_encoded")
+            if last_config_encoded is None:
+                return None
+            return last_config_encoded.value
 
-    def _set_last_sections_synced(self, last_sections_synced: set[str]) -> None:
-        """Store the configured Plex sections that were last synced
+    def _set_last_config_encoded(self, config_encoded: str) -> None:
+        """Store the encoded version of the config
 
         Args:
-            last_sections_synced (set[str]): The set of Plex section titles that were last synced
+            config_encoded (str): The encoded config
         """
         with Session(db.engine) as session:
-            session.merge(
-                Housekeeping(
-                    key="last_sections_synced", value=",".join(last_sections_synced)
-                )
-            )
+            session.merge(Housekeeping(key="last_config_encoded", value=config_encoded))
             session.commit()
 
     def sync(self) -> None:
@@ -114,7 +108,7 @@ class BridgeClient:
 
         # Update the sync state
         self._set_last_synced(tmp_last_synced)
-        self._set_last_sections_synced({section.title for section in plex_sections})
+        self._set_last_config_encoded(self.config.encode())
 
         log.info(f"{self.__class__.__name__}: Anime mappings sync completed")
         log.info(
@@ -130,11 +124,19 @@ class BridgeClient:
         """
         log.debug(f"{self.__class__.__name__}: Syncing section $$'{section.title}'$$")
 
+        should_perform_partial_scan = self._should_perform_partial_scan()
+        if should_perform_partial_scan:
+            log.info(
+                f"{self.__class__.__name__}: Performing partial scan for section $$'{section.title}'$$"
+            )
+        else:
+            log.info(
+                f"{self.__class__.__name__}: Performing full scan for section $$'{section.title}'$$"
+            )
+
         items = self.plex_client.get_section_items(
             section,
-            min_last_modified=self.last_synced
-            if self._should_perform_partial_scan()
-            else None,
+            min_last_modified=self.last_synced if should_perform_partial_scan else None,
             require_watched=not self.config.DESTRUCTIVE_SYNC,
         )
 
@@ -158,5 +160,5 @@ class BridgeClient:
         return (
             self.config.PARTIAL_SCAN
             and self.last_synced is not None
-            and self.last_sections_synced == self.plex_client.plex_sections
+            and self.last_config_encoded == self.config.encode()
         )
