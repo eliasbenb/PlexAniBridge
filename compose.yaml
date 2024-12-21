@@ -6,6 +6,7 @@ services:
       PLEX_URL: http://localhost:32400
       PLEX_TOKEN: 2Sb... # https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/
       PLEX_SECTIONS: '["Anime", "Anime Movies"]'
+      # PLEX_USERS: '["user1", "user2"]' # Sync progress for multiple users (read the docs for how to set this up)
       # SYNC_INTERVAL: 3600 # Time in seconds between each sync
       # PARTIAL_SCAN: True # Set to False to scan all Plex items, regardless of if it has already been processed by previous runs
       # DESTRUCTIVE_SYNC: False # Set to True to destructively sync Plex progress. E.g. if you have an entry with a progress of 10 on AniList but Plex is report only a progress of 2, the AniList entry will be updated to 2
