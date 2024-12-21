@@ -8,12 +8,13 @@ services:
       PLEX_SECTIONS: '["Anime", "Anime Movies"]'
       # SYNC_INTERVAL: 3600 # Time in seconds between each sync
       # PARTIAL_SCAN: True # Set to False to scan all Plex items, regardless of if it has already been processed by previous runs
-      # DESTRUCTIVE_SYNC: False # Set to True to destructively sync Plex progress. E.g. if you have an entry with a progress of 10 on AniList but Plex is report only a progress of 2, the AniList entry will be updated to 2.
-      # DB_PATH: db/plexanibridge.db
+      # DESTRUCTIVE_SYNC: False # Set to True to destructively sync Plex progress. E.g. if you have an entry with a progress of 10 on AniList but Plex is report only a progress of 2, the AniList entry will be updated to 2
+      # EXCLUDED_SYNC_FIELDS: ["notes", "score"] # List of fields to exclude from sync
+      # DATA_PATH: ./data
       # DRY_RUN: False # Use this to test the script without making any permanent changes
       # LOG_LEVEL: INFO # [DEBUG, INFO, WARNING, ERROR, CRITICAL]
       # FUZZY_SEARCH_THRESHOLD: 90 # [0-100] sets the strictness when matching anime title search results
     volumes:
-      - ./db:/app/db
+      - ./data:/app/data
       # - ./logs:/app/logs
     restart: unless-stopped

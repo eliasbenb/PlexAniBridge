@@ -14,6 +14,6 @@ class AniMap(SQLModel, table=True):
     mal_id: Optional[list[int]] = Field(sa_type=JSON(none_as_null=True), index=True)
     tmdb_movie_id: Optional[int] = Field(index=True)
     tmdb_show_id: Optional[int] = Field(index=True)
-    tvdb_epoffset: Optional[int]
     tvdb_id: Optional[int] = Field(index=True)
+    tvdb_epoffset: Optional[int]
     tvdb_season: Optional[int]

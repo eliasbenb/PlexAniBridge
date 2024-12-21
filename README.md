@@ -4,11 +4,10 @@ PlexAniBridge is a synchronization tool that automatically keeps your AniList pr
 
 ## Features
 
-- Synchronize watch progress, rating scores, text reviews or notes, watch status, start/end dates, repeat counts
-- Mapping Plex movies, shows, seasons, and episode ranges to AniList using [Kometa mappings](https://github.com/Kometa-Team/Anime-IDs) with fuzzy title search as a fallback
-- Partial scanning support — only consider items added/updated/rated since last the sync
+- Synchronize watch statusm, watch progress, repeat counts, rating scores, text reviews, and start/end dates
+- Mapping Plex movies, shows, seasons, episode ranges, and specials to AniList using [Kometa mappings](https://github.com/Kometa-Team/Anime-IDs) with fuzzy title search as a fallback
+- Partial scanning support — only consider items added/updated/rated since the last sync
 - Scheduled sync jobs with configurable polling capabilities
-- Configurable safe/destructive syncs — decide between making only progressive (increasing) updates or potentially regressive (decreasing) updates
 - Intelligent caching of Plex and AniList requests to reduce rate limits
 - [Docker](#docker) 🐳 deployments
 
@@ -31,7 +30,7 @@ services:
       PLEX_TOKEN: 2Sb...
       PLEX_SECTIONS: '["Anime", "Anime Movies"]'
     volumes:
-      - ./db:/app/db
+      - ./data:/app/data
       # - ./logs:/app/logs
     restart: unless-stopped
 ```
@@ -67,10 +66,14 @@ python main.py
 - `DESTRUCTIVE_SYNC`: Regressively update AniList data to match Plex regardless of existing data. (default: `False`).
   - When syncing items, the script typically only updates fields on AniList that are less than the corresponding fields on Plex. With `DESTRUCTIVE_SYNC` enabled, this is no longer the case.
   - For example, if the watch progress on AniList is greater than the watch progress on Plex, the progress on AniList will be lowered to match the progress on Plex.
-  - The only exception to the above rule is when the Plex value is 0 or None. E.g. if the watch progress on Plex is 0, the watch progress on AniList will not be destructively updated.
   - Destructive syncs apply to every field (e.g. status, watch progress, score, repeat, notes, start date, end date, etc.).
+  - In addition to regressive updates, destructive syncs also allow for deleting items from AniList lists. This can occur if the item exists in the Plex library but has no status (no watch history and is not watchlisted).
   - Not recommended unless you know what you're doing.
-- `DB_PATH`: Path to the SQLite database file (default: `./db/plexanibridge.db`)
+- `EXCLUDED_SYNC_FIELDS`: List of fields to exclude from sync (default: `[]`)
+  - The syntax is the same as a Python list. E.g. `["notes", "score"]`
+  - This is useful if you don't want to sync certain fields, such as notes or scores.
+  - All available fields are: `["status", "score", "progress", "repeat", "notes", "started_at", "completed_at"]`
+- `DATA_PATH`: Path to the data folder that will store the database and custom mappings (default: `./data`)
 - `LOG_LEVEL`: Logging level (default: `INFO`)
   - Possible values: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`
 - `DRY_RUN`: Disables modifying AniList data (default: `False`)
@@ -82,14 +85,21 @@ python main.py
   - Lower values will result in more matches, but also more false positives.
   - Higher values will result in fewer matches, but also fewer false positives.
 
+## Notices
+
+> [!WARNING]
+> This project is still in development, while it is usable, I cannot guarantee that it will be stable for every release.
+
+> [!IMPORTANT]
+> To prevent data loss, PlexAniBridge automatically creates backups of your AniList data before syncing. These backups are stored under the data folder (set in `DATA_PATH`) in the `backups` directory. These backups are automatically deleted after 7 days.
+
 ## TODO
 
 > [!WARNING]
 > This project is still in development, while it is usable, I cannot guarantee that it will be stable for every release.
 
-- [ ] Special/OVA/ONA support
 - [ ] Custom mapping support
-- [ ] Config option for users to choose which fields to sync (status, progress, repeats, rating, notes, start/end dates)
+- [ ] AniList recovery script to restore from the automatically created backups in the data folder
 
 ## Special Thanks/Dependencies
 

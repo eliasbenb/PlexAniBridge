@@ -1,7 +1,9 @@
 # Database
 *.db
 *.sqlite3
-db/
+
+# Backup
+data/backups
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

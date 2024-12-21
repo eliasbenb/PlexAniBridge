@@ -1,13 +1,14 @@
 from enum import StrEnum
-from typing import Optional
+from pathlib import Path
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic.alias_generators import to_camel
 from pydantic_settings import BaseSettings
 
 
 class SyncField(StrEnum):
     """AniList fields that PlexAniBridge is able to sync"""
+
     STATUS = "status"
     SCORE = "score"
     PROGRESS = "progress"
@@ -17,7 +18,7 @@ class SyncField(StrEnum):
     COMPLETED_AT = "completed_at"
 
     def to_camel(self) -> str:
-        """"Converts the enum value to camel case, which is the format AniList uses
+        """ "Converts the enum value to camel case, which is the format AniList uses
 
         Returns:
             str: The sync field in camel case
@@ -35,6 +36,7 @@ class SyncField(StrEnum):
 
 class LogLevel(StrEnum):
     """The available logging levels"""
+
     DEBUG = "DEBUG"
     INFO = "INFO"
     WARNING = "WARNING"
@@ -50,39 +52,35 @@ class LogLevel(StrEnum):
         return f"'{self.value}'"
 
 
-class Config(BaseSettings):
+class PlexAnibridgeConfig(BaseSettings):
     """Reads, validdates and stores the configuration settings from env vars"""
+
     # AniList
     ANILIST_TOKEN: str
 
     # Plex
-    PLEX_URL: Optional[str] = "http://localhost:32400"
+    PLEX_URL: str = "http://localhost:32400"
     PLEX_TOKEN: str
     PLEX_SECTIONS: set[str]
 
     # General
-    SYNC_INTERVAL: Optional[int] = Field(3600, ge=-1)
-    PARTIAL_SCAN: Optional[bool] = True
-    DESTRUCTIVE_SYNC: Optional[bool] = False
+    SYNC_INTERVAL: int = Field(3600, ge=-1)
+    PARTIAL_SCAN: bool = True
+    DESTRUCTIVE_SYNC: bool = False
 
-    SYNC_FIELDS: Optional[set[SyncField]] = {
-        SyncField.STATUS,
-        SyncField.SCORE,
-        SyncField.PROGRESS,
-        SyncField.REPEAT,
-        SyncField.NOTES,
-        SyncField.STARTED_AT,
-        SyncField.COMPLETED_AT,
-    }
+    EXCLUDED_SYNC_FIELDS: set[SyncField] = {"notes", "score"}
 
     # Advanced
-    DB_PATH: Optional[str] = "db/plexanibridge.db"
-    DRY_RUN: Optional[bool] = False
-    LOG_LEVEL: Optional[LogLevel] = LogLevel.INFO
-    FUZZY_SEARCH_THRESHOLD: Optional[int] = Field(90, ge=0, le=100)
+    DATA_PATH: Path = "./data"
+    DRY_RUN: bool = False
+    LOG_LEVEL: LogLevel = LogLevel.INFO
+    FUZZY_SEARCH_THRESHOLD: int = Field(90, ge=0, le=100)
 
-    class Config:
-        env_file = ".env"
+    @model_validator(mode="after")
+    def absolute_data_path(self) -> "PlexAnibridgeConfig":
+        """Ensures `DATA_PATH` is always absolute"""
+        self.DATA_PATH = Path(self.DATA_PATH).resolve()
+        return self
 
     def __str__(self) -> str:
         """Return a string representation of the config
@@ -102,5 +100,5 @@ class Config(BaseSettings):
             ]
         )
 
-
-config = Config()
+    class Config:
+        env_file = ".env"

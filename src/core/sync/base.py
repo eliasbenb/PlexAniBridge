@@ -64,7 +64,7 @@ class BaseSyncClient(ABC, Generic[T, S]):
         anilist_client: AniListClient,
         animap_client: AniMapClient,
         plex_client: PlexClient,
-        sync_fields: set[SyncField],
+        excluded_sync_fields: set[SyncField],
         destructive_sync: bool,
         fuzzy_search_threshold: int,
     ) -> None:
@@ -72,7 +72,7 @@ class BaseSyncClient(ABC, Generic[T, S]):
         self.animap_client = animap_client
         self.plex_client = plex_client
 
-        self.sync_fields = sync_fields
+        self.excluded_sync_fields = excluded_sync_fields
         self.destructive_sync = destructive_sync
         self.fuzzy_search_threshold = fuzzy_search_threshold
 
@@ -85,6 +85,7 @@ class BaseSyncClient(ABC, Generic[T, S]):
 
         for subitem, animapping in self.map_media(item):
             try:
+                anilist_media = None
                 if animapping and (animapping.anilist_id or animapping.mal_id):
                     anilist_media = self.anilist_client.get_anime(
                         anilist_id=animapping.anilist_id,
@@ -105,10 +106,8 @@ class BaseSyncClient(ABC, Generic[T, S]):
 
                 animapping = animapping or AniMap(
                     anilist_id=anilist_media.id,
-                    tvdb_epoffset=0 if isinstance(subitem, Season) else None,
-                    tvdb_season=subitem.seasonNumber
-                    if isinstance(subitem, Season)
-                    else None,
+                    tvdb_epoffset=0 if item.type == "show" else None,
+                    tvdb_season=subitem.seasonNumber if item.type == "show" else None,
                 )
 
                 log.debug(
@@ -152,11 +151,17 @@ class BaseSyncClient(ABC, Generic[T, S]):
 
     def sync_media(
         self, item: T, subitem: S, anilist_media: Media, animapping: AniMap
-    ) -> None:
-        anilist_media_list = anilist_media.media_list_entry
+    ) -> SyncStats:
+        anilist_media_list = (
+            anilist_media.media_list_entry if anilist_media.media_list_entry else None
+        )
         plex_media_list = self._get_plex_media_list(
             item, subitem, anilist_media, animapping
         )
+
+        if anilist_media_list:
+            anilist_media_list.unset_fields(self.excluded_sync_fields)
+        plex_media_list.unset_fields(self.excluded_sync_fields)
 
         final_media_list = self._merge_media_lists(anilist_media_list, plex_media_list)
 

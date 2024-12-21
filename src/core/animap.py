@@ -5,11 +5,9 @@ import requests
 from sqlmodel import Session, delete, func, select
 from sqlmodel.sql.expression import and_, or_
 
-from src import log
+from src import db, log
 from src.models.animap import AniMap
 from src.models.housekeeping import Housekeeping
-
-from .db import db
 
 
 class AniMapClient:
@@ -28,54 +26,54 @@ class AniMapClient:
 
     def __sync_db(self) -> None:
         """Sync the local AniMap database with the CDN source"""
-        with Session(db) as session:
+        with Session(db.engine) as session:
             # First check if the CDN data has changed. If not, we can skip the sync
             last_cdn_hash = session.get(Housekeeping, "animap_cdn_hash")
 
-            with requests.get(self.CDN_URL) as response:
-                response.raise_for_status()
-                cdn_data: dict[int, dict[str, Union[int, str]]] = response.json()
-                curr_cdn_hash = md5(response.content).hexdigest()
+            response = requests.get(self.CDN_URL)
+            response.raise_for_status()
 
-            if last_cdn_hash is None or last_cdn_hash.value != curr_cdn_hash:
-                log.debug(
-                    f"{self.__class__.__name__}: Anime mapping changes detected from the CDN, syncing database now"
-                )
-            else:
+            cdn_data: dict[int, dict[str, Union[int, str]]] = response.json()
+            curr_cdn_hash = md5(response.content).hexdigest()
+
+            if last_cdn_hash and last_cdn_hash.value == curr_cdn_hash:
                 log.debug(
                     f"{self.__class__.__name__}: Cache is still valid, skipping sync"
                 )
                 return
 
+            log.debug(
+                f"{self.__class__.__name__}: Anime mapping changes detected, syncing database"
+            )
+
             values = [
                 {
                     "anidb_id": anidb_id,
-                    **{key: data.get(key) for key in AniMap.__fields__.keys()},
+                    **{field: data.get(field) for field in AniMap.model_fields},
                 }
                 for anidb_id, data in cdn_data.items()
-            ]  # Convert the CDN data to a format that can be inserted into the database
+            ]
 
             session.exec(
                 delete(AniMap).where(
                     AniMap.anidb_id.not_in([d["anidb_id"] for d in values])
                 )
-            )  # Delete any mappings that are no longer in the CDN data
+            )
 
-            for value in values:  # Insert or update the mappings
-                if value.get("mal_id"):
+            for value in values:
+                if "mal_id" in value and value["mal_id"] is not None:
                     value["mal_id"] = [
                         int(id) for id in str(value["mal_id"]).split(",")
                     ]
-                if value.get("imdb_id"):
+                if "imdb_id" in value and value["imdb_id"] is not None:
                     value["imdb_id"] = str(value["imdb_id"]).split(",")
 
                 session.merge(AniMap(**value))
 
             session.merge(Housekeeping(key="animap_cdn_hash", value=curr_cdn_hash))
-
             session.commit()
 
-        log.debug(f"{self.__class__.__name__}: Database sync complete")
+            log.debug(f"{self.__class__.__name__}: Database sync complete")
 
     def get_mappings(
         self,
@@ -101,7 +99,7 @@ class AniMapClient:
         Returns:
             list[AniMap]: The list of AniMap entries that match the criteria
         """
-        with Session(db) as session:
+        with Session(db.engine) as session:
             partial_matches = {AniMap.imdb_id.contains: imdb}
             exact_matches = {}
             if is_movie:

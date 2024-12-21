@@ -4,15 +4,11 @@ from typing import Optional, Union
 from plexapi.library import MovieSection, ShowSection
 from sqlmodel import Session
 
-from src import log
+from src import db, log
 from src.core import AniListClient, AniMapClient, PlexClient
+from src.core.sync import MovieSyncClient, ShowSyncClient, SyncStats
 from src.models.housekeeping import Housekeeping
-from src.settings import Config
-
-from .db import db
-from .sync.base import SyncStats
-from .sync.movie import MovieSyncClient
-from .sync.show import ShowSyncClient
+from src.settings import PlexAnibridgeConfig
 
 
 class BridgeClient:
@@ -21,10 +17,12 @@ class BridgeClient:
     All components of the program are managed and initialized by this class.
     """
 
-    def __init__(self, config: Config) -> None:
+    def __init__(self, config: PlexAnibridgeConfig) -> None:
         self.config = config
 
-        self.anilist_client = AniListClient(config.ANILIST_TOKEN, config.DRY_RUN)
+        self.anilist_client = AniListClient(
+            config.ANILIST_TOKEN, config.DATA_PATH / "backups", config.DRY_RUN
+        )
         self.animap_client = AniMapClient()
         self.plex_client = PlexClient(
             config.PLEX_URL, config.PLEX_TOKEN, config.PLEX_SECTIONS
@@ -34,7 +32,7 @@ class BridgeClient:
             "anilist_client": self.anilist_client,
             "animap_client": self.animap_client,
             "plex_client": self.plex_client,
-            "sync_fields": config.SYNC_FIELDS,
+            "excluded_sync_fields": config.EXCLUDED_SYNC_FIELDS,
             "destructive_sync": config.DESTRUCTIVE_SYNC,
             "fuzzy_search_threshold": config.FUZZY_SEARCH_THRESHOLD,
         }
@@ -50,7 +48,7 @@ class BridgeClient:
         Returns:
             Optional[datetime]: The timestamp of the last sync, or None if it has never been synced
         """
-        with Session(db) as session:
+        with Session(db.engine) as session:
             last_synced = session.get(Housekeeping, "last_synced")
             if last_synced is None or last_synced.value is None:
                 return None
@@ -62,7 +60,7 @@ class BridgeClient:
         Args:
             last_synced (datetime): The timestamp of the last sync
         """
-        with Session(db) as session:
+        with Session(db.engine) as session:
             session.merge(
                 Housekeeping(key="last_synced", value=last_synced.isoformat())
             )
@@ -76,7 +74,7 @@ class BridgeClient:
         Returns:
             set[str]: The set of Plex section titles that were last synced
         """
-        with Session(db) as session:
+        with Session(db.engine) as session:
             last_synced = session.get(Housekeeping, "last_sections_synced")
             if last_synced is None:
                 return set()
@@ -88,7 +86,7 @@ class BridgeClient:
         Args:
             last_sections_synced (set[str]): The set of Plex section titles that were last synced
         """
-        with Session(db) as session:
+        with Session(db.engine) as session:
             session.merge(
                 Housekeeping(
                     key="last_sections_synced", value=",".join(last_sections_synced)
@@ -138,15 +136,14 @@ class BridgeClient:
             min_last_modified=self.last_synced
             if self._should_perform_partial_scan()
             else None,
-            require_watched=True,
+            require_watched=not self.config.DESTRUCTIVE_SYNC,
         )
 
-        sync_stats = SyncStats()
         sync_client = self.movie_sync if section.type == "movie" else self.show_sync
         for item in items:
-            sync_stats += sync_client.process_media(item)
+            sync_client.process_media(item)
 
-        return sync_stats
+        return sync_client.sync_stats
 
     def _should_perform_partial_scan(self) -> bool:
         """Check if a partial scan can be performed

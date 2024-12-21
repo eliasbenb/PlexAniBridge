@@ -12,7 +12,7 @@ from .base import BaseSyncClient, ParsedGuids
 class ShowSyncClient(BaseSyncClient[Show, Season]):
     def map_media(self, item: Show) -> Iterator[tuple[Season, Optional[AniMap]]]:
         guids = ParsedGuids.from_guids(item.guids)
-        seasons: list[Season] = item.seasons(index__gt=0)
+        seasons: list[Season] = item.seasons()
         season_map = {s.index: s for s in seasons}
 
         for animapping in self.animap_client.get_mappings(
@@ -27,6 +27,8 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
             yield season, None
 
     def search_media(self, item: Show, subitem: Season) -> Optional[Media]:
+        if subitem.seasonNumber == 0:
+            return None
         episodes = subitem.leafCount
         results = self.anilist_client.search_anime(item.title, False, episodes)
         return self._best_search_result(item.title, results)

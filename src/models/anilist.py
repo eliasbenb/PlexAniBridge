@@ -132,10 +132,20 @@ class AniListBaseModel(BaseModel):
         Returns:
             str: JSON serialized string of the model
         """
-        json_str = super().model_dump_json(**kwargs)
+        json_str = super().model_dump_json()
         data = json.loads(json_str)
         camel_data = {to_camel(k): v for k, v in data.items()}
-        return json.dumps(camel_data)
+        return json.dumps(camel_data, **kwargs)
+
+    def clear(self) -> None:
+        """Clear all the fields of the model"""
+        for field, field_info in self.model_fields.items():
+            if field_info.default_factory:
+                default_value = field_info.default_factory()
+            else:
+                default_value = field_info.default
+            setattr(self, field, default_value)
+        self.model_fields_set.clear()
 
     @classmethod
     def model_dump_graphql(cls, indent_level: int = 0) -> str:
@@ -184,6 +194,11 @@ class AniListBaseModel(BaseModel):
     model_config = ConfigDict(
         alias_generator=AliasGenerator(to_camel), populate_by_name=True
     )
+
+
+class User(AniListBaseModel):
+    id: int
+    name: str
 
 
 class PageInfo(AniListBaseModel):
@@ -278,14 +293,19 @@ class MediaList(AniListBaseModel):
     user_id: int
     media_id: int
     status: Optional[MediaListStatus] = None
-    score: Optional[float] = None
-    progress: Optional[int] = None
-    repeat: Optional[int] = None
+    score: Optional[float] = 0.0
+    progress: Optional[int] = 0
+    repeat: Optional[int] = 0
     notes: Optional[str] = None
     started_at: Optional[FuzzyDate] = None
     completed_at: Optional[FuzzyDate] = None
     created_at: Optional[UTCDateTime] = None
     updated_at: Optional[UTCDateTime] = None
+
+    def unset_fields(self, fields: set[str]) -> None:
+        for field, field_info in self.model_fields.items():
+            if field in fields:
+                setattr(self, field, field_info.default)
 
     def __str__(self) -> str:
         notes_truncated = None
@@ -297,6 +317,20 @@ class MediaList(AniListBaseModel):
             f"repeat={self.repeat}, notes={notes_truncated}, started_at={self.started_at}, "
             f"completed_at={self.completed_at})"
         )
+
+
+class MediaListGroup(AniListBaseModel):
+    entries: list[MediaList] = []
+    name: Optional[str] = None
+    is_custom_list: Optional[bool] = None
+    is_split_completed_list: Optional[bool] = None
+    status: Optional[MediaListStatus] = None
+
+
+class MediaListCollection(AniListBaseModel):
+    user: Optional[User] = None
+    lists: list[MediaListGroup] = []
+    has_next_chunk: Optional[bool] = None
 
 
 class AiringSchedule(AniListBaseModel):
@@ -337,8 +371,3 @@ class MediaConnection(AniListBaseModel):
 
 class MediaWithRelations(Media):
     relations: MediaConnection
-
-
-class User(AniListBaseModel):
-    id: int
-    name: str

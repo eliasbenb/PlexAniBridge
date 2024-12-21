@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from datetime import datetime
 from functools import cache
 from typing import Optional, Union
@@ -10,16 +9,6 @@ from plexapi.utils import joinArgs
 from plexapi.video import Episode, EpisodeHistory, Movie, MovieHistory, Season, Show
 
 from src import log
-
-
-@dataclass(frozen=True)
-class ReviewKey:
-    """Key used to cache API responses for user reviews"""
-
-    rating_key: str
-    item_type: str
-    title: str
-    guid: str
 
 
 class PlexClient:
@@ -102,6 +91,7 @@ class PlexClient:
             filters["and"].append(
                 {
                     "or": [
+                        {"addedAt>>=": min_last_modified},
                         {"updatedAt>>=": min_last_modified},
                         {"lastViewedAt>>=": min_last_modified},
                         {"lastRatedAt>>=": min_last_modified},
