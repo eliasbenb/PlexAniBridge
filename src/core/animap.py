@@ -5,7 +5,8 @@ import requests
 from sqlmodel import Session, delete, func, select
 from sqlmodel.sql.expression import and_, or_
 
-from src import db, log
+from src import log
+from src.database import db
 from src.models.animap import AniMap
 from src.models.housekeeping import Housekeeping
 

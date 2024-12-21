@@ -3,6 +3,8 @@ from pathlib import Path
 from sqlalchemy.engine import Engine
 from sqlmodel import SQLModel, create_engine
 
+from src import config
+
 
 class PlexAniBridgeDB:
     """A class to manage the creation and initialization of the database"""
@@ -54,3 +56,6 @@ class PlexAniBridgeDB:
         config.set_main_option("sqlalchemy.url", f"sqlite:///{self.db_path}")
 
         command.upgrade(config, "head")
+
+
+db = PlexAniBridgeDB(config.DATA_PATH)
