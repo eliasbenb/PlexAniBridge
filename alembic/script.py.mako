@@ -9,7 +9,6 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
-import sqlalchemy_utils
 import sqlmodel # added
 ${imports if imports else ""}
 
