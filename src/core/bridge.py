@@ -139,12 +139,11 @@ class BridgeClient:
             require_watched=not self.config.DESTRUCTIVE_SYNC,
         )
 
-        sync_stats = SyncStats()
         sync_client = self.movie_sync if section.type == "movie" else self.show_sync
         for item in items:
-            sync_stats += sync_client.process_media(item)
+            sync_client.process_media(item)
 
-        return sync_stats
+        return sync_client.sync_stats
 
     def _should_perform_partial_scan(self) -> bool:
         """Check if a partial scan can be performed

@@ -151,7 +151,7 @@ class BaseSyncClient(ABC, Generic[T, S]):
 
     def sync_media(
         self, item: T, subitem: S, anilist_media: Media, animapping: AniMap
-    ) -> None:
+    ) -> SyncStats:
         anilist_media_list = (
             anilist_media.media_list_entry if anilist_media.media_list_entry else None
         )
