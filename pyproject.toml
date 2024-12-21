@@ -14,4 +14,5 @@ dependencies = [
     "colorama>=0.4.6",
     "tomlkit>=0.13.2",
     "PyYAML>=6.0.2",
+    "alembic>=1.14.0",
 ]
