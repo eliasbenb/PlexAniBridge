@@ -71,7 +71,7 @@ class AniListClient:
 
         if self.dry_run:  # Skip the request, only log the variables
             log.info(
-                f"{self.__class__.__name__}: Dry run enabled, skipping anime entry update {{anilist_id: {media_list_entry.media_id}}}"
+                f"{self.__class__.__name__}: Dry run enabled, skipping anime entry update $${{anilist_id: {media_list_entry.media_id}}}$$"
             )
             None
 
@@ -100,7 +100,7 @@ class AniListClient:
 
         if self.dry_run:
             log.info(
-                f"{self.__class__.__name__}: Dry run enabled, skipping anime entry deletion {{anilist_id: {media_id}}}"
+                f"{self.__class__.__name__}: Dry run enabled, skipping anime entry deletion $${{anilist_id: {media_id}}}$$"
             )
             return False
 
@@ -134,7 +134,7 @@ class AniListClient:
         """
         log.debug(
             f"{self.__class__.__name__}: Searching for anime {'movie' if is_movie else 'show'} "
-            f"with title \u2018{search_str}\u2019 that has {episodes or 'unknown'} episodes"
+            f"with title $$'{search_str}'$$ that has {episodes or 'unknown'} episodes"
         )
 
         res = self._search_anime(search_str, is_movie, limit)
@@ -227,7 +227,7 @@ class AniListClient:
         """).strip()
 
         log.debug(
-            f"{self.__class__.__name__}: Getting AniList media object {{{id_type_str}: {media_id}}}"
+            f"$${self.__class__.__name__}: Getting AniList media object $${{{id_type_str}: {media_id}}}$$"
         )
 
         response = self._make_request(query, {id_type: media_id})

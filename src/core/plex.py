@@ -42,12 +42,12 @@ class PlexClient:
                 section = section_name_map[section_name]
             except KeyError:
                 raise ValueError(
-                    f"Section \u2018{section_name}\u2019 was not found in the Plex server"
+                    f"Section $$'{section_name}'$$ was not found in the Plex server"
                 )
 
             if section.type not in ["movie", "show"]:
                 raise ValueError(
-                    f"Section \u2018{section_name}\u2019 is not a movie or show section"
+                    f"Section $$'{section_name}'$$ is not a movie or show section"
                 )
 
         log.debug(f"{self.__class__.__name__}: All sections are valid")
@@ -84,7 +84,7 @@ class PlexClient:
         filters = {"and": []}
         if min_last_modified:
             log.debug(
-                f"{self.__class__.__name__}: `PARTIAL_SCAN` is set. Filtering section \u2018{section.title}\u2019 "
+                f"{self.__class__.__name__}: `PARTIAL_SCAN` is set. Filtering section $$'{section.title}'$$ "
                 f"by items last updated, viewed, or rated after {
                     min_last_modified}"
             )
@@ -143,7 +143,7 @@ class PlexClient:
 
         log.debug(
             f"{self.__class__.__name__}: Getting reviews for {item.type} "
-            f"\u2018{item.title}\u2019 {{plex_id: {item.guid}}}"
+            f"$$'{item.title}'$$ $${{plex_id: {item.guid}}}$$"
         )
 
         try:
@@ -168,14 +168,14 @@ class PlexClient:
 
         except requests.HTTPError as e:
             log.error(
-                f"Failed to get review for {item.type} \u2018{item.title}&#0146 "
+                f"Failed to get review for {item.type} $$'{item.title}&#0146 "
                 f"{{plex_key: {item.ratingKey}}}",
                 exc_info=e,
             )
             return None
         except (KeyError, ValueError) as e:
             log.error(
-                f"Failed to parse review for {item.type} \u2018{item.title}&#0146 "
+                f"Failed to parse review for {item.type} $$'{item.title}&#0146 "
                 f"{{plex_key: {item.ratingKey}}}",
                 exc_info=e,
             )
