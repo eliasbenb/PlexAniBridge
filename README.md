@@ -67,8 +67,8 @@ python main.py
 - `DESTRUCTIVE_SYNC`: Regressively update AniList data to match Plex regardless of existing data. (default: `False`).
   - When syncing items, the script typically only updates fields on AniList that are less than the corresponding fields on Plex. With `DESTRUCTIVE_SYNC` enabled, this is no longer the case.
   - For example, if the watch progress on AniList is greater than the watch progress on Plex, the progress on AniList will be lowered to match the progress on Plex.
-  - The only exception to the above rule is when the Plex value is 0 or None. E.g. if the watch progress on Plex is 0, the watch progress on AniList will not be destructively updated.
   - Destructive syncs apply to every field (e.g. status, watch progress, score, repeat, notes, start date, end date, etc.).
+  - In addition to regressive updates, destructive syncs also allow for deleting items from AniList lists. This can occur if the item exists in the Plex library but has no status (no watch history and is not watchlisted).
   - Not recommended unless you know what you're doing.
 - `EXCLUDED_SYNC_FIELDS`: List of fields to exclude from sync (default: `[]`)
   - The syntax is the same as a Python list. E.g. `["notes", "score"]`
