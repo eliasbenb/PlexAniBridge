@@ -302,12 +302,9 @@ class MediaList(AniListBaseModel):
     created_at: Optional[UTCDateTime] = None
     updated_at: Optional[UTCDateTime] = None
 
-    def keep_fields(self, fields: set[str]) -> None:
-        excluded_fields = (
-            set(self.model_fields) - {"id", "user_id", "media_id"} - fields
-        )
+    def unset_fields(self, fields: set[str]) -> None:
         for field, field_info in self.model_fields.items():
-            if field in excluded_fields:
+            if field in fields:
                 setattr(self, field, field_info.default)
 
     def __str__(self) -> str:

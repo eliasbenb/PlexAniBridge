@@ -69,15 +69,7 @@ class PlexAnibridgeConfig(BaseSettings):
     PARTIAL_SCAN: bool = True
     DESTRUCTIVE_SYNC: bool = False
 
-    SYNC_FIELDS: set[SyncField] = {
-        SyncField.STATUS,
-        SyncField.SCORE,
-        SyncField.PROGRESS,
-        SyncField.REPEAT,
-        SyncField.NOTES,
-        SyncField.STARTED_AT,
-        SyncField.COMPLETED_AT,
-    }
+    EXCLUDED_SYNC_FIELDS: set[SyncField] = {}
 
     # Advanced
     DATA_PATH: Path = "./data"

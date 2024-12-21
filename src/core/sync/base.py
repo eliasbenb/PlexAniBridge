@@ -64,7 +64,7 @@ class BaseSyncClient(ABC, Generic[T, S]):
         anilist_client: AniListClient,
         animap_client: AniMapClient,
         plex_client: PlexClient,
-        sync_fields: set[SyncField],
+        excluded_sync_fields: set[SyncField],
         destructive_sync: bool,
         fuzzy_search_threshold: int,
     ) -> None:
@@ -72,7 +72,7 @@ class BaseSyncClient(ABC, Generic[T, S]):
         self.animap_client = animap_client
         self.plex_client = plex_client
 
-        self.sync_fields = sync_fields
+        self.excluded_sync_fields = excluded_sync_fields
         self.destructive_sync = destructive_sync
         self.fuzzy_search_threshold = fuzzy_search_threshold
 
@@ -160,8 +160,8 @@ class BaseSyncClient(ABC, Generic[T, S]):
         )
 
         if anilist_media_list:
-            anilist_media_list.keep_fields(self.sync_fields)
-        plex_media_list.keep_fields(self.sync_fields)
+            anilist_media_list.unset_fields(self.excluded_sync_fields)
+        plex_media_list.unset_fields(self.excluded_sync_fields)
 
         final_media_list = self._merge_media_lists(anilist_media_list, plex_media_list)
 
