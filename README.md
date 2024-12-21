@@ -86,15 +86,21 @@ python main.py
   - Lower values will result in more matches, but also more false positives.
   - Higher values will result in fewer matches, but also fewer false positives.
 
+## Notices
+
+> [!WARNING]
+> This project is still in development, while it is usable, I cannot guarantee that it will be stable for every release.
+
+> [!IMPORTANT]
+> To prevent data loss, PlexAniBridge automatically creates backups of your AniList data before syncing. These backups are stored under the data folder (set in `DATA_PATH`) in the `backups` directory. These backups are automatically deleted after 7 days.
+
 ## TODO
 
 > [!WARNING]
 > This project is still in development, while it is usable, I cannot guarantee that it will be stable for every release.
 
-- [ ] Special/OVA/ONA support
 - [ ] Custom mapping support
-- [ ] Config option for users to choose which fields to sync (status, progress, repeats, rating, notes, start/end dates)
-- [ ] Backup recovery script to restore from the automatically created backups in the data folder
+- [ ] AniList recovery script to restore from the automatically created backups in the data folder
 
 ## Special Thanks/Dependencies
 
