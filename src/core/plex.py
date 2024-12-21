@@ -91,6 +91,7 @@ class PlexClient:
             filters["and"].append(
                 {
                     "or": [
+                        {"addedAt>>=": min_last_modified},
                         {"updatedAt>>=": min_last_modified},
                         {"lastViewedAt>>=": min_last_modified},
                         {"lastRatedAt>>=": min_last_modified},
