@@ -70,6 +70,10 @@ python main.py
   - The only exception to the above rule is when the Plex value is 0 or None. E.g. if the watch progress on Plex is 0, the watch progress on AniList will not be destructively updated.
   - Destructive syncs apply to every field (e.g. status, watch progress, score, repeat, notes, start date, end date, etc.).
   - Not recommended unless you know what you're doing.
+- `EXCLUDED_SYNC_FIELDS`: List of fields to exclude from sync (default: `[]`)
+  - The syntax is the same as a Python list. E.g. `["notes", "score"]`
+  - This is useful if you don't want to sync certain fields, such as notes or scores.
+  - All available are: `["status", "score", "progress", "repeat", "notes", "started_at", "completed_at"]`
 - `DATA_PATH`: Path to the data folder that will store the database and custom mappings (default: `./data`)
 - `LOG_LEVEL`: Logging level (default: `INFO`)
   - Possible values: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`
