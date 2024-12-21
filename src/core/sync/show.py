@@ -86,8 +86,8 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
             return MediaListStatus.DROPPED
         return None
 
-    def _calculate_score(self, item: Show, subitem: Season, *_) -> int:
-        return subitem.userRating or item.userRating or 0.0
+    def _calculate_score(self, item: Show, subitem: Season, *_) -> Optional[int]:
+        return subitem.userRating or item.userRating
 
     def _calculate_progress(
         self,
@@ -95,9 +95,12 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
         subitem: Season,
         anilist_media: Media,
         animapping: AniMap,
-    ) -> int:
-        return len(
-            self.__filter_watched_episodes(item, subitem, anilist_media, animapping)
+    ) -> Optional[int]:
+        return (
+            len(
+                self.__filter_watched_episodes(item, subitem, anilist_media, animapping)
+            )
+            or None
         )
 
     def _calculate_repeats(
@@ -106,11 +109,12 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
         subitem: Season,
         anilist_media: Media,
         animapping: AniMap,
-    ) -> int:
+    ) -> Optional[int]:
         episodes = self.__filter_mapped_episodes(
             item, subitem, anilist_media, animapping
         )
-        return (min((e.viewCount for e in episodes), default=1) or 1) - 1
+        least_views = min((e.viewCount for e in episodes), default=0)
+        return least_views - 1 if least_views else None
 
     def _calculate_started_at(
         self,

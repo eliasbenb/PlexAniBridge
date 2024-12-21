@@ -32,13 +32,15 @@ class ColorFormatter(logging.Formatter):
         if isinstance(record.msg, str):
             # Color strings in quotes
             record.msg = re.sub(
-                r"\u2018.*?\u2019",
-                f"{Fore.LIGHTBLUE_EX}\\g<0>{Style.RESET_ALL}",
+                r"\$\$\'(.*?)\'\$\$",
+                f"{Fore.LIGHTBLUE_EX}'\\g<1>'{Style.RESET_ALL}",
                 record.msg,
             )
             # Color curly brace values
             record.msg = re.sub(
-                r"({[^}]*})", f"{Style.DIM}\\1{Style.RESET_ALL}", record.msg
+                r"\$\$\{(.*?)\}\$\$",
+                f"{Style.DIM}{{\\g<1>}}{Style.RESET_ALL}",
+                record.msg,
             )
 
         result = super().format(record)
