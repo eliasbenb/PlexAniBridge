@@ -1,4 +1,3 @@
-from .database import PlexAniBridgeDB
 from .logging import setup_logger
 from .settings import PlexAnibridgeConfig
 from .utils.version import get_git_hash, get_pyproject_version
@@ -28,5 +27,3 @@ PLEX_ANIBDRIGE_HEADER = f"""
 config = PlexAnibridgeConfig()
 
 log = setup_logger(log_name="PlexAniBridge", log_level=config.LOG_LEVEL, log_dir="logs")
-
-db = PlexAniBridgeDB(config.DATA_PATH)

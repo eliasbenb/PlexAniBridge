@@ -1,7 +1,9 @@
 from pathlib import Path
 
 from sqlalchemy.engine import Engine
-from sqlmodel import SQLModel, create_engine
+from sqlmodel import create_engine
+
+from src import config
 
 
 class PlexAniBridgeDB:
@@ -11,9 +13,10 @@ class PlexAniBridgeDB:
         self.data_path = data_path
         self.db_path = data_path / "plexanibridge.db"
 
-        self.engine = self.__setup_db()
+        self.engine = self._setup_db()
+        self._do_migrations()
 
-    def __setup_db(self) -> Engine:
+    def _setup_db(self) -> Engine:
         """Creates and initializes the database
 
         Returns:
@@ -37,5 +40,21 @@ class PlexAniBridgeDB:
             )
 
         engine = create_engine(f"sqlite:///{self.db_path}")
-        SQLModel.metadata.create_all(engine)
+
         return engine
+
+    def _do_migrations(self) -> None:
+        """Calls alembic to check for and do any database migrations"""
+        from alembic import command
+        from alembic.config import Config
+
+        config = Config()
+        config.set_main_option(
+            "script_location", str(Path(__file__).resolve().parent.parent / "alembic")
+        )
+        config.set_main_option("sqlalchemy.url", f"sqlite:///{self.db_path}")
+
+        command.upgrade(config, "head")
+
+
+db = PlexAniBridgeDB(config.DATA_PATH)

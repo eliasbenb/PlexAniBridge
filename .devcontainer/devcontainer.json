@@ -9,7 +9,9 @@
 			"extensions": [
 				"ms-python.python",
 				"charliermarsh.ruff",
-				"cweijan.vscode-database-client2"
+				"cweijan.vscode-database-client2",
+				"yzhang.markdown-all-in-one",
+				"yy0931.vscode-sqlite3-editor"
 			]
 		}
 	},
@@ -18,7 +20,7 @@
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
 	// "forwardPorts": [],
 	// Use 'postCreateCommand' to run commands after the container is created.
-	"postCreateCommand": "sudo apt-get update && sudo apt-get install -y sqlite3 && pip3 install --user -r requirements.txt"
+	"postCreateCommand": ".devcontainer/setup.sh"
 	// Configure tool-specific properties.
 	// "customizations": {},
 	// Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.

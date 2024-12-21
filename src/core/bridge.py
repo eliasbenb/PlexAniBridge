@@ -4,9 +4,10 @@ from typing import Optional, Union
 from plexapi.library import MovieSection, ShowSection
 from sqlmodel import Session
 
-from src import db, log
+from src import log
 from src.core import AniListClient, AniMapClient, PlexClient
 from src.core.sync import MovieSyncClient, ShowSyncClient, SyncStats
+from src.database import db
 from src.models.housekeeping import Housekeeping
 from src.settings import PlexAnibridgeConfig
 
