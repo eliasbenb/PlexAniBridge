@@ -69,8 +69,8 @@ python main.py
   - Destructive syncs apply to every field (e.g. status, watch progress, score, repeat, notes, start date, end date, etc.).
   - In addition to regressive updates, destructive syncs also allow for deleting items from AniList lists. This can occur if the item exists in the Plex library but has no status (no watch history and is not watchlisted).
   - Not recommended unless you know what you're doing.
-- `EXCLUDED_SYNC_FIELDS`: List of fields to exclude from sync (default: `[]`)
-  - The syntax is the same as a Python list. E.g. `["notes", "score"]`
+- `EXCLUDED_SYNC_FIELDS`: List of fields to exclude from sync (default: `["notes", "score"]`)
+  - The syntax is the same as a Python list. E.g. `["started_at", "completed_at"]`
   - This is useful if you don't want to sync certain fields, such as notes or scores.
   - All available fields are: `["status", "score", "progress", "repeat", "notes", "started_at", "completed_at"]`
 - `DATA_PATH`: Path to the data folder that will store the database and custom mappings (default: `./data`)
