@@ -2,6 +2,7 @@ from datetime import datetime
 from functools import cache
 from typing import Optional, Union
 
+import plexapi.utils
 import requests
 from plexapi.library import MovieSection, ShowSection
 from plexapi.server import PlexServer
@@ -35,7 +36,9 @@ class PlexClient:
             PlexServer: The Plex client for the user account
         """
         admin_account = self.admin_client.myPlexAccount()
-        if admin_account.username == self.plex_user:
+        self.is_admin_user = admin_account.username == self.plex_user
+
+        if self.is_admin_user:
             self.user_client = self.admin_client
             self.user_account_id = 1
         else:
@@ -49,7 +52,7 @@ class PlexClient:
         )
         log.debug(
             f"{self.__class__.__name__}: User is an admin, using admin client"
-            if admin_account.username == self.plex_user
+            if self.is_admin_user
             else f"{self.__class__.__name__}: User is not an admin, using user client"
         )
 
@@ -104,7 +107,6 @@ class PlexClient:
                 f"{self.__class__.__name__}: Filtering section '{
                     section.title}' by items that have been watched"
             )
-            filters["and"].append({"viewCount>>=": 0})
 
         return section.search(filters=filters)
 
@@ -118,6 +120,9 @@ class PlexClient:
         Returns:
             Optional[str]: The user review or None if not found
         """
+        if not self.is_admin_user:
+            return None
+
         if item.type not in ("movie", "show", "season"):
             return None
 
@@ -185,8 +190,7 @@ class PlexClient:
     def get_continue_watching(
         self,
         item: Union[Movie, Season],
-        season_lower: Optional[int] = None,
-        season_upper: Optional[int] = None,
+        **kwargs,
     ) -> Union[list[Movie], list[Episode]]:
         """Get the items that are in the 'Continue Watching' hub for a movie or season
 
@@ -197,17 +201,12 @@ class PlexClient:
             Union[list[Movie], list[Episode]]: The item(s) related to the target item that are in the 'Continue Watching' hub
         """
         if item.type == "movie":
-            return self.admin_client.fetchItems(
+            return self.user_client.fetchItems(
                 "/hubs/continueWatching/items", ratingKey=item.ratingKey
             )
         elif item.type == "season":
-            kwargs = {"parentRatingKey": item.ratingKey}
-            if season_lower is not None:
-                kwargs["index__gte"] = season_lower
-            if season_upper is not None:
-                kwargs["index__lte"] = season_upper
-            return self.admin_client.fetchItems(
-                "/hubs/continueWatching/items", **kwargs
+            return self.user_client.fetchItems(
+                "/hubs/continueWatching/items", parentRatingKey=item.ratingKey, **kwargs
             )
         return []
 
@@ -229,11 +228,17 @@ class PlexClient:
         Returns:
                 list[PlexHistory]: The history for the target item
         """
-        return self.admin_client.history(
-            ratingKey=item.ratingKey,
-            mindate=min_date,
+        args = {
+            "metadataItemID": item.ratingKey,
+            "accountID": self.user_account_id,
+            "sort": "viewedAt:asc",
+        }
+        if min_date:
+            args["viewedAt>"] = int(min_date.timestamp())
+
+        return self.admin_client.fetchItems(
+            f"/status/sessions/history/all{plexapi.utils.joinArgs(args)}",
             maxresults=max_results,
-            accountID=self.user_account_id,
         )
 
     def is_on_deck(self, item: Union[Movie, Show]) -> bool:
@@ -256,8 +261,15 @@ class PlexClient:
         Returns:
             bool: True if the item is on the watchlist, False otherwise
         """
-        return bool(
-            self.admin_client.fetchItems(
-                f"/hubs/continueWatching/items?accountID={self.user_account_id}"
-            )
-        )
+        return bool(item.onWatchlist()) if self.is_admin_user else False
+
+    def is_on_continue_watching(self, item: Union[Movie, Season], **kwargs) -> bool:
+        """Check if a movie or season is on the 'Continue Watching' hub
+
+        Args:
+            item (Union[Movie, Episode]): The target item
+
+        Returns:
+            bool: True if the item is on the 'Continue Watching' hub, False otherwise
+        """
+        return bool(self.get_continue_watching(item, maxresults=1, **kwargs))

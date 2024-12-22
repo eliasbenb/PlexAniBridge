@@ -25,7 +25,7 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie]):
     def _calculate_status(self, item: Movie, *_) -> Optional[MediaListStatus]:
         is_viewed = item.viewCount > 0
         is_partially_viewed = item.viewOffset > 0
-        is_on_continue_watching = self.plex_client.get_continue_watching(item) and True
+        is_on_continue_watching = self.plex_client.is_on_continue_watching(item)
         is_on_watchlist = self.plex_client.is_on_watchlist(item)
 
         # We've already watched it and are in the process of watching it again
@@ -59,7 +59,7 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie]):
 
     def _calculate_started_at(self, item: Movie, *_) -> Optional[FuzzyDate]:
         try:
-            history = self.plex_client.get_history(item)[-1]
+            history = self.plex_client.get_history(item)[0]
         except (plexapi.exceptions.NotFound, IndexError):
             return None
 
