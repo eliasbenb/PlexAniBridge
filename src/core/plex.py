@@ -204,6 +204,7 @@ class PlexClient:
             return self.user_client.fetchItems(
                 "/hubs/continueWatching/items",
                 ratingKey=item.ratingKey,
+                **kwargs,
             )
         elif item.type == "season":
             return self.user_client.fetchItems(
@@ -218,7 +219,8 @@ class PlexClient:
         self,
         item: Union[Movie, Show, Season, Episode],
         min_date: Optional[datetime] = None,
-        max_results: Optional[int] = None,
+        sort_asc: bool = True,
+        **kwargs,
     ) -> Union[list[MovieHistory], list[EpisodeHistory]]:
         """Get the history for a movie, show, or season
 
@@ -229,31 +231,73 @@ class PlexClient:
             sort_asc (bool, optional): Sort the history in ascending order. Defaults to True.
 
         Returns:
-                list[PlexHistory]: The history for the target item
+                Union[list[MovieHistory], list[EpisodeHistory]]: The history for the target item
         """
         args = {
             "metadataItemID": item.ratingKey,
             "accountID": self.user_account_id,
-            "sort": "viewedAt:asc",
+            "sort": "viewedAt:asc" if sort_asc else "viewedAt:desc",
         }
         if min_date:
             args["viewedAt>"] = int(min_date.timestamp())
 
         return self.admin_client.fetchItems(
-            f"/status/sessions/history/all{plexapi.utils.joinArgs(args)}",
-            maxresults=max_results,
+            f"/status/sessions/history/all{plexapi.utils.joinArgs(args)}", **kwargs
         )
 
-    def is_on_deck(self, item: Union[Movie, Show]) -> bool:
-        """Check if a movie or show is on the 'On Deck' hub
+    def get_first_history(
+        self, item: Union[Movie, Show, Season, Episode], **kwargs
+    ) -> Optional[Union[MovieHistory, EpisodeHistory]]:
+        """Get the first (oldest) history for a movie, show, or season
 
         Args:
-            item (Union[Movie, Show]): The target item
+            item (Union[Movie, Show, Season, Episode]): The target item
 
         Returns:
-            bool: True if the item is on the 'On Deck' hub, False otherwise
+            Optional[Union[MovieHistory, EpisodeHistory]]: The first (oldest) history for the target item
         """
-        return bool(item.onDeck())
+        return next(
+            iter(self.get_history(item, maxresults=1, sort_asc=True, **kwargs)), None
+        )
+
+    def get_last_history(
+        self, item: Union[Movie, Show, Season, Episode], **kwargs
+    ) -> Optional[Union[MovieHistory, EpisodeHistory]]:
+        """Get the last (most recent) history for a movie, show, or season
+        Args:
+            item (Union[Movie, Show, Season, Episode]): The target item
+
+        Returns:
+            Optional[Union[MovieHistory, EpisodeHistory]]: The last (most recent) history for the target item
+        """
+        return next(
+            iter(self.get_history(item, maxresults=1, sort_asc=False, **kwargs)), None
+        )
+
+    def get_on_deck(
+        self,
+        item: Union[Show, Season],
+        **kwargs,
+    ) -> Optional[Episode]:
+        """Get the items that are in the 'On Deck' hub for a movie or season
+
+        Args:
+            item (Union[Show, Season]): The target item
+
+        Returns:
+                Optional[Episode]: The item that's on deck
+        """
+        return next(
+            iter(
+                self.user_client.fetchItems(
+                    f"{item.ratingKey}?includeOnDeck=1",
+                    cls=Episode,
+                    rtag="OnDeck",
+                    **kwargs,
+                )
+            ),
+            None,
+        )
 
     def is_on_watchlist(self, item: Union[Movie, Show]) -> bool:
         """Check if a movie or show is on the user's watchlist
@@ -276,3 +320,14 @@ class PlexClient:
             bool: True if the item is on the 'Continue Watching' hub, False otherwise
         """
         return bool(self.get_continue_watching(item, maxresults=1, **kwargs))
+
+    def is_on_deck(self, item: Union[Movie, Show], **kwargs) -> bool:
+        """Check if a movie or show is on the 'On Deck' hub
+
+        Args:
+            item (Union[Movie, Show]): The target item
+
+        Returns:
+            bool: True if the item is on the 'On Deck' hub, False otherwise
+        """
+        return bool(self.get_on_deck(item, **kwargs))

@@ -1,6 +1,5 @@
 from typing import Iterator, Optional
 
-import plexapi.exceptions
 from plexapi.video import Movie
 
 from src.models.anilist import FuzzyDate, Media, MediaListStatus
@@ -26,7 +25,6 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie]):
         is_viewed = item.viewCount > 0
         is_partially_viewed = item.viewOffset > 0
         is_on_continue_watching = self.plex_client.is_on_continue_watching(item)
-        is_on_watchlist = self.plex_client.is_on_watchlist(item)
 
         # We've already watched it and are in the process of watching it again
         if is_viewed and is_on_continue_watching:
@@ -37,6 +35,8 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie]):
         # We've watched part of it recently
         if is_on_continue_watching:
             return MediaListStatus.PAUSED
+
+        is_on_watchlist = self.plex_client.is_on_watchlist(item)
         # We've watched part of it and it's not on continue watching. However, we've watchlisted it
         if is_on_watchlist and is_partially_viewed:
             return MediaListStatus.PAUSED
@@ -58,12 +58,14 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie]):
         return item.viewCount - 1 if item.viewCount else None
 
     def _calculate_started_at(self, item: Movie, *_) -> Optional[FuzzyDate]:
-        try:
-            history = self.plex_client.get_history(item)[0]
-        except (plexapi.exceptions.NotFound, IndexError):
+        history = self.plex_client.get_first_history(item)
+        if not history and not item.lastViewedAt:
             return None
-
-        return FuzzyDate.from_date(history.viewedAt)
+        if not history:
+            return FuzzyDate.from_date(item.lastViewedAt)
+        if not item.lastViewedAt:
+            return FuzzyDate.from_date(history.viewedAt)
+        return FuzzyDate.from_date(min(history.viewedAt, item.lastViewedAt))
 
     def _calculate_completed_at(self, item: Movie, *_) -> Optional[FuzzyDate]:
-        return self._calculate_started_at(item)
+        return self._calculate_started_at(item, *_)

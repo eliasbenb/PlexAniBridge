@@ -99,23 +99,24 @@ class MediaListStatus(AniListBaseEnum):
     PAUSED = "PAUSED"
     REPEATING = "REPEATING"
 
-    # A lower priority value means a higher priority/precedence
     __priority = {
-        "REPEATING": 0,
-        "COMPLETED": 1,
+        "PLANNING": 1,
         "CURRENT": 2,
-        "DROPPED": 3,
-        "PAUSED": 4,
-        "PLANNING": 5,
+        "PAUSED": 2,
+        "DROPPED": 2,
+        "COMPLETED": 3,
+        "REPEATING": 3,
     }
 
-    def __lt__(self, other: "MediaListStatus") -> bool:
-        return self.__priority[self.value] > self.__priority[other.value]
+    def __lt__(self, other) -> bool:
+        if self.__class__ is other.__class__:
+            return self.__priority[self.value] < self.__priority[other.value]
+        return NotImplemented
 
-    def __eq__(self, other: Any) -> bool:
-        if isinstance(other, MediaListStatus):
-            return self.value == other.value
-        return self.value == other
+    def __gt__(self, other) -> bool:
+        if self.__class__ is other.__class__:
+            return self.__priority[self.value] > self.__priority[other.value]
+        return NotImplemented
 
 
 class AniListBaseModel(BaseModel):
@@ -244,16 +245,16 @@ class FuzzyDate(AniListBaseModel):
     day: Optional[int] = None
 
     @staticmethod
-    def from_date(date: Union[date, datetime]) -> "FuzzyDate":
+    def from_date(d: Union[date, datetime]) -> "FuzzyDate":
         """Create a FuzzyDate from a date or datetime object
 
         Args:
-            date (Union[date, datetime]): A date or datetime object
+            d (Union[date, datetime]): A date or datetime object
 
         Returns:
             FuzzyDate: An equivalent FuzzyDate object
         """
-        return FuzzyDate(year=date.year, month=date.month, day=date.day)
+        return FuzzyDate(year=d.year, month=d.month, day=d.day)
 
     def to_datetime(self) -> Optional[datetime]:
         """Convert the FuzzyDate to a datetime object
@@ -308,7 +309,7 @@ class MediaList(AniListBaseModel):
     created_at: Optional[UTCDateTime] = None
     updated_at: Optional[UTCDateTime] = None
 
-    def unset_fields(self, fields: set[str]) -> None:
+    def unset_fields(self, fields: list[str]) -> None:
         for field, field_info in self.model_fields.items():
             if field in fields:
                 setattr(self, field, field_info.default)

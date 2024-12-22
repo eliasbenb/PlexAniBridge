@@ -1,7 +1,7 @@
 from typing import Iterator, Optional
 
 import plexapi.exceptions
-from plexapi.video import Episode, EpisodeHistory, Season, Show
+from plexapi.video import Episode, Season, Show
 
 from src.models.anilist import FuzzyDate, Media, MediaListStatus, MediaStatus
 from src.models.animap import AniMap
@@ -40,13 +40,9 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
         anilist_media: Media,
         animapping: AniMap,
     ) -> Optional[MediaListStatus]:
-        all_episodes = self.__filter_mapped_episodes(
-            item, subitem, anilist_media, animapping
-        )
         watched_episodes = self.__filter_watched_episodes(
             item, subitem, anilist_media, animapping
         )
-
         is_viewed = len(watched_episodes) >= anilist_media.episodes
         is_partially_viewed = len(watched_episodes) > 0
         is_on_continue_watching = self.plex_client.is_on_continue_watching(
@@ -54,7 +50,6 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
             index__gte=animapping.tvdb_epoffset + 1,
             index__lte=animapping.tvdb_epoffset + anilist_media.episodes,
         )
-        is_on_watchlist = self.plex_client.is_on_watchlist(item)
 
         # We've watched it and are in the process of watching it again
         if is_viewed and is_on_continue_watching:
@@ -64,6 +59,10 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
         # We've watched some episode recently and have more remaining
         if is_on_continue_watching:
             return MediaListStatus.CURRENT
+
+        all_episodes = self.__filter_mapped_episodes(
+            item, subitem, anilist_media, animapping
+        )
         # We've watched all currently aired episodes, which is why it's not on continue watching
         if (
             anilist_media.status == MediaStatus.RELEASING
@@ -74,6 +73,8 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
         # We've watched all the episodes available to us, so we're forced to pause
         if len(all_episodes) == len(watched_episodes) and is_partially_viewed:
             return MediaListStatus.PAUSED
+
+        is_on_watchlist = self.plex_client.is_on_watchlist(item)
         # At this point, we can consider the show dropped. However, if it is on the watchlist, we'll assume the user still wants to watch it
         if is_on_watchlist and is_partially_viewed:
             return MediaListStatus.PAUSED
@@ -123,12 +124,20 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
         animapping: AniMap,
     ) -> Optional[FuzzyDate]:
         try:
-            episode = subitem.get(episode=animapping.tvdb_epoffset + 1)
-            history: EpisodeHistory = self.plex_client.get_history(episode)[0]
+            episode: Episode = subitem.get(episode=animapping.tvdb_epoffset + 1)
         except (plexapi.exceptions.NotFound, IndexError):
             return None
 
-        return FuzzyDate.from_date(history.viewedAt)
+        history = self.plex_client.get_first_history(episode)
+        if not history and not episode.lastViewedAt:
+            return None
+        if not history:
+            return FuzzyDate.from_date(episode.lastViewedAt)
+
+        return min(
+            FuzzyDate.from_date(history.viewedAt) or 0,
+            FuzzyDate.from_date(episode.lastViewedAt) or 0,
+        )
 
     def _calculate_completed_at(
         self,
@@ -138,14 +147,22 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
         animapping: AniMap,
     ) -> Optional[FuzzyDate]:
         try:
-            episode = subitem.get(
+            episode: Episode = subitem.get(
                 episode=animapping.tvdb_epoffset + anilist_media.episodes
             )
-            history: EpisodeHistory = self.plex_client.get_history(episode)[0]
         except (plexapi.exceptions.NotFound, IndexError):
             return None
 
-        return FuzzyDate.from_date(history.viewedAt)
+        history = self.plex_client.get_first_history(episode)
+        if not history and not episode.lastViewedAt:
+            return None
+        if not history:
+            return FuzzyDate.from_date(episode.lastViewedAt)
+
+        return min(
+            FuzzyDate.from_date(history.viewedAt) or 0,
+            FuzzyDate.from_date(episode.lastViewedAt) or 0,
+        )
 
     def __filter_mapped_episodes(
         self,
