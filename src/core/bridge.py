@@ -20,45 +20,8 @@ class BridgeClient:
 
     def __init__(self, config: PlexAnibridgeConfig) -> None:
         self.config = config
-
-        anilist_tokens = (
-            config.ANILIST_TOKEN
-            if isinstance(config.ANILIST_TOKEN, list)
-            else [config.ANILIST_TOKEN]
-        )
-        plex_users = config.PLEX_USERS or ["default"]
-        plex_anilist_pairs = list(zip(plex_users, anilist_tokens))
-
+        self.token_user_pairs = list(zip(config.ANILIST_TOKEN, config.PLEX_USER))
         self.animap_client = AniMapClient()
-
-        plex_user, anilist_token = plex_anilist_pairs.pop(0)
-        self.plex_client = PlexClient(
-            config.PLEX_URL, config.PLEX_TOKEN, config.PLEX_SECTIONS
-        )
-        self.anilist_client = AniListClient(
-            anilist_token, config.DATA_PATH / "backups", config.DRY_RUN
-        )
-
-        sync_client_args = {
-            "anilist_client": self.anilist_client,
-            "animap_client": self.animap_client,
-            "plex_client": self.plex_client,
-            "excluded_sync_fields": config.EXCLUDED_SYNC_FIELDS,
-            "destructive_sync": config.DESTRUCTIVE_SYNC,
-            "fuzzy_search_threshold": config.FUZZY_SEARCH_THRESHOLD,
-        }
-
-        self.movie_sync = MovieSyncClient(**sync_client_args)
-        self.show_sync = ShowSyncClient(**sync_client_args)
-
-        while plex_anilist_pairs:
-            plex_user, anilist_token = plex_anilist_pairs.pop(0)
-
-            self.plex_client.switch_user(plex_user)
-            self.anilist_client.switch_user(anilist_token)
-
-            self.movie_sync = MovieSyncClient(**sync_client_args)
-            self.show_sync = ShowSyncClient(**sync_client_args)
 
         self.last_synced = self._get_last_synced()
         self.last_config_encoded = self._get_last_config_encoded()
@@ -113,24 +76,59 @@ class BridgeClient:
         """Sync the Plex and AniList libraries"""
         log.info(
             f"{self.__class__.__name__}: Starting "
-            f"{'partial ' if self.config.PARTIAL_SCAN else ''}"
-            f"{'and ' if self.config.PARTIAL_SCAN and self.config.DESTRUCTIVE_SYNC else ''}"
+            f"{'partial ' if self._should_perform_partial_scan() else ''}"
+            f"{'and ' if  self._should_perform_partial_scan() and self.config.DESTRUCTIVE_SYNC else ''}"
             f"{'destructive ' if self.config.DESTRUCTIVE_SYNC else ''}"
             f"sync between Plex and AniList libraries"
         )
 
         tmp_last_synced = datetime.now()  # We'll store this if the sync is successful
+
+        for anilist_token, plex_user in self.token_user_pairs:
+            self._sync_user(anilist_token, plex_user)
+
+        tmp_last_synced = min(tmp_last_synced, self.last_synced)
+
+        self._set_last_synced(tmp_last_synced)
+        self._set_last_config_encoded(self.config.encode())
+
+        log.info(f"{self.__class__.__name__}: Sync completed")
+
+    def _sync_user(self, anilist_token: str, plex_user: str) -> None:
+        """Sync a single Plex AniList user pair
+
+        Args:
+            plex_token (str): The Plex user's token
+            anilist_token (str): The AniList token
+        """
+        self.anilist_client = AniListClient(
+            anilist_token, self.config.DATA_PATH / "backups", self.config.DRY_RUN
+        )
+        self.plex_client = PlexClient(
+            self.config.PLEX_TOKEN,
+            plex_user,
+            self.config.PLEX_URL,
+            self.config.PLEX_SECTIONS,
+        )
+
+        sync_client_args = {
+            "anilist_client": self.anilist_client,
+            "animap_client": self.animap_client,
+            "plex_client": self.plex_client,
+            "excluded_sync_fields": self.config.EXCLUDED_SYNC_FIELDS,
+            "destructive_sync": self.config.DESTRUCTIVE_SYNC,
+            "fuzzy_search_threshold": self.config.FUZZY_SEARCH_THRESHOLD,
+        }
+
+        self.movie_sync = MovieSyncClient(**sync_client_args)
+        self.show_sync = ShowSyncClient(**sync_client_args)
+
         plex_sections = self.plex_client.get_sections()
 
         sync_stats = SyncStats()
         for section in plex_sections:
             sync_stats += self._sync_section(section)
 
-        # Update the sync state
-        self._set_last_synced(tmp_last_synced)
-        self._set_last_config_encoded(self.config.encode())
-
-        log.info(f"{self.__class__.__name__}: Anime mappings sync completed")
         log.info(
             f"{self.__class__.__name__}: {sync_stats.synced} items synced, {sync_stats.deleted} items deleted, "
             f"{sync_stats.skipped} items skipped, {sync_stats.failed} items failed"

@@ -1,38 +1,42 @@
 from datetime import datetime
+from functools import cache
 from typing import Optional, Union
 
 import requests
 from plexapi.library import MovieSection, ShowSection
 from plexapi.server import PlexServer
-from plexapi.utils import joinArgs
 from plexapi.video import Episode, EpisodeHistory, Movie, MovieHistory, Season, Show
 
 from src import log
-from src.utils.cache import user_cache
 
 
 class PlexClient:
     def __init__(
-        self, plex_url: str, plex_token: str, plex_sections: list[str]
+        self,
+        plex_token: str,
+        plex_user: str,
+        plex_url: str,
+        plex_sections: list[str],
     ) -> None:
-        self.plex_url = plex_url
         self.plex_token = plex_token
+        self.plex_user = plex_user
+        self.plex_url = plex_url
         self.plex_sections = plex_sections
 
-        self.client = PlexServer(self.plex_url, self.plex_token)
-        self.user = self.client.myPlexAccount()
+        self.admin_client = PlexServer(plex_url, plex_token)
+        self._init_user_client()
 
-    def switch_user(self, user: str) -> None:
-        """Switch the Plex client to a different user
-
-        Args:
-            user (str): The username, email, or user ID to switch to
-        """
-        self.client.switchUser(user)
-        self.user = self.client.myPlexAccount()
-        log.debug(
-            f"{self.__class__.__name__}: Switched to user $$'{self.user.username}'$$"
-        )
+    def _init_user_client(self) -> PlexServer:
+        """Get the Plex client for the user"""
+        admin_account = self.admin_client.myPlexAccount()
+        if admin_account.username == self.plex_user:
+            self.user_client = self.admin_client
+            self.user_account_id = 1
+        else:
+            self.user_client = self.admin_client.switchUser(self.plex_user)
+            self.user_account_id = next(
+                u.id for u in admin_account.users() if u.username == self.plex_user
+            )
 
     def get_sections(self) -> Union[list[MovieSection], list[ShowSection]]:
         """Get all Plex sections that are configured
@@ -44,7 +48,7 @@ class PlexClient:
 
         return [
             section
-            for section in self.client.library.sections()
+            for section in self.user_client.library.sections()
             if section.title in self.plex_sections
         ]
 
@@ -89,7 +93,7 @@ class PlexClient:
 
         return section.search(filters=filters)
 
-    @user_cache
+    @cache
     def get_user_review(self, item: Union[Movie, Show, Season]) -> Optional[str]:
         """Get the user review for a movie or show
 
@@ -178,7 +182,7 @@ class PlexClient:
             Union[list[Movie], list[Episode]]: The item(s) related to the target item that are in the 'Continue Watching' hub
         """
         if item.type == "movie":
-            return self.client.fetchItems(
+            return self.admin_client.fetchItems(
                 "/hubs/continueWatching/items", ratingKey=item.ratingKey
             )
         elif item.type == "season":
@@ -187,16 +191,17 @@ class PlexClient:
                 kwargs["index__gte"] = season_lower
             if season_upper is not None:
                 kwargs["index__lte"] = season_upper
-            return self.client.fetchItems("/hubs/continueWatching/items", **kwargs)
+            return self.admin_client.fetchItems(
+                "/hubs/continueWatching/items", **kwargs
+            )
         return []
 
-    @user_cache
+    @cache
     def get_history(
         self,
         item: Union[Movie, Show, Season, Episode],
         min_date: Optional[datetime] = None,
         max_results: Optional[int] = None,
-        sort_asc: bool = True,
     ) -> Union[list[MovieHistory], list[EpisodeHistory]]:
         """Get the history for a movie, show, or season
 
@@ -209,15 +214,12 @@ class PlexClient:
         Returns:
                 list[PlexHistory]: The history for the target item
         """
-        args = {
-            "metadataItemID": item.ratingKey,
-            "sort": f"viewedAt:{'asc' if sort_asc else 'desc'}",
-        }
-        if min_date:
-            args["viewedAt>"] = int(min_date.timestamp())
-
-        key = f"/status/sessions/history/all{joinArgs(args)}"
-        return self.client.fetchItems(key, maxresults=max_results)
+        return self.admin_client.history(
+            ratingKey=item.ratingKey,
+            mindate=min_date,
+            maxresults=max_results,
+            accountID=self.user_account_id,
+        )
 
     def is_on_deck(self, item: Union[Movie, Show]) -> bool:
         """Check if a movie or show is on the 'On Deck' hub
@@ -228,4 +230,19 @@ class PlexClient:
         Returns:
             bool: True if the item is on the 'On Deck' hub, False otherwise
         """
-        return self.client.library.onDeck(item) is not None
+        return bool(item.onDeck())
+
+    def is_on_watchlist(self, item: Union[Movie, Show]) -> bool:
+        """Check if a movie or show is on the user's watchlist
+
+        Args:
+            item (Union[Movie, Show]): The target item
+
+        Returns:
+            bool: True if the item is on the watchlist, False otherwise
+        """
+        return bool(
+            self.admin_client.fetchItems(
+                f"/hubs/continueWatching/items?accountID={self.user_account_id}"
+            )
+        )

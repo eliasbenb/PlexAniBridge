@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from functools import cache
 from pathlib import Path
 from textwrap import dedent
 from time import sleep
@@ -16,7 +17,6 @@ from src.models.anilist import (
     MediaWithRelations,
     User,
 )
-from src.utils.cache import user_cache
 from src.utils.rate_limitter import RateLimiter
 
 
@@ -27,26 +27,12 @@ class AniListClient:
     BACKUP_RETENTION_DAYS = 7
 
     def __init__(self, anilist_token: str, backup_dir: Path, dry_run: bool) -> None:
+        self.anilist_token = anilist_token
         self.backup_dir = backup_dir
         self.dry_run = dry_run
 
         self.rate_limiter = RateLimiter(self.__class__.__name__, requests_per_minute=90)
-
-        self.switch_user(anilist_token)
-
-    def switch_user(self, anilist_token: str) -> User:
-        """Switches the authenticated user to the specified user
-
-        Args:
-            token (str): The AniList token of the user to switch to
-            Returns:
-        User: The new anilist user object
-        """
-        self.anilist_token = anilist_token
         self.user = self.get_user()
-        log.debug(f"{self.__class__.__name__}: Switched to user $$'{self.user.name}'$$")
-
-        self.backup_anilist()
 
     def get_user(self) -> User:
         """Gets the owner user of the AniList token
@@ -159,7 +145,7 @@ class AniListClient:
             or not episodes
         ]
 
-    @user_cache
+    @cache
     def _search_anime(
         self,
         search_str: str,
