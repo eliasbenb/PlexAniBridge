@@ -64,7 +64,7 @@ class BaseSyncClient(ABC, Generic[T, S]):
         anilist_client: AniListClient,
         animap_client: AniMapClient,
         plex_client: PlexClient,
-        excluded_sync_fields: set[SyncField],
+        excluded_sync_fields: list[SyncField],
         destructive_sync: bool,
         fuzzy_search_threshold: int,
     ) -> None:

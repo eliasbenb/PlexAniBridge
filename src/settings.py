@@ -64,14 +64,14 @@ class PlexAnibridgeConfig(BaseSettings):
     PLEX_TOKEN: str
     PLEX_USER: Union[str, list[str]]
     PLEX_URL: str = "http://localhost:32400"
-    PLEX_SECTIONS: set[str]
+    PLEX_SECTIONS: list[str]
 
     # General
     SYNC_INTERVAL: int = Field(3600, ge=-1)
     PARTIAL_SCAN: bool = True
     DESTRUCTIVE_SYNC: bool = False
 
-    EXCLUDED_SYNC_FIELDS: set[SyncField] = {"notes", "score"}
+    EXCLUDED_SYNC_FIELDS: list[SyncField] = ["notes", "score"]
 
     # Advanced
     DATA_PATH: Path = "./data"
