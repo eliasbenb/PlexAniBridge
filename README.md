@@ -119,7 +119,7 @@ python main.py
 > While PlexAniBridge supports multiple users, there are some limitations:
 >
 > - You will need to set the `PLEX_TOKEN` that the Plex server's admin user has. This means you will need the admin user's permission to run PlexAniBridge
-> - Only the admin user can sync reviews and watchlists (planning status)
+> - Only the admin user can sync reviews and watchlists. What this means is that syncing the 'Notes' section on AniList or marking an item as 'Planning' will not be available for non-admin users. Besides these two things, all other features are available for all users.
 
 ## TODO
 
