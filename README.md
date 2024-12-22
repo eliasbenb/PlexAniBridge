@@ -53,15 +53,21 @@ python main.py
 > Any list item prefixed with `*` must be set for the script to run.
 
 - `*ANILIST_TOKEN (str | list[str])`: AniList API access token [get one here](https://anilist.co/login?apiVersion=v2&client_id=23079&response_type=token)
-  - If you plan to sync multiple users (have `PLEX_USERS` set), you can provide a list of tokens. E.g. `["token1", "token2"]`
-  - Otherwise, a single token is sufficient. E.g. `ANILIST_TOKEN=token`
-- `*PLEX_URL (str)`: URL to your Plex server (default: `http://localhost:32400`)
+  - If you plan to sync multiple users you can provide a list of tokens. E.g. `["token1", "token2"]`
+    - In this case, you must also provide a list of Plex users in the `PLEX_USER` variable
+    - The number of tokens must match the number of users
+    - The order of the tokens must match the order of the users
+  - If you plan to sync just one user, a single token is sufficient. E.g. `ANILIST_TOKEN=token`
 - `*PLEX_TOKEN (str)`: Plex API access token [get one here](https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/)
+- `PLEX_USER (str | list[str])`: Username of the Plex user to sync
+  - If you want to sync multiple users, provide a list of usernames. E.g. `["user1", "user2"]`
+    - In this case, you must also provide a list of AniList tokens in the `ANILIST_TOKEN` variable
+    - The number of users must match the number of tokens
+    - The order of the users must match the order of the tokens
+- `*PLEX_URL (str)`: URL to your Plex server (default: `http://localhost:32400`)
 - `*PLEX_SECTIONS (list[str])`: List of Plex library sections to consider
   - The syntax is the same as a Python list. E.g. `["Anime", "Anime Movies"]`
-- `PLEX_USERS (list[str])`: List of Plex users to sync (default: `[]`)
-  - If you want to sync multiple users, provide a list of usernames, emails, or user IDs. E.g. `["user1", "email2", "id3"]`
-  - Each user must have a corresponding AniList token in the `ANILIST_TOKEN` variable. The order of the tokens must match the order of the users.
+  - In a multi-user setup, every section will be synced for every user. However, if the user doesn't have access to a section, it will be skipped.
 - `SYNC_INTERVAL (int)`: Interval in seconds between each sync job. (default: `3600`)
   - Set as `-1` to disable scheduled sync jobs. This will cause the script to run only once and exit.
   - When `PARTIAL_SCAN` is enabled, it can be beneficial to lower the interval for quicker syncs. In this case, an interval of `300` (5 minutes) is recommended.
