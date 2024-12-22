@@ -46,15 +46,14 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
         watched_episodes = self.__filter_watched_episodes(
             item, subitem, anilist_media, animapping
         )
-        countinue_watching_episodes = self.plex_client.is_on_continue_watching(
-            subitem,
-            index__gt=animapping.tvdb_epoffset,
-            index__lte=animapping.tvdb_epoffset + anilist_media.episodes,
-        )
 
         is_viewed = len(watched_episodes) >= anilist_media.episodes
         is_partially_viewed = len(watched_episodes) > 0
-        is_on_continue_watching = len(countinue_watching_episodes) > 0
+        is_on_continue_watching = self.plex_client.is_on_continue_watching(
+            subitem,
+            index__gte=animapping.tvdb_epoffset + 1,
+            index__lte=animapping.tvdb_epoffset + anilist_media.episodes,
+        )
         is_on_watchlist = self.plex_client.is_on_watchlist(item)
 
         # We've watched it and are in the process of watching it again

@@ -202,11 +202,14 @@ class PlexClient:
         """
         if item.type == "movie":
             return self.user_client.fetchItems(
-                "/hubs/continueWatching/items", ratingKey=item.ratingKey
+                "/hubs/continueWatching/items",
+                ratingKey=item.ratingKey,
             )
         elif item.type == "season":
             return self.user_client.fetchItems(
-                "/hubs/continueWatching/items", parentRatingKey=item.ratingKey, **kwargs
+                "/hubs/continueWatching/items",
+                parentRatingKey=item.ratingKey,
+                **kwargs,
             )
         return []
 
