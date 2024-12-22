@@ -112,6 +112,13 @@ python main.py
 > python scripts/anilist_restore.py --token <YOUR_ANILIST_TOKEN> ./data/backups/plexanibridge-user.1.json
 > ```
 
+> [!NOTE]
+>
+> While PlexAniBridge supports multiple users, there are some limitations:
+>
+> - You will need to set the `PLEX_TOKEN` that the Plex server's admin user has. This means you will need the admin user's permission to run PlexAniBridge
+> - Only the admin user can sync reviews and watchlists (planning status)
+
 ## TODO
 
 - [ ] Custom mapping support
