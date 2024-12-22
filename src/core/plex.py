@@ -27,7 +27,13 @@ class PlexClient:
         self._init_user_client()
 
     def _init_user_client(self) -> PlexServer:
-        """Get the Plex client for the user"""
+        """Get the Plex client for the user account
+
+        It handles cases where the user account is an admin or a regular user.
+
+        Returns:
+            PlexServer: The Plex client for the user account
+        """
         admin_account = self.admin_client.myPlexAccount()
         if admin_account.username == self.plex_user:
             self.user_client = self.admin_client
@@ -37,6 +43,15 @@ class PlexClient:
             self.user_account_id = next(
                 u.id for u in admin_account.users() if u.username == self.plex_user
             )
+        log.debug(
+            f"{self.__class__.__name__}: Initialized Plex client for user "
+            f"$$'{self.plex_user}'$$ $${{plex_account_id: {self.user_account_id}}}$$"
+        )
+        log.debug(
+            f"{self.__class__.__name__}: User is an admin, using admin client"
+            if admin_account.username == self.plex_user
+            else f"{self.__class__.__name__}: User is not an admin, using user client"
+        )
 
     def get_sections(self) -> Union[list[MovieSection], list[ShowSection]]:
         """Get all Plex sections that are configured

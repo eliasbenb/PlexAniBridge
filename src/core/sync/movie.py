@@ -1,7 +1,7 @@
 from typing import Iterator, Optional
 
 import plexapi.exceptions
-from plexapi.video import Movie, MovieHistory
+from plexapi.video import Movie
 
 from src.models.anilist import FuzzyDate, Media, MediaListStatus
 from src.models.animap import AniMap

@@ -1,7 +1,7 @@
 from enum import StrEnum
 from hashlib import md5
 from pathlib import Path
-from typing import Optional, Union
+from typing import Union
 
 from pydantic import Field, model_validator
 from pydantic.alias_generators import to_camel

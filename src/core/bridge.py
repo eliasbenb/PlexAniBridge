@@ -104,6 +104,12 @@ class BridgeClient:
         self.anilist_client = AniListClient(
             anilist_token, self.config.DATA_PATH / "backups", self.config.DRY_RUN
         )
+
+        log.info(
+            f"{self.__class__.__name__}: Syncing Plex user $$'{plex_user}'$$ "
+            f"with AniList user $$'{self.anilist_client.user.name}'$$"
+        )
+
         self.plex_client = PlexClient(
             self.config.PLEX_TOKEN,
             plex_user,
@@ -140,15 +146,15 @@ class BridgeClient:
         Args:
             section (Union[MovieSection, ShowSection]): The Plex section to sync
         """
-        log.debug(f"{self.__class__.__name__}: Syncing section $$'{section.title}'$$")
+        log.info(f"{self.__class__.__name__}: Syncing section $$'{section.title}'$$")
 
         should_perform_partial_scan = self._should_perform_partial_scan()
         if should_perform_partial_scan:
-            log.info(
+            log.debug(
                 f"{self.__class__.__name__}: Performing partial scan for section $$'{section.title}'$$"
             )
         else:
-            log.info(
+            log.debug(
                 f"{self.__class__.__name__}: Performing full scan for section $$'{section.title}'$$"
             )
 
