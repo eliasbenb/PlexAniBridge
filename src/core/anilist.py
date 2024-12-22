@@ -132,7 +132,7 @@ class AniListClient:
             list[Media]: The filtered search results
         """
         log.debug(
-            f"{self.__class__.__name__}: Searching for anime {'movie' if is_movie else 'show'} "
+            f"{self.__class__.__name__}: Searching for {'movie' if is_movie else 'show'} "
             f"with title $$'{search_str}'$$ that has {episodes or 'unknown'} episodes"
         )
 

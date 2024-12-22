@@ -213,7 +213,7 @@ class BaseSyncClient(ABC, Generic[T, S]):
         media_list = MediaList(
             id=anilist_media.media_list_entry
             and anilist_media.media_list_entry.id
-            or -1,
+            or 0,
             user_id=self.anilist_client.user.id,
             media_id=anilist_media.id,
             status=self._calculate_status(item, subitem, anilist_media, animapping),
