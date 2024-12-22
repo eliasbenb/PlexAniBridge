@@ -59,6 +59,7 @@ python main.py
     - The order of the tokens must match the order of the users
   - If you plan to sync just one user, a single token is sufficient. E.g. `ANILIST_TOKEN=token`
 - `*PLEX_TOKEN (str)`: Plex API access token [get one here](https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/)
+  - This must be the Plex token of the admin user of the Plex server
 - `PLEX_USER (str | list[str])`: Username of the Plex user to sync
   - If you want to sync multiple users, provide a list of usernames. E.g. `["user1", "user2"]`
     - In this case, you must also provide a list of AniList tokens in the `ANILIST_TOKEN` variable
@@ -102,7 +103,7 @@ python main.py
 > This project is still in development, while it is usable, I cannot guarantee that it will be stable for every release.
 
 > [!IMPORTANT]
-> To prevent data loss, PlexAniBridge automatically creates backups of your AniList data before syncing. These backups are stored under the data folder (defined in`DATA_PATH`) in the `backups` directory. These backups are automatically deleted after 7 days.
+> To prevent data loss, PlexAniBridge automatically creates backups of your AniList data before syncing. These backups are stored under the data folder (defined in `DATA_PATH`) in the `backups` directory. These backups are automatically deleted after 7 days.
 >
 > To restore from a backup, use the [restore script](./scripts/anilist_restore.py) in the `scripts` folder. You will need to pass the backup file and AniList token as arguments:
 > 
