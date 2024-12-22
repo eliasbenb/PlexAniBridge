@@ -61,10 +61,10 @@ class PlexAnibridgeConfig(BaseSettings):
     ANILIST_TOKEN: Union[str, list[str]]
 
     # Plex
-    PLEX_URL: str = "http://localhost:32400"
     PLEX_TOKEN: str
+    PLEX_USER: Union[str, list[str]]
+    PLEX_URL: str = "http://localhost:32400"
     PLEX_SECTIONS: set[str]
-    PLEX_USERS: Optional[list[str]] = None
 
     # General
     SYNC_INTERVAL: int = Field(3600, ge=-1)
@@ -86,19 +86,14 @@ class PlexAnibridgeConfig(BaseSettings):
         return self
 
     @model_validator(mode="after")
-    def validate_token_users_match(self) -> "PlexAnibridgeConfig":
-        """Ensures ANILIST_TOKEN and PLEX_USERS lists match in length when using multiple tokens"""
-        if self.PLEX_USERS:
-            if isinstance(self.ANILIST_TOKEN, str):
-                raise ValueError(
-                    "`ANILIST_TOKEN` must be a list when using multiple Plex users"
-                )
-            if len(self.ANILIST_TOKEN) != len(self.PLEX_USERS):
-                raise ValueError(
-                    "`ANILIST_TOKEN` and `PLEX_USERS` must be the same length when using multiple Plex users"
-                )
-        if not self.ANILIST_TOKEN:
-            raise ValueError("`ANILIST_TOKEN` must be set")
+    def token_validation(self) -> "PlexAnibridgeConfig":
+        """Validates the token values"""
+        if isinstance(self.ANILIST_TOKEN, str):
+            self.ANILIST_TOKEN = [self.ANILIST_TOKEN]
+        if isinstance(self.PLEX_USER, str):
+            self.PLEX_USER = [self.PLEX_USER]
+        if len(self.ANILIST_TOKEN) != len(self.PLEX_USER):
+            raise ValueError("The number of Plex users and AniList tokens must match")
         return self
 
     def encode(self) -> str:
