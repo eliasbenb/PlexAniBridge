@@ -1,6 +1,7 @@
 from typing import Iterator, Optional
 
-from plexapi.video import Movie, MovieHistory
+import plexapi.exceptions
+from plexapi.video import Movie
 
 from src.models.anilist import FuzzyDate, Media, MediaListStatus
 from src.models.animap import AniMap
@@ -24,8 +25,8 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie]):
     def _calculate_status(self, item: Movie, *_) -> Optional[MediaListStatus]:
         is_viewed = item.viewCount > 0
         is_partially_viewed = item.viewOffset > 0
-        is_on_continue_watching = self.plex_client.get_continue_watching(item) and True
-        is_on_watchlist = item.onWatchlist()
+        is_on_continue_watching = self.plex_client.is_on_continue_watching(item)
+        is_on_watchlist = self.plex_client.is_on_watchlist(item)
 
         # We've already watched it and are in the process of watching it again
         if is_viewed and is_on_continue_watching:
@@ -57,12 +58,12 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie]):
         return item.viewCount - 1 if item.viewCount else None
 
     def _calculate_started_at(self, item: Movie, *_) -> Optional[FuzzyDate]:
-        history: list[MovieHistory] = self.plex_client.get_history(
-            item, max_results=1, sort_asc=True
-        )
-        if not history:
+        try:
+            history = self.plex_client.get_history(item)[0]
+        except (plexapi.exceptions.NotFound, IndexError):
             return None
-        return FuzzyDate.from_date(history[0].viewedAt)
+
+        return FuzzyDate.from_date(history.viewedAt)
 
     def _calculate_completed_at(self, item: Movie, *_) -> Optional[FuzzyDate]:
         return self._calculate_started_at(item)

@@ -32,8 +32,7 @@ class AniListClient:
         self.dry_run = dry_run
 
         self.rate_limiter = RateLimiter(self.__class__.__name__, requests_per_minute=90)
-        self.anilist_user = self.get_user()
-        self.backup_anilist()
+        self.user = self.get_user()
 
     def get_user(self) -> User:
         """Gets the owner user of the AniList token
@@ -105,7 +104,7 @@ class AniListClient:
             return False
 
         variables = MediaList(
-            id=entry_id, media_id=media_id, user_id=self.anilist_user.id
+            id=entry_id, media_id=media_id, user_id=self.user.id
         ).model_dump_json(exclude_none=True)
 
         response = self._make_request(query, variables)["data"]["DeleteMediaListEntry"]
@@ -245,8 +244,8 @@ class AniListClient:
         }}
         """).strip()
 
-        data = MediaListCollection(user=self.anilist_user, has_next_chunk=True)
-        variables = {"userId": self.anilist_user.id, "type": "ANIME", "chunk": 0}
+        data = MediaListCollection(user=self.user, has_next_chunk=True)
+        variables = {"userId": self.user.id, "type": "ANIME", "chunk": 0}
 
         while data.has_next_chunk:
             response = self._make_request(query, variables)["data"][
@@ -260,14 +259,10 @@ class AniListClient:
             variables["chunk"] += 1
 
         n = 1
-        backup_file = (
-            self.backup_dir / f"plexanibridge-{self.anilist_user.name}.{n}.json"
-        )
+        backup_file = self.backup_dir / f"plexanibridge-{self.user.name}.{n}.json"
         while backup_file.exists():
             n += 1
-            backup_file = (
-                self.backup_dir / f"plexanibridge-{self.anilist_user.name}.{n}.json"
-            )
+            backup_file = self.backup_dir / f"plexanibridge-{self.user.name}.{n}.json"
 
         if not backup_file.parent.exists():
             backup_file.parent.mkdir(parents=True)

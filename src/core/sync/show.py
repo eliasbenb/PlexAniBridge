@@ -46,16 +46,15 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
         watched_episodes = self.__filter_watched_episodes(
             item, subitem, anilist_media, animapping
         )
-        countinue_watching_episodes = self.plex_client.get_continue_watching(
-            subitem,
-            season_lower=animapping.tvdb_epoffset + 1,
-            season_upper=animapping.tvdb_epoffset + anilist_media.episodes,
-        )
 
         is_viewed = len(watched_episodes) >= anilist_media.episodes
         is_partially_viewed = len(watched_episodes) > 0
-        is_on_continue_watching = len(countinue_watching_episodes) > 0
-        is_on_watchlist = item.onWatchlist()
+        is_on_continue_watching = self.plex_client.is_on_continue_watching(
+            subitem,
+            index__gte=animapping.tvdb_epoffset + 1,
+            index__lte=animapping.tvdb_epoffset + anilist_media.episodes,
+        )
+        is_on_watchlist = self.plex_client.is_on_watchlist(item)
 
         # We've watched it and are in the process of watching it again
         if is_viewed and is_on_continue_watching:
@@ -125,9 +124,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
     ) -> Optional[FuzzyDate]:
         try:
             episode = subitem.get(episode=animapping.tvdb_epoffset + 1)
-            history: EpisodeHistory = self.plex_client.get_history(
-                episode, max_results=1, sort_asc=True
-            )[0]
+            history: EpisodeHistory = self.plex_client.get_history(episode)[0]
         except (plexapi.exceptions.NotFound, IndexError):
             return None
 
@@ -144,9 +141,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
             episode = subitem.get(
                 episode=animapping.tvdb_epoffset + anilist_media.episodes
             )
-            history: EpisodeHistory = self.plex_client.get_history(
-                episode, max_results=1, sort_asc=True
-            )[0]
+            history: EpisodeHistory = self.plex_client.get_history(episode)[0]
         except (plexapi.exceptions.NotFound, IndexError):
             return None
 
