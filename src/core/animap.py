@@ -50,7 +50,11 @@ class AniMapClient:
             values = [
                 {
                     "anidb_id": anidb_id,
-                    **{field: data.get(field) for field in AniMap.model_fields},
+                    **{
+                        field: data.get(field)
+                        for field in AniMap.model_fields
+                        if field != "anidb_id"
+                    },
                 }
                 for anidb_id, data in cdn_data.items()
             ]
