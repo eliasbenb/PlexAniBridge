@@ -92,7 +92,7 @@ class AniMapClient:
 
         Args:
             imdb (Optional[str], optional): The IMDB ID to match. Defaults to None.
-            tmdb (Optional[int], optional): The TMDB movie ir show ID to match. Defaults to None.
+            tmdb (Optional[int], optional): The TMDB movie or show ID to match. Defaults to None.
             tvdb (Optional[int], optional): The TVDB ID to match. Defaults to None.
             season (Optional[int], optional): The TVDB season number to match. Defaults to None.
             epoffset (Optional[int], optional): The TVDB episode offset to match. Defaults to None.
@@ -115,23 +115,30 @@ class AniMapClient:
                     AniMap.tvdb_epoffset.__eq__: epoffset,
                 }
 
-            # There is an edge case of about ~120 entries where the entry does not map directly to an AniList ID and
-            # is instead mapped to multiple MAL IDs. Handling this would vastly increase complexity and computation.
-            # So, I'm simply ignoring those ~120 entries by forcing there to be a 1:1 mapping.
-            query = select(AniMap).where(
-                or_(
-                    AniMap.anilist_id.is_not(None),
-                    AniMap.mal_id.is_(None),
-                    func.json_array_length(AniMap.mal_id) == 1,
-                )
-            )
+            # Base filters
+            query = select(AniMap).where(AniMap.anilist_id.is_not(None))
+
+            # Add partial matches
             if any(v is not None for v in partial_matches.values()):
                 query = query.where(
                     or_(*(op(v) for op, v in partial_matches.items() if v is not None))
                 )
+            # Add exact matches
             if any(v is not None for v in exact_matches.values()):
                 query = query.where(
                     and_(*(op(v) for op, v in exact_matches.items() if v is not None))
                 )
+
+            # Make sure we only return unique entries
+            query = query.distinct(
+                AniMap.anilist_id,
+                AniMap.tvdb_season,
+                AniMap.tvdb_epoffset,
+            ).order_by(
+                AniMap.anilist_id,
+                AniMap.tvdb_season,
+                AniMap.tvdb_epoffset,
+                AniMap.anidb_id,
+            )
 
             return session.exec(query).all()

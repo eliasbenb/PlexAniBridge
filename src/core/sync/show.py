@@ -14,6 +14,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
         guids = ParsedGuids.from_guids(item.guids)
         seasons: list[Season] = item.seasons()
         season_map = {s.index: s for s in seasons}
+        unyielded_seasons = set(season_map.keys())
 
         for animapping in self.animap_client.get_mappings(
             **dict(guids), is_movie=False
@@ -21,10 +22,14 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
             if animapping.tvdb_season is None:
                 continue
             if animapping.tvdb_season in season_map:
-                yield season_map.pop(animapping.tvdb_season), animapping
+                try:
+                    unyielded_seasons.remove(animapping.tvdb_season)
+                except KeyError:
+                    continue
+                yield season_map[animapping.tvdb_season], animapping
 
-        for season in season_map.values():
-            yield season, None
+        for season in unyielded_seasons:
+            yield season_map[season], None
 
     def search_media(self, item: Show, subitem: Season) -> Optional[Media]:
         if subitem.seasonNumber == 0:
