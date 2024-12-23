@@ -1,7 +1,7 @@
 from datetime import date, datetime, timedelta, timezone
 from enum import StrEnum
 from functools import total_ordering
-from typing import Annotated, Any, ClassVar, Optional, Union, get_args, get_origin
+from typing import Annotated, ClassVar, Optional, Union, get_args, get_origin
 
 from pydantic import AfterValidator, AliasGenerator, BaseModel, ConfigDict
 from pydantic.alias_generators import to_camel

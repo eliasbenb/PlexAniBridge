@@ -41,6 +41,9 @@ class ParsedGuids:
     def __iter__(self) -> Iterator[tuple[str, Optional[Union[int, str]]]]:
         return iter(self.__dict__.items())
 
+    def __str__(self) -> str:
+        return ", ".join(f"{k}_id: {v}" for k, v in self if v is not None)
+
 
 @dataclass
 class SyncStats:
@@ -79,18 +82,17 @@ class BaseSyncClient(ABC, Generic[T, S]):
         self.sync_stats = SyncStats()
 
     def process_media(self, item: T) -> SyncStats:
+        guids = ParsedGuids.from_guids(item.guids)
         log.debug(
-            f"{self.__class__.__name__}: Processing {item.type} $$'{item.title}'$$ $${{plex_id: {item.guid}}}$$"
+            f"{self.__class__.__name__}: Processing {item.type} {self._debug_log_title(item)} "
+            f"{self._debug_log_ids(item.guid, guids)}"
         )
 
-        for subitem, animapping in self.map_media(item):
+        for subitem, animapping, guids in self.map_media(item):
             try:
                 anilist_media = None
-                if animapping and (animapping.anilist_id or animapping.mal_id):
-                    anilist_media = self.anilist_client.get_anime(
-                        anilist_id=animapping.anilist_id,
-                        mal_id=next(iter(animapping.mal_id or ()), None),
-                    )
+                if animapping and animapping.anilist_id:
+                    anilist_media = self.anilist_client.get_anime(animapping.anilist_id)
                     match_method = "mapping lookup"
                 else:
                     anilist_media = self.search_media(item, subitem)
@@ -99,8 +101,8 @@ class BaseSyncClient(ABC, Generic[T, S]):
                 if not anilist_media:
                     log.warning(
                         f"{self.__class__.__name__}: No suitable AniList results found during mapping "
-                        f"lookup or title search for {item.type} $$'{self._clean_item_title(item, subitem)}'$$ "
-                        f"$${{plex_id: {item.guid}}}$$"
+                        f"lookup or title search for {item.type} {self._debug_log_title(item, subitem)} "
+                        f"{self._debug_log_ids(item.guid, guids)}"
                     )
                     continue
 
@@ -112,14 +114,16 @@ class BaseSyncClient(ABC, Generic[T, S]):
 
                 log.debug(
                     f"{self.__class__.__name__}: Found AniList entry using {match_method} for {item.type} "
-                    f"$$'{self._clean_item_title(item, subitem)}'$$ $${{plex_id: {item.guid}, anilist_id: {anilist_media.id}}}$$"
+                    f"{self._debug_log_title(item, subitem)} "
+                    f"{self._debug_log_ids(item.guid, guids, anilist_media.id)}"
                 )
 
                 self.sync_media(item, subitem, anilist_media, animapping)
             except Exception as e:
                 log.exception(
                     f"{self.__class__.__name__}: Failed to process {item.type} "
-                    f"$$'{self._clean_item_title(item, subitem)}'$$ $${{plex_id: {item.guid}}}$$",
+                    f"{self._debug_log_title(item, subitem)} "
+                    f"{self._debug_log_ids(item.guid, guids)}",
                     exc_info=e,
                 )
                 self.sync_stats.failed += 1
@@ -152,6 +156,8 @@ class BaseSyncClient(ABC, Generic[T, S]):
     def sync_media(
         self, item: T, subitem: S, anilist_media: Media, animapping: AniMap
     ) -> SyncStats:
+        guids = ParsedGuids.from_guids(item.guids)
+
         anilist_media_list = (
             anilist_media.media_list_entry if anilist_media.media_list_entry else None
         )
@@ -168,7 +174,8 @@ class BaseSyncClient(ABC, Generic[T, S]):
         if final_media_list == anilist_media_list:
             log.info(
                 f"{self.__class__.__name__}: Skipping {item.type} because it is already up to date "
-                f"$$'{self._clean_item_title(item, subitem)}'$$ $${{plex_id: {item.guid}}}$$"
+                f"{self._debug_log_title(item, subitem)} "
+                f"{self._debug_log_ids(item.guid, guids, anilist_id=animapping.anilist_id)}"
             )
             self.sync_stats.skipped += 1
             return
@@ -188,14 +195,16 @@ class BaseSyncClient(ABC, Generic[T, S]):
         if not final_media_list.status:
             log.info(
                 f"{self.__class__.__name__}: Skipping {item.type} due to no activity "
-                f"$$'{self._clean_item_title(item, subitem)}'$$ $${{plex_id: {item.guid}}}$$"
+                f"{self._debug_log_title(item, subitem)} "
+                f"{self._debug_log_ids(item.guid, guids, anilist_id=animapping.anilist_id)}"
             )
             self.sync_stats.skipped += 1
             return
 
         log.debug(
             f"{self.__class__.__name__}: Syncing AniList entry for {item.type} "
-            f"$$'{self._clean_item_title(item, subitem)}'$$ $${{plex_id: {item.guid}}}$$"
+            f"{self._debug_log_title(item, subitem)} "
+            f"{self._debug_log_ids(item.guid, guids, anilist_id=animapping.anilist_id)}"
         )
         log.debug(f"\t\tBEFORE => {anilist_media_list}")
         log.debug(f"\t\tAFTER  => {final_media_list}")
@@ -203,7 +212,8 @@ class BaseSyncClient(ABC, Generic[T, S]):
         self.anilist_client.update_anime_entry(final_media_list)
 
         log.info(
-            f"{self.__class__.__name__}: Synced {item.type} $$'{self._clean_item_title(item, subitem)}'$$ $${{plex_id: {item.guid}}}$$"
+            f"{self.__class__.__name__}: Synced {item.type} {self._debug_log_title(item, subitem)} "
+            f"{self._debug_log_ids(item.guid, guids, anilist_id=animapping.anilist_id)}"
         )
         self.sync_stats.synced += 1
 
@@ -225,9 +235,10 @@ class BaseSyncClient(ABC, Generic[T, S]):
         if media_list.status is None:
             return media_list
 
-        media_list.notes = self.plex_client.get_user_review(
-            subitem
-        ) or self.plex_client.get_user_review(item)
+        if "notes" not in self.excluded_sync_fields:
+            media_list.notes = self.plex_client.get_user_review(
+                subitem
+            ) or self.plex_client.get_user_review(item)
 
         if media_list.status > MediaListStatus.PLANNING:
             media_list.started_at = self._calculate_started_at(
@@ -311,7 +322,15 @@ class BaseSyncClient(ABC, Generic[T, S]):
 
         return res_media_list
 
-    def _clean_item_title(self, item: T, subitem: Optional[S] = None) -> str:
+    def _debug_log_title(self, item: T, subitem: Optional[S] = None) -> str:
         if subitem and item != subitem:
-            return f"{item.title} | {subitem.title}"
-        return item.title
+            return f"$$'{item.title} | {subitem.title}'$$"
+        return f"$$'{item.title}'$$"
+
+    def _debug_log_ids(
+        self,
+        plex_id: str,
+        guids: ParsedGuids,
+        anilist_id: Optional[int] = None,
+    ) -> str:
+        return f"$${{plex_id: {plex_id}, {guids}{f', anilist_id: {anilist_id}' if anilist_id else ''}}}$$"

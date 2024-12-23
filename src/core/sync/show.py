@@ -10,10 +10,13 @@ from .base import BaseSyncClient, ParsedGuids
 
 
 class ShowSyncClient(BaseSyncClient[Show, Season]):
-    def map_media(self, item: Show) -> Iterator[tuple[Season, Optional[AniMap]]]:
+    def map_media(
+        self, item: Show
+    ) -> Iterator[tuple[Season, Optional[AniMap], ParsedGuids]]:
         guids = ParsedGuids.from_guids(item.guids)
         seasons: list[Season] = item.seasons()
         season_map = {s.index: s for s in seasons}
+        unyielded_seasons = set(season_map.keys())
 
         for animapping in self.animap_client.get_mappings(
             **dict(guids), is_movie=False
@@ -21,10 +24,14 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
             if animapping.tvdb_season is None:
                 continue
             if animapping.tvdb_season in season_map:
-                yield season_map.pop(animapping.tvdb_season), animapping
+                try:
+                    unyielded_seasons.remove(animapping.tvdb_season)
+                except KeyError:
+                    pass
+                yield season_map[animapping.tvdb_season], animapping, guids
 
-        for season in season_map.values():
-            yield season, None
+        for season in unyielded_seasons:
+            yield season_map[season], None, guids
 
     def search_media(self, item: Show, subitem: Season) -> Optional[Media]:
         if subitem.seasonNumber == 0:
@@ -47,7 +54,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
         is_partially_viewed = len(watched_episodes) > 0
         is_on_continue_watching = self.plex_client.is_on_continue_watching(
             subitem,
-            index__gte=animapping.tvdb_epoffset + 1,
+            index__gt=animapping.tvdb_epoffset,
             index__lte=animapping.tvdb_epoffset + anilist_media.episodes,
         )
 
@@ -171,9 +178,10 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
         anilist_media: Media,
         animapping: AniMap,
     ) -> list[Episode]:
-        return subitem.episodes(
-            index__gt=animapping.tvdb_epoffset,
-            index__lte=animapping.tvdb_epoffset + anilist_media.episodes,
+        return self.plex_client.get_episodes(
+            subitem,
+            start=animapping.tvdb_epoffset + 1,
+            end=animapping.tvdb_epoffset + anilist_media.episodes,
         )
 
     def __filter_watched_episodes(
@@ -183,8 +191,8 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
         anilist_media: Media,
         animapping: AniMap,
     ) -> list[Episode]:
-        return subitem.episodes(
-            index__gt=animapping.tvdb_epoffset,
-            index__lte=animapping.tvdb_epoffset + anilist_media.episodes,
-            viewCount__gt=0,
+        return self.plex_client.get_watched_episodes(
+            subitem,
+            start=animapping.tvdb_epoffset + 1,
+            end=animapping.tvdb_epoffset + anilist_media.episodes,
         )
