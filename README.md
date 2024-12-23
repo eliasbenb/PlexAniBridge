@@ -8,7 +8,7 @@ PlexAniBridge is a synchronization tool that automatically keeps your AniList pr
 - Mapping Plex movies, shows, seasons, episode ranges, and specials to AniList using [Kometa mappings](https://github.com/Kometa-Team/Anime-IDs) with fuzzy title search as a fallback
 - Partial scanning support — only consider items added/updated/rated since the last sync
 - Scheduled sync jobs with configurable polling capabilities
-- Multi-user support — sync multiple Plex users to multiple AniList accounts
+- Multi-user support — sync multiple Plex users and home users to multiple AniList accounts
 - Intelligent caching of Plex and AniList requests to reduce rate limits
 - [Docker](#docker) 🐳 deployments
 
