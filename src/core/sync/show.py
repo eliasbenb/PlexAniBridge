@@ -25,7 +25,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
                 try:
                     unyielded_seasons.remove(animapping.tvdb_season)
                 except KeyError:
-                    continue
+                    pass
                 yield season_map[animapping.tvdb_season], animapping
 
         for season in unyielded_seasons:

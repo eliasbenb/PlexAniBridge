@@ -2,7 +2,7 @@ from hashlib import md5
 from typing import Optional, Union
 
 import requests
-from sqlmodel import Session, delete, func, select
+from sqlmodel import Session, delete, select
 from sqlmodel.sql.expression import and_, or_
 
 from src import log
@@ -123,22 +123,21 @@ class AniMapClient:
                 query = query.where(
                     or_(*(op(v) for op, v in partial_matches.items() if v is not None))
                 )
-            # Add exact matches
             if any(v is not None for v in exact_matches.values()):
                 query = query.where(
                     and_(*(op(v) for op, v in exact_matches.items() if v is not None))
                 )
 
             # Make sure we only return unique entries
-            query = query.distinct(
+            query = query.group_by(
                 AniMap.anilist_id,
                 AniMap.tvdb_season,
                 AniMap.tvdb_epoffset,
-            ).order_by(
-                AniMap.anilist_id,
-                AniMap.tvdb_season,
-                AniMap.tvdb_epoffset,
-                AniMap.anidb_id,
+            ).subquery()
+            query = (
+                select(AniMap)
+                .join(query, AniMap.anidb_id == query.c.anidb_id)
+                .order_by(AniMap.anidb_id)
             )
 
             return session.exec(query).all()
