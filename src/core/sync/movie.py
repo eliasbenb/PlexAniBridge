@@ -9,13 +9,15 @@ from .base import BaseSyncClient, ParsedGuids
 
 
 class MovieSyncClient(BaseSyncClient[Movie, Movie]):
-    def map_media(self, item: Movie) -> Iterator[tuple[Movie, Optional[AniMap]]]:
+    def map_media(
+        self, item: Movie
+    ) -> Iterator[tuple[Movie, Optional[AniMap], ParsedGuids]]:
         guids = ParsedGuids.from_guids(item.guids)
         animapping = next(
             iter(self.animap_client.get_mappings(**dict(guids), is_movie=True)), None
         )
 
-        yield item, animapping
+        yield item, animapping, guids
 
     def search_media(self, item: Movie, *_) -> Optional[Media]:
         results = self.anilist_client.search_anime(item.title, True, 1)

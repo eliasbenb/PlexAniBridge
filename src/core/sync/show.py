@@ -10,7 +10,9 @@ from .base import BaseSyncClient, ParsedGuids
 
 
 class ShowSyncClient(BaseSyncClient[Show, Season]):
-    def map_media(self, item: Show) -> Iterator[tuple[Season, Optional[AniMap]]]:
+    def map_media(
+        self, item: Show
+    ) -> Iterator[tuple[Season, Optional[AniMap], ParsedGuids]]:
         guids = ParsedGuids.from_guids(item.guids)
         seasons: list[Season] = item.seasons()
         season_map = {s.index: s for s in seasons}
@@ -26,10 +28,10 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
                     unyielded_seasons.remove(animapping.tvdb_season)
                 except KeyError:
                     pass
-                yield season_map[animapping.tvdb_season], animapping
+                yield season_map[animapping.tvdb_season], animapping, guids
 
         for season in unyielded_seasons:
-            yield season_map[season], None
+            yield season_map[season], None, guids
 
     def search_media(self, item: Show, subitem: Season) -> Optional[Media]:
         if subitem.seasonNumber == 0:
@@ -52,7 +54,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
         is_partially_viewed = len(watched_episodes) > 0
         is_on_continue_watching = self.plex_client.is_on_continue_watching(
             subitem,
-            index__gte=animapping.tvdb_epoffset + 1,
+            index__gt=animapping.tvdb_epoffset,
             index__lte=animapping.tvdb_epoffset + anilist_media.episodes,
         )
 
