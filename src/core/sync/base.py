@@ -222,9 +222,10 @@ class BaseSyncClient(ABC, Generic[T, S]):
         if media_list.status is None:
             return media_list
 
-        media_list.notes = self.plex_client.get_user_review(
-            subitem
-        ) or self.plex_client.get_user_review(item)
+        if "notes" not in self.excluded_sync_fields:
+            media_list.notes = self.plex_client.get_user_review(
+                subitem
+            ) or self.plex_client.get_user_review(item)
 
         if media_list.status > MediaListStatus.PLANNING:
             media_list.started_at = self._calculate_started_at(
