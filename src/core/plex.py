@@ -30,13 +30,16 @@ class PlexClient:
     def _init_user_client(self) -> PlexServer:
         """Get the Plex client for the user account
 
-        It handles cases where the user account is an admin or a regular user.
+        It handles cases where the user account is an admin user, regular user, or home user.
 
         Returns:
             PlexServer: The Plex client for the user account
         """
         admin_account = self.admin_client.myPlexAccount()
-        self.is_admin_user = admin_account.username == self.plex_user
+        self.is_admin_user = self.plex_user in (
+            admin_account.username,
+            admin_account.email,
+        ) or (admin_account.title == self.plex_user and not admin_account.username)
 
         if self.is_admin_user:
             self.user_client = self.admin_client
@@ -44,7 +47,10 @@ class PlexClient:
         else:
             self.user_client = self.admin_client.switchUser(self.plex_user)
             self.user_account_id = next(
-                u.id for u in admin_account.users() if u.username == self.plex_user
+                u.id
+                for u in admin_account.users()
+                if self.plex_user in (u.username, u.email)  # Regular user
+                or (u.title == self.plex_user and not u.username)  # Home user
             )
         log.debug(
             f"{self.__class__.__name__}: Initialized Plex client for user "
