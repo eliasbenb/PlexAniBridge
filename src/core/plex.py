@@ -193,6 +193,46 @@ class PlexClient:
             )
             return None
 
+    def get_episodes(self, season: Season, start: int, end: int) -> list[Episode]:
+        """Filter episodes based on the start and end episode numbers
+
+        Args:
+            season: The season to filter
+            start: The start episode number
+            end: The end episode number
+        Returns:
+            list[Episode]: List of filtered episodes
+        """
+        return [
+            e
+            for e in season.episodes(
+                index__gte=start,
+            )
+            if e.index <= end
+        ]
+
+    def get_watched_episodes(
+        self, season: Season, start: int, end: int
+    ) -> list[Episode]:
+        """Filter episodes based on the start and end episode numbers that have been watched
+
+        Args:
+            season: The season to filter
+            start: The start episode number
+            end: The end episode number
+
+        Returns:
+            list[Episode]: List of filtered episodes
+        """
+        return [
+            e
+            for e in season.episodes(
+                index__gte=start,
+                viewCount__gt=0,
+            )
+            if e.index <= end
+        ]
+
     def get_continue_watching(
         self,
         item: Union[Movie, Season],

@@ -176,9 +176,10 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
         anilist_media: Media,
         animapping: AniMap,
     ) -> list[Episode]:
-        return subitem.episodes(
-            index__gt=animapping.tvdb_epoffset,
-            index__lte=animapping.tvdb_epoffset + anilist_media.episodes,
+        return self.plex_client.get_episodes(
+            subitem,
+            start=animapping.tvdb_epoffset + 1,
+            end=animapping.tvdb_epoffset + anilist_media.episodes,
         )
 
     def __filter_watched_episodes(
@@ -188,8 +189,8 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
         anilist_media: Media,
         animapping: AniMap,
     ) -> list[Episode]:
-        return subitem.episodes(
-            index__gt=animapping.tvdb_epoffset,
-            index__lte=animapping.tvdb_epoffset + anilist_media.episodes,
-            viewCount__gt=0,
+        return self.plex_client.get_watched_episodes(
+            subitem,
+            start=animapping.tvdb_epoffset + 1,
+            end=animapping.tvdb_epoffset + anilist_media.episodes,
         )
