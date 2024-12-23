@@ -62,7 +62,7 @@ python main.py
   - If you plan to sync just one user, a single token is sufficient. E.g. `ANILIST_TOKEN=token`
 - `*PLEX_TOKEN (str)`: Plex API access token [get one here](https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/)
   - This must be the Plex token of the admin user of the Plex server
-- `PLEX_USER (str | list[str])`: The Plex user to sync
+- `*PLEX_USER (str | list[str])`: The Plex user to sync
   - The user can be identified by either a Plex account username (e.g. `user`), a Plex account email (e.g. `user@email.com`), or a Plex Home user name (e.g. `Home User`)
   - If you want to sync multiple users, provide a list of user identifiers. E.g. `["user1", "user2@email.com", "Home User"]`
     - In this case, you must also provide a list of AniList tokens in the `ANILIST_TOKEN` variable
