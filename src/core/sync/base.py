@@ -296,28 +296,36 @@ class BaseSyncClient(ABC, Generic[T, S]):
             return plex_media_list.model_copy()
         res_media_list = anilist_media_list.model_copy()
 
-        NE_KEYS = ("score", "notes")
-        GT_KEYS = ("status", "progress", "repeat")
-        LT_KEYS = ("started_at", "completed_at")
+        COMPARISON_RULES = {
+            "score": "ne",
+            "notes": "ne",
+            "progress": "gt",
+            "repeat": "gt",
+            "status": "gte",
+            "started_at": "lt",
+            "completed_at": "lt",
+        }
 
-        for key in NE_KEYS:
+        def should_update(op: str, p_val, a_val) -> bool:
+            if p_val is None:
+                return False
+            match op:
+                case "ne":
+                    return p_val != a_val
+                case "gt":
+                    return self.destructive_sync or p_val > a_val
+                case "gte":
+                    return self.destructive_sync or p_val >= a_val
+                case "lt":
+                    return self.destructive_sync or p_val < a_val
+                case "lte":
+                    return self.destructive_sync or p_val <= a_val
+            return False
+
+        for key, rule in COMPARISON_RULES.items():
             plex_val = getattr(plex_media_list, key)
             anilist_val = getattr(anilist_media_list, key)
-            if plex_val is not None and plex_val != anilist_val:
-                setattr(res_media_list, key, plex_val)
-        for key in GT_KEYS:
-            plex_val = getattr(plex_media_list, key)
-            anilist_val = getattr(anilist_media_list, key)
-            if plex_val is None:
-                continue
-            if self.destructive_sync or plex_val > anilist_val:
-                setattr(res_media_list, key, plex_val)
-        for key in LT_KEYS:
-            plex_val = getattr(plex_media_list, key)
-            anilist_val = getattr(anilist_media_list, key)
-            if plex_val is None:
-                continue
-            if self.destructive_sync or plex_val < anilist_val:
+            if should_update(rule, plex_val, anilist_val):
                 setattr(res_media_list, key, plex_val)
 
         return res_media_list
