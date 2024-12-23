@@ -194,8 +194,7 @@ class AniListClient:
 
     def get_anime(
         self,
-        anilist_id: Optional[int] = None,
-        mal_id: Optional[int] = None,
+        anilist_id: int,
         relations: Optional[bool] = False,
     ) -> Union[Media, MediaWithRelations]:
         """Gets anime data from AniList
@@ -203,33 +202,25 @@ class AniListClient:
         Either an AniList ID or a MAL ID must be provided. If both are provided, the AniList ID will be used.
 
         Args:
-            anilist_id (Optional[int], optional): The AniList ID of the anime. Defaults to None.
-            mal_id (Optional[int], optional): The MAL ID of the anime. Defaults to None.
+            anilist_id (int): The AniList ID of the anime
             relations (Optional[bool], optional): Whether to include relations in the response. Defaults to False.
 
         Returns:
             Union[Media, MediaWithRelations]: The AniList Media object
         """
-        media_id = anilist_id or mal_id or None
-        id_type = "id" if anilist_id else "idMal" if mal_id else None
-        id_type_str = "anilist_id" if anilist_id else "mal_id" if mal_id else None
-
-        if not media_id:
-            raise ValueError("Either an AniList ID or a MAL ID must be provided")
-
         query = dedent(f"""
-        query (${id_type}: Int) {{
-            Media({id_type}: ${id_type}, type: ANIME) {{
+        query ($id: Int) {{
+            Media(id: $id, type: ANIME) {{
 {MediaWithRelations.model_dump_graphql(indent_level=3) if relations else Media.model_dump_graphql(indent_level=3)}
             }}
         }}
         """).strip()
 
         log.debug(
-            f"{self.__class__.__name__}: Getting AniList media object $${{{id_type_str}: {media_id}}}$$"
+            f"{self.__class__.__name__}: Getting AniList media object $${{anilist_id: {anilist_id}}}$$"
         )
 
-        response = self._make_request(query, {id_type: media_id})
+        response = self._make_request(query, {"id": anilist_id})
 
         if relations:
             return MediaWithRelations(**response["data"]["Media"])
