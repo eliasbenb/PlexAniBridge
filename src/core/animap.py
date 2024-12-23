@@ -23,9 +23,9 @@ class AniMapClient:
     CDN_URL = "https://cdn.jsdelivr.net/gh/Kometa-Team/Anime-IDs@refs/heads/master/anime_ids.json"
 
     def __init__(self) -> None:
-        self.__sync_db()
+        self._sync_db()
 
-    def __sync_db(self) -> None:
+    def _sync_db(self) -> None:
         """Sync the local AniMap database with the CDN source"""
         with Session(db.engine) as session:
             # First check if the CDN data has changed. If not, we can skip the sync
