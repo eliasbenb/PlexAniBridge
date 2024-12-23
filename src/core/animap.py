@@ -141,7 +141,12 @@ class AniMapClient:
             query = (
                 select(AniMap)
                 .join(query, AniMap.anidb_id == query.c.anidb_id)
-                .order_by(AniMap.anidb_id)
+                .order_by(
+                    AniMap.tvdb_season,
+                    AniMap.tvdb_epoffset,
+                    AniMap.anilist_id,
+                    AniMap.anidb_id,
+                )
             )
 
             return session.exec(query).all()
