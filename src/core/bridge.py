@@ -87,8 +87,6 @@ class BridgeClient:
         for anilist_token, plex_user in self.token_user_pairs:
             self._sync_user(anilist_token, plex_user)
 
-        tmp_last_synced = min(tmp_last_synced, self.last_synced)
-
         self._set_last_synced(tmp_last_synced)
         self._set_last_config_encoded(self.config.encode())
 
