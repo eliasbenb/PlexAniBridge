@@ -72,7 +72,7 @@ class AniListClient:
             log.info(
                 f"{self.__class__.__name__}: Dry run enabled, skipping anime entry update $${{anilist_id: {media_list_entry.media_id}}}$$"
             )
-            None
+            return None
 
         variables = media_list_entry.model_dump_json(exclude_none=True)
 
