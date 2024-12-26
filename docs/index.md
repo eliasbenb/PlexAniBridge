@@ -1,8 +1,9 @@
-# PlexAniBridge
+---
+title: Introduction
+icon: material/home
+---
 
 PlexAniBridge is a synchronization tool that automatically keeps your AniList profile up-to-date based on your Plex watching activity.
-
-Visit the [documentation](https://plexanibridge.elias.eu.org) for more information.
 
 ## Features
 
@@ -13,3 +14,8 @@ Visit the [documentation](https://plexanibridge.elias.eu.org) for more informati
 - Multi-user support — sync multiple Plex users and home users to multiple AniList accounts
 - Intelligent caching of Plex and AniList requests to reduce rate limits
 - [Docker](./quick-start/docker.md) 🐳 deployments
+
+## Special Thanks/Dependencies
+
+- [Kometa Mappings](https://github.com/Kometa-Team/Anime-IDs)
+- [Python-PlexAPI](https://github.com/pkkid/python-plexapi)
