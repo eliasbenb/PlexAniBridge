@@ -2,7 +2,8 @@
 
 PlexAniBridge is a synchronization tool that automatically keeps your AniList profile up-to-date based on your Plex watching activity.
 
-Visit the [documentation](https://plexanibridge.elias.eu.org) for more information.
+> [!IMPORTANT]  
+> Visit the [PlexAniBridge documentation](https://plexanibridge.elias.eu.org) for detailed setup instructions and usage information.
 
 ## Features
 
