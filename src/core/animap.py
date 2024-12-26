@@ -104,6 +104,9 @@ class AniMapClient:
         Returns:
             list[AniMap]: The list of AniMap entries that match the criteria
         """
+        if not imdb and not tmdb and not tvdb:
+            return []
+
         with Session(db.engine) as session:
             partial_matches = {AniMap.imdb_id.contains: imdb}
             exact_matches = {}
