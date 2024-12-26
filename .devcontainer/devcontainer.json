@@ -11,7 +11,9 @@
 				"charliermarsh.ruff",
 				"cweijan.vscode-database-client2",
 				"yzhang.markdown-all-in-one",
-				"yy0931.vscode-sqlite3-editor"
+				"yy0931.vscode-sqlite3-editor",
+				"redhat.vscode-yaml",
+				"esbenp.prettier-vscode"
 			]
 		}
 	},
