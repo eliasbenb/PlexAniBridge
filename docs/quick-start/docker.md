@@ -6,7 +6,7 @@ icon: material/docker
 ## Requirements
 
 - [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/)
-- AMD64 or ARM64 CPU architecture
+- AMD64 or ARM64 CPU architecture (or build the image yourself for other architectures)
 
 ## Setup
 
