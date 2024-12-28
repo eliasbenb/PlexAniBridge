@@ -12,9 +12,9 @@ from src.models.anilist import (
     Media,
     MediaFormat,
     MediaList,
-    MediaListCollection,
+    MediaListCollectionWithMedia,
+    MediaListWithMedia,
     MediaStatus,
-    MediaWithRelations,
     User,
 )
 from src.utils.rate_limitter import RateLimiter
@@ -33,6 +33,9 @@ class AniListClient:
 
         self.rate_limiter = RateLimiter(self.__class__.__name__, requests_per_minute=90)
         self.user = self.get_user()
+
+        self.offline_anilist_entries: dict[int, MediaList] = {}
+        self.backup_anilist()
 
     def get_user(self) -> User:
         """Gets the owner user of the AniList token
@@ -195,59 +198,69 @@ class AniListClient:
     def get_anime(
         self,
         anilist_id: int,
-        relations: Optional[bool] = False,
-    ) -> Union[Media, MediaWithRelations]:
+    ) -> Media:
         """Gets anime data from AniList
 
         Either an AniList ID or a MAL ID must be provided. If both are provided, the AniList ID will be used.
 
         Args:
             anilist_id (int): The AniList ID of the anime
-            relations (Optional[bool], optional): Whether to include relations in the response. Defaults to False.
 
         Returns:
-            Union[Media, MediaWithRelations]: The AniList Media object
+            Media: The AniList Media object
         """
+        if anilist_id in self.offline_anilist_entries:
+            log.debug(
+                f"{self.__class__.__name__}: Pulling AniList data from local cache $${{anilist_id: {anilist_id}}}$$"
+            )
+            return self.offline_anilist_entries[anilist_id]
+
         query = dedent(f"""
         query ($id: Int) {{
             Media(id: $id, type: ANIME) {{
-{MediaWithRelations.model_dump_graphql(indent_level=3) if relations else Media.model_dump_graphql(indent_level=3)}
+{Media.model_dump_graphql(indent_level=3)}
             }}
         }}
         """).strip()
 
         log.debug(
-            f"{self.__class__.__name__}: Getting AniList media object $${{anilist_id: {anilist_id}}}$$"
+            f"{self.__class__.__name__}: Pulling AniList data from API $${{anilist_id: {anilist_id}}}$$"
         )
 
         response = self._make_request(query, {"id": anilist_id})
 
-        if relations:
-            return MediaWithRelations(**response["data"]["Media"])
         return Media(**response["data"]["Media"])
 
     def backup_anilist(self) -> None:
         query = dedent(f"""
         query MediaListCollection($userId: Int, $type: MediaType, $chunk: Int) {{
             MediaListCollection(userId: $userId, type: $type, chunk: $chunk) {{
-{MediaListCollection.model_dump_graphql(indent_level=3)}
+{MediaListCollectionWithMedia.model_dump_graphql(indent_level=3)}
             }}
         }}
         """).strip()
 
-        data = MediaListCollection(user=self.user, has_next_chunk=True)
+        data = MediaListCollectionWithMedia(user=self.user, has_next_chunk=True)
         variables = {"userId": self.user.id, "type": "ANIME", "chunk": 0}
 
         while data.has_next_chunk:
             response = self._make_request(query, variables)["data"][
                 "MediaListCollection"
             ]
-            new_data = MediaListCollection(**response)
+
+            new_data = MediaListCollectionWithMedia(**response)
 
             data.has_next_chunk = new_data.has_next_chunk
-            data.lists.extend(new_data.lists)
-
             variables["chunk"] += 1
+
+            for li in new_data.lists:
+                if li.is_custom_list:
+                    continue
+                data.lists.append(li)
+                for entry in li.entries:
+                    self.offline_anilist_entries[entry.media_id] = (
+                        self._media_list_entry_to_media(entry)
+                    )
 
         n = 1
         backup_file = self.backup_dir / f"plexanibridge-{self.user.name}.{n}.json"
@@ -268,6 +281,30 @@ class AniListClient:
             if file_mtime < cutoff_date:
                 file.unlink()
                 log.debug(f"{self.__class__.__name__}: Deleted old backup '{file}'")
+
+    def _media_list_entry_to_media(self, media_list_entry: MediaListWithMedia) -> Media:
+        """Converts a MediaListEntry to a Media object
+
+        Args:
+            media_list_entry (MediaListWithMedia): The media list entry
+
+        Returns:
+            Media: The media object
+        """
+        return Media(
+            media_list_entry=MediaList(
+                **{
+                    field: getattr(media_list_entry, field)
+                    for field in MediaList.model_fields
+                    if hasattr(media_list_entry, field)
+                }
+            ),
+            **{
+                field: getattr(media_list_entry.media, field)
+                for field in Media.model_fields
+                if hasattr(media_list_entry.media, field)
+            },
+        )
 
     def _make_request(
         self, query: str, variables: Optional[Union[dict, str]] = None
