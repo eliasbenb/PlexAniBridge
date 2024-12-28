@@ -179,6 +179,11 @@ class AniListBaseModel(BaseModel):
             setattr(self, field, default_value)
         self.model_fields_set.clear()
 
+    def unset_fields(self, fields: list[str]) -> None:
+        for field, field_info in self.model_fields.items():
+            if field in fields:
+                setattr(self, field, field_info.default)
+
     @classmethod
     def model_dump_graphql(cls, indent_level: int = 0) -> str:
         """Generate GraphQL query fields with proper indentation
@@ -334,11 +339,6 @@ class MediaList(AniListBaseModel):
     created_at: Optional[UTCDateTime] = None
     updated_at: Optional[UTCDateTime] = None
 
-    def unset_fields(self, fields: list[str]) -> None:
-        for field, field_info in self.model_fields.items():
-            if field in fields:
-                setattr(self, field, field_info.default)
-
     def __str__(self) -> str:
         notes_truncated = None
         if self.notes:
@@ -373,7 +373,7 @@ class AiringSchedule(AniListBaseModel):
     media_id: int
 
 
-class Media(AniListBaseModel):
+class MediaWithoutList(AniListBaseModel):
     id: int
     id_mal: Optional[int] = None
     type: Optional[MediaType] = None
@@ -389,17 +389,24 @@ class Media(AniListBaseModel):
     start_date: Optional[FuzzyDate] = None
     end_date: Optional[FuzzyDate] = None
     next_airing_episode: Optional[AiringSchedule] = None
+
+
+class Media(MediaWithoutList):
     media_list_entry: Optional[MediaList] = None
 
 
-class MediaEdge(AniListBaseModel):
-    node: Media
+class MediaListWithMedia(MediaList):
+    media: Optional[MediaWithoutList] = None
+
+
+class MediaListGroupWithMedia(MediaListGroup):
+    entries: list[MediaListWithMedia] = []
+
+
+class MediaListCollectionWithMedia(MediaListCollection):
+    lists: list[MediaListGroupWithMedia] = []
 
 
 class MediaConnection(AniListBaseModel):
     nodes: list[Media]
     pageInfo: PageInfo = PageInfo()
-
-
-class MediaWithRelations(Media):
-    relations: MediaConnection
