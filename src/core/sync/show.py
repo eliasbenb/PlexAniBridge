@@ -14,8 +14,9 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
         self, item: Show
     ) -> Iterator[tuple[Season, Optional[AniMap], ParsedGuids]]:
         guids = ParsedGuids.from_guids(item.guids)
-        seasons: list[Season] = item.seasons()
-        season_map = {s.index: s for s in seasons}
+        season_map: dict[int, Season] = {
+            s.index: s for s in item.seasons() if self.destructive_sync or s.isPlayed
+        }
         unyielded_seasons = set(season_map.keys())
 
         for animapping in self.animap_client.get_mappings(
