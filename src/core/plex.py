@@ -181,14 +181,14 @@ class PlexClient:
 
         except requests.HTTPError as e:
             log.error(
-                f"Failed to get review for {item.type} $$'{item.title}&#0146 "
+                f"Failed to get review for {item.type} $$'{item.title}'$$ "
                 f"{{plex_key: {item.ratingKey}}}",
                 exc_info=e,
             )
             return None
         except (KeyError, ValueError) as e:
             log.error(
-                f"Failed to parse review for {item.type} $$'{item.title}&#0146 "
+                f"Failed to parse review for {item.type} $$'{item.title}'$$ "
                 f"{{plex_key: {item.ratingKey}}}",
                 exc_info=e,
             )
