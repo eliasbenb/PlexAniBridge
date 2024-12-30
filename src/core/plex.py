@@ -113,6 +113,7 @@ class PlexClient:
                 f"{self.__class__.__name__}: Filtering section '{
                     section.title}' by items that have been watched"
             )
+            filters["and"].append({"viewCount>>": 0})
 
         return section.search(filters=filters)
 
