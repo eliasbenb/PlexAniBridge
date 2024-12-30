@@ -34,7 +34,7 @@ class AniListClient:
         self.rate_limiter = RateLimiter(self.__class__.__name__, requests_per_minute=90)
         self.user = self.get_user()
 
-        self.offline_anilist_entries: dict[int, MediaList] = {}
+        self.offline_anilist_entries: dict[int, Media] = {}
         self.backup_anilist()
 
     def get_user(self) -> User:
