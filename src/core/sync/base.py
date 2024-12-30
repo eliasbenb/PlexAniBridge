@@ -94,7 +94,7 @@ class BaseSyncClient(ABC, Generic[T, S]):
                 if animapping and animapping.anilist_id:
                     anilist_media = self.anilist_client.get_anime(animapping.anilist_id)
                     match_method = "mapping lookup"
-                else:
+                elif subitem.type != "season" or subitem.seasonNumber > 0:
                     anilist_media = self.search_media(item, subitem)
                     match_method = "title search"
 
