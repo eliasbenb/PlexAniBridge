@@ -104,6 +104,7 @@ class BaseSyncClient(ABC, Generic[T, S]):
                         f"lookup or title search for {item.type} {self._debug_log_title(item, subitem)} "
                         f"{self._debug_log_ids(item.guid, guids)}"
                     )
+                    self.sync_stats.failed += 1
                     continue
 
                 animapping = animapping or AniMap(
