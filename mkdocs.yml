@@ -6,8 +6,6 @@ edit_uri: edit/main/docs/
 
 extra:
   generator: false
-  version:
-    provider: mike
 plugins:
   - git-revision-date-localized
   - search
