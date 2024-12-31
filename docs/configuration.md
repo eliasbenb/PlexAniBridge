@@ -101,6 +101,10 @@ Only processes items added/updated/rated since the last sync.
 
 !!! note
 
+    Partial scanning helps to greatly reduce the number of items to process, especially for large libraries.
+
+!!! note
+
     The initial sync is always a full sync regardless of this setting.
 
     Subsequent syncs only consider changes since the last sync's start time.
@@ -119,6 +123,10 @@ Only processes items added/updated/rated since the last sync.
 
     - Deleting AniList entries (in very specific scenarios)
     - Making 'regressive' updates to AniList. Meaning, even if AniList reports a 'higher' value than Plex, the Plex value will be used and updated in AniList. For example, if AniList has a higher watch progress than Plex, the AniList value will be lowered to match Plex.
+
+!!! note
+
+    Destructive sync greatly increases processing time and API usage. When enabled, PlexAniBridge ignores the default behavior of scanning only watched items. With destructive sync, all items are scanned, regardless of watch status.
 
 ### `EXCLUDED_SYNC_FIELDS`
 
