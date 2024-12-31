@@ -55,7 +55,7 @@ Which Plex user(s) to sync. Can be identified by:
 
 ??? note "Multi-User Limitations"
 
-    Due to limitations in the Plex API, only the admin user can sync reviews and watchlists. Besides these two fields, all other features are available for all users.
+    Due to limitations in the Plex API, only the admin user can sync reviews and watch lists. Besides these two fields, all other features are available for all users.
 
 ### `PLEX_URL`
 
@@ -117,7 +117,7 @@ Only processes items added/updated/rated since the last sync.
 
     Destructive sync allows for:
 
-    - Deleting AniList entries (in very specfic scenarios)
+    - Deleting AniList entries (in very specific scenarios)
     - Making 'regressive' updates to AniList. Meaning, even if AniList reports a 'higher' value than Plex, the Plex value will be used and updated in AniList. For example, if AniList has a higher watch progress than Plex, the AniList value will be lowered to match Plex.
 
 ### `EXCLUDED_SYNC_FIELDS`
