@@ -146,19 +146,11 @@ class BridgeClient:
         """
         log.info(f"{self.__class__.__name__}: Syncing section $$'{section.title}'$$")
 
-        should_perform_partial_scan = self._should_perform_partial_scan()
-        if should_perform_partial_scan:
-            log.debug(
-                f"{self.__class__.__name__}: Performing partial scan for section $$'{section.title}'$$"
-            )
-        else:
-            log.debug(
-                f"{self.__class__.__name__}: Performing full scan for section $$'{section.title}'$$"
-            )
-
         items = self.plex_client.get_section_items(
             section,
-            min_last_modified=self.last_synced if should_perform_partial_scan else None,
+            min_last_modified=self.last_synced
+            if self._should_perform_partial_scan()
+            else None,
             require_watched=not self.config.DESTRUCTIVE_SYNC,
         )
 
