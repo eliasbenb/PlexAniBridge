@@ -1,5 +1,6 @@
 from datetime import datetime
 from functools import cache
+from textwrap import dedent
 from typing import Optional, Union
 
 import plexapi.utils
@@ -92,10 +93,11 @@ class PlexClient:
             list[Union[Movie, Show]]: List of items in the section
         """
         filters = {"and": []}
+
         if min_last_modified:
             log.debug(
-                f"{self.__class__.__name__}: `PARTIAL_SCAN` is set. Filtering section $$'{section.title}'$$ "
-                f"by items last updated, viewed, or rated after {min_last_modified}"
+                f"{self.__class__.__name__}: Filtering section $$'{section.title}'$$ by "
+                f"items last updated, viewed, or rated after {min_last_modified}"
             )
             filters["and"].append(
                 {
@@ -107,10 +109,11 @@ class PlexClient:
                     ]
                 }
             )
+
         if require_watched:
             log.debug(
-                f"{self.__class__.__name__}: Filtering section '{
-                    section.title}' by items that have been watched"
+                f"{self.__class__.__name__}: Filtering section $$'{section.title}'$$ by "
+                f"items that have been watched"
             )
             filters["and"].append({"unwatched": False})
 
@@ -132,7 +135,7 @@ class PlexClient:
         if item.type not in ("movie", "show", "season"):
             return None
 
-        query = """
+        query = dedent("""
         query GetReview($metadataID: ID!) {
             metadataReviewV2(metadata: {id: $metadataID}) {
                 ... on ActivityReview {
@@ -143,7 +146,7 @@ class PlexClient:
                 }
             }
         }
-        """
+        """).strip()
 
         guid = item.guid[13:] if item.type == "movie" else item.guid[12:]
 
