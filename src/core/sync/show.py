@@ -1,3 +1,4 @@
+import sys
 from typing import Iterator, Optional
 
 import plexapi.exceptions
@@ -53,12 +54,13 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
         watched_episodes = self.__filter_watched_episodes(
             item, subitem, anilist_media, animapping
         )
-        is_viewed = len(watched_episodes) >= anilist_media.episodes
+        is_viewed = len(watched_episodes) >= (anilist_media.episodes or sys.maxsize)
         is_partially_viewed = len(watched_episodes) > 0
         is_on_continue_watching = self.plex_client.is_on_continue_watching(
             subitem,
             index__gt=animapping.tvdb_epoffset,
-            index__lte=animapping.tvdb_epoffset + anilist_media.episodes,
+            index__lte=animapping.tvdb_epoffset
+            + (anilist_media.episodes or sys.maxsize),
         )
 
         # We've watched it and are in the process of watching it again
@@ -158,7 +160,8 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
     ) -> Optional[FuzzyDate]:
         try:
             episode: Episode = subitem.get(
-                episode=animapping.tvdb_epoffset + anilist_media.episodes
+                episode=animapping.tvdb_epoffset
+                + (anilist_media.episodes or sys.maxsize)
             )
         except (plexapi.exceptions.NotFound, IndexError):
             return None
@@ -184,7 +187,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
         return self.plex_client.get_episodes(
             subitem,
             start=animapping.tvdb_epoffset + 1,
-            end=animapping.tvdb_epoffset + anilist_media.episodes,
+            end=animapping.tvdb_epoffset + (anilist_media.episodes or sys.maxsize),
         )
 
     def __filter_watched_episodes(
@@ -197,5 +200,5 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
         return self.plex_client.get_watched_episodes(
             subitem,
             start=animapping.tvdb_epoffset + 1,
-            end=animapping.tvdb_epoffset + anilist_media.episodes,
+            end=animapping.tvdb_epoffset + (anilist_media.episodes or sys.maxsize),
         )
