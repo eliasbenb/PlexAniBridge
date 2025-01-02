@@ -26,6 +26,7 @@ class ColorFormatter(logging.Formatter):
         Args:
             record (logging.LogRecord): The log record to format
         """
+        orig_msg = record.msg
         orig_levelname = record.levelname
         record.levelname = f"{self.COLORS.get(record.levelname, '')}{record.levelname}{Style.RESET_ALL}"
 
@@ -33,19 +34,48 @@ class ColorFormatter(logging.Formatter):
             # Color strings in quotes
             record.msg = re.sub(
                 r"\$\$\'(.*?)\'\$\$",
-                f"{Fore.LIGHTBLUE_EX}'\\g<1>'{Style.RESET_ALL}",
+                f"{Fore.LIGHTBLUE_EX}'\\1'{Style.RESET_ALL}",
                 record.msg,
             )
             # Color curly brace values
             record.msg = re.sub(
                 r"\$\$\{(.*?)\}\$\$",
-                f"{Style.DIM}{{\\g<1>}}{Style.RESET_ALL}",
+                f"{Style.DIM}{{\\1}}{Style.RESET_ALL}",
                 record.msg,
             )
 
         result = super().format(record)
+
         record.levelname = orig_levelname
+        record.msg = orig_msg
+
         return result
+
+
+class CleanFormatter(logging.Formatter):
+    """Formatter that removes color markers from log messages"""
+
+    def format(self, record: logging.LogRecord) -> str:
+        """Format the log record without color markers
+
+        Args:
+            record (logging.LogRecord): The log record to format
+        """
+        if isinstance(record.msg, str):
+            orig_msg = record.msg
+
+            # Remove the $$ markers and keep the content
+            cleaned_msg = re.sub(r"\$\$\'(.*?)\'\$\$", "'\\1'", record.msg)
+            cleaned_msg = re.sub(r"\$\$\{(.*?)\}\$\$", "{\\1}", cleaned_msg)
+            record.msg = cleaned_msg
+
+            result = super().format(record)
+
+            record.msg = orig_msg
+
+            return result
+
+        return super().format(record)
 
 
 def setup_logger(log_name: str, log_level: str, log_dir: str) -> logging.Logger:
@@ -73,7 +103,7 @@ def setup_logger(log_name: str, log_level: str, log_dir: str) -> logging.Logger:
             else "%(asctime)s - %(name)s - %(levelname)s\t%(message)s"
         )
 
-        file_formatter = logging.Formatter(
+        file_formatter = CleanFormatter(
             log_format,
             datefmt="%Y-%m-%d %H:%M:%S",
         )
