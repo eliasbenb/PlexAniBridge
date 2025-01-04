@@ -1,7 +1,6 @@
 from datetime import datetime
 from functools import cache
 from textwrap import dedent
-from typing import Optional, Union
 
 import plexapi.utils
 import requests
@@ -63,11 +62,11 @@ class PlexClient:
             else f"{self.__class__.__name__}: User is not an admin, using user client"
         )
 
-    def get_sections(self) -> Union[list[MovieSection], list[ShowSection]]:
+    def get_sections(self) -> list[MovieSection] | list[ShowSection]:
         """Get all Plex sections that are configured
 
         Returns:
-            Union[list[MovieSection], list[ShowSection]]: List of configured Plex sections
+            list[MovieSection] | list[ShowSection]: List of configured Plex sections
         """
         log.debug(f"{self.__class__.__name__}: Getting all sections")
 
@@ -79,18 +78,18 @@ class PlexClient:
 
     def get_section_items(
         self,
-        section: Union[MovieSection, ShowSection],
-        min_last_modified: Optional[datetime] = None,
+        section: MovieSection | ShowSection,
+        min_last_modified: datetime | None = None,
         require_watched: bool = False,
-    ) -> list[Union[Movie, Show]]:
+    ) -> list[Movie] | list[Show]:
         """Get all items in a Plex section
 
         Args:
-            section (Union[MovieSection, ShowSection]): The target section
-            min_last_modified (Optional[datetime], optional): The minimum last update, view, or rating time. Defaults to None.
+            section (MovieSection | ShowSection): The target section
+            min_last_modified (datetime | None): The minimum last update, view, or rating time. Defaults to None.
 
         Returns:
-            list[Union[Movie, Show]]: List of items in the section
+            list[Movie] | list[Show]: List of items in the section
         """
         filters = {"and": []}
 
@@ -120,14 +119,14 @@ class PlexClient:
         return section.search(filters=filters)
 
     @cache
-    def get_user_review(self, item: Union[Movie, Show, Season]) -> Optional[str]:
+    def get_user_review(self, item: Movie | Show | Season) -> str | None:
         """Get the user review for a movie or show
 
         Args:
-            item (Union[Movie, Show, Season]): The target item
+            item (Movie | Show | Season): The target item
 
         Returns:
-            Optional[str]: The user review or None if not found
+            str | None: The user review or None if not found
         """
         if not self.is_admin_user:
             return None
@@ -238,16 +237,16 @@ class PlexClient:
 
     def get_continue_watching(
         self,
-        item: Union[Movie, Season],
+        item: Movie | Season,
         **kwargs,
-    ) -> Union[list[Movie], list[Episode]]:
+    ) -> list[Movie] | list[Episode]:
         """Get the items that are in the 'Continue Watching' hub for a movie or season
 
         Args:
-            item (Union[Movie, Season]): The target item
+            item (Movie | Season): The target item
 
         Returns:
-            Union[list[Movie], list[Episode]]: The item(s) related to the target item that are in the 'Continue Watching' hub
+            list[Movie] | list[Episode]: The item(s) related to the target item that are in the 'Continue Watching' hub
         """
         if item.type == "movie":
             return self.user_client.fetchItems(
@@ -266,21 +265,21 @@ class PlexClient:
     @cache
     def get_history(
         self,
-        item: Union[Movie, Show, Season, Episode],
-        min_date: Optional[datetime] = None,
+        item: Movie | Show | Season | Episode,
+        min_date: datetime | None = None,
         sort_asc: bool = True,
         **kwargs,
-    ) -> Union[list[MovieHistory], list[EpisodeHistory]]:
+    ) -> list[MovieHistory] | list[EpisodeHistory]:
         """Get the history for a movie, show, or season
 
         Args:
-            item (Union[Movie, Show, Season]): The target item
-            min_date (Optional[datetime], optional): The minimum date to include in the history. Defaults to None.
-            max_results (Optional[int], optional): The maximum number of results to return. Defaults to None.
-            sort_asc (bool, optional): Sort the history in ascending order. Defaults to True.
+            item (Movie | Show | Season): The target item
+            min_date (datetime | None): The minimum date to include in the history. Defaults to None.
+            max_results (int | None): The maximum number of results to return. Defaults to None.
+            sort_asc (bool | None): Sort the history in ascending order. Defaults to True.
 
         Returns:
-                Union[list[MovieHistory], list[EpisodeHistory]]: The history for the target item
+                list[MovieHistory] | list[EpisodeHistory]: The history for the target item
         """
         args = {
             "metadataItemID": item.ratingKey,
@@ -295,29 +294,29 @@ class PlexClient:
         )
 
     def get_first_history(
-        self, item: Union[Movie, Show, Season, Episode], **kwargs
-    ) -> Optional[Union[MovieHistory, EpisodeHistory]]:
+        self, item: Movie | Show | Season | Episode, **kwargs
+    ) -> MovieHistory | EpisodeHistory | None:
         """Get the first (oldest) history for a movie, show, or season
 
         Args:
-            item (Union[Movie, Show, Season, Episode]): The target item
+            item (Movie | Show | Season | Episode): The target item
 
         Returns:
-            Optional[Union[MovieHistory, EpisodeHistory]]: The first (oldest) history for the target item
+            MovieHistory | EpisodeHistory | None: The first (oldest) history for the target item
         """
         return next(
             iter(self.get_history(item, maxresults=1, sort_asc=True, **kwargs)), None
         )
 
     def get_last_history(
-        self, item: Union[Movie, Show, Season, Episode], **kwargs
-    ) -> Optional[Union[MovieHistory, EpisodeHistory]]:
+        self, item: Movie | Show | Season | Episode, **kwargs
+    ) -> MovieHistory | EpisodeHistory | None:
         """Get the last (most recent) history for a movie, show, or season
         Args:
-            item (Union[Movie, Show, Season, Episode]): The target item
+            item (Movie | Show | Season | Episode): The target item
 
         Returns:
-            Optional[Union[MovieHistory, EpisodeHistory]]: The last (most recent) history for the target item
+            MovieHistory | EpisodeHistory | None: The last (most recent) history for the target item
         """
         return next(
             iter(self.get_history(item, maxresults=1, sort_asc=False, **kwargs)), None
@@ -325,16 +324,16 @@ class PlexClient:
 
     def get_on_deck(
         self,
-        item: Union[Show, Season],
+        item: Show | Season,
         **kwargs,
-    ) -> Optional[Episode]:
+    ) -> Episode | None:
         """Get the items that are in the 'On Deck' hub for a movie or season
 
         Args:
-            item (Union[Show, Season]): The target item
+            item (Show | Season): The target item
 
         Returns:
-                Optional[Episode]: The item that's on deck
+                Episode | None: The item that's on deck
         """
         return next(
             iter(
@@ -348,33 +347,33 @@ class PlexClient:
             None,
         )
 
-    def is_on_watchlist(self, item: Union[Movie, Show]) -> bool:
+    def is_on_watchlist(self, item: Movie | Show) -> bool:
         """Check if a movie or show is on the user's watchlist
 
         Args:
-            item (Union[Movie, Show]): The target item
+            item (Movie | Show): The target item
 
         Returns:
             bool: True if the item is on the watchlist, False otherwise
         """
         return bool(item.onWatchlist()) if self.is_admin_user else False
 
-    def is_on_continue_watching(self, item: Union[Movie, Season], **kwargs) -> bool:
+    def is_on_continue_watching(self, item: Movie | Season, **kwargs) -> bool:
         """Check if a movie or season is on the 'Continue Watching' hub
 
         Args:
-            item (Union[Movie, Episode]): The target item
+            item (Movie | Season): The target item
 
         Returns:
             bool: True if the item is on the 'Continue Watching' hub, False otherwise
         """
         return bool(self.get_continue_watching(item, maxresults=1, **kwargs))
 
-    def is_on_deck(self, item: Union[Movie, Show], **kwargs) -> bool:
+    def is_on_deck(self, item: Movie | Show, **kwargs) -> bool:
         """Check if a movie or show is on the 'On Deck' hub
 
         Args:
-            item (Union[Movie, Show]): The target item
+            item (Movie | Show): The target item
 
         Returns:
             bool: True if the item is on the 'On Deck' hub, False otherwise

@@ -1,7 +1,7 @@
 from datetime import date, datetime, timedelta, timezone
 from enum import StrEnum
 from functools import total_ordering
-from typing import Annotated, ClassVar, Optional, Union, get_args, get_origin
+from typing import Annotated, ClassVar, get_args, get_origin
 
 from pydantic import AfterValidator, AliasGenerator, BaseModel, ConfigDict
 from pydantic.alias_generators import to_camel
@@ -192,7 +192,7 @@ class AniListBaseModel(BaseModel):
         This allows us to dynamically generate GraphQL queries without having to manually write them for each model.
 
         Args:
-            indent_level (int, optional): How many levels to indent. Defaults to 0.
+            indent_level (int | None): How many levels to indent. Defaults to 0.
 
         Returns:
             str: The GraphQL query fields with proper indentation
@@ -239,17 +239,17 @@ class User(AniListBaseModel):
 
 
 class PageInfo(AniListBaseModel):
-    total: Optional[int] = None
-    per_page: Optional[int] = None
-    current_page: Optional[int] = None
-    last_page: Optional[int] = None
-    has_next_page: Optional[bool] = None
+    total: int | None = None
+    per_page: int | None = None
+    current_page: int | None = None
+    last_page: int | None = None
+    has_next_page: bool | None = None
 
 
 class MediaTitle(AniListBaseModel):
-    romaji: Optional[str] = None
-    english: Optional[str] = None
-    native: Optional[str] = None
+    romaji: str | None = None
+    english: str | None = None
+    native: str | None = None
 
     def titles(self) -> list[str]:
         """Return a list of all the available titles
@@ -270,27 +270,27 @@ class MediaTitle(AniListBaseModel):
 
 @total_ordering
 class FuzzyDate(AniListBaseModel):
-    year: Optional[int] = None
-    month: Optional[int] = None
-    day: Optional[int] = None
+    year: int | None = None
+    month: int | None = None
+    day: int | None = None
 
     @staticmethod
-    def from_date(d: Union[date, datetime]) -> "FuzzyDate":
+    def from_date(d: date | datetime) -> "FuzzyDate":
         """Create a FuzzyDate from a date or datetime object
 
         Args:
-            d (Union[date, datetime]): A date or datetime object
+            d (date | datetime): A date or datetime object
 
         Returns:
             FuzzyDate: An equivalent FuzzyDate object
         """
         return FuzzyDate(year=d.year, month=d.month, day=d.day)
 
-    def to_datetime(self) -> Optional[datetime]:
+    def to_datetime(self) -> datetime | None:
         """Convert the FuzzyDate to a datetime object
 
         Returns:
-            Optional[datetime]: A datetime object or None if the FuzzyDate is incomplete
+            datetime | None: A datetime object or None if the FuzzyDate is incomplete
         """
         if not self.year:
             return None
@@ -305,7 +305,7 @@ class FuzzyDate(AniListBaseModel):
             and self.day == other.day
         )
 
-    def __lt__(self, other: Optional["FuzzyDate"]) -> bool:
+    def __lt__(self, other: "FuzzyDate" | None) -> bool:
         if other is None:
             return False
         return ((self.year or 0), (self.month or 0), (self.day or 0)) < (
@@ -329,15 +329,15 @@ class MediaList(AniListBaseModel):
     id: int
     user_id: int
     media_id: int
-    status: Optional[MediaListStatus] = None
-    score: Optional[float] = None
-    progress: Optional[int] = None
-    repeat: Optional[int] = None
-    notes: Optional[str] = None
-    started_at: Optional[FuzzyDate] = None
-    completed_at: Optional[FuzzyDate] = None
-    created_at: Optional[UTCDateTime] = None
-    updated_at: Optional[UTCDateTime] = None
+    status: MediaListStatus | None = None
+    score: float | None = None
+    progress: int | None = None
+    repeat: int | None = None
+    notes: str | None = None
+    started_at: FuzzyDate | None = None
+    completed_at: FuzzyDate | None = None
+    created_at: UTCDateTime | None = None
+    updated_at: UTCDateTime | None = None
 
     def __str__(self) -> str:
         notes_truncated = None
@@ -353,16 +353,16 @@ class MediaList(AniListBaseModel):
 
 class MediaListGroup(AniListBaseModel):
     entries: list[MediaList] = []
-    name: Optional[str] = None
-    is_custom_list: Optional[bool] = None
-    is_split_completed_list: Optional[bool] = None
-    status: Optional[MediaListStatus] = None
+    name: str | None = None
+    is_custom_list: bool | None = None
+    is_split_completed_list: bool | None = None
+    status: MediaListStatus | None = None
 
 
 class MediaListCollection(AniListBaseModel):
-    user: Optional[User] = None
+    user: User | None = None
     lists: list[MediaListGroup] = []
-    has_next_chunk: Optional[bool] = None
+    has_next_chunk: bool | None = None
 
 
 class AiringSchedule(AniListBaseModel):
@@ -375,28 +375,28 @@ class AiringSchedule(AniListBaseModel):
 
 class MediaWithoutList(AniListBaseModel):
     id: int
-    id_mal: Optional[int] = None
-    type: Optional[MediaType] = None
-    format: Optional[MediaFormat] = None
-    status: Optional[MediaStatus] = None
-    season: Optional[MediaSeason] = None
-    season_year: Optional[int] = None
-    episodes: Optional[int] = None
-    duration: Optional[int] = None
-    synonyms: Optional[list[str]] = None
-    is_locked: Optional[bool] = None
-    title: Optional[MediaTitle] = None
-    start_date: Optional[FuzzyDate] = None
-    end_date: Optional[FuzzyDate] = None
-    next_airing_episode: Optional[AiringSchedule] = None
+    id_mal: int | None = None
+    type: MediaType | None = None
+    format: MediaFormat | None = None
+    status: MediaStatus | None = None
+    season: MediaSeason | None = None
+    season_year: int | None = None
+    episodes: int | None = None
+    duration: int | None = None
+    synonyms: list[str] | None = None
+    is_locked: bool | None = None
+    title: MediaTitle | None = None
+    start_date: FuzzyDate | None = None
+    end_date: FuzzyDate | None = None
+    next_airing_episode: AiringSchedule | None = None
 
 
 class Media(MediaWithoutList):
-    media_list_entry: Optional[MediaList] = None
+    media_list_entry: MediaList | None = None
 
 
 class MediaListWithMedia(MediaList):
-    media: Optional[MediaWithoutList] = None
+    media: MediaWithoutList | None = None
 
 
 class MediaListGroupWithMedia(MediaListGroup):

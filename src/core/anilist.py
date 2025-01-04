@@ -3,7 +3,6 @@ from functools import cache
 from pathlib import Path
 from textwrap import dedent
 from time import sleep
-from typing import Optional, Union
 
 import requests
 
@@ -54,14 +53,14 @@ class AniListClient:
         response = self._make_request(query)["data"]["Viewer"]
         return User(**response)
 
-    def update_anime_entry(self, media_list_entry: MediaList) -> Optional[MediaList]:
+    def update_anime_entry(self, media_list_entry: MediaList) -> MediaList | None:
         """Updates an anime entry on the authenticated user's list
 
         Args:
             media_list_entry (MediaList): The media list entry with the updated values
 
         Returns:
-            Optional[MediaList]: The updated media list entry
+            MediaList | None: The updated media list entry
         """
         query = dedent(f"""
         mutation ($mediaId: Int, $status: MediaListStatus, $score: Float, $progress: Int, $repeat: Int, $notes: String, $startedAt: FuzzyDateInput, $completedAt: FuzzyDateInput) {{
@@ -117,7 +116,7 @@ class AniListClient:
         self,
         search_str: str,
         is_movie: bool,
-        episodes: Optional[int] = None,
+        episodes: int | None = None,
         limit: int = 10,
     ) -> list[Media]:
         """Searches for anime on AniList
@@ -128,8 +127,8 @@ class AniListClient:
         Args:
             search_str (str): The search query
             is_movie (bool): Whether the anime is a movie
-            episodes (Optional[int], optional): The number of episodes in the anime. Defaults to None.
-            limit (int, optional): The maximum number of results to return. Defaults to 10.
+            episodes (int | None): The number of episodes in the anime. Defaults to None.
+            limit (int | None): The maximum number of results to return. Defaults to 10.
 
         Returns:
             list[Media]: The filtered search results
@@ -160,7 +159,7 @@ class AniListClient:
         Args:
             search_str (str): The search query
             is_movie (bool): Whether the anime is a movie
-            limit (int, optional): The maximum number of results to return. Defaults to 10.
+            limit (int | None): The maximum number of results to return. Defaults to 10.
 
         Returns:
             list[Media]: The search results
@@ -306,16 +305,14 @@ class AniListClient:
             },
         )
 
-    def _make_request(
-        self, query: str, variables: Optional[Union[dict, str]] = None
-    ) -> dict:
+    def _make_request(self, query: str, variables: dict | str | None = None) -> dict:
         """Makes a request to the AniList API
 
         All requests are rate limited to 90 requests per minute.
 
         Args:
             query (str): The GraphQL query
-            variables (Optional[dict], optional): The variables for the query. Defaults to None.
+            variables (dict | str | None): The variables for the query. Defaults to None.
 
         Returns:
             dict: The JSON response from the API

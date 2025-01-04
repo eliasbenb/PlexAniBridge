@@ -1,5 +1,4 @@
 from datetime import datetime
-from typing import Optional, Union
 
 from plexapi.library import MovieSection, ShowSection
 from sqlmodel import Session
@@ -26,11 +25,11 @@ class BridgeClient:
         self.last_synced = self._get_last_synced()
         self.last_config_encoded = self._get_last_config_encoded()
 
-    def _get_last_synced(self) -> Optional[datetime]:
+    def _get_last_synced(self) -> datetime | None:
         """Get the timestamp of the last sync
 
         Returns:
-            Optional[datetime]: The timestamp of the last sync, or None if it has never been synced
+            datetime | None: The timestamp of the last sync, or None if it has never been synced
         """
         with Session(db.engine) as session:
             last_synced = session.get(Housekeeping, "last_synced")
@@ -50,11 +49,11 @@ class BridgeClient:
             )
             session.commit()
 
-    def _get_last_config_encoded(self) -> Optional[str]:
+    def _get_last_config_encoded(self) -> str | None:
         """Get the encoded version of the last config
 
         Returns:
-            Optional[str]: The encoded config
+            str | None: The encoded config
         """
         with Session(db.engine) as session:
             last_config_encoded = session.get(Housekeeping, "last_config_encoded")
@@ -138,11 +137,11 @@ class BridgeClient:
             f"{sync_stats.skipped} items skipped, {sync_stats.failed} items failed"
         )
 
-    def _sync_section(self, section: Union[MovieSection, ShowSection]) -> SyncStats:
+    def _sync_section(self, section: MovieSection | ShowSection) -> SyncStats:
         """Sync a Plex section with the AniList library
 
         Args:
-            section (Union[MovieSection, ShowSection]): The Plex section to sync
+            section (MovieSection | ShowSection): The Plex section to sync
         """
         log.info(f"{self.__class__.__name__}: Syncing section $$'{section.title}'$$")
 

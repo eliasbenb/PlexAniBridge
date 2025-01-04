@@ -1,5 +1,5 @@
 from hashlib import md5
-from typing import Optional, Union
+from typing import Any
 
 import requests
 from sqlmodel import Session, delete, select
@@ -34,7 +34,7 @@ class AniMapClient:
             response = requests.get(self.CDN_URL)
             response.raise_for_status()
 
-            cdn_data: dict[int, dict[str, Union[int, str]]] = response.json()
+            cdn_data: dict[int, dict[str, Any]] = response.json()
             curr_cdn_hash = md5(response.content).hexdigest()
 
             if last_cdn_hash and last_cdn_hash.value == curr_cdn_hash:
@@ -82,11 +82,11 @@ class AniMapClient:
 
     def get_mappings(
         self,
-        imdb: Optional[str] = None,
-        tmdb: Optional[int] = None,
-        tvdb: Optional[int] = None,
-        season: Optional[int] = None,
-        epoffset: Optional[int] = None,
+        imdb: str | None = None,
+        tmdb: int | None = None,
+        tvdb: int | None = None,
+        season: int | None = None,
+        epoffset: int | None = None,
         is_movie: bool = True,
     ) -> list[AniMap]:
         """Get the AniMap entries that match the provided criteria
@@ -95,11 +95,11 @@ class AniMapClient:
         The TVDB season and episode offset must be exact matches for an entry to be returned.
 
         Args:
-            imdb (Optional[str], optional): The IMDB ID to match. Defaults to None.
-            tmdb (Optional[int], optional): The TMDB movie or show ID to match. Defaults to None.
-            tvdb (Optional[int], optional): The TVDB ID to match. Defaults to None.
-            season (Optional[int], optional): The TVDB season number to match. Defaults to None.
-            epoffset (Optional[int], optional): The TVDB episode offset to match. Defaults to None.
+            imdb (str | None): The IMDB ID to match. Defaults to None.
+            tmdb (int | None): The TMDB movie or show ID to match. Defaults to None.
+            tvdb (int | None): The TVDB ID to match. Defaults to None.
+            season (int | None): The TVDB season number to match. Defaults to None.
+            epoffset (int | None): The TVDB episode offset to match. Defaults to None.
 
         Returns:
             list[AniMap]: The list of AniMap entries that match the criteria

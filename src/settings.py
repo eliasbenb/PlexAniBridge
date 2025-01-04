@@ -1,7 +1,6 @@
 from enum import StrEnum
 from hashlib import md5
 from pathlib import Path
-from typing import Union
 
 from pydantic import Field, model_validator
 from pydantic.alias_generators import to_camel
@@ -58,11 +57,11 @@ class PlexAnibridgeConfig(BaseSettings):
     """Reads, validdates and stores the configuration settings from env vars"""
 
     # AniList
-    ANILIST_TOKEN: Union[str, list[str]]
+    ANILIST_TOKEN: str | list[str]
 
     # Plex
     PLEX_TOKEN: str
-    PLEX_USER: Union[str, list[str]]
+    PLEX_USER: str | list[str]
     PLEX_URL: str = "http://localhost:32400"
     PLEX_SECTIONS: list[str]
 

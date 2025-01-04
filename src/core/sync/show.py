@@ -1,5 +1,5 @@
 import sys
-from typing import Iterator, Optional
+from typing import Iterator
 
 import plexapi.exceptions
 from plexapi.video import Episode, Season, Show
@@ -13,7 +13,7 @@ from .base import BaseSyncClient, ParsedGuids
 class ShowSyncClient(BaseSyncClient[Show, Season]):
     def map_media(
         self, item: Show
-    ) -> Iterator[tuple[Season, Optional[AniMap], ParsedGuids]]:
+    ) -> Iterator[tuple[Season, AniMap | None, ParsedGuids]]:
         guids = ParsedGuids.from_guids(item.guids)
         season_map: dict[int, Season] = {
             s.index: s
@@ -37,7 +37,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
         for season in unyielded_seasons:
             yield season_map[season], None, guids
 
-    def search_media(self, item: Show, subitem: Season) -> Optional[Media]:
+    def search_media(self, item: Show, subitem: Season) -> Media | None:
         if subitem.seasonNumber == 0:
             return None
         episodes = subitem.leafCount
@@ -50,7 +50,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
         subitem: Season,
         anilist_media: Media,
         animapping: AniMap,
-    ) -> Optional[MediaListStatus]:
+    ) -> MediaListStatus | None:
         watched_episodes = self.__filter_watched_episodes(
             item, subitem, anilist_media, animapping
         )
@@ -98,7 +98,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
             return MediaListStatus.DROPPED
         return None
 
-    def _calculate_score(self, item: Show, subitem: Season, *_) -> Optional[int]:
+    def _calculate_score(self, item: Show, subitem: Season, *_) -> int | None:
         return subitem.userRating or item.userRating
 
     def _calculate_progress(
@@ -107,7 +107,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
         subitem: Season,
         anilist_media: Media,
         animapping: AniMap,
-    ) -> Optional[int]:
+    ) -> int | None:
         return (
             len(
                 self.__filter_watched_episodes(item, subitem, anilist_media, animapping)
@@ -121,7 +121,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
         subitem: Season,
         anilist_media: Media,
         animapping: AniMap,
-    ) -> Optional[int]:
+    ) -> int | None:
         episodes = self.__filter_mapped_episodes(
             item, subitem, anilist_media, animapping
         )
@@ -134,7 +134,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
         subitem: Season,
         anilist_media: Media,
         animapping: AniMap,
-    ) -> Optional[FuzzyDate]:
+    ) -> FuzzyDate | None:
         try:
             episode: Episode = subitem.get(episode=animapping.tvdb_epoffset + 1)
         except (plexapi.exceptions.NotFound, IndexError):
@@ -157,7 +157,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
         subitem: Season,
         anilist_media: Media,
         animapping: AniMap,
-    ) -> Optional[FuzzyDate]:
+    ) -> FuzzyDate | None:
         try:
             episode: Episode = subitem.get(
                 episode=animapping.tvdb_epoffset

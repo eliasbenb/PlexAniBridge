@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Generic, Iterator, Optional, TypeVar, Union
+from typing import Generic, Iterator, TypeVar
 
 from plexapi.media import Guid
 from plexapi.video import Movie, Season, Show
@@ -12,15 +12,15 @@ from src.models.anilist import FuzzyDate, Media, MediaList, MediaListStatus
 from src.models.animap import AniMap
 from src.settings import SyncField
 
-T = TypeVar("T", bound=Union[Movie, Show])  # Section item
-S = TypeVar("S", bound=Union[Movie, Season])  # Item child (season)
+T = TypeVar("T", bound=Movie | Show)  # Section item
+S = TypeVar("S", bound=Movie | Season)  # Item child (season)
 
 
 @dataclass
 class ParsedGuids:
-    tvdb: Optional[int] = None
-    tmdb: Optional[int] = None
-    imdb: Optional[str] = None
+    tvdb: int | None = None
+    tmdb: int | None = None
+    imdb: str | None = None
 
     @staticmethod
     def from_guids(guids: list[Guid]) -> "ParsedGuids":
@@ -38,7 +38,7 @@ class ParsedGuids:
             setattr(parsed_guids, split_guid[0], split_guid[1])
         return parsed_guids
 
-    def __iter__(self) -> Iterator[tuple[str, Optional[Union[int, str]]]]:
+    def __iter__(self) -> Iterator[tuple[str, int | str | None]]:
         return iter(self.__dict__.items())
 
     def __str__(self) -> str:
@@ -132,14 +132,14 @@ class BaseSyncClient(ABC, Generic[T, S]):
         return self.sync_stats
 
     @abstractmethod
-    def map_media(self, item: T) -> Iterator[tuple[S, Optional[AniMap]]]:
+    def map_media(self, item: T) -> Iterator[tuple[S, AniMap | None]]:
         pass
 
     @abstractmethod
-    def search_media(self, item: T, subitem: S) -> Optional[Media]:
+    def search_media(self, item: T, subitem: S) -> Media | None:
         pass
 
-    def _best_search_result(self, title: str, results: list[Media]) -> Optional[Media]:
+    def _best_search_result(self, title: str, results: list[Media]) -> Media | None:
         best_result, best_ratio = max(
             (
                 (r, max(fuzz.ratio(title, t) for t in r.title.titles() if t))
@@ -255,42 +255,42 @@ class BaseSyncClient(ABC, Generic[T, S]):
     @abstractmethod
     def _calculate_status(
         self, item: T, subitem: S, anilist_media: Media, animapping: AniMap
-    ) -> Optional[MediaListStatus]:
+    ) -> MediaListStatus | None:
         pass
 
     @abstractmethod
     def _calculate_score(
         self, item: T, subitem: S, anilist_media: Media, animapping: AniMap
-    ) -> Optional[int]:
+    ) -> int | None:
         pass
 
     @abstractmethod
     def _calculate_progress(
         self, item: T, subitem: S, anilist_media: Media, animapping: AniMap
-    ) -> Optional[int]:
+    ) -> int | None:
         pass
 
     @abstractmethod
     def _calculate_repeats(
         self, item: T, subitem: S, anilist_media: Media, animapping: AniMap
-    ) -> Optional[int]:
+    ) -> int | None:
         pass
 
     @abstractmethod
     def _calculate_started_at(
         self, item: T, subitem: S, anilist_media: Media, animapping: AniMap
-    ) -> Optional[FuzzyDate]:
+    ) -> FuzzyDate | None:
         pass
 
     @abstractmethod
     def _calculate_completed_at(
         self, item: T, subitem: S, anilist_media: Media, animapping: AniMap
-    ) -> Optional[FuzzyDate]:
+    ) -> FuzzyDate | None:
         pass
 
     def _merge_media_lists(
         self,
-        anilist_media_list: Optional[MediaList],
+        anilist_media_list: MediaList | None,
         plex_media_list: MediaList,
     ) -> MediaList:
         if not anilist_media_list:
@@ -331,7 +331,7 @@ class BaseSyncClient(ABC, Generic[T, S]):
 
         return res_media_list
 
-    def _debug_log_title(self, item: T, subitem: Optional[S] = None) -> str:
+    def _debug_log_title(self, item: T, subitem: S | None = None) -> str:
         if subitem and item != subitem:
             return f"$$'{item.title} | {subitem.title}'$$"
         return f"$$'{item.title}'$$"
@@ -340,6 +340,6 @@ class BaseSyncClient(ABC, Generic[T, S]):
         self,
         plex_id: str,
         guids: ParsedGuids,
-        anilist_id: Optional[int] = None,
+        anilist_id: int | None = None,
     ) -> str:
         return f"$${{plex_id: {plex_id}, {guids}{f', anilist_id: {anilist_id}' if anilist_id else ''}}}$$"
