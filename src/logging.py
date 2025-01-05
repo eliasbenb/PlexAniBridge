@@ -10,7 +10,27 @@ colorama.init()
 
 
 class ColorFormatter(logging.Formatter):
-    """Custom formatter to add colors to console output"""
+    """Custom formatter that adds terminal colors to log messages.
+
+    Enhances log readability by adding color coding to different components:
+    - Log levels are colored according to severity
+    - Quoted strings are highlighted in light blue
+    - Curly brace values are dimmed
+
+    Color Scheme:
+        DEBUG: Cyan
+        INFO: Green
+        WARNING: Yellow
+        ERROR: Red
+        CRITICAL: Bright Red
+        Quoted values: Light Blue (e.g., $$'example'$$)
+        Bracketed values: Dimmed (e.g., $${key: value}$$)
+
+    Note:
+        - Uses colorama for cross-platform color support
+        - Color markers ($$) in the message must be balanced
+        - Original message is preserved after formatting
+    """
 
     COLORS = {
         "DEBUG": Fore.CYAN,
@@ -21,10 +41,23 @@ class ColorFormatter(logging.Formatter):
     }
 
     def format(self, record: logging.LogRecord) -> str:
-        """Format the log record with colors
+        """Formats a log record with ANSI color codes.
+
+        Applies color formatting to:
+        1. Log level name based on severity
+        2. Special markers in the message:
+           - $$'text'$$ -> Light blue quoted text
+           - $${text}$$ -> Dimmed bracketed text
 
         Args:
-            record (logging.LogRecord): The log record to format
+            record (logging.LogRecord): Log record to format
+
+        Returns:
+            str: Color-formatted log message
+
+        Note:
+            Temporarily modifies the record but restores original values
+            before returning to prevent side effects in other formatters
         """
         orig_msg = record.msg
         orig_levelname = record.levelname
@@ -53,13 +86,33 @@ class ColorFormatter(logging.Formatter):
 
 
 class CleanFormatter(logging.Formatter):
-    """Formatter that removes color markers from log messages"""
+    """Formatter that strips color markers from log messages.
+
+    Used for file output where color codes are unnecessary and would
+    reduce readability. Removes the special markers while preserving
+    the content within them.
+
+    Transformation Examples:
+        $$'example'$$ -> 'example'
+        $${key: value}$$ -> {key: value}
+
+    Note:
+        - Preserves the original message structure
+        - Only processes string messages
+        - Original message is restored after formatting
+    """
 
     def format(self, record: logging.LogRecord) -> str:
-        """Format the log record without color markers
+        """Formats a log record by removing color markers.
 
         Args:
-            record (logging.LogRecord): The log record to format
+            record (logging.LogRecord): Log record to format
+
+        Returns:
+            str: Clean log message without color markers
+
+        Note:
+            Only processes string messages, passes through other types unchanged
         """
         if isinstance(record.msg, str):
             orig_msg = record.msg
@@ -79,15 +132,41 @@ class CleanFormatter(logging.Formatter):
 
 
 def setup_logger(log_name: str, log_level: str, log_dir: str) -> logging.Logger:
-    """Setup a logger with a file and console handler
+    """Configures a logger with console and file output.
+
+    Creates a logger that writes to both console (with colors) and a rotating
+    log file (without colors). The log format varies based on log level.
 
     Args:
-        log_name (str): The name of the logger
-        log_level (str): The logging level
-        log_dir (str): The directory to store the log files
+        log_name (str): Name of the logger and base name for log file
+        log_level (str): Logging level ('DEBUG', 'INFO', etc.)
+        log_dir (str): Directory where log files will be stored
 
     Returns:
-        logging.Logger: The configured logger
+        logging.Logger: Configured logger instance
+
+    Log File Details:
+        - Location: {log_dir}/{log_name}.{log_level}.log
+        - Rotation: 10MB max file size
+        - Retention: Keeps 5 backup files
+
+    Format Patterns:
+        Debug Level:
+            {timestamp} - {name} - {level}    {file}:{line}    {message}
+        Other Levels:
+            {timestamp} - {name} - {level}    {message}
+
+    Example:
+        >>> logger = setup_logger('myapp', 'DEBUG', '/var/log/myapp')
+        >>> logger.debug("Processing item $$'foo'$$ $${id: 123}$$")
+        2024-01-04 12:34:56 - myapp - DEBUG    main.py:42    Processing item 'foo' {id: 123}
+
+    Note:
+        - Creates log directory if it doesn't exist
+        - Only configures handlers if none exist
+        - Uses ColorFormatter for console output
+        - Uses CleanFormatter for file output
+        - Timestamp format: YYYY-MM-DD HH:MM:SS
     """
     log_level_literal = getattr(logging, log_level)
     log_path = Path(log_dir)

@@ -1,4 +1,4 @@
-from typing import Iterator, Optional
+from typing import Iterator
 
 from plexapi.video import Movie
 
@@ -11,7 +11,17 @@ from .base import BaseSyncClient, ParsedGuids
 class MovieSyncClient(BaseSyncClient[Movie, Movie]):
     def map_media(
         self, item: Movie
-    ) -> Iterator[tuple[Movie, Optional[AniMap], ParsedGuids]]:
+    ) -> Iterator[tuple[Movie, AniMap | None, ParsedGuids]]:
+        """Maps a Plex item to potential AniList matches.
+
+        For movies, only a single match is yielded.
+
+        Args:
+            item (Movie): Plex media item to map
+
+        Returns:
+            Iterator[tuple[Movie, AniMap | None]]: Potential matches
+        """
         guids = ParsedGuids.from_guids(item.guids)
         animapping = next(
             iter(self.animap_client.get_mappings(**dict(guids), is_movie=True)), None
@@ -19,11 +29,29 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie]):
 
         yield item, animapping, guids
 
-    def search_media(self, item: Movie, *_) -> Optional[Media]:
+    def search_media(self, item: Movie, **_) -> Media | None:
+        """Searches for matching AniList entry by title.
+
+        For movies, we search for single episode entries.
+
+        Args:
+            item (Movie): Main Plex item
+
+        Returns:
+            Media | None: Matching AniList entry or None if not found
+        """
         results = self.anilist_client.search_anime(item.title, True, 1)
         return self._best_search_result(item.title, results)
 
-    def _calculate_status(self, item: Movie, *_) -> Optional[MediaListStatus]:
+    def _calculate_status(self, item: Movie, **_) -> MediaListStatus | None:
+        """Calculates the watch status for a media item.
+
+        Args:
+            item (Movie): Main Plex media item
+
+        Returns:
+            MediaListStatus | None: Watch status for the media item
+        """
         is_viewed = item.viewCount > 0
         is_partially_viewed = item.viewOffset > 0
         is_on_continue_watching = self.plex_client.is_on_continue_watching(item)
@@ -50,16 +78,48 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie]):
             return MediaListStatus.DROPPED
         return None
 
-    def _calculate_score(self, item: Movie, *_) -> Optional[int]:
+    def _calculate_score(self, item: Movie, **_) -> int | None:
+        """Calculates the user rating for a media item.
+
+        Args:
+            item (Movie): Main Plex media item
+
+        Returns:
+            int | None: User rating for the media item
+        """
         return item.userRating
 
-    def _calculate_progress(self, item: Movie, *_) -> Optional[int]:
+    def _calculate_progress(self, item: Movie, **_) -> int | None:
+        """Calculates the progress for a media item.
+
+        Args:
+            item (Movie): Main Plex media item
+
+        Returns:
+            int | None: Progress for the media item
+        """
         return 1 if item.viewCount else None
 
-    def _calculate_repeats(self, item: Movie, *_) -> Optional[int]:
+    def _calculate_repeats(self, item: Movie, **_) -> int | None:
+        """Calculates the number of repeats for a media item.
+
+        Args:
+            item (Movie): Main Plex media item
+
+        Returns:
+            int | None: Number of repeats for the media item
+        """
         return item.viewCount - 1 if item.viewCount else None
 
-    def _calculate_started_at(self, item: Movie, *_) -> Optional[FuzzyDate]:
+    def _calculate_started_at(self, item: Movie, **_) -> FuzzyDate | None:
+        """Calculates the start date for a media item.
+
+        Args:
+            item (Movie): Main Plex media item
+
+        Returns:
+            FuzzyDate | None: Start date for the media item
+        """
         history = self.plex_client.get_first_history(item)
         if not history and not item.lastViewedAt:
             return None
@@ -69,5 +129,13 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie]):
             return FuzzyDate.from_date(history.viewedAt)
         return FuzzyDate.from_date(min(history.viewedAt, item.lastViewedAt))
 
-    def _calculate_completed_at(self, item: Movie, *_) -> Optional[FuzzyDate]:
-        return self._calculate_started_at(item, *_)
+    def _calculate_completed_at(self, item: Movie, **_) -> FuzzyDate | None:
+        """Calculates the completion date for a media item.
+
+        Args:
+            item (Movie): Main Plex media item
+
+        Returns:
+            FuzzyDate | None: Completion date for the media item
+        """
+        return self._calculate_started_at(item, **_)

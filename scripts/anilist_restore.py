@@ -6,31 +6,31 @@ from datetime import datetime
 from pathlib import Path
 from textwrap import dedent
 from time import sleep
-from typing import Optional
+from typing import Any
 
 import requests
 from pydantic import BaseModel
 
 
 class FuzzyDate(BaseModel):
-    year: Optional[int] = None
-    month: Optional[int] = None
-    day: Optional[int] = None
+    year: int | None = None
+    month: int | None = None
+    day: int | None = None
 
 
 class MediaList(BaseModel):
     id: int
     userId: int
     mediaId: int
-    status: Optional[str] = None
-    score: Optional[float] = None
-    progress: Optional[int] = None
-    repeat: Optional[int] = None
-    notes: Optional[str] = None
-    started_at: Optional[FuzzyDate] = None
-    completed_at: Optional[FuzzyDate] = None
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    status: str | None = None
+    score: float | None = None
+    progress: int | None = None
+    repeat: int | None = None
+    notes: str | None = None
+    started_at: FuzzyDate | None = None
+    completed_at: FuzzyDate | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 class AniListRestoreClient:
@@ -82,7 +82,9 @@ class AniListRestoreClient:
         except Exception as e:
             print(f"Failed to restore entry {entry.mediaId}: {str(e)}")
 
-    def _make_request(self, query: str, variables: Optional[dict] = None) -> dict:
+    def _make_request(
+        self, query: str, variables: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         response = requests.post(
             self.API_URL,
             headers={

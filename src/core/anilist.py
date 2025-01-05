@@ -3,7 +3,6 @@ from functools import cache
 from pathlib import Path
 from textwrap import dedent
 from time import sleep
-from typing import Optional, Union
 
 import requests
 
@@ -21,7 +20,22 @@ from src.utils.rate_limitter import RateLimiter
 
 
 class AniListClient:
-    """Client for interacting with the AniList GraphQL API"""
+    """Client for interacting with the AniList GraphQL API
+
+    This client provides methods to interact with the AniList GraphQL API, including searching for anime,
+    updating user lists, and managing anime entries. It implements rate limiting and local caching
+    to optimize API usage.
+
+    Attributes:
+        API_URL (str): The AniList GraphQL API endpoint
+        BACKUP_RETENTION_DAYS (int): Number of days to retain backup files
+        anilist_token (str): Authentication token for AniList API
+        backup_dir (Path): Directory where backup files are stored
+        dry_run (bool): If True, skips making actual API modifications
+        rate_limiter (RateLimiter): Handles API request rate limiting
+        user (User): Authenticated user's information
+        offline_anilist_entries (dict[int, Media]): Cache of anime entries
+    """
 
     API_URL = "https://graphql.anilist.co"
     BACKUP_RETENTION_DAYS = 7
@@ -38,10 +52,16 @@ class AniListClient:
         self.backup_anilist()
 
     def get_user(self) -> User:
-        """Gets the owner user of the AniList token
+        """Retrieves the authenticated user's information from AniList.
+
+        Makes a GraphQL query to fetch detailed user information including ID, name,
+        and other profile data for the authenticated user.
 
         Returns:
-            User: The anilist user object
+            User: Object containing the authenticated user's information
+
+        Raises:
+            requests.HTTPError: If the API request fails
         """
         query = dedent(f"""
         query {{
@@ -54,14 +74,20 @@ class AniListClient:
         response = self._make_request(query)["data"]["Viewer"]
         return User(**response)
 
-    def update_anime_entry(self, media_list_entry: MediaList) -> Optional[MediaList]:
-        """Updates an anime entry on the authenticated user's list
+    def update_anime_entry(self, media_list_entry: MediaList) -> MediaList | None:
+        """Updates an anime entry on the authenticated user's list.
+
+        Sends a mutation to modify an existing anime entry in the user's list with new
+        values for status, score, progress, etc.
 
         Args:
-            media_list_entry (MediaList): The media list entry with the updated values
+            media_list_entry (MediaList): Updated entry containing the following fields:
 
         Returns:
-            Optional[MediaList]: The updated media list entry
+            MediaList | None: Updated entry if successful and not in dry run mode, None otherwise
+
+        Raises:
+            requests.HTTPError: If the API request fails
         """
         query = dedent(f"""
         mutation ($mediaId: Int, $status: MediaListStatus, $score: Float, $progress: Int, $repeat: Int, $notes: String, $startedAt: FuzzyDateInput, $completedAt: FuzzyDateInput) {{
@@ -83,14 +109,19 @@ class AniListClient:
         return MediaList(**response)
 
     def delete_anime_entry(self, entry_id: int, media_id: int) -> bool:
-        """Deletes an anime entry on the authenticated user's list
+        """Deletes an anime entry from the authenticated user's list.
+
+        Sends a mutation to remove a specific anime entry from the user's list.
 
         Args:
             entry_id (int): The AniList ID of the list entry to delete
-            media_id (int): The AniList ID of the anime
+            media_id (int): The AniList ID of the anime being deleted
 
         Returns:
-            bool: True if the entry was deleted, False otherwise
+            bool: True if the entry was successfully deleted and not in dry run mode, False otherwise
+
+        Raises:
+            requests.HTTPError: If the API request fails
         """
         query = dedent("""
         mutation ($id: Int) {
@@ -117,22 +148,25 @@ class AniListClient:
         self,
         search_str: str,
         is_movie: bool,
-        episodes: Optional[int] = None,
+        episodes: int | None = None,
         limit: int = 10,
     ) -> list[Media]:
-        """Searches for anime on AniList
+        """Searches for anime on AniList with filtering capabilities.
 
-        This function is a wrapper of the cached `_search_anime()` it handles filtering while `_search_anime()`
-        actually makes and caches the request.
+        Performs a search query and filters results based on media format and episode count.
+        Uses local caching through _search_anime() to optimize repeated searches.
 
         Args:
-            search_str (str): The search query
-            is_movie (bool): Whether the anime is a movie
-            episodes (Optional[int], optional): The number of episodes in the anime. Defaults to None.
-            limit (int, optional): The maximum number of results to return. Defaults to 10.
+            search_str (str): Title or keywords to search for
+            is_movie (bool): If True, searches only for movies and specials. If False, searches for TV series, OVAs, and ONAs
+            episodes (int | None): Filter results to match this episode count. If None, returns all results
+            limit (int): Maximum number of results to return. Defaults to 10
 
         Returns:
-            list[Media]: The filtered search results
+            list[Media]: Filtered list of matching anime entries, sorted by relevance
+
+        Raises:
+            requests.HTTPError: If the API request fails
         """
         log.debug(
             f"{self.__class__.__name__}: Searching for {'movie' if is_movie else 'show'} "
@@ -155,15 +189,24 @@ class AniListClient:
         is_movie: bool,
         limit: int = 10,
     ) -> list[Media]:
-        """Helper function to `search_anime()` that caches AniList GraphQL results
+        """Cached helper function for anime searches.
+
+        Makes the actual GraphQL query to search for anime and caches results
+        to reduce API calls for repeated searches.
 
         Args:
-            search_str (str): The search query
-            is_movie (bool): Whether the anime is a movie
-            limit (int, optional): The maximum number of results to return. Defaults to 10.
+            search_str (str): Title or keywords to search for
+            is_movie (bool): If True, limits to movies and specials. If False, limits to TV series, OVAs, and ONAs
+            limit (int): Maximum number of results to return. Defaults to 10
 
         Returns:
-            list[Media]: The search results
+            list[Media]: List of matching anime entries, unfiltered
+
+        Raises:
+            requests.HTTPError: If the API request fails
+
+        Note:
+            This method is cached using functools.cache to optimize repeated searches
         """
         query = dedent(f"""
             query ($search: String, $formats: [MediaFormat], $limit: Int) {{
@@ -199,15 +242,22 @@ class AniListClient:
         self,
         anilist_id: int,
     ) -> Media:
-        """Gets anime data from AniList
+        """Retrieves detailed information about a specific anime.
 
-        Either an AniList ID or a MAL ID must be provided. If both are provided, the AniList ID will be used.
+        Attempts to fetch anime data from local cache first, falling back to
+        an API request if not found in cache.
 
         Args:
-            anilist_id (int): The AniList ID of the anime
+            anilist_id (int): The AniList ID of the anime to retrieve
 
         Returns:
-            Media: The AniList Media object
+            Media: Detailed information about the requested anime
+
+        Raises:
+            requests.HTTPError: If the API request fails
+
+        Note:
+            Results are cached in self.offline_anilist_entries for future use
         """
         if anilist_id in self.offline_anilist_entries:
             log.debug(
@@ -232,6 +282,25 @@ class AniListClient:
         return Media(**response["data"]["Media"])
 
     def backup_anilist(self) -> None:
+        """Creates a JSON backup of the user's AniList data.
+
+        Fetches all anime entries from the user's lists and saves them to a JSON file.
+        Implements a rotating backup system that maintains backups for BACKUP_RETENTION_DAYS.
+
+        The backup includes:
+            - User information
+            - All non-custom anime lists
+            - Detailed information about each anime entry
+
+        Raises:
+            requests.HTTPError: If the API request fails
+            OSError: If unable to create backup directory or write backup file
+
+        Note:
+            - Backup files are named: plexanibridge-{username}.{number}.json
+            - Old backups exceeding BACKUP_RETENTION_DAYS are automatically deleted
+            - Skips custom lists to focus on standard watching status lists
+        """
         query = dedent(f"""
         query MediaListCollection($userId: Int, $type: MediaType, $chunk: Int) {{
             MediaListCollection(userId: $userId, type: $type, chunk: $chunk) {{
@@ -283,13 +352,19 @@ class AniListClient:
                 log.debug(f"{self.__class__.__name__}: Deleted old backup '{file}'")
 
     def _media_list_entry_to_media(self, media_list_entry: MediaListWithMedia) -> Media:
-        """Converts a MediaListEntry to a Media object
+        """Converts a MediaListWithMedia object to a Media object.
+
+        Creates a new Media object that combines the user's list entry data
+        with the anime's metadata.
 
         Args:
-            media_list_entry (MediaListWithMedia): The media list entry
+            media_list_entry (MediaListWithMedia): Combined object containing both list entry and media information
 
         Returns:
-            Media: The media object
+            Media: New Media object containing all relevant fields from both the list entry and media information
+
+        Note:
+            This is an internal helper method used primarily by backup_anilist()
         """
         return Media(
             media_list_entry=MediaList(
@@ -306,22 +381,26 @@ class AniListClient:
             },
         )
 
-    def _make_request(
-        self, query: str, variables: Optional[Union[dict, str]] = None
-    ) -> dict:
-        """Makes a request to the AniList API
+    def _make_request(self, query: str, variables: dict | str | None = None) -> dict:
+        """Makes a rate-limited request to the AniList GraphQL API.
 
-        All requests are rate limited to 90 requests per minute.
+        Handles rate limiting, authentication, and automatic retries for
+        rate limit exceeded responses.
 
         Args:
-            query (str): The GraphQL query
-            variables (Optional[dict], optional): The variables for the query. Defaults to None.
+            query (str): GraphQL query string
+            variables (dict | str | None): Variables for the GraphQL query
 
         Returns:
-            dict: The JSON response from the API
+            dict: JSON response from the API
 
         Raises:
-            requests.HTTPError: If the request fails
+            requests.HTTPError: If the request fails for any reason other than rate limiting
+
+        Note:
+            - Implements rate limiting of 90 requests per minute
+            - Automatically retries after waiting if rate limit is exceeded
+            - Includes Authorization header using the stored token
         """
         self.rate_limiter.wait_if_needed()  # Rate limit the requests
 
