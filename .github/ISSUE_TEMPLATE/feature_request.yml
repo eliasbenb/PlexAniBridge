@@ -1,6 +1,6 @@
 name: Feature Request
-description: 'Suggest an idea for Sonarr'
-labels: ['needs-triage']
+description: 'Suggest an idea for PlexAniBridge'
+labels: ['enhancement']
 body:
 - type: checkboxes
   attributes:

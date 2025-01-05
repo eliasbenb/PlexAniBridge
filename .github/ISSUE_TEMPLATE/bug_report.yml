@@ -1,6 +1,6 @@
 name: Bug Report
-description: 'Only bug reports for v4 will be accepted, older versions are no longer receiving bug fixes and support issues will be closed immediately.'
-labels: ['needs-triage']
+description: 'Make sure to read through all instructions in the template below before submitting an issue.'
+labels: ['bug']
 body:
 - type: checkboxes
   attributes:
@@ -38,17 +38,13 @@ body:
     description: |
       examples:
         - **OS**: Ubuntu 22.04
-        - **Sonarr**: Sonarr 4.0.0.766
+        - **PlexAniBridge**: PlexAniBridge 0.2.2
         - **Docker Install**: Yes
-        - **Using Reverse Proxy**: No
-        - **Browser**: Firefox 90 (If UI related)
-        - **Database**: Sqlite 3.41.2
+        - **Database**: Sqlite 3.41.1
     value: |
         - OS: 
-        - Sonarr: 
+        - PlexAniBridge: 
         - Docker Install: 
-        - Using Reverse Proxy: 
-        - Browser: 
         - Database: 
     render: markdown
   validations:
@@ -64,11 +60,11 @@ body:
     required: true
 - type: textarea
   attributes:
-    label: Trace Logs?
+    label: Debug Logs?
     description: |
-      Trace Logs (https://wiki.servarr.com/sonarr/troubleshooting#logging-and-log-files) 
-      ***Generally speaking, all bug reports must have trace logs provided.***
-      *** Info Logs are not trace logs. If the logs do not say trace and are not from a file like `*.trace.*.txt` they are not trace logs.***
+      Debug Logs
+      ***Generally speaking, all bug reports must have debug logs provided.***
+      *** Info Logs are not debug logs. If the logs do not say debug and are not from a file like `*.DEBUG.log` they are not debug logs.***
   validations:
     required: true
 - type: textarea
