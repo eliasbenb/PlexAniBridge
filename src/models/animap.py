@@ -2,7 +2,7 @@ from sqlmodel import JSON, Field, SQLModel
 
 
 class AniMap(SQLModel, table=True):
-    """Model for the animap table"""
+    """Model for the animap table."""
 
     __tablename__ = "animap"
 

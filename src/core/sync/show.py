@@ -14,6 +14,16 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
     def map_media(
         self, item: Show
     ) -> Iterator[tuple[Season, AniMap | None, ParsedGuids]]:
+        """Maps a Plex item to potential AniList matches.
+
+        For shows, we map each season to its corresponding AniList entry.
+
+        Args:
+            item (Show): Plex media item to map
+
+        Returns:
+            Iterator[tuple[S, AniMap | None]]: Potential matches
+        """
         guids = ParsedGuids.from_guids(item.guids)
         season_map: dict[int, Season] = {
             s.index: s
@@ -38,6 +48,18 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
             yield season_map[season], None, guids
 
     def search_media(self, item: Show, subitem: Season) -> Media | None:
+        """Searches for matching AniList entry by title.
+
+        For shows, we search for entries with matching episode counts and
+        similar titles (fuzzy search).
+
+        Args:
+            item (Show): Main Plex item
+            subitem (Season): Specific item to match
+
+        Returns:
+            Media | None: Matching AniList entry or None if not found
+        """
         if subitem.seasonNumber == 0:
             return None
         episodes = subitem.leafCount
@@ -51,8 +73,19 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
         anilist_media: Media,
         animapping: AniMap,
     ) -> MediaListStatus | None:
+        """Calculates the watch status for a media item.
+
+        Args:
+            item (Show): Main Plex media item
+            subitem (Season): Specific item to sync
+            anilist_media (Media): Matched AniList entry
+            animapping (AniMap): ID mapping information
+
+        Returns:
+            MediaListStatus | None: Watch status for the media item
+        """
         watched_episodes = self.__filter_watched_episodes(
-            item, subitem, anilist_media, animapping
+            subitem, anilist_media, animapping
         )
         is_viewed = len(watched_episodes) >= (anilist_media.episodes or sys.maxsize)
         is_partially_viewed = len(watched_episodes) > 0
@@ -72,9 +105,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
         if is_on_continue_watching:
             return MediaListStatus.CURRENT
 
-        all_episodes = self.__filter_mapped_episodes(
-            item, subitem, anilist_media, animapping
-        )
+        all_episodes = self.__filter_mapped_episodes(subitem, anilist_media, animapping)
         # We've watched all currently aired episodes, which is why it's not on continue watching
         if (
             anilist_media.status == MediaStatus.RELEASING
@@ -98,43 +129,73 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
             return MediaListStatus.DROPPED
         return None
 
-    def _calculate_score(self, item: Show, subitem: Season, *_) -> int | None:
+    def _calculate_score(self, item: Show, subitem: Season, **_) -> int | None:
+        """Calculates the user rating for a media item.
+
+        Args:
+            item (Show): Main Plex media item
+            subitem (Season): Specific item to sync
+
+        Returns:
+            int | None: User rating for the media item
+        """
         return subitem.userRating or item.userRating
 
     def _calculate_progress(
         self,
-        item: Show,
         subitem: Season,
         anilist_media: Media,
         animapping: AniMap,
+        **_,
     ) -> int | None:
+        """Calculates the progress for a media item.
+
+        Args:
+            subitem (Season): Specific item to sync
+            anilist_media (Media): Matched AniList entry
+            animapping (AniMap): ID mapping information
+
+        Returns:
+            int | None: Progress for the media item
+        """
         return (
-            len(
-                self.__filter_watched_episodes(item, subitem, anilist_media, animapping)
-            )
+            len(self.__filter_watched_episodes(subitem, anilist_media, animapping))
             or None
         )
 
     def _calculate_repeats(
         self,
-        item: Show,
         subitem: Season,
         anilist_media: Media,
         animapping: AniMap,
+        **_,
     ) -> int | None:
-        episodes = self.__filter_mapped_episodes(
-            item, subitem, anilist_media, animapping
-        )
+        """Calculates the number of repeats for a media item.
+
+        Args:
+            subitem (Season): Specific item to sync
+            anilist_media (Media): Matched AniList entry
+            animapping (AniMap): ID mapping information
+
+        Returns:
+            int | None: Number of repeats for the media item
+        """
+        episodes = self.__filter_mapped_episodes(subitem, anilist_media, animapping)
         least_views = min((e.viewCount for e in episodes), default=0)
         return least_views - 1 if least_views else None
 
     def _calculate_started_at(
-        self,
-        _: Show,
-        subitem: Season,
-        anilist_media: Media,
-        animapping: AniMap,
+        self, subitem: Season, animapping: AniMap, **_
     ) -> FuzzyDate | None:
+        """Calculates the start date for a media item.
+
+        Args:
+            subitem (Movie): Specific item to sync
+            animapping (AniMap): ID mapping information
+
+        Returns:
+            FuzzyDate | None: Start date for the media item
+        """
         try:
             episode: Episode = subitem.get(episode=animapping.tvdb_epoffset + 1)
         except (plexapi.exceptions.NotFound, IndexError):
@@ -152,12 +213,18 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
         )
 
     def _calculate_completed_at(
-        self,
-        _: Show,
-        subitem: Season,
-        anilist_media: Media,
-        animapping: AniMap,
+        self, subitem: Season, anilist_media: Media, animapping: AniMap, **_
     ) -> FuzzyDate | None:
+        """Calculates the completion date for a media item.
+
+        Args:
+            subitem (Movie): Specific item to sync
+            anilist_media (Media): Matched AniList entry
+            animapping (AniMap): ID mapping information
+
+        Returns:
+            FuzzyDate | None: Completion date for the media item
+        """
         try:
             episode: Episode = subitem.get(
                 episode=animapping.tvdb_epoffset
@@ -178,11 +245,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
         )
 
     def __filter_mapped_episodes(
-        self,
-        _: Show,
-        subitem: Season,
-        anilist_media: Media,
-        animapping: AniMap,
+        self, subitem: Season, anilist_media: Media, animapping: AniMap
     ) -> list[Episode]:
         return self.plex_client.get_episodes(
             subitem,
@@ -191,11 +254,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
         )
 
     def __filter_watched_episodes(
-        self,
-        _: Show,
-        subitem: Season,
-        anilist_media: Media,
-        animapping: AniMap,
+        self, subitem: Season, anilist_media: Media, animapping: AniMap
     ) -> list[Episode]:
         return self.plex_client.get_watched_episodes(
             subitem,

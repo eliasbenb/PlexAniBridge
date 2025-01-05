@@ -12,9 +12,30 @@ from src.settings import PlexAnibridgeConfig
 
 
 class BridgeClient:
-    """The main client that orchestrates the sync between Plex and AniList libraries
+    """Main orchestrator for synchronizing Plex and AniList libraries.
 
-    All components of the program are managed and initialized by this class.
+    This client serves as the central coordinator for the entire synchronization process,
+    managing the initialization and interaction between various components:
+    - AniList API client
+    - Plex Media Server client
+    - AniMap database client (for ID mappings)
+    - Sync clients for movies and TV shows
+
+    The client supports multiple user pairs (Plex user + AniList token), partial scanning
+    for efficiency, and both destructive and non-destructive sync modes.
+
+    Attributes:
+        config (PlexAnibridgeConfig): Application configuration settings
+        token_user_pairs (list[tuple[str, str]]): Paired AniList tokens and Plex usernames
+        animap_client (AniMapClient): Client for anime ID mapping database
+        last_synced (datetime | None): Timestamp of the last successful sync
+        last_config_encoded (str | None): Encoded version of the last used configuration
+
+    Configuration Options:
+        - PARTIAL_SCAN: Enable incremental syncs based on modification time
+        - DESTRUCTIVE_SYNC: Allow deletion of AniList entries
+        - EXCLUDED_SYNC_FIELDS: Fields to ignore during sync
+        - FUZZY_SEARCH_THRESHOLD: Matching threshold for title comparison
     """
 
     def __init__(self, config: PlexAnibridgeConfig) -> None:
@@ -26,10 +47,14 @@ class BridgeClient:
         self.last_config_encoded = self._get_last_config_encoded()
 
     def _get_last_synced(self) -> datetime | None:
-        """Get the timestamp of the last sync
+        """Retrieves the timestamp of the last successful sync from the database.
 
         Returns:
-            datetime | None: The timestamp of the last sync, or None if it has never been synced
+            datetime | None: Timestamp of the last sync, None if never synced
+
+        Note:
+            Used to determine whether partial scanning is possible and
+            to filter items for incremental syncs
         """
         with Session(db.engine) as session:
             last_synced = session.get(Housekeeping, "last_synced")
@@ -38,10 +63,13 @@ class BridgeClient:
             return datetime.fromisoformat(last_synced.value)
 
     def _set_last_synced(self, last_synced: datetime) -> None:
-        """Store the timestamp of the last sync
+        """Stores the timestamp of a successful sync in the database.
 
         Args:
-            last_synced (datetime): The timestamp of the last sync
+            last_synced (datetime): Timestamp to store
+
+        Note:
+            Only called after a completely successful sync operation
         """
         with Session(db.engine) as session:
             session.merge(
@@ -50,10 +78,13 @@ class BridgeClient:
             session.commit()
 
     def _get_last_config_encoded(self) -> str | None:
-        """Get the encoded version of the last config
+        """Retrieves the encoded configuration from the last sync.
+
+        The encoded configuration is used to determine if settings have
+        changed between syncs, which affects partial scan eligibility.
 
         Returns:
-            str | None: The encoded config
+            str | None: Encoded configuration string, None if no previous sync
         """
         with Session(db.engine) as session:
             last_config_encoded = session.get(Housekeeping, "last_config_encoded")
@@ -62,17 +93,35 @@ class BridgeClient:
             return last_config_encoded.value
 
     def _set_last_config_encoded(self, config_encoded: str) -> None:
-        """Store the encoded version of the config
+        """Stores the encoded configuration after a successful sync.
 
         Args:
-            config_encoded (str): The encoded config
+            config_encoded (str): Encoded configuration string
+
+        Note:
+            Used in conjunction with last_synced to validate partial scan eligibility
         """
         with Session(db.engine) as session:
             session.merge(Housekeeping(key="last_config_encoded", value=config_encoded))
             session.commit()
 
     def sync(self) -> None:
-        """Sync the Plex and AniList libraries"""
+        """Initiates the synchronization process for all configured user pairs.
+
+        This is the main entry point for the sync process. It:
+        1. Determines the appropriate sync mode (partial/full, destructive/non-destructive)
+        2. Processes each Plex user + AniList token pair
+        3. Updates sync metadata upon successful completion
+
+        The sync process is considered successful only if all user pairs
+        are processed without errors. A failure for any user will prevent
+        the last_synced timestamp from being updated.
+
+        Note:
+            - Partial sync requires valid last_synced and matching configuration
+            - Destructive sync can remove entries from AniList
+            - Non-destructive sync only processes watched content
+        """
         log.info(
             f"{self.__class__.__name__}: Starting "
             f"{'partial ' if self._should_perform_partial_scan() else ''}"
@@ -92,11 +141,22 @@ class BridgeClient:
         log.info(f"{self.__class__.__name__}: Sync completed")
 
     def _sync_user(self, anilist_token: str, plex_user: str) -> None:
-        """Sync a single Plex AniList user pair
+        """Synchronizes a single Plex user's library with their AniList account.
 
         Args:
-            plex_token (str): The Plex user's token
-            anilist_token (str): The AniList token
+            anilist_token (str): Authentication token for AniList API
+            plex_user (str): Username or email of the Plex user
+
+        Process:
+        1. Initializes AniList client with user's token
+        2. Initializes Plex client for the user
+        3. Creates sync clients for movies and shows
+        4. Processes each configured Plex section
+        5. Reports sync statistics
+
+        Note:
+            Creates new client instances for each user to maintain proper
+            authentication and separation of concerns
         """
         self.anilist_client = AniListClient(
             anilist_token, self.config.DATA_PATH / "backups", self.config.DRY_RUN
@@ -138,10 +198,25 @@ class BridgeClient:
         )
 
     def _sync_section(self, section: MovieSection | ShowSection) -> SyncStats:
-        """Sync a Plex section with the AniList library
+        """Synchronizes a single Plex library section.
 
         Args:
-            section (MovieSection | ShowSection): The Plex section to sync
+            section (MovieSection | ShowSection): Plex library section to process
+
+        Returns:
+            SyncStats: Statistics about the sync operation including:
+                - Number of items synced
+                - Number of items deleted
+                - Number of items skipped
+                - Number of items that failed
+
+        Process:
+        1. Retrieves items from the section based on sync mode:
+           - Partial scan: Only items modified since last sync
+           - Full scan: All items
+           - Non-destructive: Only watched items
+        2. Routes each item to appropriate sync client (movie/show)
+        3. Collects and returns sync statistics
         """
         log.info(f"{self.__class__.__name__}: Syncing section $$'{section.title}'$$")
 
@@ -160,15 +235,20 @@ class BridgeClient:
         return sync_client.sync_stats
 
     def _should_perform_partial_scan(self) -> bool:
-        """Check if a partial scan can be performed
+        """Determines if a partial (incremental) sync is possible.
 
-        A partial scan can only be performed if the following conditions are met:
-            1. The `PARTIAL_SCAN` setting is enabled
-            2. The last sync timestamp is not None
-            3. The last synced sections match the configured Plex sections
+        A partial scan optimizes the sync process by only processing
+        items that have been modified since the last successful sync.
 
         Returns:
-            bool: True if a partial scan can be performed, False otherwise
+            bool: True if all conditions for partial scan are met:
+                1. PARTIAL_SCAN setting is enabled
+                2. Last sync timestamp exists
+                3. Current configuration matches last sync's configuration
+
+        Note:
+            Configuration changes invalidate partial scan eligibility to
+            ensure changes in sync settings are properly applied
         """
         return (
             self.config.PARTIAL_SCAN

@@ -12,12 +12,32 @@ from src.models.housekeeping import Housekeeping
 
 
 class AniMapClient:
-    """Client for managing the AniMap database (Kometa's anime ID mapping)
+    """Client for managing the AniMap database (Kometa's anime ID mapping).
 
-    The AniMap database allows for mapping between AniList IDs and other sources, including TVDB and IMDB.
-    This class is responsible for syncing the local database with the CDN source and querying the database.
+    This client manages a local SQLite database that maps anime IDs between different services
+    (AniList, TVDB, IMDB, etc.). It handles synchronization with Kometa's CDN source and
+    provides query capabilities for ID mapping lookups.
 
-    Mapping Source: https://github.com/Kometa-Team/Anime-IDs/
+    The database is automatically synchronized on client initialization and maintains
+    a hash of the CDN data to minimize unnecessary updates.
+
+    Attributes:
+        CDN_URL (str): URL to Kometa's anime ID mapping JSON file
+
+    Database Schema:
+        The client manages the following tables:
+        - AniMap: Stores the ID mappings between services
+        - Housekeeping: Stores metadata like the CDN hash for sync management
+
+    Mapping Source:
+        https://github.com/Kometa-Team/Anime-IDs/
+
+    Note:
+        The client maintains data integrity by:
+        - Only syncing when CDN content has changed (verified via MD5 hash)
+        - Properly handling multi-value fields (mal_id, imdb_id)
+        - Removing entries that no longer exist in the CDN
+        - Using database transactions for atomic updates
     """
 
     CDN_URL = "https://cdn.jsdelivr.net/gh/Kometa-Team/Anime-IDs@refs/heads/master/anime_ids.json"
@@ -26,7 +46,28 @@ class AniMapClient:
         self._sync_db()
 
     def _sync_db(self) -> None:
-        """Sync the local AniMap database with the CDN source"""
+        """Synchronizes the local database with the Kometa CDN source.
+
+        Performs the following steps:
+        1. Checks if the CDN data has changed by comparing MD5 hashes
+        2. If unchanged, skips the sync to avoid unnecessary updates
+        3. If changed:
+            - Downloads the latest mapping data
+            - Converts data to appropriate types (handling multi-value fields)
+            - Updates the local database using merge operations
+            - Removes entries that no longer exist in the CDN
+            - Updates the stored CDN hash
+
+        Raises:
+            requests.HTTPError: If the CDN request fails
+            SQLAlchemyError: If database operations fail
+
+        Note:
+            - Uses MD5 hashing to detect changes in CDN data
+            - Handles multi-value fields (mal_id, imdb_id) by splitting comma-separated strings
+            - Uses SQLModel merge operations to efficiently update existing records
+            - Maintains data consistency using database transactions
+        """
         with Session(db.engine) as session:
             # First check if the CDN data has changed. If not, we can skip the sync
             last_cdn_hash = session.get(Housekeeping, "animap_cdn_hash")
@@ -89,20 +130,33 @@ class AniMapClient:
         epoffset: int | None = None,
         is_movie: bool = True,
     ) -> list[AniMap]:
-        """Get the AniMap entries that match the provided criteria
+        """Retrieves anime ID mappings based on provided criteria.
 
-        Certain criteria are optional, and the function will return entries that match any of the provided criteria.
-        The TVDB season and episode offset must be exact matches for an entry to be returned.
+        Performs a complex database query to find entries that match the given identifiers
+        and metadata. The search logic differs between movies and TV shows.
 
         Args:
-            imdb (str | None): The IMDB ID to match. Defaults to None.
-            tmdb (int | None): The TMDB movie or show ID to match. Defaults to None.
-            tvdb (int | None): The TVDB ID to match. Defaults to None.
-            season (int | None): The TVDB season number to match. Defaults to None.
-            epoffset (int | None): The TVDB episode offset to match. Defaults to None.
+            imdb (str | None): IMDB ID to match (can be partial match within array)
+            tmdb (int | None): TMDB ID to match (movies and TV shows)
+            tvdb (int | None): TVDB ID to match (TV shows only)
+            season (int | None): TVDB season number for exact matching (TV shows only)
+            epoffset (int | None): TVDB episode offset for exact matching (TV shows only)
+            is_movie (bool): Whether the search is for a movie or TV show
 
         Returns:
-            list[AniMap]: The list of AniMap entries that match the criteria
+            list[AniMap]: Matching entries sorted by:
+                1. TVDB season (if applicable)
+                2. TVDB episode offset (if applicable)
+                3. AniList ID
+                4. AniDB ID
+
+        Note:
+            Search Behavior:
+            - Only returns entries that have an AniList ID
+            - IMDB matching is partial (can match within array of IDs)
+            - TMDB, TVDB, season, and epoffset require exact matches
+            - TV show searches can include season and episode offset criteria
+            - Results are deduplicated based on (anilist_id, tvdb_season, tvdb_epoffset)
         """
         if not imdb and not tmdb and not tvdb:
             return []

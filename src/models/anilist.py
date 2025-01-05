@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 from datetime import date, datetime, timedelta, timezone
 from enum import StrEnum
 from functools import total_ordering
-from typing import Annotated, ClassVar, get_args, get_origin
+from typing import Annotated, Any, ClassVar, get_args, get_origin
 
 from pydantic import AfterValidator, AliasGenerator, BaseModel, ConfigDict
 from pydantic.alias_generators import to_camel
@@ -107,17 +109,17 @@ class MediaListStatus(AniListBaseEnum):
         "REPEATING": 3,
     }
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: MediaListStatus) -> bool:
         if self.__class__ is not other.__class__:
             return NotImplemented
         return self.value == other.value
 
-    def __ne__(self, other) -> bool:
+    def __ne__(self, other: MediaListStatus) -> bool:
         if self.__class__ is not other.__class__:
             return NotImplemented
         return self.value != other.value
 
-    def __lt__(self, other) -> bool:
+    def __lt__(self, other: MediaListStatus) -> bool:
         if self.__class__ is not other.__class__:
             return NotImplemented
         return (
@@ -125,12 +127,12 @@ class MediaListStatus(AniListBaseEnum):
             and self.__priority[self.value] <= self.__priority[other.value]
         )
 
-    def __le__(self, other) -> bool:
+    def __le__(self, other: MediaListStatus) -> bool:
         if self.__class__ is not other.__class__:
             return NotImplemented
         return self.__priority[self.value] <= self.__priority[other.value]
 
-    def __gt__(self, other) -> bool:
+    def __gt__(self, other: MediaListStatus) -> bool:
         if self.__class__ is not other.__class__:
             return NotImplemented
         return (
@@ -138,7 +140,7 @@ class MediaListStatus(AniListBaseEnum):
             and self.__priority[self.value] >= self.__priority[other.value]
         )
 
-    def __ge__(self, other) -> bool:
+    def __ge__(self, other: MediaListStatus) -> bool:
         if self.__class__ is not other.__class__:
             return NotImplemented
         return self.__priority[self.value] >= self.__priority[other.value]
@@ -275,7 +277,7 @@ class FuzzyDate(AniListBaseModel):
     day: int | None = None
 
     @staticmethod
-    def from_date(d: date | datetime) -> "FuzzyDate":
+    def from_date(d: date | datetime) -> FuzzyDate:
         """Create a FuzzyDate from a date or datetime object
 
         Args:
@@ -296,7 +298,7 @@ class FuzzyDate(AniListBaseModel):
             return None
         return datetime(year=self.year, month=self.month or 1, day=self.day or 1)
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: Any) -> bool:
         if not isinstance(other, FuzzyDate):
             return False
         return (
@@ -305,7 +307,7 @@ class FuzzyDate(AniListBaseModel):
             and self.day == other.day
         )
 
-    def __lt__(self, other: "FuzzyDate" | None) -> bool:
+    def __lt__(self, other: FuzzyDate | None) -> bool:
         if other is None:
             return False
         return ((self.year or 0), (self.month or 0), (self.day or 0)) < (

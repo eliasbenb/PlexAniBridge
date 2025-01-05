@@ -2,7 +2,7 @@ from sqlmodel import Field, SQLModel
 
 
 class Housekeeping(SQLModel, table=True):
-    """Model for the Housekeeping table
+    """Model for the Housekeeping table.
 
     This table is used to store miscellaneous data such as timestamps and hashes.
     """
