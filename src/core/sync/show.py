@@ -106,16 +106,9 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
             return MediaListStatus.CURRENT
 
         all_episodes = self.__filter_mapped_episodes(subitem, anilist_media, animapping)
-        # We've watched all currently aired episodes, which is why it's not on continue watching
-        if (
-            anilist_media.status == MediaStatus.RELEASING
-            and len(watched_episodes) == len(all_episodes)
-            and is_partially_viewed
-        ):
+        # We've watched all episodes available to us
+        if len(watched_episodes) == len(all_episodes) and is_partially_viewed:
             return MediaListStatus.CURRENT
-        # We've watched all the episodes available to us, so we're forced to pause
-        if len(all_episodes) == len(watched_episodes) and is_partially_viewed:
-            return MediaListStatus.PAUSED
 
         is_on_watchlist = self.plex_client.is_on_watchlist(item)
         # At this point, we can consider the show dropped. However, if it is on the watchlist, we'll assume the user still wants to watch it
