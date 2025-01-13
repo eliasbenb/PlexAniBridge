@@ -434,14 +434,19 @@ class BaseSyncClient(ABC, Generic[T, S]):
         if media_list.status is None:
             return media_list
 
-        if media_list.status >= MediaListStatus.CURRENT:
+        notes = None
+        if "notes" not in self.excluded_sync_fields:
+            notes = self.plex_client.get_user_review(
+                subitem
+            ) or self.plex_client.get_user_review(item)
+
+        if media_list.status > MediaListStatus.PLANNING:
             media_list.started_at = self._calculate_started_at(
                 item=item,
                 subitem=subitem,
                 anilist_media=anilist_media,
                 animapping=animapping,
             )
-
         if media_list.status >= MediaListStatus.COMPLETED:
             media_list.completed_at = self._calculate_completed_at(
                 item=item,
@@ -449,18 +454,13 @@ class BaseSyncClient(ABC, Generic[T, S]):
                 anilist_media=anilist_media,
                 animapping=animapping,
             )
-
             media_list.score = self._calculate_score(
                 item=item,
                 subitem=subitem,
                 anilist_media=anilist_media,
                 animapping=animapping,
             )
-
-            if "notes" not in self.excluded_sync_fields:  # Avoid unnecessary API calls
-                media_list.notes = self.plex_client.get_user_review(
-                    subitem
-                ) or self.plex_client.get_user_review(item)
+            media_list.notes = notes
 
         return media_list
 

@@ -1,10 +1,11 @@
 import sys
+from datetime import datetime
 from typing import Iterator
 
 import plexapi.exceptions
 from plexapi.video import Episode, Season, Show
 
-from src.models.anilist import FuzzyDate, Media, MediaListStatus, MediaStatus
+from src.models.anilist import FuzzyDate, Media, MediaListStatus
 from src.models.animap import AniMap
 
 from .base import BaseSyncClient, ParsedGuids
@@ -96,9 +97,10 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
             + (anilist_media.episodes or sys.maxsize),
         )
 
-        # We've watched it and are in the process of watching it again
+        # We've watched all episodes and are in the process of watching them again
         if is_viewed and is_on_continue_watching:
             return MediaListStatus.REPEATING
+        # We've watched all episodes
         if is_viewed:
             return MediaListStatus.COMPLETED
         # We've watched some episode recently and have more remaining
@@ -106,18 +108,25 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
             return MediaListStatus.CURRENT
 
         all_episodes = self.__filter_mapped_episodes(subitem, anilist_media, animapping)
-        # We've watched all episodes available to us
-        if len(watched_episodes) == len(all_episodes) and is_partially_viewed:
+        is_all_available = len(all_episodes) >= (anilist_media.episodes or sys.maxsize)
+        is_in_deck_window = any(
+            e.lastViewedAt + self.plex_client.on_deck_window > datetime.now()
+            for e in watched_episodes
+        )
+
+        # We've watched some episodes recently and the Plex server doesn't have all episodes
+        if is_in_deck_window and not is_all_available:
             return MediaListStatus.CURRENT
 
         is_on_watchlist = self.plex_client.is_on_watchlist(item)
-        # At this point, we can consider the show dropped. However, if it is on the watchlist, we'll assume the user still wants to watch it
-        if is_on_watchlist and is_partially_viewed:
+
+        # We've watched some episodes but it's no longer on continue watching. However, it's on the watchlist
+        if is_partially_viewed and is_on_watchlist:
             return MediaListStatus.PAUSED
-        # On the watchlist + no partial views = planning
+        # We haven't watched any episodes and it's on the watchlist
         if is_on_watchlist:
             return MediaListStatus.PLANNING
-        # We've watched some episodes but are not on continue watching, so we're dropped
+        # We've watched some episodes but it's not on continue watching or the watchlist
         if is_partially_viewed:
             return MediaListStatus.DROPPED
         return None
@@ -183,7 +192,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
         """Calculates the start date for a media item.
 
         Args:
-            subitem (Movie): Specific item to sync
+            subitem (Season): Specific item to sync
             animapping (AniMap): ID mapping information
 
         Returns:
@@ -211,7 +220,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
         """Calculates the completion date for a media item.
 
         Args:
-            subitem (Movie): Specific item to sync
+            subitem (Season): Specific item to sync
             anilist_media (Media): Matched AniList entry
             animapping (AniMap): ID mapping information
 
@@ -240,6 +249,18 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
     def __filter_mapped_episodes(
         self, subitem: Season, anilist_media: Media, animapping: AniMap
     ) -> list[Episode]:
+        """Filter episodes based on the mapped AniList entry.
+
+        Only episodes in the mapped range are returned.
+
+        Args:
+            subitem (Season): Specific item to sync
+            anilist_media (Media): Matched AniList entry
+            animapping (AniMap): ID mapping information
+
+        Returns:
+            list[Episode]: Filtered episodes
+        """
         return self.plex_client.get_episodes(
             subitem,
             start=animapping.tvdb_epoffset + 1,
@@ -249,6 +270,18 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
     def __filter_watched_episodes(
         self, subitem: Season, anilist_media: Media, animapping: AniMap
     ) -> list[Episode]:
+        """Filter episodes based on the mapped AniList entry and watched status.
+
+        Only episodes in the mapped range that have been watched are returned.
+
+        Args:
+            subitem (Season): Specific item to sync
+            anilist_media (Media): Matched AniList entry
+            animapping (AniMap): ID mapping information
+
+        Returns:
+            list[Episode]: Filtered episodes
+        """
         return self.plex_client.get_watched_episodes(
             subitem,
             start=animapping.tvdb_epoffset + 1,

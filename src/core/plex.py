@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import cache
 from textwrap import dedent
 
@@ -43,6 +43,7 @@ class PlexClient:
 
         self.admin_client = PlexServer(plex_url, plex_token)
         self._init_user_client()
+        self.on_deck_window = self._get_on_deck_window()
 
     def _init_user_client(self) -> PlexServer:
         """Initializes the Plex client for the specified user account.
@@ -85,6 +86,16 @@ class PlexClient:
             if self.is_admin_user
             else f"{self.__class__.__name__}: User is not an admin, using user client"
         )
+
+    def _get_on_deck_window(self) -> timedelta:
+        """Gets the configured cutoff time for Continue Watching items on Plex.
+
+        This setting is server-wide and can only be configured by the admin of the server.
+
+        Returns:
+            timedelta: Time delta for the cutoff duration
+        """
+        return timedelta(weeks=self.admin_client.settings.get("onDeckWindow").value)
 
     def get_sections(self) -> list[MovieSection] | list[ShowSection]:
         """Retrieves configured Plex library sections.
