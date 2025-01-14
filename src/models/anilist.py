@@ -146,6 +146,23 @@ class MediaListStatus(AniListBaseEnum):
         return self.__priority[self.value] >= self.__priority[other.value]
 
 
+class ScoreFormat(AniListBaseEnum):
+    POINT_100 = "POINT_100"
+    POINT_10_DECIMAL = "POINT_10_DECIMAL"
+    POINT_10 = "POINT_10"
+    POINT_5 = "POINT_5"
+    POINT_3 = "POINT_3"
+
+
+class UserTitleLanguage(AniListBaseEnum):
+    ROMAJI = "ROMAJI"
+    ENGLISH = "ENGLISH"
+    NATIVE = "NATIVE"
+    ROMAJI_STYLISED = "ROMAJI_STYLISED"
+    ENGLISH_STYLISED = "ENGLISH_STYLISED"
+    NATIVE_STYLISED = "NATIVE_STYLISED"
+
+
 class AniListBaseModel(BaseModel):
     """Base, abstract class for all AniList models to represent GraphQL objects"""
 
@@ -235,9 +252,16 @@ class AniListBaseModel(BaseModel):
     )
 
 
+class UserOptions(AniListBaseModel):
+    title_language: UserTitleLanguage | None = None
+    timezone: str | None = None
+
+
 class User(AniListBaseModel):
     id: int
     name: str
+    options: UserOptions | None = None
+    media_list_options: MediaListOptions | None = None
 
 
 class PageInfo(AniListBaseModel):
@@ -365,6 +389,11 @@ class MediaListCollection(AniListBaseModel):
     user: User | None = None
     lists: list[MediaListGroup] = []
     has_next_chunk: bool | None = None
+
+
+class MediaListOptions(AniListBaseModel):
+    score_format: ScoreFormat | None = None
+    row_order: str | None = None
 
 
 class AiringSchedule(AniListBaseModel):

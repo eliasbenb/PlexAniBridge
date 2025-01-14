@@ -87,7 +87,8 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie]):
         Returns:
             int | None: User rating for the media item
         """
-        return item.userRating
+        score = item.userRating
+        return self._normalize_score(score) if score else None
 
     def _calculate_progress(self, item: Movie, **_) -> int | None:
         """Calculates the progress for a media item.
