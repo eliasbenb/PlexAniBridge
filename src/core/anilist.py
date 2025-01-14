@@ -74,7 +74,7 @@ class AniListClient:
         response = self._make_request(query)["data"]["Viewer"]
         return User(**response)
 
-    def update_anime_entry(self, media_list_entry: MediaList) -> MediaList | None:
+    def update_anime_entry(self, media_list_entry: MediaList) -> None:
         """Updates an anime entry on the authenticated user's list.
 
         Sends a mutation to modify an existing anime entry in the user's list with new
@@ -83,16 +83,13 @@ class AniListClient:
         Args:
             media_list_entry (MediaList): Updated entry containing the following fields:
 
-        Returns:
-            MediaList | None: Updated entry if successful and not in dry run mode, None otherwise
-
         Raises:
             requests.HTTPError: If the API request fails
         """
         query = dedent(f"""
         mutation ($mediaId: Int, $status: MediaListStatus, $score: Float, $progress: Int, $repeat: Int, $notes: String, $startedAt: FuzzyDateInput, $completedAt: FuzzyDateInput) {{
             SaveMediaListEntry(mediaId: $mediaId, status: $status, score: $score, progress: $progress, repeat: $repeat, notes: $notes, startedAt: $startedAt, completedAt: $completedAt) {{
-{MediaList.model_dump_graphql(indent_level=3)}
+{MediaListWithMedia.model_dump_graphql(indent_level=3)}
             }}
         }}
         """).strip()
@@ -106,7 +103,10 @@ class AniListClient:
         variables = media_list_entry.model_dump_json(exclude_none=True)
 
         response = self._make_request(query, variables)["data"]["SaveMediaListEntry"]
-        return MediaList(**response)
+
+        self.offline_anilist_entries[media_list_entry.media_id] = (
+            self._media_list_entry_to_media(MediaListWithMedia(**response))
+        )
 
     def delete_anime_entry(self, entry_id: int, media_id: int) -> bool:
         """Deletes an anime entry from the authenticated user's list.
@@ -142,6 +142,12 @@ class AniListClient:
         ).model_dump_json(exclude_none=True)
 
         response = self._make_request(query, variables)["data"]["DeleteMediaListEntry"]
+
+        try:
+            del self.offline_anilist_entries[media_id]
+        except KeyError:
+            pass
+
         return response["deleted"]
 
     def search_anime(
@@ -278,8 +284,11 @@ class AniListClient:
         )
 
         response = self._make_request(query, {"id": anilist_id})
+        result = Media(**response["data"]["Media"])
 
-        return Media(**response["data"]["Media"])
+        self.offline_anilist_entries[anilist_id] = result
+
+        return result
 
     def backup_anilist(self) -> None:
         """Creates a JSON backup of the user's AniList data.
