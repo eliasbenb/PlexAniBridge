@@ -248,7 +248,7 @@ def setup_logger(log_name: str, log_level: str, log_dir: str) -> logging.Logger:
                 datefmt="%Y-%m-%d %H:%M:%S",
             )
             if HAS_COLOR_SUPPORT
-            else logging.Formatter(
+            else CleanFormatter(
                 log_format,
                 datefmt="%Y-%m-%d %H:%M:%S",
             )
