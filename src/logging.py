@@ -1,12 +1,67 @@
 import logging
+import os
 import re
+import sys
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 import colorama
 from colorama import Fore, Style
 
-colorama.init()
+
+def supports_color() -> bool:
+    """Check if the terminal supports ANSI color codes.
+
+    Detects if the terminal supports ANSI color codes by checking platform-specific
+    conditions and environment variables. On Windows, it also checks the Windows
+    registry for the VirtualTerminalLevel key.
+
+    Returns:
+        bool: True if the terminal supports color, False otherwise
+    """
+
+    def vt_codes_enabled_in_windows_registry():
+        try:
+            import winreg
+        except ImportError:
+            return False
+
+        try:
+            reg_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Console")
+            reg_key_value, _ = winreg.QueryValueEx(reg_key, "VirtualTerminalLevel")
+            return reg_key_value == 1
+        except FileNotFoundError:
+            return False
+
+    is_a_tty = hasattr(sys.stdout, "isatty") and sys.stdout.isatty()
+
+    if not is_a_tty:
+        return False
+
+    if sys.platform == "win32":
+        return (
+            getattr(colorama, "fixed_windows_console", False)
+            or "ANSICON" in os.environ
+            or "WT_SESSION" in os.environ  # Windows Terminal
+            or os.environ.get("TERM_PROGRAM") == "vscode"
+            or vt_codes_enabled_in_windows_registry()
+        )
+
+    return True
+
+
+if supports_color():
+    try:
+        if sys.platform == "win32":
+            colorama.just_fix_windows_console()
+        else:
+            colorama.init()
+    except (AttributeError, ImportError, OSError):
+        HAS_COLOR_SUPPORT = False
+    else:
+        HAS_COLOR_SUPPORT = True
+else:
+    HAS_COLOR_SUPPORT = False
 
 
 class ColorFormatter(logging.Formatter):
@@ -187,9 +242,16 @@ def setup_logger(log_name: str, log_level: str, log_dir: str) -> logging.Logger:
             datefmt="%Y-%m-%d %H:%M:%S",
         )
 
-        console_formatter = ColorFormatter(
-            log_format,
-            datefmt="%Y-%m-%d %H:%M:%S",
+        console_formatter = (
+            ColorFormatter(
+                log_format,
+                datefmt="%Y-%m-%d %H:%M:%S",
+            )
+            if HAS_COLOR_SUPPORT
+            else logging.Formatter(
+                log_format,
+                datefmt="%Y-%m-%d %H:%M:%S",
+            )
         )
 
         log_file = log_path / f"{log_name}.{log_level}.log"
