@@ -8,7 +8,7 @@ from thefuzz import fuzz
 
 from src import log
 from src.core import AniListClient, AniMapClient, PlexClient
-from src.models.anilist import FuzzyDate, Media, MediaList, MediaListStatus
+from src.models.anilist import FuzzyDate, Media, MediaList, MediaListStatus, ScoreFormat
 from src.models.animap import AniMap
 from src.settings import SyncField
 
@@ -327,9 +327,7 @@ class BaseSyncClient(ABC, Generic[T, S]):
         """
         guids = ParsedGuids.from_guids(item.guids)
 
-        anilist_media_list = (
-            anilist_media.media_list_entry if anilist_media.media_list_entry else None
-        )
+        anilist_media_list = anilist_media.media_list_entry or None
         plex_media_list = self._get_plex_media_list(
             item=item,
             subitem=subitem,
@@ -577,6 +575,36 @@ class BaseSyncClient(ABC, Generic[T, S]):
             FuzzyDate | None: Completion date for the media item
         """
         pass
+
+    def _normalize_score(self, score: int | None) -> int | float | None:
+        """Normalizes a 0-10 point rating to the user's preferred scale.
+
+        Note:
+            Plex uses a scale of 0-5 with half-steps in the UI but the API uses 0-10 points.
+
+        Args:
+            score (int | float | None): User rating to normalize
+        Returns:
+            int | None: Normalized rating or None if no rating
+        """
+        if score is None:
+            return None
+
+        scale = self.anilist_client.user.media_list_options.score_format
+
+        match scale:
+            case ScoreFormat.POINT_100:
+                return score * 10
+            case ScoreFormat.POINT_10_DECIMAL:
+                return score * 1.0
+            case ScoreFormat.POINT_10:
+                return score * 1
+            case ScoreFormat.POINT_5:
+                return round(score / 2)
+            case ScoreFormat.POINT_3:
+                return round(score / 3.33)
+            case None:
+                return score
 
     def _merge_media_lists(
         self,

@@ -141,7 +141,8 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
         Returns:
             int | None: User rating for the media item
         """
-        return subitem.userRating or item.userRating
+        score = subitem.userRating or item.userRating
+        return self._normalize_score(score) if score else None
 
     def _calculate_progress(
         self,
