@@ -10,7 +10,7 @@ services:
       # SYNC_INTERVAL: 3600
       # PARTIAL_SCAN: True
       # DESTRUCTIVE_SYNC: False
-      # EXCLUDED_SYNC_FIELDS: ["notes", "score"]
+      # EXCLUDED_SYNC_FIELDS: '["notes", "score"]'
       # DATA_PATH: ./data
       # DRY_RUN: False
       # LOG_LEVEL: INFO
