@@ -41,7 +41,7 @@ class BridgeClient:
     def __init__(self, config: PlexAnibridgeConfig) -> None:
         self.config = config
         self.token_user_pairs = list(zip(config.ANILIST_TOKEN, config.PLEX_USER))
-        self.animap_client = AniMapClient()
+        self.animap_client = AniMapClient(config.DATA_PATH)
 
         self.last_synced = self._get_last_synced()
         self.last_config_encoded = self._get_last_config_encoded()
@@ -125,7 +125,7 @@ class BridgeClient:
         log.info(
             f"{self.__class__.__name__}: Starting "
             f"{'partial ' if self._should_perform_partial_scan() else ''}"
-            f"{'and ' if  self._should_perform_partial_scan() and self.config.DESTRUCTIVE_SYNC else ''}"
+            f"{'and ' if self._should_perform_partial_scan() and self.config.DESTRUCTIVE_SYNC else ''}"
             f"{'destructive ' if self.config.DESTRUCTIVE_SYNC else ''}"
             f"sync between Plex and AniList libraries"
         )
