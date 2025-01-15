@@ -15,3 +15,9 @@ class AniMap(SQLModel, table=True):
     tvdb_id: int | None = Field(index=True)
     tvdb_epoffset: int | None
     tvdb_season: int | None
+
+    def __hash__(self) -> int:
+        return hash(self.__repr__())
+
+    def __repr__(self):
+        return f"<{':'.join(f'{k}={v}' for k, v in self.model_dump().items() if v is not None)}>"
