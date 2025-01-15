@@ -250,33 +250,24 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
         Returns:
             FuzzyDate | None: Completion date for the media item
         """
-        try:
-            episode: Episode | None = None
-
-            if animapping.tvdb_season == -1:
-                seasons: list[Season] = item.seasons(index__gt=0)
-                episodes_count = 0
-
-                for season in seasons:
-                    episodes: list[Episode] = season.episodes()
-                    max_episode_index = episodes[-1].index if episodes else 0
-
-                    if episodes_count + max_episode_index >= anilist_media.episodes:
-                        episode = season.get(
-                            episode=anilist_media.episodes - episodes_count
-                        )
-                        break
-                    episodes_count += season.leafCount
-            else:
+        if animapping.tvdb_season == -1:
+            episodes = self.__filter_mapped_episodes(
+                item=item,
+                subitem=subitem,
+                anilist_media=anilist_media,
+                animapping=animapping,
+            )
+            if not episodes or len(episodes) < (anilist_media.episodes or sys.maxsize):
+                return None
+            episode = episodes[-1]
+        else:
+            try:
                 episode: Episode = subitem.get(
                     episode=animapping.tvdb_epoffset
                     + (anilist_media.episodes or sys.maxsize)
                 )
-
-            if not episode:
+            except (plexapi.exceptions.NotFound, IndexError):
                 return None
-        except (plexapi.exceptions.NotFound, IndexError):
-            return None
 
         history = self.plex_client.get_first_history(episode)
         if not history and not episode.lastViewedAt:
@@ -305,6 +296,29 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
         Returns:
             list[Episode]: Filtered episodes
         """
+        if animapping.tvdb_season == -1:
+            episodes: list[Episode] = []
+            seasons: list[Season] = item.seasons(index__gt=0)
+            episodes_count = 0
+
+            for season in seasons:
+                tmp_episodes: list[Episode] = season.episodes()
+                max_episode_index = episodes[-1].index if episodes else 0
+
+                if episodes_count + max_episode_index >= anilist_media.episodes:
+                    episodes.extend(
+                        (
+                            e
+                            for e in tmp_episodes
+                            if e.index <= anilist_media.episodes - episodes_count
+                        )
+                    )
+                    break
+
+                episodes.extend(tmp_episodes)
+                episodes_count += season.leafCount
+            return episodes
+
         return self.plex_client.get_episodes(
             item if animapping.tvdb_season == -1 else subitem,
             start=animapping.tvdb_epoffset + 1,
@@ -327,8 +341,13 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
         Returns:
             list[Episode]: Filtered episodes
         """
-        return self.plex_client.get_watched_episodes(
-            item if animapping.tvdb_season == -1 else subitem,
-            start=animapping.tvdb_epoffset + 1,
-            end=animapping.tvdb_epoffset + (anilist_media.episodes or sys.maxsize),
-        )
+        return [
+            e
+            for e in self.__filter_mapped_episodes(
+                item=item,
+                subitem=subitem,
+                anilist_media=anilist_media,
+                animapping=animapping,
+            )
+            if e.viewCount
+        ]
