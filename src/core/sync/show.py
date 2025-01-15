@@ -303,7 +303,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
 
             for season in seasons:
                 tmp_episodes: list[Episode] = season.episodes()
-                max_episode_index = episodes[-1].index if episodes else 0
+                max_episode_index = tmp_episodes[-1].index if tmp_episodes else 0
 
                 if episodes_count + max_episode_index >= anilist_media.episodes:
                     episodes.extend(
@@ -316,11 +316,11 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
                     break
 
                 episodes.extend(tmp_episodes)
-                episodes_count += season.leafCount
+                episodes_count += max_episode_index
             return episodes
 
         return self.plex_client.get_episodes(
-            item if animapping.tvdb_season == -1 else subitem,
+            subitem,
             start=animapping.tvdb_epoffset + 1,
             end=animapping.tvdb_epoffset + (anilist_media.episodes or sys.maxsize),
         )
