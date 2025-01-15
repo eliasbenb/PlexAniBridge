@@ -2,7 +2,7 @@ from hashlib import md5
 from typing import Any
 
 import requests
-from sqlmodel import Session, delete, select
+from sqlmodel import Session, column, delete, exists, func, select, true
 from sqlmodel.sql.expression import and_, or_
 
 from src import log
@@ -12,17 +12,17 @@ from src.models.housekeeping import Housekeeping
 
 
 class AniMapClient:
-    """Client for managing the AniMap database (Kometa's anime ID mapping).
+    """Client for managing the AniMap database.
 
     This client manages a local SQLite database that maps anime IDs between different services
-    (AniList, TVDB, IMDB, etc.). It handles synchronization with Kometa's CDN source and
+    (AniList, TVDB, IMDB, etc.). It handles synchronization with the mapping source and
     provides query capabilities for ID mapping lookups.
 
     The database is automatically synchronized on client initialization and maintains
     a hash of the CDN data to minimize unnecessary updates.
 
     Attributes:
-        CDN_URL (str): URL to Kometa's anime ID mapping JSON file
+        CDN_URL (str): URL to the mappings JSON file in the PlexAniBridge-Mappings repository on GitHub
 
     Database Schema:
         The client manages the following tables:
@@ -30,7 +30,7 @@ class AniMapClient:
         - Housekeeping: Stores metadata like the CDN hash for sync management
 
     Mapping Source:
-        https://github.com/Kometa-Team/Anime-IDs/
+        https://github.com/eliasbenb/PlexAniBridge-Mappings
 
     Note:
         The client maintains data integrity by:
@@ -40,13 +40,13 @@ class AniMapClient:
         - Using database transactions for atomic updates
     """
 
-    CDN_URL = "https://cdn.jsdelivr.net/gh/Kometa-Team/Anime-IDs@refs/heads/master/anime_ids.json"
+    CDN_URL = "https://cdn.jsdelivr.net/gh/eliasbenb/PlexAniBridge-Mappings@main/mappings.json"
 
     def __init__(self) -> None:
         self._sync_db()
 
     def _sync_db(self) -> None:
-        """Synchronizes the local database with the Kometa CDN source.
+        """Synchronizes the local database with the mapping source.
 
         Performs the following steps:
         1. Checks if the CDN data has changed by comparing MD5 hashes
@@ -68,14 +68,30 @@ class AniMapClient:
             - Uses SQLModel merge operations to efficiently update existing records
             - Maintains data consistency using database transactions
         """
+
+        def single_val_to_list(value: Any) -> list[int | str]:
+            """Converts a single value to a list if not already a list.
+
+            Args:
+                value (Any): Value to convert
+
+            Returns:
+                list[int | str]: Converted value
+            """
+            if value is None:
+                return None
+            return [value] if not isinstance(value, list) else value
+
         with Session(db.engine) as session:
             # First check if the CDN data has changed. If not, we can skip the sync
             last_cdn_hash = session.get(Housekeeping, "animap_cdn_hash")
 
             response = requests.get(self.CDN_URL)
             response.raise_for_status()
+            response_data: dict = response.json()
+            response_data.pop("$schema", None)
 
-            cdn_data: dict[int, dict[str, Any]] = response.json()
+            cdn_data: dict[int, dict[str, Any]] = response_data
             curr_cdn_hash = md5(response.content).hexdigest()
 
             if last_cdn_hash and last_cdn_hash.value == curr_cdn_hash:
@@ -90,30 +106,26 @@ class AniMapClient:
 
             values = [
                 {
-                    "anidb_id": anidb_id,
+                    "anilist_id": anilist_id,
                     **{
-                        field: data.get(field)
+                        field: data[field]
                         for field in AniMap.model_fields
-                        if field != "anidb_id"
+                        if field in data
                     },
                 }
-                for anidb_id, data in cdn_data.items()
+                for anilist_id, data in cdn_data.items()
             ]
 
             session.exec(
                 delete(AniMap).where(
-                    AniMap.anidb_id.not_in([d["anidb_id"] for d in values])
+                    AniMap.anilist_id.not_in([d["anilist_id"] for d in values])
                 )
             )
 
             for value in values:
-                if "mal_id" in value and value["mal_id"] is not None:
-                    value["mal_id"] = [
-                        int(id) for id in str(value["mal_id"]).split(",")
-                    ]
-                if "imdb_id" in value and value["imdb_id"] is not None:
-                    value["imdb_id"] = str(value["imdb_id"]).split(",")
-
+                for attr in ("mal_id", "imdb_id", "tmdb_movie_id", "tmdb_show_id"):
+                    if attr in value:
+                        value[attr] = single_val_to_list(value[attr])
                 session.merge(AniMap(**value))
 
             session.merge(Housekeeping(key="animap_cdn_hash", value=curr_cdn_hash))
