@@ -1,10 +1,10 @@
+# Data
+data/
+
 # Database
 *.db
 *.db-journal
 *.sqlite3
-
-# Backup
-data/backups
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
