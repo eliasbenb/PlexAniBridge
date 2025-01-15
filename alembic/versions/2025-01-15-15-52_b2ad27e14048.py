@@ -34,10 +34,8 @@ def upgrade() -> None:
     # Create a new table with the desired schema and primary key
     op.create_table(
         "animap_new",
-        sa.Column(
-            "anidb_id", sa.Integer, primary_key=True, nullable=False
-        ),  # New primary key
-        sa.Column("anilist_id", sa.Integer, nullable=True),
+        sa.Column("anilist_id", sa.Integer, primary_key=True, nullable=False),
+        sa.Column("anidb_id", sa.Integer, primary_key=False, nullable=True),
         sa.Column("imdb_id", JSON(none_as_null=True), nullable=True),
         sa.Column("mal_id", JSON(none_as_null=True), nullable=True),
         sa.Column("tmdb_movie_id", JSON(none_as_null=True), nullable=True),
@@ -50,11 +48,11 @@ def upgrade() -> None:
     # Copy data from the old table to the new table
     op.execute("""
         INSERT INTO animap_new (
-            anidb_id, anilist_id, imdb_id, mal_id, tmdb_movie_id, tmdb_show_id,
+            anilist_id, anidb_id, imdb_id, mal_id, tmdb_movie_id, tmdb_show_id,
             tvdb_id, tvdb_epoffset, tvdb_season
         )
         SELECT
-            anidb_id, anilist_id, imdb_id, mal_id, tmdb_movie_id, tmdb_show_id,
+            anilist_id, anidb_id, imdb_id, mal_id, tmdb_movie_id, tmdb_show_id,
             tvdb_id, tvdb_epoffset, tvdb_season
         FROM animap
     """)
@@ -120,6 +118,7 @@ def downgrade() -> None:
 
     # Recreate indexes for the old table
     op.create_index("ix_animap_anilist_id", "animap", ["anilist_id"], unique=True)
+    op.create_index("ix_animap_anidb_id", "animap", ["anidb_id"], unique=True)
     op.create_index("ix_animap_imdb_id", "animap", ["imdb_id"], unique=False)
     op.create_index("ix_animap_mal_id", "animap", ["mal_id"], unique=False)
     op.create_index(
