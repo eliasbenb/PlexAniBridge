@@ -257,9 +257,12 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
                 anilist_media=anilist_media,
                 animapping=animapping,
             )
-            if not episodes or len(episodes) < (anilist_media.episodes or sys.maxsize):
+            if len(episodes) < (anilist_media.episodes or sys.maxsize):
                 return None
-            episode = episodes[-1]
+            try:
+                episode = episodes[anilist_media.episodes - 1]
+            except IndexError:
+                return None
         else:
             try:
                 episode: Episode = subitem.get(
