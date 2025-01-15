@@ -1,5 +1,6 @@
 # Database
 *.db
+*.db-journal
 *.sqlite3
 
 # Backup
