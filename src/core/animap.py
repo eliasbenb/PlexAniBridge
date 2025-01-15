@@ -199,6 +199,7 @@ class AniMapClient:
                 select(AniMap)
                 .join(query, AniMap.anidb_id == query.c.anidb_id)
                 .order_by(
+                    (AniMap.tvdb_season == -1).asc(),  # Ensure tvdb_season=-1 is last
                     AniMap.tvdb_season,
                     AniMap.tvdb_epoffset,
                     AniMap.anilist_id,
