@@ -1,7 +1,10 @@
+import json
 from hashlib import md5
+from pathlib import Path
 from typing import Any
 
 import requests
+from pydantic import ValidationError
 from sqlmodel import Session, column, delete, exists, func, select, true
 from sqlmodel.sql.expression import and_, or_
 
@@ -40,9 +43,12 @@ class AniMapClient:
         - Using database transactions for atomic updates
     """
 
-    CDN_URL = "https://cdn.jsdelivr.net/gh/eliasbenb/PlexAniBridge-Mappings@main/mappings.json"
+    CDN_URL = (
+        "https://cdn.jsdelivr.net/gh/eliasbenb/PlexAniBridge-Mappings/mappings.json"
+    )
 
-    def __init__(self) -> None:
+    def __init__(self, data_path: Path) -> None:
+        self.custom_mappings_path = data_path / "mappings.custom.json"
         self._sync_db()
 
     def _sync_db(self) -> None:
@@ -83,7 +89,8 @@ class AniMapClient:
             return [value] if not isinstance(value, list) else value
 
         with Session(db.engine) as session:
-            # First check if the CDN data has changed. If not, we can skip the sync
+            # First check if the CDN or custom data have changed. If not, we can skip the sync
+            last_custom_hash = session.get(Housekeeping, "animap_custom_hash")
             last_cdn_hash = session.get(Housekeeping, "animap_cdn_hash")
 
             response = requests.get(self.CDN_URL)
@@ -91,10 +98,58 @@ class AniMapClient:
             response_data: dict = response.json()
             response_data.pop("$schema", None)
 
+            if self.custom_mappings_path.exists():
+                with self.custom_mappings_path.open("r") as f:
+                    try:
+                        custom_data: dict = json.load(f)
+                    except json.JSONDecodeError:
+                        log.warning(
+                            f"Invalid custom mappings file at $$'{self.custom_mappings_path}'$$"
+                        )
+                        custom_data = {}
+                    custom_data.pop("$schema", None)
+
+                    animap_defaults = {field: None for field in AniMap.model_fields}
+
+                    validated_count = 0
+                    tmp_custom_data = custom_data.copy()
+                    for anilist_id, data in custom_data.items():
+                        try:
+                            AniMap.model_validate(
+                                {**animap_defaults, "anilist_id": anilist_id, **data}
+                            )
+                            validated_count += 1
+                        except ValidationError as e:
+                            log.warning(
+                                f"Invalid custom mapping entry: {anilist_id}: {e}"
+                            )
+                            tmp_custom_data.pop(anilist_id)
+                    custom_data = tmp_custom_data
+
+                    log.info(
+                        f"Loading {validated_count} custom mapping entries from $$'{self.custom_mappings_path}'$$"
+                    )
+            else:
+                with self.custom_mappings_path.open("w") as f:
+                    json.dump(
+                        {
+                            "$schema": "https://cdn.jsdelivr.net/gh/eliasbenb/PlexAniBridge-Mappings/mappings.schema.json"
+                        },
+                        f,
+                        indent=2,
+                    )
+                custom_data = {}
+
             cdn_data: dict[int, dict[str, Any]] = response_data
+
+            curr_custom_hash = md5(
+                json.dumps(custom_data, sort_keys=True).encode()
+            ).hexdigest()
             curr_cdn_hash = md5(response.content).hexdigest()
 
-            if last_cdn_hash and last_cdn_hash.value == curr_cdn_hash:
+            if (last_cdn_hash and last_cdn_hash.value == curr_cdn_hash) and (
+                last_custom_hash and last_custom_hash.value == curr_custom_hash
+            ):
                 log.debug(
                     f"{self.__class__.__name__}: Cache is still valid, skipping sync"
                 )
@@ -103,6 +158,14 @@ class AniMapClient:
             log.debug(
                 f"{self.__class__.__name__}: Anime mapping changes detected, syncing database"
             )
+
+            # Overload the CDN data with custom data
+            merged_data = {**cdn_data}
+            for anilist_id, data in custom_data.items():
+                if anilist_id in merged_data:
+                    merged_data[anilist_id].update(data)
+                else:
+                    merged_data[anilist_id] = data
 
             values = [
                 {
@@ -113,7 +176,7 @@ class AniMapClient:
                         if field in data
                     },
                 }
-                for anilist_id, data in cdn_data.items()
+                for anilist_id, data in merged_data.items()
             ]
 
             session.exec(
@@ -128,6 +191,9 @@ class AniMapClient:
                         value[attr] = single_val_to_list(value[attr])
                 session.merge(AniMap(**value))
 
+            session.merge(
+                Housekeeping(key="animap_custom_hash", value=curr_custom_hash)
+            )
             session.merge(Housekeeping(key="animap_cdn_hash", value=curr_cdn_hash))
             session.commit()
 
