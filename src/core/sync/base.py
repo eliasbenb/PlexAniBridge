@@ -185,7 +185,7 @@ class BaseSyncClient(ABC, Generic[T, S]):
         guids = ParsedGuids.from_guids(item.guids)
         log.debug(
             f"{self.__class__.__name__}: Processing {item.type} {self._debug_log_title(item)} "
-            f"{self._debug_log_ids(item.guid, guids)}"
+            f"{self._debug_log_ids(item.ratingKey, item.guid, guids)}"
         )
 
         for subitem, animapping, guids in self.map_media(item=item):
@@ -202,7 +202,7 @@ class BaseSyncClient(ABC, Generic[T, S]):
                     log.warning(
                         f"{self.__class__.__name__}: No suitable AniList results found during mapping "
                         f"lookup or title search for {item.type} {self._debug_log_title(item, subitem)} "
-                        f"{self._debug_log_ids(item.guid, guids)}"
+                        f"{self._debug_log_ids(subitem.ratingKey, subitem.guid, guids)}"
                     )
                     self.sync_stats.failed += 1
                     continue
@@ -216,7 +216,7 @@ class BaseSyncClient(ABC, Generic[T, S]):
                 log.debug(
                     f"{self.__class__.__name__}: Found AniList entry using {match_method} for {item.type} "
                     f"{self._debug_log_title(item, subitem)} "
-                    f"{self._debug_log_ids(item.guid, guids, anilist_media.id)}"
+                    f"{self._debug_log_ids(subitem.ratingKey, subitem.guid, guids, anilist_media.id)}"
                 )
 
                 self.sync_media(
@@ -229,7 +229,7 @@ class BaseSyncClient(ABC, Generic[T, S]):
                 log.exception(
                     f"{self.__class__.__name__}: Failed to process {item.type} "
                     f"{self._debug_log_title(item, subitem)} "
-                    f"{self._debug_log_ids(item.guid, guids)}",
+                    f"{self._debug_log_ids(subitem.ratingKey, subitem.guid, guids)}",
                     exc_info=e,
                 )
                 self.sync_stats.failed += 1
@@ -347,7 +347,7 @@ class BaseSyncClient(ABC, Generic[T, S]):
             log.info(
                 f"{self.__class__.__name__}: Skipping {item.type} because it is already up to date "
                 f"{self._debug_log_title(item, subitem)} "
-                f"{self._debug_log_ids(item.guid, guids, anilist_id=animapping.anilist_id)}"
+                f"{self._debug_log_ids(subitem.ratingKey, subitem.guid, guids, anilist_id=animapping.anilist_id)}"
             )
             self.sync_stats.skipped += 1
             return
@@ -368,7 +368,7 @@ class BaseSyncClient(ABC, Generic[T, S]):
             log.info(
                 f"{self.__class__.__name__}: Skipping {item.type} due to no activity "
                 f"{self._debug_log_title(item, subitem)} "
-                f"{self._debug_log_ids(item.guid, guids, anilist_id=animapping.anilist_id)}"
+                f"{self._debug_log_ids(subitem.ratingKey, subitem.guid, guids, anilist_id=animapping.anilist_id)}"
             )
             self.sync_stats.skipped += 1
             return
@@ -376,7 +376,7 @@ class BaseSyncClient(ABC, Generic[T, S]):
         log.debug(
             f"{self.__class__.__name__}: Syncing AniList entry for {item.type} "
             f"{self._debug_log_title(item, subitem)} "
-            f"{self._debug_log_ids(item.guid, guids, anilist_id=animapping.anilist_id)}"
+            f"{self._debug_log_ids(subitem.ratingKey, subitem.guid, guids, anilist_id=animapping.anilist_id)}"
         )
         log.debug(f"\t\tBEFORE => {anilist_media_list}")
         log.debug(f"\t\tAFTER  => {final_media_list}")
@@ -385,7 +385,7 @@ class BaseSyncClient(ABC, Generic[T, S]):
 
         log.info(
             f"{self.__class__.__name__}: Synced {item.type} {self._debug_log_title(item, subitem)} "
-            f"{self._debug_log_ids(item.guid, guids, anilist_id=animapping.anilist_id)}"
+            f"{self._debug_log_ids(subitem.ratingKey, subitem.guid, guids, anilist_id=animapping.anilist_id)}"
         )
         self.sync_stats.synced += 1
 
@@ -659,6 +659,8 @@ class BaseSyncClient(ABC, Generic[T, S]):
             """
             if p_val is None:
                 return False
+            if a_val is None:
+                return True
             match op:
                 case "ne":
                     return p_val != a_val
@@ -698,6 +700,7 @@ class BaseSyncClient(ABC, Generic[T, S]):
 
     def _debug_log_ids(
         self,
+        key: int,
         plex_id: str,
         guids: ParsedGuids,
         anilist_id: int | None = None,
@@ -707,6 +710,7 @@ class BaseSyncClient(ABC, Generic[T, S]):
         The outputted string uses color formatting syntax with the `$$` delimiters.
 
         Args:
+            key (int): Plex rating key
             plex_id (str): Plex ID
             guids (ParsedGuids): Plex GUIDs
             anilist_id (int | None): AniList ID
@@ -714,4 +718,4 @@ class BaseSyncClient(ABC, Generic[T, S]):
         Returns:
             str: Debug-friendly string of media identifiers
         """
-        return f"$${{plex_id: {plex_id}, {guids}{f', anilist_id: {anilist_id}' if anilist_id else ''}}}$$"
+        return f"$${{key: {key}, plex_id: {plex_id}, {guids}{f', anilist_id: {anilist_id}' if anilist_id else ''}}}$$"
