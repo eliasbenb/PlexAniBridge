@@ -1,5 +1,6 @@
 import sys
 from datetime import datetime
+from functools import cache
 from typing import Iterator
 
 import plexapi.exceptions
@@ -283,6 +284,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
             FuzzyDate.from_date(episode.lastViewedAt) or 0,
         )
 
+    @cache
     def __filter_mapped_episodes(
         self, item: Show, subitem: Season, anilist_media: Media, animapping: AniMap
     ) -> list[Episode]:
