@@ -173,43 +173,61 @@ class AniMapClient:
         if not imdb and not tmdb and not tvdb:
             return []
 
+        def json_contains(field: str, value: Any) -> Any:
+            """Generates a JSON_CONTAINS function for the given field.
+
+            Args:
+                field (str): Field name to search in
+                value (Any): Value to search for
+
+            Returns:
+                Any: JSON_CONTAINS function
+            """
+            return exists(
+                select(1)
+                .select_from(func.json_each(column(field)))
+                .where(column("value") == value)
+            )
+
         with Session(db.engine) as session:
-            partial_matches = {AniMap.imdb_id.contains: imdb}
-            exact_matches = {}
-            if is_movie:
-                partial_matches |= {AniMap.tmdb_movie_id.__eq__: tmdb}
-            else:
-                partial_matches |= {
-                    AniMap.tmdb_show_id.__eq__: tmdb,
-                    AniMap.tvdb_id.__eq__: tvdb,
-                }
-                exact_matches |= {
-                    AniMap.tvdb_season.__eq__: season,
-                    AniMap.tvdb_epoffset.__eq__: epoffset,
-                }
+            partial_conditions = []
+            exact_conditions = []
 
-            # Base filters
-            query = select(AniMap).where(AniMap.anilist_id.is_not(None))
+            if imdb:
+                partial_conditions.append(json_contains("imdb_id", imdb))
+            if tmdb:
+                if is_movie:
+                    partial_conditions.append(json_contains("tmdb_movie_id", tmdb))
+                else:
+                    partial_conditions.append(json_contains("tmdb_show_id", tmdb))
+            if not is_movie and tvdb:
+                partial_conditions.append(AniMap.tvdb_id == tvdb)
 
-            # Add partial matches
-            if any(v is not None for v in partial_matches.values()):
-                query = query.where(
-                    or_(*(op(v) for op, v in partial_matches.items() if v is not None))
-                )
-            if any(v is not None for v in exact_matches.values()):
-                query = query.where(
-                    and_(*(op(v) for op, v in exact_matches.items() if v is not None))
-                )
+            if not is_movie:
+                if season is not None:
+                    exact_conditions.append(AniMap.tvdb_season == season)
+                if epoffset is not None:
+                    exact_conditions.append(AniMap.tvdb_epoffset == epoffset)
 
-            # Make sure we only return unique entries
-            query = query.group_by(
+            # Base query with all conditions
+            query = (
+                select(AniMap)
+                .where(AniMap.anilist_id.is_not(None))
+                .where(or_(*partial_conditions) if partial_conditions else true())
+                .where(and_(*exact_conditions) if exact_conditions else true())
+            )
+
+            # Deduplicate entries
+            subquery = query.group_by(
                 AniMap.anilist_id,
                 AniMap.tvdb_season,
                 AniMap.tvdb_epoffset,
             ).subquery()
-            query = (
+
+            # Final query with ordering
+            final_query = (
                 select(AniMap)
-                .join(query, AniMap.anidb_id == query.c.anidb_id)
+                .join(subquery, AniMap.anidb_id == subquery.c.anidb_id)
                 .order_by(
                     (AniMap.tvdb_season == -1).asc(),  # Ensure tvdb_season=-1 is last
                     AniMap.tvdb_season,
@@ -219,4 +237,4 @@ class AniMapClient:
                 )
             )
 
-            return session.exec(query).all()
+            return session.exec(final_query).all()
