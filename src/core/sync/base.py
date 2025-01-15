@@ -659,6 +659,8 @@ class BaseSyncClient(ABC, Generic[T, S]):
             """
             if p_val is None:
                 return False
+            if a_val is None:
+                return True
             match op:
                 case "ne":
                     return p_val != a_val
