@@ -246,11 +246,11 @@ class PlexClient:
             )
             return None
 
-    def get_episodes(self, season: Season, start: int, end: int) -> list[Episode]:
+    def get_episodes(self, item: Show | Season, start: int, end: int) -> list[Episode]:
         """Retrieves episodes within a specified range for a season.
 
         Args:
-            season (Season): The season to get episodes from
+            item (Show | Season): The item to get episodes from
             start (int): Starting episode number (inclusive)
             end (int): Ending episode number (inclusive)
 
@@ -262,14 +262,14 @@ class PlexClient:
         """
         return [
             e
-            for e in season.episodes(
+            for e in item.episodes(
                 index__gte=start,
             )
             if e.index <= end
         ]
 
     def get_watched_episodes(
-        self, season: Season, start: int, end: int
+        self, item: Show | Season, start: int, end: int
     ) -> list[Episode]:
         """Retrieves watched episodes within a specified range for a season.
 
@@ -277,7 +277,7 @@ class PlexClient:
         watched at least once (viewCount > 0).
 
         Args:
-            season (Season): The season to get episodes from
+            item (Show | Season): The item to get episodes from
             start (int): Starting episode number (inclusive)
             end (int): Ending episode number (inclusive)
 
@@ -286,7 +286,7 @@ class PlexClient:
         """
         return [
             e
-            for e in season.episodes(
+            for e in item.episodes(
                 index__gte=start,
                 viewCount__gt=0,
             )
