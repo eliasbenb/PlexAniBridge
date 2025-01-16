@@ -1,3 +1,8 @@
+---
+title: Introduction
+icon: material/home
+---
+
 # Introduction
 
 PlexAniBridge is a tool designed to keep your AniList profile automatically synced with your Plex activity. Whether you're tracking your watch progress, ratings, or reviews, PlexAniBridge has you covered.

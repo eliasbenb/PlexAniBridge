@@ -1,3 +1,8 @@
+---
+title: Custom Mappings
+icon: material/cable-data
+---
+
 # Custom Mappings
 
 PlexAniBridge allows you to define custom mappings for Plex content to AniList, complementing the default mappings database. This feature is particularly helpful for content that is missing or incorrectly mapped in the default database.
