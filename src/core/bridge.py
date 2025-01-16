@@ -186,7 +186,9 @@ class BridgeClient:
             self._set_last_synced(sync_datetime)
             self._set_last_config_encoded(self.config.encode())
 
-        log.info(f"{self.__class__.__name__}: Sync completed")
+        log.info(
+            f"{self.__class__.__name__}: {'polling' if poll else 'periodic'} sync completed"
+        )
 
     def _sync_user(self, anilist_token: str, plex_user: str, poll: bool) -> None:
         """Synchronizes a single Plex user's library with their AniList account.
