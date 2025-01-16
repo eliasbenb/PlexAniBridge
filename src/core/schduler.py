@@ -47,9 +47,13 @@ class SchedulerClient:
         while self._running:
             try:
                 self.run_sync(poll=True)
-                log.info("Poll Scheduler: Changes detected, sync completed")
+                log.info(
+                    f"{self.__class__.__name__}:  Changes detected, sync completed"
+                )
             except Exception as e:
-                log.error("Poll Scheduler: Error during polling", exc_info=e)
+                log.error(
+                    f"{self.__class__.__name__}:  Error during polling", exc_info=e
+                )
             time.sleep(self.poll_interval)
 
     def start(self):
@@ -77,7 +81,9 @@ class SchedulerClient:
             daemon=True,
         )
         self.poll_thread.start()
-        log.info(f"Poll Scheduler: Started (interval: {self.poll_interval}s)")
+        log.info(
+            f"{self.__class__.__name__}:  Started (interval: {self.poll_interval}s)"
+        )
 
     def stop(self):
         """Stops both scheduling mechanisms."""
@@ -91,4 +97,4 @@ class SchedulerClient:
         if self.poll_thread and self.poll_thread.is_alive():
             # Wait for poll thread to finish
             self.poll_thread.join(timeout=5)
-            log.info("Poll Scheduler: Stopped")
+            log.info(f"{self.__class__.__name__}:  Stopped")
