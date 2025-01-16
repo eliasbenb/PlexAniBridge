@@ -104,7 +104,8 @@ class PlexAnibridgeConfig(BaseSettings):
 
         General Settings:
             SYNC_INTERVAL (int): Time between syncs in seconds (>= -1)
-            PARTIAL_SCAN (bool): Enable incremental syncs, default True
+            POLLING_SCAN (bool): Enable polling for new media, default False
+            FULL_SCAN (bool): Enable a full scan of all media, even if not watched, default False
             DESTRUCTIVE_SYNC (bool): Allow deletion of entries, default False
             EXCLUDED_SYNC_FIELDS (list[SyncField]): Fields to ignore during sync
 
@@ -140,7 +141,8 @@ class PlexAnibridgeConfig(BaseSettings):
 
     # General
     SYNC_INTERVAL: int = Field(3600, ge=-1)
-    PARTIAL_SCAN: bool = True
+    POLLING_SCAN: bool = False
+    FULL_SCAN: bool = False
     DESTRUCTIVE_SYNC: bool = False
 
     EXCLUDED_SYNC_FIELDS: list[SyncField] = ["notes", "score"]
@@ -208,7 +210,7 @@ class PlexAnibridgeConfig(BaseSettings):
 
         Note:
             Used to detect configuration changes between runs for
-            determining partial scan eligibility
+            determining polling scan eligibility
         """
 
         def sort_value(value):
