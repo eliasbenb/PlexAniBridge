@@ -85,11 +85,13 @@ List of Plex library sections to consider, specified in Python list syntax:
 
 `int` (optional, default `3600`)
 
-Interval in seconds between sync jobs. Set to `-1` to run once and exit
+Interval in seconds between sync jobs. Set to `-1` to run once and exit.
 
 ??? note "Sync Interval with Polling Scan"
 
     If `POLLING_SCAN` is enabled, the sync interval still applies. The polling scanner will run in addition to the regular sync.
+
+    The difference being that the polling scanner will only sync the changes detected in the library, while the regular sync will pull the mappings database and sync the entire library.
 
 ## `POLLING_SCAN`
 
@@ -101,13 +103,13 @@ The polling scanner is event-driven and will detect changes in your library and 
 
 !!! note
 
-    Even with polling scan enabled, the sync interval will still be respected. So, every `SYNC_INTERVAL` seconds, a regular sync will be performed. This includes pulling your AniList profile, pulling the [mappings database](https://github.com/eliasbenb/PlexAniBridge-Mappings), and syncing your Plex library with AniList.
+    Even with polling scan enabled, the sync interval will still be respected. So, every `SYNC_INTERVAL` seconds, a regular sync will be performed.
 
 ### `FULL_SCAN`
 
 `bool` (optional, default `False`)
 
-Scan all Plex media regardless of it has any activity. The default behavior (when disabled) is a partial scan which only scans items that have been watched, rated, or watch listed.
+Scan all Plex media regardless of it has any activity. The default behavior (when disabled) is a partial scan which only scans items that have been watched.
 
 !!! note
 
@@ -129,8 +131,12 @@ Scan all Plex media regardless of it has any activity. The default behavior (whe
 
     Destructive sync allows for:
 
-    - Deleting AniList entries (in very specific scenarios)
+    - Deleting AniList entriyes
     - Making 'regressive' updates to AniList. Meaning, even if AniList reports a 'higher' value than Plex, the Plex value will be used and updated in AniList. For example, if AniList has a higher watch progress than Plex, the AniList value will be lowered to match Plex.
+
+!!! note
+
+    If you want to delete entries from AniList that you haven't watched in Plex, you must enable `FULL_SCAN` in addition to `DESTRUCTIVE_SYNC`. Otherwise, the unwanted entries will not be detected.
 
 ### `EXCLUDED_SYNC_FIELDS`
 
