@@ -231,10 +231,12 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
             return None
         if not history:
             return FuzzyDate.from_date(episode.lastViewedAt)
+        if not episode.lastViewedAt:
+            return FuzzyDate.from_date(history.viewedAt)
 
         return min(
-            FuzzyDate.from_date(history.viewedAt) or 0,
-            FuzzyDate.from_date(episode.lastViewedAt) or 0,
+            FuzzyDate.from_date(history.viewedAt),
+            FuzzyDate.from_date(episode.lastViewedAt),
         )
 
     def _calculate_completed_at(
@@ -278,10 +280,12 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
             return None
         if not history:
             return FuzzyDate.from_date(episode.lastViewedAt)
+        if not episode.lastViewedAt:
+            return FuzzyDate.from_date(history.viewedAt)
 
         return min(
-            FuzzyDate.from_date(history.viewedAt) or 0,
-            FuzzyDate.from_date(episode.lastViewedAt) or 0,
+            FuzzyDate.from_date(history.viewedAt),
+            FuzzyDate.from_date(episode.lastViewedAt),
         )
 
     @cache
