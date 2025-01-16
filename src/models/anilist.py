@@ -247,6 +247,12 @@ class AniListBaseModel(BaseModel):
         cls._processed_models.remove(cls.__name__)
         return "\n".join(graphql_fields)
 
+    def __hash__(self) -> int:
+        return hash(self.__repr__())
+
+    def __repr__(self) -> str:
+        return f"<{': '.join([f'{k}={v}' for k, v in self.model_dump().items() if v is not None])}>"
+
     model_config = ConfigDict(
         alias_generator=AliasGenerator(to_camel), populate_by_name=True
     )

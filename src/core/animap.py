@@ -101,29 +101,34 @@ class AniMapClient:
             if self.custom_mappings_path.exists():
                 with self.custom_mappings_path.open("r") as f:
                     try:
-                        custom_data: dict = json.load(f)
+                        custom_data: dict[str, Any] = json.load(f)
                     except json.JSONDecodeError:
                         log.warning(
                             f"Invalid custom mappings file at $$'{self.custom_mappings_path}'$$"
                         )
                         custom_data = {}
-                    custom_data.pop("$schema", None)
 
                     animap_defaults = {field: None for field in AniMap.model_fields}
 
                     validated_count = 0
                     tmp_custom_data = custom_data.copy()
-                    for anilist_id, data in custom_data.items():
+                    for anilist_id_str, data in custom_data.items():
+                        if anilist_id_str.startswith("$"):
+                            continue
                         try:
                             AniMap.model_validate(
-                                {**animap_defaults, "anilist_id": anilist_id, **data}
+                                {
+                                    **animap_defaults,
+                                    "anilist_id": int(anilist_id_str),
+                                    **data,
+                                }
                             )
                             validated_count += 1
-                        except ValidationError as e:
+                        except (ValueError, ValidationError) as e:
                             log.warning(
-                                f"Invalid custom mapping entry: {anilist_id}: {e}"
+                                f"Invalid custom mapping entry: {anilist_id_str}: {e}"
                             )
-                            tmp_custom_data.pop(anilist_id)
+                            tmp_custom_data.pop(anilist_id_str)
                     custom_data = tmp_custom_data
 
                     log.info(
@@ -140,7 +145,7 @@ class AniMapClient:
                     )
                 custom_data = {}
 
-            cdn_data: dict[int, dict[str, Any]] = response_data
+            cdn_data: dict[str, Any] = response_data
 
             curr_custom_hash = md5(
                 json.dumps(custom_data, sort_keys=True).encode()
@@ -160,23 +165,25 @@ class AniMapClient:
             )
 
             # Overload the CDN data with custom data
-            merged_data = {**cdn_data}
-            for anilist_id, data in custom_data.items():
-                if anilist_id in merged_data:
-                    merged_data[anilist_id].update(data)
+            merged_data: dict[str, dict[str, Any]] = cdn_data.copy()
+            for anilist_id_str, data in custom_data.items():
+                if anilist_id_str.startswith("$"):
+                    continue
+                if anilist_id_str in merged_data:
+                    merged_data[anilist_id_str].update(data)
                 else:
-                    merged_data[anilist_id] = data
+                    merged_data[anilist_id_str] = data
 
             values = [
                 {
-                    "anilist_id": anilist_id,
+                    "anilist_id": int(anilist_id_str),
                     **{
                         field: data[field]
                         for field in AniMap.model_fields
                         if field in data
                     },
                 }
-                for anilist_id, data in merged_data.items()
+                for anilist_id_str, data in merged_data.items()
             ]
 
             session.exec(
