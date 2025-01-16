@@ -13,7 +13,12 @@ def main():
     log.info(f"PlexAniBridge: [CONFIG] => {config}")
 
     bridge = BridgeClient(config)
-    scheduler = SchedulerClient(bridge, poll_interval=30)
+    scheduler = SchedulerClient(
+        bridge,
+        sync_interval=config.SYNC_INTERVAL,
+        polling_scan=config.POLLING_SCAN,
+        poll_interval=30,
+    )
 
     try:
         if config.SYNC_INTERVAL == -1:

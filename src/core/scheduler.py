@@ -3,14 +3,23 @@ import threading
 import time
 from datetime import datetime, timedelta
 
-from src import config, log
+from src import log
 from src.core import BridgeClient
 
 
 class SchedulerClient:
-    def __init__(self, bridge: BridgeClient, poll_interval: int = 60) -> None:
+    def __init__(
+        self,
+        bridge: BridgeClient,
+        sync_interval: int,
+        polling_scan: bool,
+        poll_interval: int = 30,
+    ) -> None:
         self.bridge = bridge
+        self.sync_interval = sync_interval
+        self.polling_scan = polling_scan
         self.poll_interval = poll_interval
+
         self.periodic_scheduler = sched.scheduler(time.time, time.sleep)
         self.poll_thread: threading.Thread | None = None
         self.sync_lock = threading.Lock()
@@ -36,12 +45,12 @@ class SchedulerClient:
         finally:
             if self._running:
                 scheduler.enterabs(
-                    time.time() + config.SYNC_INTERVAL,
+                    time.time() + self.sync_interval,
                     1,
                     self.schedule_periodic_sync,
                     (scheduler,),
                 )
-                next_period = datetime.now() + timedelta(seconds=config.SYNC_INTERVAL)
+                next_period = datetime.now() + timedelta(seconds=self.sync_interval)
                 log.info(
                     f"{self.__class__.__name__}: Next periodic sync at {next_period}"
                 )
@@ -61,7 +70,7 @@ class SchedulerClient:
         """Starts both scheduling mechanisms."""
         self._running = True
 
-        if config.SYNC_INTERVAL >= 0:
+        if self.sync_interval >= 0:
             self.periodic_scheduler.enterabs(
                 time.time(),
                 1,
@@ -75,18 +84,19 @@ class SchedulerClient:
             )
             scheduler_thread.start()
             log.info(
-                f"{self.__class__.__name__}: Started periodic scheduler with interval {config.SYNC_INTERVAL}"
+                f"{self.__class__.__name__}: Started periodic scheduler with interval {self.sync_interval}"
             )
 
-        self.poll_thread = threading.Thread(
-            target=self.run_poll_sync,
-            name="poll_scheduler",
-            daemon=True,
-        )
-        self.poll_thread.start()
-        log.info(
-            f"{self.__class__.__name__}: Started polling scheduler with interval {self.poll_interval}"
-        )
+        if self.polling_scan:
+            self.poll_thread = threading.Thread(
+                target=self.run_poll_sync,
+                name="poll_scheduler",
+                daemon=True,
+            )
+            self.poll_thread.start()
+            log.info(
+                f"{self.__class__.__name__}: Started polling scheduler with interval {self.poll_interval}"
+            )
 
     def stop(self) -> None:
         """Stops both scheduling mechanisms."""
