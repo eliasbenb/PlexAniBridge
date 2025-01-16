@@ -1,6 +1,7 @@
 import sched
 import threading
 import time
+from datetime import datetime, timedelta
 
 from src import config, log
 from src.core import BridgeClient
@@ -29,7 +30,9 @@ class SchedulerClient:
             self.bridge.reinit()
             self.run_sync()
         except Exception as e:
-            log.error("Periodic Scheduler: Failed to sync", exc_info=e)
+            log.error(
+                f"{self.__class__.__name__}: Error during periodic sync", exc_info=e
+            )
         finally:
             if self._running:
                 scheduler.enterabs(
@@ -38,8 +41,9 @@ class SchedulerClient:
                     self.schedule_periodic_sync,
                     (scheduler,),
                 )
+                next_period = datetime.now() + timedelta(seconds=config.SYNC_INTERVAL)
                 log.info(
-                    f"Periodic Scheduler: Next sync in {config.SYNC_INTERVAL} seconds"
+                    f"{self.__class__.__name__}: Next periodic sync at {next_period}"
                 )
 
     def run_poll_sync(self) -> None:
@@ -47,16 +51,13 @@ class SchedulerClient:
         while self._running:
             try:
                 self.run_sync(poll=True)
-                log.info(
-                    f"{self.__class__.__name__}:  Changes detected, sync completed"
-                )
             except Exception as e:
                 log.error(
-                    f"{self.__class__.__name__}:  Error during polling", exc_info=e
+                    f"{self.__class__.__name__}: Error during polling sync", exc_info=e
                 )
             time.sleep(self.poll_interval)
 
-    def start(self):
+    def start(self) -> None:
         """Starts both scheduling mechanisms."""
         self._running = True
 
@@ -73,7 +74,9 @@ class SchedulerClient:
                 daemon=True,
             )
             scheduler_thread.start()
-            log.info("Periodic Scheduler: Started")
+            log.info(
+                f"{self.__class__.__name__}: Started periodic scheduler with interval {config.SYNC_INTERVAL}"
+            )
 
         self.poll_thread = threading.Thread(
             target=self.run_poll_sync,
@@ -82,19 +85,19 @@ class SchedulerClient:
         )
         self.poll_thread.start()
         log.info(
-            f"{self.__class__.__name__}:  Started (interval: {self.poll_interval}s)"
+            f"{self.__class__.__name__}: Started polling scheduler with interval {self.poll_interval}"
         )
 
-    def stop(self):
+    def stop(self) -> None:
         """Stops both scheduling mechanisms."""
         self._running = False
 
         if self.periodic_scheduler:
             for event in self.periodic_scheduler.queue:
                 self.periodic_scheduler.cancel(event)
-            log.info("Periodic Scheduler: Stopped")
+            log.info(f"{self.__class__.__name__}: Stopped periodic scheduler")
 
         if self.poll_thread and self.poll_thread.is_alive():
             # Wait for poll thread to finish
             self.poll_thread.join(timeout=5)
-            log.info(f"{self.__class__.__name__}:  Stopped")
+            log.info(f"{self.__class__.__name__}: Stopped polling scheduler")

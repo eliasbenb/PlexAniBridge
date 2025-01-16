@@ -56,7 +56,7 @@ class BridgeClient:
         This method is called during the application startup to ensure
         the database is properly connected and ready for use.
         """
-        self.animap_client.__init__()
+        self.animap_client.reinit()
 
     def _get_last_synced(self) -> datetime | None:
         """Retrieves the timestamp of the last successful sync from the database.
