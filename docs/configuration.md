@@ -85,29 +85,39 @@ List of Plex library sections to consider, specified in Python list syntax:
 
 `int` (optional, default `3600`)
 
-Interval in seconds between sync jobs. Set to `-1` to run once and exit
+Interval in seconds between sync jobs. Set to `-1` to run once and exit.
 
-??? tip "Sync Interval with Partial Scanning"
+??? note "Sync Interval with Polling Scan"
 
-    Lower intervals can be beneficial for quicker syncs when `PARTIAL_SCAN` is enabled.
+    If `POLLING_SCAN` is enabled, the sync interval still applies. The polling scanner will run in addition to the regular sync.
 
-    You can set the interval to lower values like `300` (5 minutes) for more responsive updates.
+    The difference being that the polling scanner will only sync the changes detected in the library, while the regular sync will pull the mappings database and sync the entire library.
 
-### `PARTIAL_SCAN`
+## `POLLING_SCAN`
 
-`bool` (optional, default `True`)
+`bool` (optional, default `False`)
 
-Only processes items added/updated/rated since the last sync.
+When enabled, PlexAniBridge will poll the Plex server for changes instead of waiting for the sync interval.
 
-!!! note
-
-    Partial scanning helps to greatly reduce the number of items to process, especially for large libraries.
+The polling scanner is event-driven and will detect changes in your library and sync that subset of your library. This is useful if you want real-time updates on your AniList profile.
 
 !!! note
 
-    The initial sync is always a full sync regardless of this setting.
+    Even with polling scan enabled, the sync interval will still be respected. So, every `SYNC_INTERVAL` seconds, a regular sync will be performed.
 
-    Subsequent syncs only consider changes since the last sync's start time.
+### `FULL_SCAN`
+
+`bool` (optional, default `False`)
+
+Scan all Plex media regardless of it has any activity. The default behavior (when disabled) is a partial scan which only scans items that have been watched.
+
+!!! note
+
+    Full scan is largely useless unless used in tandem with `DESTRUCTIVE_SYNC`. It is not recommended to enable this without understanding the implications.
+
+!!! warning
+
+    Enabling full scan will lead to excessive API usage and increased processing times.
 
 ### `DESTRUCTIVE_SYNC`
 
@@ -121,12 +131,12 @@ Only processes items added/updated/rated since the last sync.
 
     Destructive sync allows for:
 
-    - Deleting AniList entries (in very specific scenarios)
+    - Deleting AniList entriyes
     - Making 'regressive' updates to AniList. Meaning, even if AniList reports a 'higher' value than Plex, the Plex value will be used and updated in AniList. For example, if AniList has a higher watch progress than Plex, the AniList value will be lowered to match Plex.
 
 !!! note
 
-    Destructive sync greatly increases processing time and API usage. When enabled, PlexAniBridge ignores the default behavior of scanning only watched items. With destructive sync, all items are scanned, regardless of watch status.
+    If you want to delete entries from AniList that you haven't watched in Plex, you must enable `FULL_SCAN` in addition to `DESTRUCTIVE_SYNC`. Otherwise, the unwanted entries will not be detected.
 
 ### `EXCLUDED_SYNC_FIELDS`
 

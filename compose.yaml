@@ -8,7 +8,8 @@ services:
       PLEX_URL: http://plex:32400
       PLEX_SECTIONS: '["Anime", "Anime Movies"]'
       # SYNC_INTERVAL: 3600
-      # PARTIAL_SCAN: True
+      # POLLING_SCAN: False
+      # FULL_SCAN: False
       # DESTRUCTIVE_SYNC: False
       # EXCLUDED_SYNC_FIELDS: '["notes", "score"]'
       # DATA_PATH: ./data

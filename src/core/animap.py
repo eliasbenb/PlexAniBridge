@@ -51,6 +51,13 @@ class AniMapClient:
         self.custom_mappings_path = data_path / "mappings.custom.json"
         self._sync_db()
 
+    def reinit(self) -> None:
+        """Reinitializes the AniMap database.
+
+        Drops all tables and reinitializes the database from scratch.
+        """
+        self._sync_db()
+
     def _sync_db(self) -> None:
         """Synchronizes the local database with the mapping source.
 

@@ -21,9 +21,6 @@ class BridgeClient:
     - AniMap database client (for ID mappings)
     - Sync clients for movies and TV shows
 
-    The client supports multiple user pairs (Plex user + AniList token), partial scanning
-    for efficiency, and both destructive and non-destructive sync modes.
-
     Attributes:
         config (PlexAnibridgeConfig): Application configuration settings
         token_user_pairs (list[tuple[str, str]]): Paired AniList tokens and Plex usernames
@@ -32,19 +29,34 @@ class BridgeClient:
         last_config_encoded (str | None): Encoded version of the last used configuration
 
     Configuration Options:
-        - PARTIAL_SCAN: Enable incremental syncs based on modification time
+        - FULL_SCAN: Allow scanning items that don't have any activity
         - DESTRUCTIVE_SYNC: Allow deletion of AniList entries
         - EXCLUDED_SYNC_FIELDS: Fields to ignore during sync
         - FUZZY_SEARCH_THRESHOLD: Matching threshold for title comparison
+
+    Args:
+        config (PlexAnibridgeConfig): Application configuration settings
     """
 
     def __init__(self, config: PlexAnibridgeConfig) -> None:
         self.config = config
+
         self.token_user_pairs = list(zip(config.ANILIST_TOKEN, config.PLEX_USER))
         self.animap_client = AniMapClient(config.DATA_PATH)
+        self.anilist_clients: dict[str, AniListClient] = {}
+        self.plex_clients: dict[str, PlexClient] = {}
 
         self.last_synced = self._get_last_synced()
+        self.last_polled = self._get_last_polled()
         self.last_config_encoded = self._get_last_config_encoded()
+
+    def reinit(self) -> None:
+        """Reinitializes the AniMap database client.
+
+        This method is called during the application startup to ensure
+        the database is properly connected and ready for use.
+        """
+        self.animap_client.reinit()
 
     def _get_last_synced(self) -> datetime | None:
         """Retrieves the timestamp of the last successful sync from the database.
@@ -53,7 +65,7 @@ class BridgeClient:
             datetime | None: Timestamp of the last sync, None if never synced
 
         Note:
-            Used to determine whether partial scanning is possible and
+            Used to determine whether polling scanning is possible and
             to filter items for incremental syncs
         """
         with Session(db.engine) as session:
@@ -61,6 +73,21 @@ class BridgeClient:
             if last_synced is None or last_synced.value is None:
                 return None
             return datetime.fromisoformat(last_synced.value)
+
+    def _get_last_polled(self) -> datetime | None:
+        """Retrieves the timestamp of the last polling scan from the database.
+
+        Returns:
+            datetime | None: Timestamp of the last polling scan, None if never polled
+
+        Note:
+            Used to determine whether a polling scan is eligible to run
+        """
+        with Session(db.engine) as session:
+            last_polled = session.get(Housekeeping, "last_polled")
+            if last_polled is None or last_polled.value is None:
+                return None
+            return datetime.fromisoformat(last_polled.value)
 
     def _set_last_synced(self, last_synced: datetime) -> None:
         """Stores the timestamp of a successful sync in the database.
@@ -71,9 +98,26 @@ class BridgeClient:
         Note:
             Only called after a completely successful sync operation
         """
+        self.last_synced = last_synced
         with Session(db.engine) as session:
             session.merge(
                 Housekeeping(key="last_synced", value=last_synced.isoformat())
+            )
+            session.commit()
+
+    def _set_last_polled(self, last_polled: datetime) -> None:
+        """Stores the timestamp of a polling scan in the database.
+
+        Args:
+            last_polled (datetime): Timestamp to store
+
+        Note:
+            Only called after a successful polling scan
+        """
+        self.last_polled = last_polled
+        with Session(db.engine) as session:
+            session.merge(
+                Housekeeping(key="last_polled", value=last_polled.isoformat())
             )
             session.commit()
 
@@ -81,7 +125,7 @@ class BridgeClient:
         """Retrieves the encoded configuration from the last sync.
 
         The encoded configuration is used to determine if settings have
-        changed between syncs, which affects partial scan eligibility.
+        changed between syncs, which affects polling scan eligibility.
 
         Returns:
             str | None: Encoded configuration string, None if no previous sync
@@ -99,17 +143,17 @@ class BridgeClient:
             config_encoded (str): Encoded configuration string
 
         Note:
-            Used in conjunction with last_synced to validate partial scan eligibility
+            Used in conjunction with last_synced to validate polling scan eligibility
         """
         with Session(db.engine) as session:
             session.merge(Housekeeping(key="last_config_encoded", value=config_encoded))
             session.commit()
 
-    def sync(self) -> None:
+    def sync(self, poll: bool = False) -> None:
         """Initiates the synchronization process for all configured user pairs.
 
         This is the main entry point for the sync process. It:
-        1. Determines the appropriate sync mode (partial/full, destructive/non-destructive)
+        1. Determines the appropriate sync mode (polling/partial/full, destructive/non-destructive)
         2. Processes each Plex user + AniList token pair
         3. Updates sync metadata upon successful completion
 
@@ -118,34 +162,43 @@ class BridgeClient:
         the last_synced timestamp from being updated.
 
         Note:
-            - Partial sync requires valid last_synced and matching configuration
+            - Polling scan requires valid last_synced and matching configuration
+            - Partial scan can process only items with some Plex activity
+            - Full scan can process all items in the library
             - Destructive sync can remove entries from AniList
-            - Non-destructive sync only processes watched content
+
+        Args:
+            poll (bool): Flag to enable polling scan mode, default False
         """
         log.info(
             f"{self.__class__.__name__}: Starting "
-            f"{'partial ' if self._should_perform_partial_scan() else ''}"
-            f"{'and ' if self._should_perform_partial_scan() and self.config.DESTRUCTIVE_SYNC else ''}"
-            f"{'destructive ' if self.config.DESTRUCTIVE_SYNC else ''}"
+            f"{'full ' if self.config.FULL_SCAN else 'partial '}"
+            f"{'and destructive ' if self.config.DESTRUCTIVE_SYNC else ''}"
             f"sync between Plex and AniList libraries"
         )
 
-        tmp_last_synced = datetime.now()  # We'll store this if the sync is successful
+        sync_datetime = datetime.now()  # We'll store this if the sync is successful
 
         for anilist_token, plex_user in self.token_user_pairs:
-            self._sync_user(anilist_token, plex_user)
+            self._sync_user(anilist_token, plex_user, poll)
 
-        self._set_last_synced(tmp_last_synced)
-        self._set_last_config_encoded(self.config.encode())
+        if poll:
+            self._set_last_polled(sync_datetime)
+        else:
+            self._set_last_synced(sync_datetime)
+            self._set_last_config_encoded(self.config.encode())
 
-        log.info(f"{self.__class__.__name__}: Sync completed")
+        log.info(
+            f"{self.__class__.__name__}: {'polling' if poll else 'periodic'} sync completed"
+        )
 
-    def _sync_user(self, anilist_token: str, plex_user: str) -> None:
+    def _sync_user(self, anilist_token: str, plex_user: str, poll: bool) -> None:
         """Synchronizes a single Plex user's library with their AniList account.
 
         Args:
             anilist_token (str): Authentication token for AniList API
             plex_user (str): Username or email of the Plex user
+            poll (bool): Flag to enable polling scan mode
 
         Process:
         1. Initializes AniList client with user's token
@@ -158,26 +211,34 @@ class BridgeClient:
             Creates new client instances for each user to maintain proper
             authentication and separation of concerns
         """
-        self.anilist_client = AniListClient(
-            anilist_token, self.config.DATA_PATH / "backups", self.config.DRY_RUN
-        )
+        if plex_user in self.plex_clients:
+            plex_client = self.plex_clients[plex_user]
+        else:
+            plex_client = self.plex_clients[plex_user] = PlexClient(
+                self.config.PLEX_TOKEN,
+                plex_user,
+                self.config.PLEX_URL,
+                self.config.PLEX_SECTIONS,
+            )
+
+        if anilist_token in self.anilist_clients:
+            anilist_client = self.anilist_clients[anilist_token]
+            if not poll:
+                anilist_client.reinit()
+        else:
+            anilist_client = self.anilist_clients[anilist_token] = AniListClient(
+                anilist_token, self.config.DATA_PATH / "backups", self.config.DRY_RUN
+            )
 
         log.info(
             f"{self.__class__.__name__}: Syncing Plex user $$'{plex_user}'$$ "
-            f"with AniList user $$'{self.anilist_client.user.name}'$$"
-        )
-
-        self.plex_client = PlexClient(
-            self.config.PLEX_TOKEN,
-            plex_user,
-            self.config.PLEX_URL,
-            self.config.PLEX_SECTIONS,
+            f"with AniList user $$'{anilist_client.user.name}'$$"
         )
 
         sync_client_args = {
-            "anilist_client": self.anilist_client,
+            "anilist_client": anilist_client,
             "animap_client": self.animap_client,
-            "plex_client": self.plex_client,
+            "plex_client": plex_client,
             "excluded_sync_fields": self.config.EXCLUDED_SYNC_FIELDS,
             "destructive_sync": self.config.DESTRUCTIVE_SYNC,
             "fuzzy_search_threshold": self.config.FUZZY_SEARCH_THRESHOLD,
@@ -186,22 +247,26 @@ class BridgeClient:
         self.movie_sync = MovieSyncClient(**sync_client_args)
         self.show_sync = ShowSyncClient(**sync_client_args)
 
-        plex_sections = self.plex_client.get_sections()
+        plex_sections = plex_client.get_sections()
 
         sync_stats = SyncStats()
         for section in plex_sections:
-            sync_stats += self._sync_section(section)
+            sync_stats += self._sync_section(plex_client, section, poll)
 
         log.info(
             f"{self.__class__.__name__}: {sync_stats.synced} items synced, {sync_stats.deleted} items deleted, "
             f"{sync_stats.skipped} items skipped, {sync_stats.failed} items failed"
         )
 
-    def _sync_section(self, section: MovieSection | ShowSection) -> SyncStats:
+    def _sync_section(
+        self, plex_client: PlexClient, section: MovieSection | ShowSection, poll: bool
+    ) -> SyncStats:
         """Synchronizes a single Plex library section.
 
         Args:
+            plex_client (PlexClient): Client for the Plex user
             section (MovieSection | ShowSection): Plex library section to process
+            poll (bool): Flag to enable polling scan mode
 
         Returns:
             SyncStats: Statistics about the sync operation including:
@@ -212,7 +277,7 @@ class BridgeClient:
 
         Process:
         1. Retrieves items from the section based on sync mode:
-           - Partial scan: Only items modified since last sync
+           - Partial scan: Only items with activity
            - Full scan: All items
            - Non-destructive: Only watched items
         2. Routes each item to appropriate sync client (movie/show)
@@ -220,12 +285,16 @@ class BridgeClient:
         """
         log.info(f"{self.__class__.__name__}: Syncing section $$'{section.title}'$$")
 
-        items = self.plex_client.get_section_items(
+        last_sync = max(
+            self.last_synced or datetime.min,
+            self.last_polled or datetime.min,
+            datetime(1970, 1, 1),
+        )
+
+        items = plex_client.get_section_items(
             section,
-            min_last_modified=self.last_synced
-            if self._should_perform_partial_scan()
-            else None,
-            require_watched=not self.config.DESTRUCTIVE_SYNC,
+            min_last_modified=last_sync if poll else None,
+            require_watched=not self.config.FULL_SCAN,
         )
 
         sync_client = self.movie_sync if section.type == "movie" else self.show_sync
@@ -233,25 +302,3 @@ class BridgeClient:
             sync_client.process_media(item)
 
         return sync_client.sync_stats
-
-    def _should_perform_partial_scan(self) -> bool:
-        """Determines if a partial (incremental) sync is possible.
-
-        A partial scan optimizes the sync process by only processing
-        items that have been modified since the last successful sync.
-
-        Returns:
-            bool: True if all conditions for partial scan are met:
-                1. PARTIAL_SCAN setting is enabled
-                2. Last sync timestamp exists
-                3. Current configuration matches last sync's configuration
-
-        Note:
-            Configuration changes invalidate partial scan eligibility to
-            ensure changes in sync settings are properly applied
-        """
-        return (
-            self.config.PARTIAL_SCAN
-            and self.last_synced is not None
-            and self.last_config_encoded == self.config.encode()
-        )

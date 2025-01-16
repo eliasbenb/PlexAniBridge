@@ -51,6 +51,16 @@ class AniListClient:
         self.offline_anilist_entries: dict[int, Media] = {}
         self.backup_anilist()
 
+    def reinit(self) -> None:
+        """Reinitializes the AniList client after token refresh.
+
+        Reinitializes the client with a new authentication token and user information.
+        Clears the local cache and backups to prevent conflicts with outdated data.
+        """
+        self.user = self.get_user()
+        self.offline_anilist_entries.clear()
+        self.backup_anilist()
+
     def get_user(self) -> User:
         """Retrieves the authenticated user's information from AniList.
 
