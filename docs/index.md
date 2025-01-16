@@ -1,21 +1,18 @@
----
-title: Introduction
-icon: material/home
----
+# Introduction
 
-PlexAniBridge is a synchronization tool that automatically keeps your AniList profile up-to-date based on your Plex watching activity.
+PlexAniBridge is a tool designed to keep your AniList profile automatically synced with your Plex activity. Whether you're tracking your watch progress, ratings, or reviews, PlexAniBridge has you covered.
 
-## Features
+## Key Features
 
-- Synchronize watch status, watch progress, repeat counts, rating scores, text reviews, and start/end dates
-- Mapping Plex content (movies, shows, seasons, episode ranges, specials) to AniList via [a mappings database](https://github.com/eliasbenb/PlexAniBridge-Mappings) with fuzzy title search fallback, plus support for custom AniList ID mappings.
-- Partial scanning support — only consider items added/updated/rated since the last sync
-- Scheduled sync jobs with configurable polling capabilities
-- Multi-user support — sync multiple Plex users and home users to multiple AniList accounts
-- Intelligent caching of Plex and AniList requests to reduce rate limits
-- [Docker](./quick-start/docker.md) 🐳 deployments
+- **Comprehensive Synchronization**: Tracks watch status, progress, repeat counts, ratings, text reviews, and start/end dates.
+- **Smart Content Mapping**: Matches Plex content (movies, shows, specials, etc.) to AniList using [a robust mappings database](https://github.com/eliasbenb/PlexAniBridge-Mappings) with fuzzy title search as a fallback and the ability to add custom media mappings.
+- **Efficient Scanning**: Supports various modes of scanning like [partial](./configuration.md#partial_scan), [full](./configuration.md#partial_scan), or [polling](./configuration.md#) scans to minimize API usage.
+- **Flexible Scheduling**: Configurable [synchronization intervals](./configuration.md#sync_interval) in addition to polling capabilities.
+- **Multi-User Support**: Sync multiple [Plex users](./configuration.md#plex_user) and home users with their respective [AniList users](./configuration.md#anilist_token).
+- **Optimized Performance**: Intelligent caching of requests to minimize API rate limits.
+- **Easy Deployment**: Fully compatible with [Docker deployments](./quick-start/docker.md) 🐳.
 
-## Special Thanks/Dependencies
+## Acknowledgments
 
-- [Kometa Mappings](https://github.com/Kometa-Team/Anime-IDs)
-- [Python-PlexAPI](https://github.com/pkkid/python-plexapi)
+- [Kometa Mappings](https://github.com/Kometa-Team/Anime-IDs): The inspiration behind the mappings database.
+- [Python-PlexAPI](https://github.com/pkkid/python-plexapi): Powerful and straightforward Plex API bindings.
