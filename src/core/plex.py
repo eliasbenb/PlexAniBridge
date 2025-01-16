@@ -154,7 +154,14 @@ class PlexClient:
                 f"{self.__class__.__name__}: Filtering section $$'{section.title}'$$ by "
                 f"items that have been watched"
             )
-            filters["and"].append({"unwatched": False})
+            filters["and"].append(
+                {
+                    "or": [
+                        {"unwatched": False},
+                        {"lastRatedAt>>=": datetime(1970, 1, 1)},
+                    ]
+                }
+            )
 
         return section.search(filters=filters)
 
