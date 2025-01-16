@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta, timezone
 from enum import StrEnum
 from functools import total_ordering
-from typing import Annotated, Any, ClassVar, get_args, get_origin
+from typing import Annotated, Any, ClassVar, Self, get_args, get_origin
 
 from pydantic import AfterValidator, AliasGenerator, BaseModel, ConfigDict
 from pydantic.alias_generators import to_camel
@@ -307,7 +307,7 @@ class FuzzyDate(AniListBaseModel):
     day: int | None = None
 
     @staticmethod
-    def from_date(d: date | datetime) -> FuzzyDate:
+    def from_date(d: date | datetime) -> Self:
         """Create a FuzzyDate from a date or datetime object
 
         Args:

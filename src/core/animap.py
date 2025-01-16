@@ -6,7 +6,7 @@ from typing import Any
 import requests
 from pydantic import ValidationError
 from sqlmodel import Session, column, delete, exists, func, select, true
-from sqlmodel.sql.expression import and_, or_
+from sqlmodel.sql.expression import UnaryExpression, and_, or_
 
 from src import log
 from src.database import db
@@ -246,7 +246,7 @@ class AniMapClient:
         if not imdb and not tmdb and not tvdb:
             return []
 
-        def json_contains(field: str, value: Any) -> Any:
+        def json_contains(field: str, value: Any) -> UnaryExpression:
             """Generates a JSON_CONTAINS function for the given field.
 
             Args:

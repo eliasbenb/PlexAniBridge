@@ -4,10 +4,11 @@ on:
     branches:
       - main
     paths:
-      - 'docs/**'
-      - 'mkdocs.yml'
-      - '.env.example'
-      - 'compose.yaml'
+      - "docs/**"
+      - "mkdocs.yml"
+      - ".env.example"
+      - "compose.yaml"
+      - "mappings.example.json"
   workflow_dispatch:
 
 permissions:
@@ -19,12 +20,12 @@ jobs:
       - uses: actions/checkout@v4
       - name: Configure Git Credentials
         run: |
-          git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
       - uses: actions/setup-python@v5
         with:
           python-version: 3.x
-      - run: echo "cache_id=$(date --utc '+%V')" >> $GITHUB_ENV 
+      - run: echo "cache_id=$(date --utc '+%V')" >> $GITHUB_ENV
 
       - uses: actions/cache@v4
         with:
@@ -33,5 +34,4 @@ jobs:
           restore-keys: |
             mkdocs-material-
       - run: pip install mkdocs-material mkdocs-git-revision-date-localized-plugin
-
       - run: mkdocs gh-deploy --force
