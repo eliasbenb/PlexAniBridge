@@ -335,6 +335,22 @@ class BaseSyncClient(ABC, Generic[T, S]):
             animapping=animapping,
         )
 
+        debug_log_title_kwargs = {
+            "item": item,
+            "subitem": subitem
+            if animapping.tvdb_id and animapping.tvdb_season != -1
+            else None,
+            "extra_title": None
+            if animapping.tvdb_season != -1
+            else f"(001 - {anilist_media.episodes})",
+        }
+        debug_log_ids_kwargs = {
+            "key": subitem.ratingKey,
+            "plex_id": subitem.guid,
+            "guids": guids,
+            "anilist_id": animapping.anilist_id,
+        }
+
         if anilist_media_list:
             anilist_media_list.unset_fields(self.excluded_sync_fields)
         plex_media_list.unset_fields(self.excluded_sync_fields)
@@ -346,8 +362,8 @@ class BaseSyncClient(ABC, Generic[T, S]):
         if final_media_list == anilist_media_list:
             log.info(
                 f"{self.__class__.__name__}: Skipping {item.type} because it is already up to date "
-                f"{self._debug_log_title(item, subitem)} "
-                f"{self._debug_log_ids(subitem.ratingKey, subitem.guid, guids, anilist_id=animapping.anilist_id)}"
+                f"{self._debug_log_title(**debug_log_title_kwargs)} "
+                f"{self._debug_log_ids(**debug_log_ids_kwargs)}"
             )
             self.sync_stats.skipped += 1
             return
@@ -367,16 +383,16 @@ class BaseSyncClient(ABC, Generic[T, S]):
         if not final_media_list.status:
             log.info(
                 f"{self.__class__.__name__}: Skipping {item.type} due to no activity "
-                f"{self._debug_log_title(item, subitem)} "
-                f"{self._debug_log_ids(subitem.ratingKey, subitem.guid, guids, anilist_id=animapping.anilist_id)}"
+                f"{self._debug_log_title(**debug_log_title_kwargs)} "
+                f"{self._debug_log_ids(**debug_log_ids_kwargs)}"
             )
             self.sync_stats.skipped += 1
             return
 
         log.debug(
             f"{self.__class__.__name__}: Syncing AniList entry for {item.type} "
-            f"{self._debug_log_title(item, subitem)} "
-            f"{self._debug_log_ids(subitem.ratingKey, subitem.guid, guids, anilist_id=animapping.anilist_id)}"
+            f"{self._debug_log_title(**debug_log_title_kwargs)} "
+            f"{self._debug_log_ids(**debug_log_ids_kwargs)}"
         )
         log.debug(f"\t\tBEFORE => {anilist_media_list}")
         log.debug(f"\t\tAFTER  => {final_media_list}")
@@ -384,8 +400,8 @@ class BaseSyncClient(ABC, Generic[T, S]):
         self.anilist_client.update_anime_entry(final_media_list)
 
         log.info(
-            f"{self.__class__.__name__}: Synced {item.type} {self._debug_log_title(item, subitem)} "
-            f"{self._debug_log_ids(subitem.ratingKey, subitem.guid, guids, anilist_id=animapping.anilist_id)}"
+            f"{self.__class__.__name__}: Synced {item.type} {self._debug_log_title(**debug_log_title_kwargs)} "
+            f"{self._debug_log_ids(**debug_log_ids_kwargs)}"
         )
         self.sync_stats.synced += 1
 
@@ -682,7 +698,9 @@ class BaseSyncClient(ABC, Generic[T, S]):
 
         return res_media_list
 
-    def _debug_log_title(self, item: T, subitem: S | None = None) -> str:
+    def _debug_log_title(
+        self, item: T, subitem: S | None = None, extra_title: str | None = None
+    ) -> str:
         """Creates a debug-friendly string of media titles.
 
         The outputted string uses color formatting syntax with the `$$` delimiters.
@@ -690,13 +708,15 @@ class BaseSyncClient(ABC, Generic[T, S]):
         Args
             item (T): Plex media item
             subitem (S | None): Specific item to sync. Defaults to None
+            extra_title (str | None): An additional string to append to the title. Defaults to None
 
         Returns:
             str: Debug-friendly string of media titles
         """
+        extra_title = f" | {extra_title}" if extra_title else ""
         if subitem and item != subitem:
-            return f"$$'{item.title} | {subitem.title}'$$"
-        return f"$$'{item.title}'$$"
+            return f"$$'{item.title} | {subitem.title}{extra_title}'$$"
+        return f"$$'{item.title}{extra_title}'$$"
 
     def _debug_log_ids(
         self,
