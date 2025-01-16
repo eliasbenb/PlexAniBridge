@@ -284,7 +284,9 @@ class BridgeClient:
         log.info(f"{self.__class__.__name__}: Syncing section $$'{section.title}'$$")
 
         last_sync = max(
-            self.last_synced or datetime.min, self.last_polled or datetime.min
+            self.last_synced or datetime.min,
+            self.last_polled or datetime.min,
+            datetime(1970, 1, 1),
         )
 
         items = plex_client.get_section_items(
