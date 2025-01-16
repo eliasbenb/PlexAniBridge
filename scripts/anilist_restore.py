@@ -68,7 +68,10 @@ class AniListRestoreClient:
         """).strip()
 
         if self.dry_run:
-            print(f"[DRY RUN] Would restore entry for media ID: {entry.mediaId}")
+            print(
+                f"[DRY RUN] Would restore entry for media ID: {entry.mediaId} with data:"
+            )
+            print(f"\t{entry.model_dump_json(exclude_none=True)}")
             return
 
         variables = entry.model_dump_json(exclude_none=True)
