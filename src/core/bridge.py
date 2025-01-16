@@ -98,6 +98,7 @@ class BridgeClient:
         Note:
             Only called after a completely successful sync operation
         """
+        self.last_synced = last_synced
         with Session(db.engine) as session:
             session.merge(
                 Housekeeping(key="last_synced", value=last_synced.isoformat())
@@ -113,6 +114,7 @@ class BridgeClient:
         Note:
             Only called after a successful polling scan
         """
+        self.last_polled = last_polled
         with Session(db.engine) as session:
             session.merge(
                 Housekeeping(key="last_polled", value=last_polled.isoformat())

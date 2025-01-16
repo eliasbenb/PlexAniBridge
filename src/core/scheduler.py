@@ -22,7 +22,7 @@ class SchedulerClient:
             try:
                 self.bridge.sync(*args, **kwargs)
             except Exception as e:
-                log.error("Sync failed", exc_info=e)
+                log.error(f"{self.__class__.__name__}: Error during sync", exc_info=e)
 
     def schedule_periodic_sync(self, scheduler: sched.scheduler) -> None:
         """Manages periodic execution of the sync process at fixed intervals."""
