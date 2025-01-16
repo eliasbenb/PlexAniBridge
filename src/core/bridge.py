@@ -21,9 +21,6 @@ class BridgeClient:
     - AniMap database client (for ID mappings)
     - Sync clients for movies and TV shows
 
-    The client supports multiple user pairs (Plex user + AniList token), partial scanning
-    for efficiency, and both destructive and non-destructive sync modes.
-
     Attributes:
         config (PlexAnibridgeConfig): Application configuration settings
         token_user_pairs (list[tuple[str, str]]): Paired AniList tokens and Plex usernames
@@ -32,7 +29,7 @@ class BridgeClient:
         last_config_encoded (str | None): Encoded version of the last used configuration
 
     Configuration Options:
-        - PARTIAL_SCAN: Enable incremental syncs based on modification time
+        - FULL_SCAN: Allow scanning items that don't have any activity
         - DESTRUCTIVE_SYNC: Allow deletion of AniList entries
         - EXCLUDED_SYNC_FIELDS: Fields to ignore during sync
         - FUZZY_SEARCH_THRESHOLD: Matching threshold for title comparison
@@ -53,7 +50,7 @@ class BridgeClient:
             datetime | None: Timestamp of the last sync, None if never synced
 
         Note:
-            Used to determine whether partial scanning is possible and
+            Used to determine whether polling scanning is possible and
             to filter items for incremental syncs
         """
         with Session(db.engine) as session:
@@ -81,7 +78,7 @@ class BridgeClient:
         """Retrieves the encoded configuration from the last sync.
 
         The encoded configuration is used to determine if settings have
-        changed between syncs, which affects partial scan eligibility.
+        changed between syncs, which affects polling scan eligibility.
 
         Returns:
             str | None: Encoded configuration string, None if no previous sync
@@ -99,7 +96,7 @@ class BridgeClient:
             config_encoded (str): Encoded configuration string
 
         Note:
-            Used in conjunction with last_synced to validate partial scan eligibility
+            Used in conjunction with last_synced to validate polling scan eligibility
         """
         with Session(db.engine) as session:
             session.merge(Housekeeping(key="last_config_encoded", value=config_encoded))
@@ -109,7 +106,7 @@ class BridgeClient:
         """Initiates the synchronization process for all configured user pairs.
 
         This is the main entry point for the sync process. It:
-        1. Determines the appropriate sync mode (partial/full, destructive/non-destructive)
+        1. Determines the appropriate sync mode (polling/partial/full, destructive/non-destructive)
         2. Processes each Plex user + AniList token pair
         3. Updates sync metadata upon successful completion
 
@@ -118,15 +115,15 @@ class BridgeClient:
         the last_synced timestamp from being updated.
 
         Note:
-            - Partial sync requires valid last_synced and matching configuration
+            - Polling scan requires valid last_synced and matching configuration
+            - Partial scan can process only items with some Plex activity
+            - Full scan can process all items in the library
             - Destructive sync can remove entries from AniList
-            - Non-destructive sync only processes watched content
         """
         log.info(
             f"{self.__class__.__name__}: Starting "
-            f"{'partial ' if self._should_perform_partial_scan() else ''}"
-            f"{'and ' if self._should_perform_partial_scan() and self.config.DESTRUCTIVE_SYNC else ''}"
-            f"{'destructive ' if self.config.DESTRUCTIVE_SYNC else ''}"
+            f"{'full ' if self.config.FULL_SCAN else 'partial '}"
+            f"{'and destructive ' if self.config.DESTRUCTIVE_SYNC else ''}"
             f"sync between Plex and AniList libraries"
         )
 
@@ -212,7 +209,7 @@ class BridgeClient:
 
         Process:
         1. Retrieves items from the section based on sync mode:
-           - Partial scan: Only items modified since last sync
+           - Partial scan: Only items with activity
            - Full scan: All items
            - Non-destructive: Only watched items
         2. Routes each item to appropriate sync client (movie/show)
@@ -222,10 +219,8 @@ class BridgeClient:
 
         items = self.plex_client.get_section_items(
             section,
-            min_last_modified=self.last_synced
-            if self._should_perform_partial_scan()
-            else None,
-            require_watched=not self.config.DESTRUCTIVE_SYNC,
+            min_last_modified=self.last_synced if self.config.POLLING_SCAN else None,
+            require_watched=not self.config.FULL_SCAN,
         )
 
         sync_client = self.movie_sync if section.type == "movie" else self.show_sync
@@ -233,25 +228,3 @@ class BridgeClient:
             sync_client.process_media(item)
 
         return sync_client.sync_stats
-
-    def _should_perform_partial_scan(self) -> bool:
-        """Determines if a partial (incremental) sync is possible.
-
-        A partial scan optimizes the sync process by only processing
-        items that have been modified since the last successful sync.
-
-        Returns:
-            bool: True if all conditions for partial scan are met:
-                1. PARTIAL_SCAN setting is enabled
-                2. Last sync timestamp exists
-                3. Current configuration matches last sync's configuration
-
-        Note:
-            Configuration changes invalidate partial scan eligibility to
-            ensure changes in sync settings are properly applied
-        """
-        return (
-            self.config.PARTIAL_SCAN
-            and self.last_synced is not None
-            and self.last_config_encoded == self.config.encode()
-        )
