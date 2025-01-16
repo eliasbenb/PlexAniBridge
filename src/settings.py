@@ -249,3 +249,4 @@ class PlexAnibridgeConfig(BaseSettings):
 
     class Config:
         env_file = ".env"
+        extra = "ignore"
