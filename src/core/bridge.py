@@ -191,7 +191,7 @@ class BridgeClient:
             self._set_last_config_encoded(self.config.encode())
 
         log.info(
-            f"{self.__class__.__name__}: {'polling' if poll else 'periodic'} sync completed"
+            f"{self.__class__.__name__}: {'Polling' if poll else 'Periodic'} sync completed"
         )
 
     def _sync_user(self, anilist_token: str, plex_user: str, poll: bool) -> None:
