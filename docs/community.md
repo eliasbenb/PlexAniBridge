@@ -1,6 +1,6 @@
 ---
 title: Community
-icon: material/people
+icon: material/account-group
 ---
 
 ## Discord
