@@ -7,6 +7,8 @@ icon: material/home
 
 PlexAniBridge is a tool designed to keep your AniList profile automatically synced with your Plex activity. Whether you're tracking your watch progress, ratings, or reviews, PlexAniBridge has you covered.
 
+[Quick Start Docker](./quick-start/docker.md) | [Quick Start Source](./quick-start/source.md) | [Configuration](./configuration.md)
+
 ## Key Features
 
 - **Comprehensive Synchronization**: Tracks watch status, progress, repeat counts, ratings, text reviews, and start/end dates.

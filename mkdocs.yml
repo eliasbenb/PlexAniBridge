@@ -7,7 +7,7 @@ edit_uri: edit/main/docs/
 extra:
   generator: false
 plugins:
-  - git-revision-date-localized
+  - git-tag
   - search
 theme:
   name: material
@@ -16,7 +16,6 @@ theme:
   features:
     - announce.dismiss
     - content.action.edit
-    - content.action.view
     - content.code.annotate
     - content.code.copy
     # - content.code.select

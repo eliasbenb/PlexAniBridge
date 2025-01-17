@@ -20,7 +20,7 @@ Below is a PlexAniBridge Docker compose file with example values. Optional envir
 
 !!! note
 
-    You can pin the image to a specific version or branch by changing `latest` to a specific tag, e.g. `main`, `develop`, `v0.2.0-alpha.1`, etc.
+    You can pin the image to a specific version or branch by changing `latest` to a specific tag, e.g. `main`, `develop`, `{{ git_tag }}`, etc.
 
 ```yaml title="compose.yaml"
 --8<-- "compose.yaml"

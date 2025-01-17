@@ -93,7 +93,7 @@ Interval in seconds between sync jobs. Set to `-1` to run once and exit.
 
     The difference being that the polling scanner will only sync the changes detected in the library, while the regular sync will pull the mappings database and sync the entire library.
 
-## `POLLING_SCAN`
+### `POLLING_SCAN`
 
 `bool` (optional, default `False`)
 
