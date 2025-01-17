@@ -1,0 +1,36 @@
+# Data
+/data
+
+# Database
+*.db
+*.db-journal
+*.sqlite3
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Docs
+/docs
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Logs
+/logs
+
+# IDE
+/.devcontainer
+/.vscode
+
+# GitHub
+/.github
+
+# Git
+/.git
