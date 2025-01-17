@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from functools import cache
+from functools import lru_cache
 from textwrap import dedent
 
 import plexapi.utils
@@ -44,6 +44,14 @@ class PlexClient:
         self.admin_client = PlexServer(plex_url, plex_token)
         self._init_user_client()
         self.on_deck_window = self._get_on_deck_window()
+
+    def clear_cache(self) -> None:
+        """Clears the cache for all decorated methods in the class."""
+        for attr in dir(self):
+            if callable(getattr(self, attr)) and hasattr(
+                getattr(self, attr), "cache_clear"
+            ):
+                getattr(self, attr).cache_clear()
 
     def _init_user_client(self) -> PlexServer:
         """Initializes the Plex client for the specified user account.
@@ -165,7 +173,7 @@ class PlexClient:
 
         return section.search(filters=filters)
 
-    @cache
+    @lru_cache
     def get_user_review(self, item: Movie | Show | Season) -> str | None:
         """Retrieves user review for a media item from Plex community.
 
@@ -328,7 +336,7 @@ class PlexClient:
             )
         return []
 
-    @cache
+    @lru_cache
     def get_history(
         self,
         item: Movie | Show | Season | Episode,

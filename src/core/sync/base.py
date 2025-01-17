@@ -163,6 +163,14 @@ class BaseSyncClient(ABC, Generic[T, S]):
 
         self.sync_stats = SyncStats()
 
+    def clear_cache(self) -> None:
+        """Clears the cache for all decorated methods in the class."""
+        for attr in dir(self):
+            if callable(getattr(self, attr)) and hasattr(
+                getattr(self, attr), "cache_clear"
+            ):
+                getattr(self, attr).cache_clear()
+
     def process_media(self, item: T) -> SyncStats:
         """Processes a single media item for synchronization.
 

@@ -57,6 +57,8 @@ class BridgeClient:
         the database is properly connected and ready for use.
         """
         self.animap_client.reinit()
+        for plex_client in self.plex_clients.values():
+            plex_client.clear_cache()
 
     def _get_last_synced(self) -> datetime | None:
         """Retrieves the timestamp of the last successful sync from the database.

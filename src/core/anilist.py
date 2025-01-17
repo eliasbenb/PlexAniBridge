@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from functools import cache
+from functools import lru_cache
 from pathlib import Path
 from textwrap import dedent
 from time import sleep
@@ -198,7 +198,7 @@ class AniListClient:
             or not episodes
         ]
 
-    @cache
+    @lru_cache(maxsize=None)
     def _search_anime(
         self,
         search_str: str,
