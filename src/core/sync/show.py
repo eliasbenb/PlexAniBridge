@@ -1,9 +1,9 @@
 import sys
 from datetime import datetime
-from functools import lru_cache
 from typing import Iterator
 
 import plexapi.exceptions
+from cachetools.func import lru_cache
 from plexapi.video import Episode, Season, Show
 
 from src.models.anilist import FuzzyDate, Media, MediaListStatus
@@ -288,7 +288,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
             FuzzyDate.from_date(episode.lastViewedAt),
         )
 
-    @lru_cache
+    @lru_cache(maxsize=32)
     def __filter_mapped_episodes(
         self, item: Show, subitem: Season, anilist_media: Media, animapping: AniMap
     ) -> list[Episode]:

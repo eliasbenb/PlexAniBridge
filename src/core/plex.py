@@ -1,9 +1,9 @@
 from datetime import datetime, timedelta
-from functools import lru_cache
 from textwrap import dedent
 
 import plexapi.utils
 import requests
+from cachetools.func import lru_cache
 from plexapi.library import MovieSection, ShowSection
 from plexapi.server import PlexServer
 from plexapi.video import Episode, EpisodeHistory, Movie, MovieHistory, Season, Show
@@ -173,7 +173,7 @@ class PlexClient:
 
         return section.search(filters=filters)
 
-    @lru_cache
+    @lru_cache(maxsize=32)
     def get_user_review(self, item: Movie | Show | Season) -> str | None:
         """Retrieves user review for a media item from Plex community.
 
@@ -336,7 +336,7 @@ class PlexClient:
             )
         return []
 
-    @lru_cache
+    @lru_cache(maxsize=32)
     def get_history(
         self,
         item: Movie | Show | Season | Episode,
