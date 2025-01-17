@@ -5,6 +5,8 @@ PlexAniBridge is a tool designed to keep your AniList profile automatically sync
 > [!IMPORTANT]  
 > Visit the [PlexAniBridge documentation](https://plexanibridge.elias.eu.org) for detailed setup instructions and usage information.
 
+[![Discord Shield](https://discord.com/api/guilds/1329899003814609067/widget.png?style=shield)](https://discord.gg/ey8kyQU9aD)
+
 ## Key Features
 
 - **Comprehensive Synchronization**: Tracks watch status, progress, repeat counts, ratings, text reviews, and start/end dates.
