@@ -9,6 +9,9 @@ LABEL maintainer="Elias Benbourenane <eliasbenbourenane@gmail.com>" \
     org.opencontainers.image.source="https://github.com/eliasbenb/PlexAniBridge" \
     org.opencontainers.image.licenses="MIT"
 
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
 WORKDIR /app
 
 RUN apk add --no-cache git
