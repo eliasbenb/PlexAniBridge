@@ -1,10 +1,10 @@
 from datetime import datetime, timedelta
-from functools import lru_cache
 from pathlib import Path
 from textwrap import dedent
 from time import sleep
 
 import requests
+from cachetools.func import lru_cache, ttl_cache
 
 from src import log
 from src.models.anilist import (
@@ -160,6 +160,7 @@ class AniListClient:
 
         return response["deleted"]
 
+    @ttl_cache(maxsize=None, ttl=86400)
     def search_anime(
         self,
         search_str: str,
