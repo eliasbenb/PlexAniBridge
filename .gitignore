@@ -1,5 +1,5 @@
 # Data
-data/
+/data
 
 # Database
 *.db
