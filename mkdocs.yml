@@ -11,6 +11,8 @@ plugins:
   - search
 theme:
   name: material
+  logo: img/logo.png
+  favicon: favicon.ico
   icon:
     repo: fontawesome/brands/github
   features:
