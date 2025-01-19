@@ -89,7 +89,7 @@ Interval in seconds between sync jobs. Set to `-1` to run once and exit.
 
 ??? note "Sync Interval with Polling Scan"
 
-    If `POLLING_SCAN` is enabled, the sync interval will be used to determine how often to synchronize the [mappings database](./advanced/custom-mappings.md) and your AniList profile. Periodic scans will be disabled (unless it is your first run).
+    If `POLLING_SCAN` is enabled, the sync interval will be used to determine how often to synchronize the [mappings database](./advanced/custom-mappings.md) and your AniList profile. Periodic scans will be disabled.
 
 ### `POLLING_SCAN`
 
@@ -101,7 +101,7 @@ The polling scanner is event-driven and will detect changes in your library and 
 
 ??? note "Sync Interval with Polling Scan"
 
-    If `POLLING_SCAN` is enabled, the sync interval will be used to determine how often to synchronize the [mappings database](./advanced/custom-mappings.md) and your AniList profile. Periodic scans will be disabled (unless it is your first run).
+    If `POLLING_SCAN` is enabled, the sync interval will be used to determine how often to synchronize the [mappings database](./advanced/custom-mappings.md) and your AniList profile. Periodic scans will be disabled.
 
 ### `FULL_SCAN`
 
