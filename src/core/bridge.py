@@ -294,9 +294,8 @@ class BridgeClient:
         last_sync = max(
             self.last_synced or datetime.min,
             self.last_polled or datetime.min,
-            datetime(1970, 1, 1),
         )
-
+        last_sync = datetime.now() if last_sync == datetime.min else last_sync
         items = plex_client.get_section_items(
             section,
             min_last_modified=last_sync if poll else None,
