@@ -1,10 +1,11 @@
-import time
+import asyncio
+import signal
 
 from src import PLEX_ANIBDRIGE_HEADER, config, log
 from src.core import BridgeClient, SchedulerClient
 
 
-def main():
+async def main():
     """Entry point for PlexAniBridge
 
     Initializes the application and starts the scheduler.
@@ -20,16 +21,27 @@ def main():
         poll_interval=30,
     )
 
+    loop = asyncio.get_event_loop()
+    stop_event = asyncio.Event()
+
+    def signal_handler():
+        log.info("PlexAniBridge: Caught signal, shutting down...")
+        stop_event.set()
+
+    loop.add_signal_handler(signal.SIGTERM, signal_handler)
+    loop.add_signal_handler(signal.SIGINT, signal_handler)
+
     try:
         scheduler.start()
-        while True:
-            time.sleep(1)
-    except KeyboardInterrupt:
-        log.info("PlexAniBridge: Caught KeyboardInterrupt, shutting down...")
+        await stop_event.wait()
+    except asyncio.CancelledError:
+        pass
     finally:
-        scheduler.stop()
+        await scheduler.stop()
+        for sig in (signal.SIGTERM, signal.SIGINT):
+            loop.remove_signal_handler(sig)
         log.info("PlexAniBridge: Exiting...")
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
