@@ -21,15 +21,9 @@ def main():
     )
 
     try:
-        if config.SYNC_INTERVAL == -1:
-            log.info(
-                "PlexAniBridge: SYNC_INTERVAL set to -1, running once and exiting..."
-            )
-            scheduler.run_sync()
-        else:
-            scheduler.start()
-            while True:
-                time.sleep(1)
+        scheduler.start()
+        while True:
+            time.sleep(1)
     except KeyboardInterrupt:
         log.info("PlexAniBridge: Caught KeyboardInterrupt, shutting down...")
     finally:

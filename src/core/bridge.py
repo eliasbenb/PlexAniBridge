@@ -59,6 +59,8 @@ class BridgeClient:
         self.animap_client.reinit()
         for plex_client in self.plex_clients.values():
             plex_client.clear_cache()
+        for anilist_client in self.anilist_clients.values():
+            anilist_client.reinit()
 
     def _get_last_synced(self) -> datetime | None:
         """Retrieves the timestamp of the last successful sync from the database.
@@ -147,6 +149,7 @@ class BridgeClient:
         Note:
             Used in conjunction with last_synced to validate polling scan eligibility
         """
+        self.last_config_encoded = config_encoded
         with Session(db.engine) as session:
             session.merge(Housekeeping(key="last_config_encoded", value=config_encoded))
             session.commit()
@@ -188,7 +191,10 @@ class BridgeClient:
             self._set_last_polled(sync_datetime)
         else:
             self._set_last_synced(sync_datetime)
-            self._set_last_config_encoded(self.config.encode())
+
+        config_encoded = self.config.encode()
+        if config_encoded != self.last_config_encoded:
+            self._set_last_config_encoded(config_encoded)
 
         log.info(
             f"{self.__class__.__name__}: {'Polling' if poll else 'Periodic'} sync completed"
@@ -225,8 +231,6 @@ class BridgeClient:
 
         if anilist_token in self.anilist_clients:
             anilist_client = self.anilist_clients[anilist_token]
-            if not poll:
-                anilist_client.reinit()
         else:
             anilist_client = self.anilist_clients[anilist_token] = AniListClient(
                 anilist_token, self.config.DATA_PATH / "backups", self.config.DRY_RUN
