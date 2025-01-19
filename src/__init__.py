@@ -10,14 +10,14 @@ __email__ = "eliasbenbourenane@gmail.com"
 __version__ = get_pyproject_version()
 __git_hash__ = get_git_hash()
 
-PLEX_ANIBDRIGE_HEADER = f"""
+PLEXANIBDRIGE_HEADER = f"""
 ╔═══════════════════════════════════════════════════════════════════════════════╗
 ║                           P L E X A N I B R I D G E                           ║
 ╠═══════════════════════════════════════════════════════════════════════════════╣
 ║                                                                               ║
 ║  Version: {__version__:<68}║
 ║  Git Hash: {__git_hash__:<67}║
-║  Author: {f"{__author__ } @{__maintainer__}":<69}║
+║  Author: {f"{__author__} @{__maintainer__}":<69}║
 ║  License: {__license__:<68}║
 ║  Repository: https://github.com/eliasbenb/PlexAniBridge                       ║
 ║                                                                               ║
