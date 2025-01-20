@@ -89,9 +89,7 @@ Interval in seconds between sync jobs. Set to `-1` to run once and exit.
 
 ??? note "Sync Interval with Polling Scan"
 
-    If `POLLING_SCAN` is enabled, the sync interval still applies. The polling scanner will run in addition to the regular sync.
-
-    The difference being that the polling scanner will only sync the changes detected in the library, while the regular sync will pull the mappings database and sync the entire library.
+    If `POLLING_SCAN` is enabled, the sync interval will be used to determine how often to synchronize the [mappings database](./advanced/custom-mappings.md) and your AniList profile. Periodic scans will be disabled.
 
 ### `POLLING_SCAN`
 
@@ -101,9 +99,9 @@ When enabled, PlexAniBridge will poll the Plex server for changes instead of wai
 
 The polling scanner is event-driven and will detect changes in your library and sync that subset of your library. This is useful if you want real-time updates on your AniList profile.
 
-!!! note
+??? note "Sync Interval with Polling Scan"
 
-    Even with polling scan enabled, the sync interval will still be respected. So, every `SYNC_INTERVAL` seconds, a regular sync will be performed.
+    If `POLLING_SCAN` is enabled, the sync interval will be used to determine how often to synchronize the [mappings database](./advanced/custom-mappings.md) and your AniList profile. Periodic scans will be disabled.
 
 ### `FULL_SCAN`
 
