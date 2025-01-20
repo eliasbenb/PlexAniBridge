@@ -81,25 +81,38 @@ class SchedulerClient:
             return
 
         self._running = True
-        self._create_task(self._reinit())
+
+        if self.sync_interval >= 0:
+            self._create_task(self._reinit())
 
         if self.polling_scan:
-            log.info(f"Starting polling scheduler (interval: {self.poll_interval}s)")
+            log.info(
+                f"{self.__class__.__name__}: Starting polling scheduler (interval: {self.poll_interval}s)"
+            )
             self._create_task(self._poll_sync())
         else:
-            log.info(f"Starting periodic scheduler (interval: {self.sync_interval}s)")
-            self._create_task(self._periodic_sync())
+            log.info(
+                f"{self.__class__.__name__}: Starting periodic scheduler (interval: {self.sync_interval}s)"
+            )
+            if self.sync_interval >= 0:
+                self._create_task(self._periodic_sync())
+            else:
+                log.debug(
+                    f"{self.__class__.__name__}: SYNC_INTERVAL is -1, running once and exiting"
+                )
+                await self.sync()
+                exit(0)
 
     async def stop(self) -> None:
         """Stop the scheduler and clean up"""
         self._running = False
 
         if self._tasks:
-            log.info("Stopping all scheduler tasks...")
+            log.info(f"{self.__class__.__name__}: Stopping all scheduler tasks...")
             for task in self._tasks:
                 task.cancel()
 
             await asyncio.gather(*self._tasks, return_exceptions=True)
             self._tasks.clear()
 
-        log.info("Scheduler stopped")
+        log.info(f"{self.__class__.__name__}: Scheduler stopped")
