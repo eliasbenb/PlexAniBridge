@@ -7,7 +7,7 @@ icon: material/home
 
 PlexAniBridge is a tool designed to keep your AniList profile automatically synced with your Plex activity. Whether you're tracking your watch progress, ratings, or reviews, PlexAniBridge has you covered.
 
-[![Discord Shield](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fdiscord.com%2Fapi%2Finvites%2Fey8kyQU9aD%3Fwith_counts%3Dtrue&query=%24.approximate_presence_count&style=for-the-badge&logo=discord&label=Discord%20Users&labelColor=%23313338&color=%2345a1d9)](https://discord.gg/ey8kyQU9aD)
+[![Discord Shield](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fdiscord.com%2Fapi%2Finvites%2Fey8kyQU9aD%3Fwith_counts%3Dtrue&query=%24.approximate_member_count&style=for-the-badge&logo=discord&label=Discord%20Users&labelColor=%23313338&color=%2345a1d9)](https://discord.gg/ey8kyQU9aD)
 
 [Quick Start Docker](./quick-start/docker.md) | [Quick Start Source](./quick-start/source.md) | [Configuration](./configuration.md)
 
