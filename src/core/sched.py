@@ -1,5 +1,4 @@
 import asyncio
-import multiprocessing
 import signal
 from datetime import datetime, timedelta
 from functools import partial
@@ -15,28 +14,31 @@ class SchedulerClient:
         sync_interval: int,
         polling_scan: bool,
         poll_interval: int = 30,
-        reinit_interval: int = 3600,
     ):
         self.bridge = bridge
         self.sync_interval = sync_interval
         self.polling_scan = polling_scan
         self.poll_interval = poll_interval
-        self.reinit_interval = reinit_interval
+        self.reinit_interval = sync_interval
+
         self._running = False
         self._tasks: set[asyncio.Task] = set()
         self._sync_lock = asyncio.Lock()
-        self._current_process = None
+        self._current_task = None
+        self.stop_event = asyncio.Event()
 
-    def run_sync(self, poll: bool) -> None:
-        """Function to run a sync job in separate process
+    async def run_sync(self, poll: bool) -> None:
+        """Function to run a sync job
 
         Args:
             poll (bool): Flag to enable polling-based sync
         """
         try:
-            self.bridge.sync(poll=poll)
+            await asyncio.to_thread(self.bridge.sync, poll=poll)
         except Exception as e:
-            log.error(f"{__class__.__name__}: Sync process error: {e}", exc_info=True)
+            log.error(
+                f"{self.__class__.__name__}: Sync process error: {e}", exc_info=True
+            )
 
     async def sync(self, poll: bool = False) -> None:
         """Execute a single synchronization cycle with error handling
@@ -46,24 +48,17 @@ class SchedulerClient:
         """
         async with self._sync_lock:
             try:
-                self._current_process = multiprocessing.Process(
-                    target=self.run_sync, args=(poll,)
-                )
-                self._current_process.start()
-
-                while self._current_process.is_alive():
-                    await asyncio.sleep(0.1)
-
-                self._current_process.join()
+                self._current_task = asyncio.create_task(self.run_sync(poll))
+                await self._current_task
 
             except asyncio.CancelledError:
-                if self._current_process and self._current_process.is_alive():
-                    log.info(f"{self.__class__.__name__}: Terminating sync process...")
-                    self._current_process.terminate()
-
-                    await asyncio.sleep(1)
-                    if self._current_process.is_alive():
-                        self._current_process.kill()
+                if self._current_task and not self._current_task.done():
+                    log.info(f"{self.__class__.__name__}: Cancelling sync task...")
+                    self._current_task.cancel()
+                    try:
+                        await self._current_task
+                    except asyncio.CancelledError:
+                        pass
                 raise
             except Exception as e:
                 log.error(f"{self.__class__.__name__}: Sync error: {e}", exc_info=True)
@@ -107,7 +102,11 @@ class SchedulerClient:
         """Handle periodic bridge reinitialization"""
         while self._running:
             try:
-                self.bridge.reinit()
+                await asyncio.to_thread(self.bridge.reinit)
+                next_sync = datetime.now() + timedelta(seconds=self.reinit_interval)
+                log.info(
+                    f"{self.__class__.__name__}: Next reinit scheduled for: {next_sync}"
+                )
                 await asyncio.sleep(self.reinit_interval)
             except asyncio.CancelledError:
                 log.info(f"{self.__class__.__name__}: Reinit task cancelled")
@@ -127,8 +126,8 @@ class SchedulerClient:
     def _handle_signal(self, sig):
         """Handle termination signals"""
         log.info(f"{self.__class__.__name__}: Received signal {sig.name}")
-        if self._current_process and self._current_process.is_alive():
-            self._current_process.kill()
+        if self._current_task and not self._current_task.done():
+            self._current_task.cancel()
         exit(0)
 
     async def start(self) -> None:
@@ -142,7 +141,10 @@ class SchedulerClient:
         for sig in (signal.SIGTERM, signal.SIGINT):
             loop.add_signal_handler(sig, partial(self._handle_signal, sig))
 
-        if self.sync_interval >= 0:
+        if self.reinit_interval >= 0:
+            log.info(
+                f"{self.__class__.__name__}: Starting reinit scheduler (interval: {self.reinit_interval}s)"
+            )
             self._create_task(self._reinit())
 
         if self.polling_scan:
@@ -175,7 +177,11 @@ class SchedulerClient:
             await asyncio.gather(*self._tasks, return_exceptions=True)
             self._tasks.clear()
 
-        if self._current_process and self._current_process.is_alive():
-            self._current_process.kill()
+        if self._current_task and not self._current_task.done():
+            self._current_task.cancel()
+            try:
+                await self._current_task
+            except asyncio.CancelledError:
+                pass
 
         log.info(f"{self.__class__.__name__}: Scheduler stopped")
