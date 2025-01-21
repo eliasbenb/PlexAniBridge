@@ -299,32 +299,22 @@ class AniMapClient:
                 if epoffset is not None:
                     exact_conditions.append(AniMap.tvdb_epoffset == epoffset)
 
-            # Base query with all conditions
+            # Query with all conditions
             query = (
                 select(AniMap)
-                .where(AniMap.anilist_id.is_not(None))
                 .where(or_(*partial_conditions) if partial_conditions else true())
                 .where(and_(*exact_conditions) if exact_conditions else true())
-            )
-
-            # Deduplicate entries
-            subquery = query.group_by(
-                AniMap.anilist_id,
-                AniMap.tvdb_season,
-                AniMap.tvdb_epoffset,
-            ).subquery()
-
-            # Final query with ordering
-            final_query = (
-                select(AniMap)
-                .join(subquery, AniMap.anidb_id == subquery.c.anidb_id)
+                .group_by(
+                    AniMap.anilist_id,
+                    AniMap.tvdb_season,
+                    AniMap.tvdb_epoffset,
+                )
                 .order_by(
                     (AniMap.tvdb_season == -1).asc(),  # Ensure tvdb_season=-1 is last
                     AniMap.tvdb_season,
                     AniMap.tvdb_epoffset,
                     AniMap.anilist_id,
-                    AniMap.anidb_id,
                 )
             )
 
-            return session.exec(final_query).all()
+            return session.exec(query).all()
