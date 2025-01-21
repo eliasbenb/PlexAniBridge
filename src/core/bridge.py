@@ -219,22 +219,20 @@ class BridgeClient:
             Creates new client instances for each user to maintain proper
             authentication and separation of concerns
         """
-        if plex_user in self.plex_clients:
-            plex_client = self.plex_clients[plex_user]
-        else:
-            plex_client = self.plex_clients[plex_user] = PlexClient(
+        if plex_user not in self.plex_clients:
+            self.plex_clients[plex_user] = PlexClient(
                 self.config.PLEX_TOKEN,
                 plex_user,
                 self.config.PLEX_URL,
                 self.config.PLEX_SECTIONS,
             )
+        plex_client = self.plex_clients[plex_user]
 
-        if anilist_token in self.anilist_clients:
-            anilist_client = self.anilist_clients[anilist_token]
-        else:
-            anilist_client = self.anilist_clients[anilist_token] = AniListClient(
+        if anilist_token not in self.anilist_clients:
+            self.anilist_clients[anilist_token] = AniListClient(
                 anilist_token, self.config.DATA_PATH / "backups", self.config.DRY_RUN
             )
+        anilist_client = self.anilist_clients[anilist_token]
 
         log.info(
             f"{self.__class__.__name__}: Syncing Plex user $$'{plex_user}'$$ "
