@@ -99,8 +99,8 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
         is_partially_viewed = len(watched_episodes) > 0
         is_on_continue_watching = self.plex_client.is_on_continue_watching(
             subitem,
-            index__gt=animapping.tvdb_epoffset,
-            index__lte=animapping.tvdb_epoffset
+            index__gt=(animapping.tvdb_epoffset or 0),
+            index__lte=(animapping.tvdb_epoffset or 0)
             + (anilist_media.episodes or sys.maxsize),
         )
 
@@ -222,7 +222,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
             FuzzyDate | None: Start date for the media item
         """
         try:
-            episode: Episode = subitem.get(episode=animapping.tvdb_epoffset + 1)
+            episode: Episode = subitem.get(episode=(animapping.tvdb_epoffset or 0) + 1)
         except (plexapi.exceptions.NotFound, IndexError):
             return None
 
@@ -269,7 +269,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
         else:
             try:
                 episode: Episode = subitem.get(
-                    episode=animapping.tvdb_epoffset
+                    episode=(animapping.tvdb_epoffset or 0)
                     + (anilist_media.episodes or sys.maxsize)
                 )
             except (plexapi.exceptions.NotFound, IndexError):
@@ -330,8 +330,9 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
 
         return self.plex_client.get_episodes(
             subitem,
-            start=animapping.tvdb_epoffset + 1,
-            end=animapping.tvdb_epoffset + (anilist_media.episodes or sys.maxsize),
+            start=(animapping.tvdb_epoffset or 0) + 1,
+            end=(animapping.tvdb_epoffset or 0)
+            + (anilist_media.episodes or sys.maxsize),
         )
 
     def __filter_watched_episodes(
