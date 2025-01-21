@@ -8,7 +8,6 @@ from src.core import BridgeClient, SchedulerClient
 
 @asynccontextmanager
 async def create_scheduler(bridge: BridgeClient, **scheduler_kwargs):
-    """Context manager for creating and managing scheduler lifecycle"""
     scheduler = SchedulerClient(bridge, **scheduler_kwargs)
     try:
         await scheduler.start()
@@ -18,26 +17,19 @@ async def create_scheduler(bridge: BridgeClient, **scheduler_kwargs):
 
 
 async def main():
-    """Asynchronous entry point for PlexAniBridge"""
     log.info(f"\n{PLEXANIBDRIGE_HEADER}")
     log.info(f"PlexAniBridge: [CONFIG] => {config}")
 
     bridge = BridgeClient(config)
-
     stop_event = asyncio.Event()
 
-    def signal_handler(sig: signal.Signals) -> None:
-        """Signal handler for SIGTERM and SIGINT
-
-        Args:
-            sig (signal.Signals): Signal object
-        """
-        log.info(f"Received signal {sig.name}")
+    def shutdown():
+        log.info("Initiating graceful shutdown...")
         stop_event.set()
 
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGTERM, signal.SIGINT):
-        loop.add_signal_handler(sig, lambda s=sig: signal_handler(s))
+        loop.add_signal_handler(sig, shutdown)
 
     try:
         async with create_scheduler(
@@ -47,9 +39,13 @@ async def main():
             poll_interval=30,
         ) as _:
             await stop_event.wait()
+
     except asyncio.CancelledError:
         log.info("PlexAniBridge: Main task cancelled")
     finally:
+        for sig in (signal.SIGTERM, signal.SIGINT):
+            loop.remove_signal_handler(sig)
+
         tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
         if tasks:
             log.info(f"PlexAniBridge: Cleaning up {len(tasks)} remaining tasks...")
@@ -63,6 +59,6 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        log.info("PlexAniBridge: Caught KeyboardInterrupt, shutting down...")
+        pass
     finally:
         log.info("PlexAniBridge: Exiting...")
