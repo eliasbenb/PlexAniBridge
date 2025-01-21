@@ -283,21 +283,26 @@ class AniMapClient:
             partial_conditions = []
             exact_conditions = []
 
-            if imdb:
-                partial_conditions.append(json_contains("imdb_id", imdb))
-            if tmdb:
-                if is_movie:
+            if is_movie:
+                if imdb:
+                    partial_conditions.append(json_contains("imdb_id", imdb))
+                if tmdb:
                     partial_conditions.append(json_contains("tmdb_movie_id", tmdb))
-                else:
+            else:
+                if tmdb:
                     partial_conditions.append(json_contains("tmdb_show_id", tmdb))
-            if not is_movie and tvdb:
-                partial_conditions.append(AniMap.tvdb_id == tvdb)
+                if imdb:
+                    partial_conditions.append(json_contains("imdb_id", imdb))
+                if tvdb:
+                    partial_conditions.append(AniMap.tvdb_id == tvdb)
 
-            if not is_movie:
                 if season is not None:
                     exact_conditions.append(AniMap.tvdb_season == season)
+
                 if epoffset is not None:
                     exact_conditions.append(AniMap.tvdb_epoffset == epoffset)
+                else:
+                    exact_conditions.append(AniMap.tvdb_epoffset.is_not(None))
 
             # Query with all conditions
             query = (
