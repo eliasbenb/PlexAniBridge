@@ -98,7 +98,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
         is_viewed = len(watched_episodes) >= (anilist_media.episodes or sys.maxsize)
         is_partially_viewed = len(watched_episodes) > 0
         is_on_continue_watching = self.plex_client.is_on_continue_watching(
-            subitem,
+            item if animapping.tvdb_season == -1 else subitem,
             index__gt=(animapping.tvdb_epoffset or 0),
             index__lte=(animapping.tvdb_epoffset or 0)
             + (anilist_media.episodes or sys.maxsize),
