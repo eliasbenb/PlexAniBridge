@@ -191,12 +191,20 @@ class BaseSyncClient(ABC, Generic[T, S]):
             through the map_media() abstraction
         """
         guids = ParsedGuids.from_guids(item.guids)
-        log.debug(
-            f"{self.__class__.__name__}: Processing {item.type} {self._debug_log_title(item)} "
-            f"{self._debug_log_ids(item.ratingKey, item.guid, guids)}"
+
+        debug_log_title = self._debug_log_title(item=item)
+        debug_log_ids = self._debug_log_ids(
+            key=item.ratingKey, plex_id=item.guid, guids=guids
         )
 
-        for subitem, animapping, guids in self.map_media(item=item):
+        log.debug(
+            f"{self.__class__.__name__}: Processing {item.type} "
+            f"{debug_log_title} {debug_log_ids}"
+        )
+
+        for subitem, animapping in self.map_media(item=item):
+            debug_log_title = self._debug_log_title(item=item, subitem=subitem)
+
             try:
                 anilist_media = None
                 if animapping and animapping.anilist_id:
@@ -206,11 +214,26 @@ class BaseSyncClient(ABC, Generic[T, S]):
                     anilist_media = self.search_media(item=item, subitem=subitem)
                     match_method = "title search"
 
+                debug_log_title = self._debug_log_title(
+                    item=item,
+                    subitem=subitem
+                    if animapping and animapping.tvdb_id not in (None, -1)
+                    else None,
+                    extra_title=f"(001 - {anilist_media.episodes if anilist_media else '???'})"
+                    if animapping and animapping.tvdb_season == -1
+                    else None,
+                )
+                debug_log_ids = self._debug_log_ids(
+                    key=item.ratingKey,
+                    plex_id=item.guid,
+                    guids=guids,
+                    anilist_id=anilist_media.id if anilist_media else None,
+                )
+
                 if not anilist_media:
                     log.warning(
                         f"{self.__class__.__name__}: No suitable AniList results found during mapping "
-                        f"lookup or title search for {item.type} {self._debug_log_title(item, subitem)} "
-                        f"{self._debug_log_ids(subitem.ratingKey, subitem.guid, guids)}"
+                        f"lookup or title search for {item.type} {debug_log_title} {debug_log_ids}"
                     )
                     self.sync_stats.failed += 1
                     continue
@@ -223,8 +246,7 @@ class BaseSyncClient(ABC, Generic[T, S]):
 
                 log.debug(
                     f"{self.__class__.__name__}: Found AniList entry using {match_method} for {item.type} "
-                    f"{self._debug_log_title(item, subitem)} "
-                    f"{self._debug_log_ids(subitem.ratingKey, subitem.guid, guids, anilist_media.id)}"
+                    f"{debug_log_title} {debug_log_ids}"
                 )
 
                 self.sync_media(
@@ -236,8 +258,7 @@ class BaseSyncClient(ABC, Generic[T, S]):
             except Exception as e:
                 log.exception(
                     f"{self.__class__.__name__}: Failed to process {item.type} "
-                    f"{self._debug_log_title(item, subitem)} "
-                    f"{self._debug_log_ids(subitem.ratingKey, subitem.guid, guids)}",
+                    f"{debug_log_title} {debug_log_ids}",
                     exc_info=e,
                 )
                 self.sync_stats.failed += 1
@@ -335,6 +356,20 @@ class BaseSyncClient(ABC, Generic[T, S]):
         """
         guids = ParsedGuids.from_guids(item.guids)
 
+        debug_log_title = self._debug_log_title(
+            item=item,
+            subitem=subitem if animapping.tvdb_id not in (None, -1) else None,
+            extra_title=f"(001 - {anilist_media.episodes})"
+            if animapping.tvdb_season == -1
+            else None,
+        )
+        debug_log_ids = self._debug_log_ids(
+            key=subitem.ratingKey,
+            plex_id=subitem.guid,
+            guids=guids,
+            anilist_id=anilist_media.id,
+        )
+
         anilist_media_list = anilist_media.media_list_entry or None
         plex_media_list = self._get_plex_media_list(
             item=item,
@@ -342,22 +377,6 @@ class BaseSyncClient(ABC, Generic[T, S]):
             anilist_media=anilist_media,
             animapping=animapping,
         )
-
-        debug_log_title_kwargs = {
-            "item": item,
-            "subitem": subitem
-            if animapping.tvdb_id and animapping.tvdb_season != -1
-            else None,
-            "extra_title": None
-            if animapping.tvdb_season != -1
-            else f"(001 - {anilist_media.episodes})",
-        }
-        debug_log_ids_kwargs = {
-            "key": subitem.ratingKey,
-            "plex_id": subitem.guid,
-            "guids": guids,
-            "anilist_id": animapping.anilist_id,
-        }
 
         if anilist_media_list:
             anilist_media_list.unset_fields(self.excluded_sync_fields)
@@ -370,8 +389,7 @@ class BaseSyncClient(ABC, Generic[T, S]):
         if final_media_list == anilist_media_list:
             log.info(
                 f"{self.__class__.__name__}: Skipping {item.type} because it is already up to date "
-                f"{self._debug_log_title(**debug_log_title_kwargs)} "
-                f"{self._debug_log_ids(**debug_log_ids_kwargs)}"
+                f"{debug_log_title} {debug_log_ids}"
             )
             self.sync_stats.skipped += 1
             return
@@ -391,16 +409,14 @@ class BaseSyncClient(ABC, Generic[T, S]):
         if not final_media_list.status:
             log.info(
                 f"{self.__class__.__name__}: Skipping {item.type} due to no activity "
-                f"{self._debug_log_title(**debug_log_title_kwargs)} "
-                f"{self._debug_log_ids(**debug_log_ids_kwargs)}"
+                f"{debug_log_title} {debug_log_ids}"
             )
             self.sync_stats.skipped += 1
             return
 
         log.debug(
             f"{self.__class__.__name__}: Syncing AniList entry for {item.type} "
-            f"{self._debug_log_title(**debug_log_title_kwargs)} "
-            f"{self._debug_log_ids(**debug_log_ids_kwargs)}"
+            f"{debug_log_title} {debug_log_ids}"
         )
         log.debug(f"\t\tBEFORE => {anilist_media_list}")
         log.debug(f"\t\tAFTER  => {final_media_list}")
@@ -408,8 +424,8 @@ class BaseSyncClient(ABC, Generic[T, S]):
         self.anilist_client.update_anime_entry(final_media_list)
 
         log.info(
-            f"{self.__class__.__name__}: Synced {item.type} {self._debug_log_title(**debug_log_title_kwargs)} "
-            f"{self._debug_log_ids(**debug_log_ids_kwargs)}"
+            f"{self.__class__.__name__}: Synced {item.type} "
+            f"{debug_log_title} {debug_log_ids}"
         )
         self.sync_stats.synced += 1
 

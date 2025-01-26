@@ -310,7 +310,7 @@ class PlexClient:
 
     def get_continue_watching(
         self,
-        item: Movie | Season,
+        item: Movie | Show | Season,
         **kwargs,
     ) -> list[Movie] | list[Episode]:
         """Retrieves items from the 'Continue Watching' hub for a media item.
@@ -326,6 +326,12 @@ class PlexClient:
             return self.user_client.fetchItems(
                 "/hubs/continueWatching/items",
                 ratingKey=item.ratingKey,
+                **kwargs,
+            )
+        elif item.type == "show":
+            return self.user_client.fetchItems(
+                "/hubs/continueWatching/items",
+                grandparentRatingKey=item.ratingKey,
                 **kwargs,
             )
         elif item.type == "season":
@@ -449,7 +455,7 @@ class PlexClient:
         """
         return bool(item.onWatchlist()) if self.is_admin_user else False
 
-    def is_on_continue_watching(self, item: Movie | Season, **kwargs) -> bool:
+    def is_on_continue_watching(self, item: Movie | Show | Season, **kwargs) -> bool:
         """Checks if a media item appears in the Continue Watching hub.
 
         Args:
