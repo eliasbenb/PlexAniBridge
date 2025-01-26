@@ -221,9 +221,19 @@ class BaseSyncClient(ABC, Generic[T, S]):
                     tvdb_season=subitem.seasonNumber if item.type == "show" else None,
                 )
 
+                debug_log_title_kwargs = {
+                    "item": item,
+                    "subitem": subitem
+                    if animapping.tvdb_id and animapping.tvdb_season != -1
+                    else None,
+                    "extra_title": None
+                    if animapping.tvdb_season != -1
+                    else f"(001 - {anilist_media.episodes})",
+                }
+
                 log.debug(
                     f"{self.__class__.__name__}: Found AniList entry using {match_method} for {item.type} "
-                    f"{self._debug_log_title(item, subitem)} "
+                    f"{self._debug_log_title(**debug_log_title_kwargs)} "
                     f"{self._debug_log_ids(subitem.ratingKey, subitem.guid, guids, anilist_media.id)}"
                 )
 
