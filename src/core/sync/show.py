@@ -13,9 +13,7 @@ from .base import BaseSyncClient, ParsedGuids
 
 
 class ShowSyncClient(BaseSyncClient[Show, Season]):
-    def map_media(
-        self, item: Show
-    ) -> Iterator[tuple[Season, AniMap | None, ParsedGuids]]:
+    def map_media(self, item: Show) -> Iterator[tuple[Season, AniMap | None]]:
         """Maps a Plex item to potential AniList matches.
 
         For shows, we map each season to its corresponding AniList entry.
@@ -44,13 +42,13 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
                     unyielded_seasons.remove(animapping.tvdb_season)
                 except KeyError:
                     pass
-                yield season_map[animapping.tvdb_season], animapping, guids
+                yield season_map[animapping.tvdb_season], animapping
             elif animapping.tvdb_season == -1 and 1 in unyielded_seasons:
                 unyielded_seasons = set()
-                yield season_map[1], animapping, guids
+                yield season_map[1], animapping
 
         for season in unyielded_seasons:
-            yield season_map[season], None, guids
+            yield season_map[season], None
 
     def search_media(self, item: Show, subitem: Season) -> Media | None:
         """Searches for matching AniList entry by title.

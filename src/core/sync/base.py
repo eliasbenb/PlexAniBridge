@@ -202,7 +202,7 @@ class BaseSyncClient(ABC, Generic[T, S]):
             f"{debug_log_title} {debug_log_ids}"
         )
 
-        for subitem, animapping, guids in self.map_media(item=item):
+        for subitem, animapping in self.map_media(item=item):
             debug_log_title = self._debug_log_title(item=item, subitem=subitem)
 
             try:
