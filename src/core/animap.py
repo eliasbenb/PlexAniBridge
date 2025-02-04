@@ -49,7 +49,10 @@ class AniMapClient:
 
     def __init__(self, data_path: Path) -> None:
         self.custom_mappings_path = data_path / "mappings.custom.json"
-        self._sync_db()
+        try:
+            self._sync_db()
+        except Exception as e:
+            log.error(f"{self.__class__.__name__}: Failed to sync database: {e}")
 
     def reinit(self) -> None:
         """Reinitializes the AniMap database.
