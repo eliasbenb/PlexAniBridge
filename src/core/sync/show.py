@@ -108,8 +108,18 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
         # We've watched all episodes
         if is_viewed:
             return MediaListStatus.COMPLETED
-        # We've watched some episode recently and have more remaining
+        # We've watched some episodes recently and have more remaining
         if is_on_continue_watching:
+            return MediaListStatus.CURRENT
+
+        is_parent_on_continue_watching = self.plex_client.is_on_continue_watching(item)
+        is_in_deck_window = any(
+            e.lastViewedAt + self.plex_client.on_deck_window > datetime.now()
+            for e in watched_episodes
+        )
+
+        # We've watched some episodes recently but the last watched episode is from a different season
+        if is_in_deck_window and is_parent_on_continue_watching:
             return MediaListStatus.CURRENT
 
         all_episodes = self.__filter_mapped_episodes(
@@ -119,10 +129,6 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
             animapping=animapping,
         )
         is_all_available = len(all_episodes) >= (anilist_media.episodes or sys.maxsize)
-        is_in_deck_window = any(
-            e.lastViewedAt + self.plex_client.on_deck_window > datetime.now()
-            for e in watched_episodes
-        )
 
         # We've watched some episodes recently and the Plex server doesn't have all episodes
         if is_in_deck_window and not is_all_available:
