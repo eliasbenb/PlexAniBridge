@@ -4,7 +4,7 @@ from typing import Iterator
 
 import plexapi.exceptions
 from cachetools.func import lru_cache
-from plexapi.video import Episode, Season, Show
+from plexapi.video import Episode, EpisodeHistory, Season, Show
 
 from src.models.anilist import FuzzyDate, Media, MediaListStatus
 from src.models.animap import AniMap
@@ -230,18 +230,16 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
         except (plexapi.exceptions.NotFound, IndexError):
             return None
 
-        history = self.plex_client.get_first_history(episode)
-        if not history and not episode.lastViewedAt:
-            return None
-        if not history:
+        history: EpisodeHistory = self.plex_client.get_first_history(episode)
+        if episode.lastViewedAt and history:
+            return min(
+                FuzzyDate.from_date(episode.lastViewedAt),
+                FuzzyDate.from_date(history.viewedAt),
+            )
+        if episode.lastViewedAt:
             return FuzzyDate.from_date(episode.lastViewedAt)
-        if not episode.lastViewedAt:
+        if history:
             return FuzzyDate.from_date(history.viewedAt)
-
-        return min(
-            FuzzyDate.from_date(history.viewedAt),
-            FuzzyDate.from_date(episode.lastViewedAt),
-        )
 
     def _calculate_completed_at(
         self, item: Show, subitem: Season, anilist_media: Media, animapping: AniMap
