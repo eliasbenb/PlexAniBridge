@@ -1,4 +1,4 @@
-name: Docker
+name: Docker Build and Publish
 
 on:
   push:
@@ -6,14 +6,14 @@ on:
       - main
       - develop
     tags:
-      - "v*.*.*"
+      - "v*"
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  build:
+  build-and-publish:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -25,9 +25,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install cosign
-        uses: sigstore/cosign-installer@v3.5.0
-        with:
-          cosign-release: "v2.2.4"
+        uses: sigstore/cosign-installer@v3.8.0
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -47,6 +45,14 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=semver,pattern=v{{version}}
+            type=semver,pattern=v{{major}}.{{minor}}
+            type=semver,pattern=v{{major}}
+            type=ref,event=branch
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.created=${{ github.event.head_commit.timestamp }}
 
       - name: Build and push Docker image
         id: build-and-push
