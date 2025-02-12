@@ -414,12 +414,15 @@ class BaseSyncClient(ABC, Generic[T, S]):
             self.sync_stats.skipped += 1
             return
 
-        log.debug(
+        log.info(
             f"{self.__class__.__name__}: Syncing AniList entry for {item.type} "
             f"{debug_log_title} {debug_log_ids}"
         )
-        log.debug(f"\t\tBEFORE => {anilist_media_list}")
-        log.debug(f"\t\tAFTER  => {final_media_list}")
+        log.info(f"\t\tBEFORE => {anilist_media_list}")
+        log.info(f"\t\tAFTER  => {final_media_list}")
+        log.info(
+            f"\t\tDIFF   => {MediaList.diff(anilist_media_list, final_media_list)}"
+        )
 
         self.anilist_client.update_anime_entry(final_media_list)
 

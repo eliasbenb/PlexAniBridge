@@ -371,6 +371,27 @@ class MediaList(AniListBaseModel):
     created_at: UTCDateTime | None = None
     updated_at: UTCDateTime | None = None
 
+    @staticmethod
+    def diff(old: MediaList, new: MediaList) -> str:
+        """Generate a diff string between two MediaList objects
+
+        Args:
+            old (MediaList): The old MediaList object
+            new (MediaList): The new MediaList object
+
+        Returns:
+            str: A diff string between the two objects
+        """
+        diff_str = "("
+        for field, _ in old.model_fields.items():
+            old_value = getattr(old, field)
+            new_value = getattr(new, field)
+
+            if old_value != new_value:
+                diff_str += f"{field}: {old_value} -> {new_value}, "
+
+        return diff_str.rstrip(", ") + ")"
+
     def __str__(self) -> str:
         notes_truncated = None
         if self.notes:
