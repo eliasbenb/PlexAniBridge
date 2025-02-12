@@ -43,7 +43,8 @@ class AniMapClient:
         - Using database transactions for atomic updates
     """
 
-    CDN_URL = "https://raw.githubusercontent.com/eliasbenb/PlexAniBridge-Mappings/main/mappings.json"
+    SCHEMA_VERSION = "v1"
+    CDN_URL = f"https://raw.githubusercontent.com/eliasbenb/PlexAniBridge-Mappings/{SCHEMA_VERSION}/mappings.json"
 
     def __init__(self, data_path: Path) -> None:
         self.custom_mappings_path = data_path / "mappings.custom.json"
