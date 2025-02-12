@@ -1,3 +1,4 @@
+from datetime import timezone
 from typing import Iterator
 
 from plexapi.video import Movie, MovieHistory
@@ -120,12 +121,29 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie]):
             FuzzyDate | None: Start date for the media item
         """
         history: MovieHistory = self.plex_client.get_first_history(item)
-        if item.lastViewedAt and history:
-            return FuzzyDate.from_date(min(item.lastViewedAt, history.viewedAt))
-        if item.lastViewedAt:
-            return FuzzyDate.from_date(item.lastViewedAt)
-        if history:
-            return FuzzyDate.from_date(history.viewedAt)
+
+        last_viewed = (
+            FuzzyDate.from_date(
+                item.lastViewedAt.replace(tzinfo=timezone.utc).astimezone(
+                    self.anilist_client.user_tz
+                )
+            )
+            if item.lastViewedAt
+            else None
+        )
+        history_viewed = (
+            FuzzyDate.from_date(
+                history.viewedAt.replace(tzinfo=timezone.utc).astimezone(
+                    self.anilist_client.user_tz
+                )
+            )
+            if history
+            else None
+        )
+
+        if last_viewed and history_viewed:
+            return min(last_viewed, history_viewed)
+        return last_viewed or history_viewed
 
     def _calculate_completed_at(self, item: Movie, **_) -> FuzzyDate | None:
         """Calculates the completion date for a media item.

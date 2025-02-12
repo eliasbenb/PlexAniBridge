@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from plexapi.library import MovieSection, ShowSection
 from sqlmodel import Session
@@ -25,7 +25,7 @@ class BridgeClient:
         config (PlexAnibridgeConfig): Application configuration settings
         token_user_pairs (list[tuple[str, str]]): Paired AniList tokens and Plex usernames
         animap_client (AniMapClient): Client for anime ID mapping database
-        last_synced (datetime | None): Timestamp of the last successful sync
+        last_synced (datetime | None): UTC timestamp of the last successful sync
         last_config_encoded (str | None): Encoded version of the last used configuration
 
     Configuration Options:
@@ -37,6 +37,8 @@ class BridgeClient:
     Args:
         config (PlexAnibridgeConfig): Application configuration settings
     """
+
+    MIN_DATETIME = datetime.min.replace(tzinfo=timezone.utc)
 
     def __init__(self, config: PlexAnibridgeConfig) -> None:
         self.config = config
@@ -66,7 +68,7 @@ class BridgeClient:
         """Retrieves the timestamp of the last successful sync from the database.
 
         Returns:
-            datetime | None: Timestamp of the last sync, None if never synced
+            datetime | None: UTC timestamp of the last sync, None if never synced
 
         Note:
             Used to determine whether polling scanning is possible and
@@ -76,13 +78,15 @@ class BridgeClient:
             last_synced = session.get(Housekeeping, "last_synced")
             if last_synced is None or last_synced.value is None:
                 return None
-            return datetime.fromisoformat(last_synced.value)
+            return datetime.fromisoformat(last_synced.value).replace(
+                tzinfo=timezone.utc
+            )
 
     def _get_last_polled(self) -> datetime | None:
         """Retrieves the timestamp of the last polling scan from the database.
 
         Returns:
-            datetime | None: Timestamp of the last polling scan, None if never polled
+            datetime | None: UTC timestamp of the last polling scan, None if never polled
 
         Note:
             Used to determine whether a polling scan is eligible to run
@@ -91,13 +95,15 @@ class BridgeClient:
             last_polled = session.get(Housekeeping, "last_polled")
             if last_polled is None or last_polled.value is None:
                 return None
-            return datetime.fromisoformat(last_polled.value)
+            return datetime.fromisoformat(last_polled.value).replace(
+                tzinfo=timezone.utc
+            )
 
     def _set_last_synced(self, last_synced: datetime) -> None:
         """Stores the timestamp of a successful sync in the database.
 
         Args:
-            last_synced (datetime): Timestamp to store
+            last_synced (datetime): UTC timestamp to store
 
         Note:
             Only called after a completely successful sync operation
@@ -113,7 +119,7 @@ class BridgeClient:
         """Stores the timestamp of a polling scan in the database.
 
         Args:
-            last_polled (datetime): Timestamp to store
+            last_polled (datetime): UTC timestamp to store
 
         Note:
             Only called after a successful polling scan
@@ -182,7 +188,7 @@ class BridgeClient:
             f"sync between Plex and AniList libraries"
         )
 
-        sync_datetime = datetime.now()  # We'll store this if the sync is successful
+        sync_datetime = datetime.now(timezone.utc)
 
         for anilist_token, plex_user in self.token_user_pairs:
             self._sync_user(anilist_token, plex_user, poll)
@@ -290,10 +296,12 @@ class BridgeClient:
         log.info(f"{self.__class__.__name__}: Syncing section $$'{section.title}'$$")
 
         last_sync = max(
-            self.last_synced or datetime.min,
-            self.last_polled or datetime.min,
+            self.last_synced or self.MIN_DATETIME,
+            self.last_polled or self.MIN_DATETIME,
         )
-        last_sync = datetime.now() if last_sync == datetime.min else last_sync
+        last_sync = (
+            datetime.now(timezone.utc) if last_sync == self.MIN_DATETIME else last_sync
+        )
         items = plex_client.get_section_items(
             section,
             min_last_modified=last_sync if poll else None,
