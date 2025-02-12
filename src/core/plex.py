@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from textwrap import dedent
 
 import plexapi.utils
@@ -7,6 +7,7 @@ from cachetools.func import lru_cache
 from plexapi.library import MovieSection, ShowSection
 from plexapi.server import PlexServer
 from plexapi.video import Episode, EpisodeHistory, Movie, MovieHistory, Season, Show
+from tzlocal import get_localzone
 
 from src import log
 
@@ -144,7 +145,7 @@ class PlexClient:
         if min_last_modified:
             log.debug(
                 f"{self.__class__.__name__}: Filtering section $$'{section.title}'$$ by "
-                f"items last updated, viewed, or rated after {min_last_modified}"
+                f"items last updated, viewed, or rated after {min_last_modified.astimezone(get_localzone())}"
             )
             filters["and"].append(
                 {
@@ -166,7 +167,7 @@ class PlexClient:
                 {
                     "or": [
                         {"unwatched": False},
-                        {"lastRatedAt>>=": datetime(1970, 1, 1)},
+                        {"lastRatedAt>>=": datetime(1970, 1, 1, tzinfo=timezone.utc)},
                     ]
                 }
             )
