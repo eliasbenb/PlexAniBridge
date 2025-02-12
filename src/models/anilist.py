@@ -282,6 +282,7 @@ class MediaTitle(AniListBaseModel):
     romaji: str | None = None
     english: str | None = None
     native: str | None = None
+    user_preferred: str | None = None
 
     def titles(self) -> list[str]:
         """Return a list of all the available titles
@@ -297,7 +298,7 @@ class MediaTitle(AniListBaseModel):
         Returns:
             str: A title or an empty string
         """
-        return self.english or self.romaji or self.native or ""
+        return self.user_preferred or self.english or self.romaji or self.native or ""
 
 
 @total_ordering
