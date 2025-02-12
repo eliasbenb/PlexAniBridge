@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from textwrap import dedent
 from time import sleep
@@ -47,6 +47,7 @@ class AniListClient:
 
         self.rate_limiter = RateLimiter(self.__class__.__name__, requests_per_minute=90)
         self.user = self.get_user()
+        self.user_tz = self.get_user_tz()
 
         self.offline_anilist_entries: dict[int, Media] = {}
         self.backup_anilist()
@@ -58,6 +59,8 @@ class AniListClient:
         Clears the local cache and backups to prevent conflicts with outdated data.
         """
         self.user = self.get_user()
+        self.user_tz = self.get_user_tz()
+
         self.offline_anilist_entries.clear()
         self.backup_anilist()
 
@@ -83,6 +86,18 @@ class AniListClient:
 
         response = self._make_request(query)["data"]["Viewer"]
         return User(**response)
+
+    def get_user_tz(self) -> timezone:
+        """Returns the authenticated user's timezone.
+
+        Returns:
+            timezone: The timezone of the authenticated user
+        """
+        try:
+            hours, minutes = map(int, self.user.options.timezone.split(":"))
+            return timezone(timedelta(hours=hours, minutes=minutes))
+        except (AttributeError, ValueError):
+            return timezone.utc
 
     def update_anime_entry(self, media_list_entry: MediaList) -> None:
         """Updates an anime entry on the authenticated user's list.

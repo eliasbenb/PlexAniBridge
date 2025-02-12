@@ -1,5 +1,5 @@
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Iterator
 
 import plexapi.exceptions
@@ -114,7 +114,9 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
 
         is_parent_on_continue_watching = self.plex_client.is_on_continue_watching(item)
         is_in_deck_window = any(
-            e.lastViewedAt + self.plex_client.on_deck_window > datetime.now()
+            e.lastViewedAt.replace(tzinfo=timezone.utc)
+            + self.plex_client.on_deck_window
+            > datetime.now(timezone.utc)
             for e in watched_episodes
         )
 
@@ -231,15 +233,29 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
             return None
 
         history: EpisodeHistory = self.plex_client.get_first_history(episode)
-        if episode.lastViewedAt and history:
-            return min(
-                FuzzyDate.from_date(episode.lastViewedAt),
-                FuzzyDate.from_date(history.viewedAt),
+
+        last_viewed = (
+            FuzzyDate.from_date(
+                episode.lastViewedAt.replace(tzinfo=timezone.utc).astimezone(
+                    self.anilist_client.user_tz
+                )
             )
-        if episode.lastViewedAt:
-            return FuzzyDate.from_date(episode.lastViewedAt)
-        if history:
-            return FuzzyDate.from_date(history.viewedAt)
+            if episode.lastViewedAt
+            else None
+        )
+        history_viewed = (
+            FuzzyDate.from_date(
+                history.viewedAt.replace(tzinfo=timezone.utc).astimezone(
+                    self.anilist_client.user_tz
+                )
+            )
+            if history and history.viewedAt
+            else None
+        )
+
+        if last_viewed and history_viewed:
+            return min(last_viewed, history_viewed)
+        return last_viewed or history_viewed
 
     def _calculate_completed_at(
         self, item: Show, subitem: Season, anilist_media: Media, animapping: AniMap
@@ -278,17 +294,29 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
                 return None
 
         history = self.plex_client.get_first_history(episode)
-        if not history and not episode.lastViewedAt:
-            return None
-        if not history:
-            return FuzzyDate.from_date(episode.lastViewedAt)
-        if not episode.lastViewedAt:
-            return FuzzyDate.from_date(history.viewedAt)
 
-        return min(
-            FuzzyDate.from_date(history.viewedAt),
-            FuzzyDate.from_date(episode.lastViewedAt),
+        last_viewed = (
+            FuzzyDate.from_date(
+                episode.lastViewedAt.replace(tzinfo=timezone.utc).astimezone(
+                    self.anilist_client.user_tz
+                )
+            )
+            if episode.lastViewedAt
+            else None
         )
+        history_viewed = (
+            FuzzyDate.from_date(
+                history.viewedAt.replace(tzinfo=timezone.utc).astimezone(
+                    self.anilist_client.user_tz
+                )
+            )
+            if history and history.viewedAt
+            else None
+        )
+
+        if last_viewed and history_viewed:
+            return min(last_viewed, history_viewed)
+        return last_viewed or history_viewed
 
     @lru_cache(maxsize=32)
     def __filter_mapped_episodes(
