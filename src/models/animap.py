@@ -1,3 +1,4 @@
+from pydantic import field_validator
 from sqlmodel import JSON, Field, SQLModel
 
 
@@ -15,6 +16,16 @@ class AniMap(SQLModel, table=True):
     tvdb_id: int | None = Field(index=True)
     tvdb_epoffset: int | None
     tvdb_season: int | None
+
+    @field_validator(
+        "imdb_id", "mal_id", "tmdb_movie_id", "tmdb_show_id", mode="before"
+    )
+    def convert_to_list(cls, v):
+        if v is None:
+            return v
+        if not isinstance(v, list):
+            return [v]
+        return v
 
     def __hash__(self) -> int:
         return hash(self.__repr__())
