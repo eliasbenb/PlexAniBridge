@@ -125,15 +125,6 @@ class AniMapClient:
                         if anilist_id_str.startswith("$"):
                             continue
 
-                        for attr in (
-                            "mal_id",
-                            "imdb_id",
-                            "tmdb_movie_id",
-                            "tmdb_show_id",
-                        ):
-                            if attr in data:
-                                data[attr] = single_val_to_list(data[attr])
-
                         try:
                             AniMap.model_validate(
                                 {
