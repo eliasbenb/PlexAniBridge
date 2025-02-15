@@ -1,10 +1,9 @@
 import sys
+from collections import Counter
 from datetime import datetime, timezone
 from typing import Iterator
 
-import plexapi.exceptions
-from cachetools.func import lru_cache
-from plexapi.video import Episode, EpisodeHistory, Season, Show
+from plexapi.video import Episode, Season, Show
 
 from src.models.anilist import FuzzyDate, Media, MediaListStatus
 from src.models.animap import AniMap
@@ -18,39 +17,87 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
     ) -> Iterator[tuple[Season, list[Episode], AniMap | None, Media | None]]:
         """Maps a Plex item to potential AniList matches.
 
-        For shows, we map each season to its corresponding AniList entry.
-
         Args:
             item (Show): Plex media item to map
 
         Returns:
-            Iterator[tuple[S, AniMap | None]]: Potential matches
+            Iterator[tuple[Season, list[Episode], AniMap | None, Media | None]]: Mapping matches (child, grandchild, animapping, anilist_media)
         """
         guids = ParsedGuids.from_guids(item.guids)
-        season_map: dict[int, Season] = {
+        seasons: dict[int, Season] = {
             s.index: s
-            for s in item.seasons()
-            if self.destructive_sync or s.viewedLeafCount > 0
+            for s in item.seasons(index__ge=0)
+            if s.leafCount and (self.destructive_sync or s.viewedLeafCount)
         }
-        unyielded_seasons = set(season_map.keys())
+        unyielded_seasons = set(seasons.keys())
 
         for animapping in self.animap_client.get_mappings(
             **dict(guids), is_movie=False
         ):
-            if animapping.tvdb_season is None:
+            if not animapping.anilist_id:
                 continue
-            elif animapping.tvdb_season in season_map:
-                try:
-                    unyielded_seasons.remove(animapping.tvdb_season)
-                except KeyError:
-                    pass
-                yield season_map[animapping.tvdb_season], animapping
-            elif animapping.tvdb_season == -1 and 1 in unyielded_seasons:
-                unyielded_seasons = set()
-                yield season_map[1], animapping
 
-        for season in unyielded_seasons:
-            yield season_map[season], None
+            tvdb_mappings = animapping.parse_tvdb_mappings()
+
+            filtered_seasons = {
+                index: seasons.get(index)
+                for index in {m.season for m in tvdb_mappings}
+                if index in seasons
+            }
+            if not filtered_seasons:
+                continue
+
+            episodes: list[Episode] = []
+
+            anilist_media = self.anilist_client.get_anime(animapping.anilist_id)
+            if not anilist_media:
+                continue
+
+            for tvdb_mapping in tvdb_mappings:
+                season = filtered_seasons.get(tvdb_mapping.season)
+                if not season:
+                    continue
+
+                if tvdb_mapping.end:
+                    episodes.extend(
+                        e
+                        for e in season.episodes()
+                        if tvdb_mapping.start <= e.index <= tvdb_mapping.end
+                    )
+                else:
+                    episodes.extend(
+                        e for e in season.episodes() if e.index >= tvdb_mapping.start
+                    )
+
+                if tvdb_mapping.ratio > 0:
+                    target_length = (
+                        anilist_media.episodes or sys.maxsize // tvdb_mapping.ratio
+                    )
+                    episodes = [
+                        e
+                        for e in episodes[:target_length]
+                        for _ in range(tvdb_mapping.ratio)
+                    ]
+                elif tvdb_mapping.ratio < 0:
+                    target_length = (
+                        anilist_media.episodes or sys.maxsize
+                    ) * -tvdb_mapping.ratio
+                    episodes = episodes[:target_length][:: -tvdb_mapping.ratio]
+
+            if not episodes:
+                continue
+
+            all_seasons = Counter(e.parentIndex for e in episodes)
+            primary_season = filtered_seasons[all_seasons.most_common(1)[0][0]]
+            unyielded_seasons -= set(all_seasons.keys())
+
+            yield primary_season, episodes, animapping, anilist_media
+
+        for index in unyielded_seasons:
+            if index < 1:
+                continue
+            season = seasons[index]
+            yield season, season.episodes(), None, None
 
     def search_media(self, item: Show, child_item: Season) -> Media | None:
         """Searches for matching AniList entry by title.
@@ -309,76 +356,13 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             return min(last_viewed, history_viewed)
         return last_viewed or history_viewed
 
-    @lru_cache(maxsize=32)
-    def __filter_mapped_episodes(
-        self, item: Show, subitem: Season, anilist_media: Media, animapping: AniMap
-    ) -> list[Episode]:
-        """Filter episodes based on the mapped AniList entry.
-
-        Only episodes in the mapped range are returned.
+    def _filter_watched_episodes(self, episodes: list[Episode]) -> list[Episode]:
+        """Filters watched episodes based on AniList entry.
 
         Args:
-            item (Show): Main Plex media item
-            subitem (Season): Specific item to sync
-            anilist_media (Media): Matched AniList entry
-            animapping (AniMap): ID mapping information
+            episodes (list[Episode]): Episodes to filter
 
         Returns:
             list[Episode]: Filtered episodes
         """
-        if animapping.tvdb_season == -1:
-            episodes: list[Episode] = []
-            seasons: list[Season] = item.seasons(index__gt=0)
-            episodes_count = 0
-
-            for season in seasons:
-                tmp_episodes: list[Episode] = season.episodes()
-                max_episode_index = tmp_episodes[-1].index if tmp_episodes else 0
-
-                if episodes_count + max_episode_index >= anilist_media.episodes:
-                    episodes.extend(
-                        (
-                            e
-                            for e in tmp_episodes
-                            if e.index <= anilist_media.episodes - episodes_count
-                        )
-                    )
-                    break
-
-                episodes.extend(tmp_episodes)
-                episodes_count += max_episode_index
-            return episodes
-
-        return self.plex_client.get_episodes(
-            subitem,
-            start=(animapping.tvdb_epoffset or 0) + 1,
-            end=(animapping.tvdb_epoffset or 0)
-            + (anilist_media.episodes or sys.maxsize),
-        )
-
-    def __filter_watched_episodes(
-        self, item: Show, subitem: Season, anilist_media: Media, animapping: AniMap
-    ) -> list[Episode]:
-        """Filter episodes based on the mapped AniList entry and watched status.
-
-        Only episodes in the mapped range that have been watched are returned.
-
-        Args:
-            item (Show): Main Plex media item
-            subitem (Season): The Plex season to filter
-            anilist_media (Media): Matched AniList entry
-            animapping (AniMap): ID mapping information
-
-        Returns:
-            list[Episode]: Filtered episodes
-        """
-        return [
-            e
-            for e in self.__filter_mapped_episodes(
-                item=item,
-                subitem=subitem,
-                anilist_media=anilist_media,
-                animapping=animapping,
-            )
-            if e.viewCount
-        ]
+        return [e for e in episodes if e.viewCount]
