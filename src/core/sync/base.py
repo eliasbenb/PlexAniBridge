@@ -424,30 +424,23 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         Returns:
             MediaList: MediaList object with updated states
         """
+        kwargs = {
+            "item": item,
+            "child_item": child_item,
+            "grandchild_items": grandchild_items,
+            "anilist_media": anilist_media,
+            "animapping": animapping,
+        }
+
         media_list = MediaList(
             id=anilist_media.media_list_entry
             and anilist_media.media_list_entry.id
             or 0,
             user_id=self.anilist_client.user.id,
             media_id=anilist_media.id,
-            status=self._calculate_status(
-                item=item,
-                subitem=subitem,
-                anilist_media=anilist_media,
-                animapping=animapping,
-            ),
-            progress=self._calculate_progress(
-                item=item,
-                subitem=subitem,
-                anilist_media=anilist_media,
-                animapping=animapping,
-            ),
-            repeat=self._calculate_repeats(
-                item=item,
-                subitem=subitem,
-                anilist_media=anilist_media,
-                animapping=animapping,
-            ),
+            status=self._calculate_status(**kwargs),
+            progress=self._calculate_progress(**kwargs),
+            repeat=self._calculate_repeats(**kwargs),
         )
 
         if media_list.status is None:
@@ -456,29 +449,14 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         notes = None
         if "notes" not in self.excluded_sync_fields:
             notes = self.plex_client.get_user_review(
-                subitem
+                child_item
             ) or self.plex_client.get_user_review(item)
 
         if media_list.status > MediaListStatus.PLANNING:
-            media_list.started_at = self._calculate_started_at(
-                item=item,
-                subitem=subitem,
-                anilist_media=anilist_media,
-                animapping=animapping,
-            )
+            media_list.started_at = self._calculate_started_at(**kwargs)
         if media_list.status >= MediaListStatus.COMPLETED:
-            media_list.completed_at = self._calculate_completed_at(
-                item=item,
-                subitem=subitem,
-                anilist_media=anilist_media,
-                animapping=animapping,
-            )
-            media_list.score = self._calculate_score(
-                item=item,
-                subitem=subitem,
-                anilist_media=anilist_media,
-                animapping=animapping,
-            )
+            media_list.completed_at = self._calculate_completed_at(**kwargs)
+            media_list.score = self._calculate_score(**kwargs)
             media_list.notes = notes
 
         return media_list
