@@ -15,20 +15,24 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
     ) -> Iterator[tuple[Movie, list[Movie], AniMap | None, Media | None]]:
         """Maps a Plex item to potential AniList matches.
 
-        For movies, only a single match is yielded.
-
         Args:
             item (Movie): Plex media item to map
 
         Returns:
-            Iterator[tuple[Movie, AniMap | None]]: Potential matches
+            Iterator[tuple[Movie, list[Movie], AniMap | None, Media | None]]: Mapping matches (child, grandchild, animapping, anilist_media)
         """
         guids = ParsedGuids.from_guids(item.guids)
-        animapping = next(
-            iter(self.animap_client.get_mappings(**dict(guids), is_movie=True)), None
-        )
 
-        yield item, animapping
+        for animapping in self.animap_client.get_mappings(**dict(guids), is_movie=True):
+            anilist_media = self.anilist_client.get_anime(animapping.anilist_id)
+
+            if not anilist_media:
+                continue
+
+            yield item, [item], animapping, anilist_media
+            return
+
+        yield item, [item], None, None
 
     def search_media(self, item: Movie, **_) -> Media | None:
         """Searches for matching AniList entry by title.
