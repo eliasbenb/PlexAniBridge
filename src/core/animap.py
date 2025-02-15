@@ -5,8 +5,8 @@ from typing import Any
 
 import requests
 from pydantic import ValidationError
-from sqlmodel import Session, column, delete, exists, func, select, true
-from sqlmodel.sql.expression import UnaryExpression, and_, or_
+from sqlmodel import Session, column, delete, exists, func, select
+from sqlmodel.sql.expression import UnaryExpression, or_
 
 from src import log
 from src.database import db
@@ -43,8 +43,9 @@ class AniMapClient:
         - Using database transactions for atomic updates
     """
 
-    SCHEMA_VERSION = "v1"
+    SCHEMA_VERSION = "v2"
     CDN_URL = f"https://raw.githubusercontent.com/eliasbenb/PlexAniBridge-Mappings/{SCHEMA_VERSION}/mappings.json"
+    SCHEMA_URL = f"https://cdn.statically.io/gh/eliasbenb/PlexAniBridge-Mappings/{SCHEMA_VERSION}/mappings.schema.json"
 
     def __init__(self, data_path: Path) -> None:
         self.custom_mappings_path = data_path / "mappings.custom.json"
@@ -149,13 +150,7 @@ class AniMapClient:
                     )
             else:
                 with self.custom_mappings_path.open("w") as f:
-                    json.dump(
-                        {
-                            "$schema": "https://cdn.jsdelivr.net/gh/eliasbenb/PlexAniBridge-Mappings/mappings.schema.json"
-                        },
-                        f,
-                        indent=2,
-                    )
+                    json.dump({"$schema": self.SCHEMA_URL}, f, indent=2)
                 custom_data = {}
 
             cdn_data: dict[str, Any] = response_data
@@ -240,7 +235,6 @@ class AniMapClient:
         tmdb: int | None = None,
         tvdb: int | None = None,
         season: int | None = None,
-        epoffset: int | None = None,
         is_movie: bool = True,
     ) -> list[AniMap]:
         """Retrieves anime ID mappings based on provided criteria.
@@ -253,7 +247,6 @@ class AniMapClient:
             tmdb (int | None): TMDB ID to match (movies and TV shows)
             tvdb (int | None): TVDB ID to match (TV shows only)
             season (int | None): TVDB season number for exact matching (TV shows only)
-            epoffset (int | None): TVDB episode offset for exact matching (TV shows only)
             is_movie (bool): Whether the search is for a movie or TV show
 
         Returns:
@@ -291,46 +284,22 @@ class AniMapClient:
             )
 
         with Session(db.engine) as session:
-            partial_conditions = []
-            exact_conditions = []
-
+            conditions = []
             if is_movie:
                 if imdb:
-                    partial_conditions.append(json_contains("imdb_id", imdb))
+                    conditions.append(json_contains("imdb_id", imdb))
                 if tmdb:
-                    partial_conditions.append(json_contains("tmdb_movie_id", tmdb))
+                    conditions.append(json_contains("tmdb_movie_id", tmdb))
             else:
                 if tmdb:
-                    partial_conditions.append(json_contains("tmdb_show_id", tmdb))
+                    conditions.append(json_contains("tmdb_show_id", tmdb))
                 if imdb:
-                    partial_conditions.append(json_contains("imdb_id", imdb))
+                    conditions.append(json_contains("imdb_id", imdb))
                 if tvdb:
-                    partial_conditions.append(AniMap.tvdb_id == tvdb)
+                    conditions.append(AniMap.tvdb_id == tvdb)
 
-                if season is not None:
-                    exact_conditions.append(AniMap.tvdb_season == season)
+            if not conditions:
+                return []
 
-                if epoffset is not None:
-                    exact_conditions.append(AniMap.tvdb_epoffset == epoffset)
-                else:
-                    exact_conditions.append(AniMap.tvdb_epoffset.is_not(None))
-
-            # Query with all conditions
-            query = (
-                select(AniMap)
-                .where(or_(*partial_conditions) if partial_conditions else true())
-                .where(and_(*exact_conditions) if exact_conditions else true())
-                .group_by(
-                    AniMap.anilist_id,
-                    AniMap.tvdb_season,
-                    AniMap.tvdb_epoffset,
-                )
-                .order_by(
-                    (AniMap.tvdb_season == -1).asc(),  # Ensure tvdb_season=-1 is last
-                    AniMap.tvdb_season,
-                    AniMap.tvdb_epoffset,
-                    AniMap.anilist_id,
-                )
-            )
-
+            query = select(AniMap).where(or_(*conditions)).group_by(AniMap.anilist_id)
             return session.exec(query).all()
