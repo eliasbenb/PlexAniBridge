@@ -12,8 +12,10 @@ from src.models.animap import AniMap
 from .base import BaseSyncClient, ParsedGuids
 
 
-class ShowSyncClient(BaseSyncClient[Show, Season]):
-    def map_media(self, item: Show) -> Iterator[tuple[Season, AniMap | None]]:
+class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
+    def map_media(
+        self, item: Show, **_
+    ) -> Iterator[tuple[Season, list[Episode], AniMap | None, Media | None]]:
         """Maps a Plex item to potential AniList matches.
 
         For shows, we map each season to its corresponding AniList entry.
@@ -50,7 +52,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
         for season in unyielded_seasons:
             yield season_map[season], None
 
-    def search_media(self, item: Show, subitem: Season) -> Media | None:
+    def search_media(self, item: Show, child_item: Season) -> Media | None:
         """Searches for matching AniList entry by title.
 
         For shows, we search for entries with matching episode counts and
@@ -70,11 +72,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
         return self._best_search_result(item.title, results)
 
     def _calculate_status(
-        self,
-        item: Show,
-        subitem: Season,
-        anilist_media: Media,
-        animapping: AniMap,
+        self, item: Show, grandchild_items: list[Episode], anilist_media: Media, **_
     ) -> MediaListStatus | None:
         """Calculates the watch status for a media item.
 
@@ -149,7 +147,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
             return MediaListStatus.DROPPED
         return None
 
-    def _calculate_score(self, item: Show, subitem: Season, **_) -> int | None:
+    def _calculate_score(self, item: Show, child_item: Season, **_) -> int | None:
         """Calculates the user rating for a media item.
 
         Args:
@@ -188,14 +186,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
             or None
         )
 
-    def _calculate_repeats(
-        self,
-        item: Show,
-        subitem: Season,
-        anilist_media: Media,
-        animapping: AniMap,
-        **_,
-    ) -> int | None:
+    def _calculate_repeats(self, grandchild_items: list[Episode], **_) -> int | None:
         """Calculates the number of repeats for a media item.
 
         Args:
@@ -216,7 +207,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
         return least_views - 1 if least_views else None
 
     def _calculate_started_at(
-        self, subitem: Season, animapping: AniMap, **_
+        self, grandchild_items: list[Episode], **_
     ) -> FuzzyDate | None:
         """Calculates the start date for a media item.
 
@@ -258,7 +249,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
         return last_viewed or history_viewed
 
     def _calculate_completed_at(
-        self, item: Show, subitem: Season, anilist_media: Media, animapping: AniMap
+        self, grandchild_items: list[Episode], **_
     ) -> FuzzyDate | None:
         """Calculates the completion date for a media item.
 

@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import Generic, Iterator, TypeVar
 
 from plexapi.media import Guid
-from plexapi.video import Movie, Season, Show
+from plexapi.video import Episode, Movie, Season, Show
 from thefuzz import fuzz
 
 from src import log
@@ -14,6 +14,7 @@ from src.settings import SyncField
 
 T = TypeVar("T", bound=Movie | Show)  # Section item
 S = TypeVar("S", bound=Movie | Season)  # Item child (season)
+E = TypeVar("E", bound=Movie | Episode)  # Item grandchild (episode)
 
 
 @dataclass
@@ -117,7 +118,7 @@ class SyncStats:
         )
 
 
-class BaseSyncClient(ABC, Generic[T, S]):
+class BaseSyncClient(ABC, Generic[T, S, E]):
     """Abstract base class for media synchronization between Plex and AniList.
 
     Provides core synchronization logic while allowing specialized implementations
@@ -266,7 +267,9 @@ class BaseSyncClient(ABC, Generic[T, S]):
         return self.sync_stats
 
     @abstractmethod
-    def map_media(self, item: T) -> Iterator[tuple[S, AniMap | None]]:
+    def map_media(
+        self, item: T
+    ) -> Iterator[tuple[S, list[E], AniMap | None, Media | None]]:
         """Maps a Plex item to potential AniList matches.
 
         Must be implemented by subclasses to handle different
@@ -281,7 +284,7 @@ class BaseSyncClient(ABC, Generic[T, S]):
         pass
 
     @abstractmethod
-    def search_media(self, item: T, subitem: S) -> Media | None:
+    def search_media(self, item: T, child_item: S) -> Media | None:
         """Searches for matching AniList entry by title.
 
         Must be implemented by subclasses to handle different
@@ -325,7 +328,12 @@ class BaseSyncClient(ABC, Generic[T, S]):
         return best_result
 
     def sync_media(
-        self, item: T, subitem: S, anilist_media: Media, animapping: AniMap
+        self,
+        item: T,
+        child_item: S,
+        grandchild_items: list[E],
+        anilist_media: Media,
+        animapping: AniMap,
     ) -> SyncStats:
         """Synchronizes a matched media item with AniList.
 
@@ -433,7 +441,12 @@ class BaseSyncClient(ABC, Generic[T, S]):
         self.sync_stats.synced += 1
 
     def _get_plex_media_list(
-        self, item: T, subitem: S, anilist_media: Media, animapping: AniMap
+        self,
+        item: T,
+        child_item: S,
+        grandchild_items: list[E],
+        anilist_media: Media,
+        animapping: AniMap,
     ) -> MediaList:
         """Creates a MediaList object from Plex states and AniMap data.
 
@@ -507,7 +520,12 @@ class BaseSyncClient(ABC, Generic[T, S]):
 
     @abstractmethod
     def _calculate_status(
-        self, item: T, subitem: S, anilist_media: Media, animapping: AniMap
+        self,
+        item: T,
+        child_item: S,
+        grandchild_items: list[E],
+        anilist_media: Media,
+        animapping: AniMap,
     ) -> MediaListStatus | None:
         """Calculates the watch status for a media item.
 
@@ -526,7 +544,12 @@ class BaseSyncClient(ABC, Generic[T, S]):
 
     @abstractmethod
     def _calculate_score(
-        self, item: T, subitem: S, anilist_media: Media, animapping: AniMap
+        self,
+        item: T,
+        child_item: S,
+        grandchild_items: list[E],
+        anilist_media: Media,
+        animapping: AniMap,
     ) -> int | None:
         """Calculates the user rating for a media item.
 
@@ -545,7 +568,12 @@ class BaseSyncClient(ABC, Generic[T, S]):
 
     @abstractmethod
     def _calculate_progress(
-        self, item: T, subitem: S, anilist_media: Media, animapping: AniMap
+        self,
+        item: T,
+        child_item: S,
+        grandchild_items: list[E],
+        anilist_media: Media,
+        animapping: AniMap,
     ) -> int | None:
         """Calculates the progress for a media item.
 
@@ -564,7 +592,12 @@ class BaseSyncClient(ABC, Generic[T, S]):
 
     @abstractmethod
     def _calculate_repeats(
-        self, item: T, subitem: S, anilist_media: Media, animapping: AniMap
+        self,
+        item: T,
+        child_item: S,
+        grandchild_items: list[E],
+        anilist_media: Media,
+        animapping: AniMap,
     ) -> int | None:
         """Calculates the number of repeats for a media item.
 
@@ -583,7 +616,12 @@ class BaseSyncClient(ABC, Generic[T, S]):
 
     @abstractmethod
     def _calculate_started_at(
-        self, item: T, subitem: S, anilist_media: Media, animapping: AniMap
+        self,
+        item: T,
+        child_item: S,
+        grandchild_items: list[E],
+        anilist_media: Media,
+        animapping: AniMap,
     ) -> FuzzyDate | None:
         """Calculates the start date for a media item.
 
@@ -602,7 +640,12 @@ class BaseSyncClient(ABC, Generic[T, S]):
 
     @abstractmethod
     def _calculate_completed_at(
-        self, item: T, subitem: S, anilist_media: Media, animapping: AniMap
+        self,
+        item: T,
+        child_item: S,
+        grandchild_items: list[E],
+        anilist_media: Media,
+        animapping: AniMap,
     ) -> FuzzyDate | None:
         """Calculates the completion date for a media item.
 
