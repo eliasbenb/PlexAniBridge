@@ -50,10 +50,6 @@ class ParsedGuids:
 
         Returns:
             ParsedGuids: New instance with parsed IDs
-
-        Note:
-            - Handles both string (IMDB) and integer (TVDB/TMDB) IDs
-            - Silently skips invalid or unknown GUID formats
         """
         parsed_guids = ParsedGuids()
         for guid in guids:
@@ -77,7 +73,7 @@ class ParsedGuids:
         """
         return iter(self.__dict__.items())
 
-    def __str__(self) -> str:
+    def __repr__(self) -> str:
         """Creates a debug-friendly string representation.
 
         Returns:
@@ -85,6 +81,12 @@ class ParsedGuids:
             Example: "tvdb_id: 123456, imdb_id: tt1234567"
         """
         return ", ".join(f"{k}_id: {v}" for k, v in self if v is not None)
+
+    def __str__(self) -> str:
+        return repr(self)
+
+    def __hash__(self) -> int:
+        return hash(repr(self))
 
 
 @dataclass
@@ -257,8 +259,8 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         search strategies for movies vs shows.
 
         Args:
-            item (T): Main Plex item
-            subitem (S): Specific item to match
+            item (T): Grandparent Plex media item
+            child_item (S): Target child item to sync
 
         Returns:
             Media | None: Matching AniList entry or None if not found
@@ -270,14 +272,10 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
 
         Args:
             title (str): Title to match against
-            results (list[Media]): Potential matches from AniList
+            results (list[Media]): List of potential Media matches from AniList
 
         Returns:
-            Media | None: Best match above threshold, or None if no good match
-
-        Note:
-            Uses fuzz.ratio from thefuzz library for string similarity
-            Compares against all available title variants
+            Media | None: Best matching Media entry above threshold, or None if no match meets threshold
         """
         best_result, best_ratio = max(
             (
@@ -303,30 +301,15 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
     ) -> SyncStats:
         """Synchronizes a matched media item with AniList.
 
-        Workflow:
-        1. Get current states from both services
-        2. Apply excluded fields
-        3. Merge states using comparison rules
-        4. Update or delete on AniList as needed
-
         Args:
-            item (T): Main Plex media item
-            subitem (S): Specific item to sync (same as item for movies)
+            item (T): Grandparent Plex media item
+            child_item (S): Target child item to sync
+            grandchild_items (list[E]): Grandchild items to extract data from
             anilist_media (Media): Matched AniList entry
             animapping (AniMap): ID mapping information
 
-        Fields Synced (unless excluded):
-            - Watch status
-            - Score/rating
-            - Progress (episodes watched)
-            - Rewatch count
-            - User notes/review
-            - Start/completion dates
-
-        Note:
-            - Destructive sync allows deleting entries
-            - Skips update if no changes needed
-            - Uses _merge_media_lists for conflict resolution
+        Returns:
+            SyncStats: Updated synchronization statistics
         """
         guids = ParsedGuids.from_guids(item.guids)
 
@@ -416,13 +399,14 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         """Creates a MediaList object from Plex states and AniMap data.
 
         Args:
-            item (T): Main Plex media item
-            subitem (S): Specific item to sync
+            item (T): Grandparent Plex media item
+            child_item (S): Target child item to sync
+            grandchild_items (list[E]): Grandchild items to extract data from
             anilist_media (Media): Matched AniList entry
             animapping (AniMap): ID mapping information
 
         Returns:
-            MediaList: MediaList object with updated states
+            MediaList: New MediaList object populated with current Plex states
         """
         kwargs = {
             "item": item,
@@ -475,8 +459,9 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         Must be implemented by subclasses to handle different media types.
 
         Args:
-            item (T): Main Plex media item
-            subitem (S): Specific item to sync
+            item (T): Grandparent Plex media item
+            child_item (S): Target child item to sync
+            grandchild_items (list[E]): Grandchild items to extract data from
             anilist_media (Media): Matched AniList entry
             animapping (AniMap): ID mapping information
 
@@ -499,8 +484,9 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         Must be implemented by subclasses to handle different media types.
 
         Args:
-            item (T): Main Plex media item
-            subitem (S): Specific item to sync
+            item (T): Grandparent Plex media item
+            child_item (S): Target child item to sync
+            grandchild_items (list[E]): Grandchild items to extract data from
             anilist_media (Media): Matched AniList entry
             animapping (AniMap): ID mapping information
 
@@ -523,8 +509,9 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         Must be implemented by subclasses to handle different media types.
 
         Args:
-            item (T): Main Plex media item
-            subitem (S): Specific item to sync
+            item (T): Grandparent Plex media item
+            child_item (S): Target child item to sync
+            grandchild_items (list[E]): Grandchild items to extract data from
             anilist_media (Media): Matched AniList entry
             animapping (AniMap): ID mapping information
 
@@ -547,8 +534,9 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         Must be implemented by subclasses to handle different media types.
 
         Args:
-            item (T): Main Plex media item
-            subitem (S): Specific item to sync
+            item (T): Grandparent Plex media item
+            child_item (S): Target child item to sync
+            grandchild_items (list[E]): Grandchild items to extract data from
             anilist_media (Media): Matched AniList entry
             animapping (AniMap): ID mapping information
 
@@ -571,8 +559,9 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         Must be implemented by subclasses to handle different media types.
 
         Args:
-            item (T): Main Plex media item
-            subitem (S): Specific item to sync
+            item (T): Grandparent Plex media item
+            child_item (S): Target child item to sync
+            grandchild_items (list[E]): Grandchild items to extract data from
             anilist_media (Media): Matched AniList entry
             animapping (AniMap): ID mapping information
 
@@ -595,8 +584,9 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         Must be implemented by subclasses to handle different media types.
 
         Args:
-            item (T): Main Plex media item
-            subitem (S): Specific item to sync
+            item (T): Grandparent Plex media item
+            child_item (S): Target child item to sync
+            grandchild_items (list[E]): Grandchild items to extract data from
             anilist_media (Media): Matched AniList entry
             animapping (AniMap): ID mapping information
 
@@ -654,7 +644,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         Args:
             score (int | float | None): User rating to normalize
         Returns:
-            int | None: Normalized rating or None if no rating
+            int | float | None: Normalized rating or None if no rating
         """
         if score is None:
             return None
@@ -682,24 +672,12 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
     ) -> MediaList:
         """Merges Plex and AniList states using defined comparison rules.
 
-        Rules by field:
-            score: Update if different
-            notes: Update if different
-            progress: Update if Plex value is higher (or destructive)
-            repeat: Update if Plex value is higher (or destructive)
-            status: Update if Plex status is higher (or destructive)
-            started_at: Update if Plex date is earlier (or destructive)
-            completed_at: Update if Plex date is earlier (or destructive)
-
         Args:
             anilist_media_list (MediaList | None): Current AniList state
             plex_media_list (MediaList): Current Plex state
 
         Returns:
-            MediaList: Merged state to apply to AniList
-
-        Note:
-            Destructive sync ignores the usual comparison rules and always uses the Plex value
+            MediaList: New MediaList containing merged state based on comparison rules
         """
         if not anilist_media_list:
             return plex_media_list.model_copy()
@@ -750,45 +728,3 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
                 setattr(res_media_list, key, plex_val)
 
         return res_media_list
-
-    def _debug_log_title(
-        self, item: T, subitem: S | None = None, extra_title: str | None = None
-    ) -> str:
-        """Creates a debug-friendly string of media titles.
-
-        The outputted string uses color formatting syntax with the `$$` delimiters.
-
-        Args
-            item (T): Plex media item
-            subitem (S | None): Specific item to sync. Defaults to None
-            extra_title (str | None): An additional string to append to the title. Defaults to None
-
-        Returns:
-            str: Debug-friendly string of media titles
-        """
-        extra_title = f" | {extra_title}" if extra_title else ""
-        if subitem and item != subitem:
-            return f"$$'{item.title} | {subitem.title}{extra_title}'$$"
-        return f"$$'{item.title}{extra_title}'$$"
-
-    def _debug_log_ids(
-        self,
-        key: int,
-        plex_id: str,
-        guids: ParsedGuids,
-        anilist_id: int | None = None,
-    ) -> str:
-        """Creates a debug-friendly string of media identifiers.
-
-        The outputted string uses color formatting syntax with the `$$` delimiters.
-
-        Args:
-            key (int): Plex rating key
-            plex_id (str): Plex ID
-            guids (ParsedGuids): Plex GUIDs
-            anilist_id (int | None): AniList ID
-
-        Returns:
-            str: Debug-friendly string of media identifiers
-        """
-        return f"$${{key: {key}, plex_id: {plex_id}, {guids}{f', anilist_id: {anilist_id}' if anilist_id else ''}}}$$"
