@@ -72,6 +72,7 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
             return MediaListStatus.PAUSED
 
         is_on_watchlist = self.plex_client.is_on_watchlist(item)
+
         # We've watched part of it and it's not on continue watching. However, we've watchlisted it
         if is_on_watchlist and is_partially_viewed:
             return MediaListStatus.PAUSED
@@ -161,3 +162,38 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
             FuzzyDate | None: Completion date for the media item
         """
         return self._calculate_started_at(item, **_)
+
+    def _debug_log_title(self, item: Movie, **_) -> str:
+        """Creates a debug-friendly string of media titles.
+
+        The outputted string uses color formatting syntax with the `$$` delimiters.
+
+        Args
+            item (T): Plex media item
+
+        Returns:
+            str: Debug-friendly string of media titles
+        """
+        return f"$$'{item.title} | {item.title}'$$"
+
+    def _debug_log_ids(
+        self,
+        key: int,
+        plex_id: str,
+        guids: ParsedGuids,
+        anilist_id: int | None = None,
+    ) -> str:
+        """Creates a debug-friendly string of media identifiers.
+
+        The outputted string uses color formatting syntax with the `$$` delimiters.
+
+        Args:
+            key (int): Plex rating key
+            plex_id (str): Plex ID
+            guids (ParsedGuids): Plex GUIDs
+            anilist_id (int | None): AniList ID
+
+        Returns:
+            str: Debug-friendly string of media identifiers
+        """
+        return f"$${{key: {key}, plex_id: {plex_id}, {guids}{f', anilist_id: {anilist_id}' if anilist_id else ''}}}$$"

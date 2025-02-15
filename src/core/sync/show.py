@@ -309,28 +309,68 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         Returns:
             FuzzyDate | None: Completion date for the media item
         """
-        if animapping.tvdb_season == -1:
-            episodes = self.__filter_mapped_episodes(
-                item=item,
-                subitem=subitem,
-                anilist_media=anilist_media,
-                animapping=animapping,
-            )
-            if len(episodes) < (anilist_media.episodes or sys.maxsize):
-                return None
-            try:
-                episode = episodes[anilist_media.episodes - 1]
-            except IndexError:
-                return None
-        else:
-            try:
-                episode: Episode = subitem.get(
-                    episode=(animapping.tvdb_epoffset or 0)
-                    + (anilist_media.episodes or sys.maxsize)
-                )
-            except (plexapi.exceptions.NotFound, IndexError):
-                return None
+        return self._get_last_watched_date(grandchild_items[-1])
 
+    def _debug_log_title(
+        self,
+        item: Show,
+        child_item: Season | None = None,
+        grandchild_items: list[Episode] | None = None,
+    ) -> str:
+        """Creates a debug-friendly string of media titles.
+
+        The outputted string uses color formatting syntax with the `$$` delimiters.
+
+        Args:
+            item (Show): Grandparent Plex media item
+            child_item (Season | None): Target child item to log
+            grandchild_items (list[Episode] | None): Grandchild items to extract data from
+
+        Returns:
+            str: Debug-friendly string of media titles
+        """
+        unique_seasons = (
+            set(e.parentIndex for e in grandchild_items) if grandchild_items else set()
+        )
+        extra_seasons = (
+            f" ({', '.join(f'S{season:02}' for season in sorted(unique_seasons))})"
+            if len(unique_seasons) > 1
+            else ""
+        )
+        child_title = f" | {child_item.title}" if child_item else ""
+        return f"$$'{item.title}{child_title}{extra_seasons}'$$"
+
+    def _debug_log_ids(
+        self,
+        key: int,
+        plex_id: str,
+        guids: ParsedGuids,
+        anilist_id: int | None = None,
+    ) -> str:
+        """Creates a debug-friendly string of media identifiers.
+
+        The outputted string uses color formatting syntax with the `$$` delimiters.
+
+        Args:
+            key (int): Plex rating key
+            plex_id (str): Plex ID
+            guids (ParsedGuids): Plex GUIDs
+            anilist_id (int | None): AniList ID
+
+        Returns:
+            str: Debug-friendly string of media identifiers
+        """
+        return f"$${{key: {key}, plex_id: {plex_id}, {guids}{f', anilist_id: {anilist_id}' if anilist_id else ''}}}$$"
+
+    def _get_last_watched_date(self, episode: Episode) -> FuzzyDate | None:
+        """Gets the last watched date for an episode.
+
+        Args:
+            episode (Episode): Episode to check
+
+        Returns:
+            FuzzyDate | None: Last watched date for the episode
+        """
         history = self.plex_client.get_first_history(episode)
 
         last_viewed = (

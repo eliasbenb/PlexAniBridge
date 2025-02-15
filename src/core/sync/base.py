@@ -627,7 +627,47 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         """
         pass
 
-    def _normalize_score(self, score: int | None) -> int | float | None:
+    @abstractmethod
+    def _debug_log_title(
+        self,
+        item: T,
+        child_item: S | None = None,
+        grandchild_items: list[E] | None = None,
+    ) -> str:
+        """Creates a debug-friendly string of media titles.
+
+        Must be implemented by subclasses to handle different media types.
+
+        Args:
+            item (T): Grandparent Plex media item
+            child_item (S): Target child item to sync
+            grandchild_items (list[E]): Grandchild items to extract data from
+
+        Returns:
+            str: Debug-friendly string of media titles
+        """
+        pass
+
+    @abstractmethod
+    def _debug_log_ids(
+        self, key: int, plex_id: str, guids: ParsedGuids, anilist_id: int | None = None
+    ) -> str:
+        """Creates a debug-friendly string of media identifiers.
+
+        Must be implemented by subclasses to handle different media types.
+
+        Args:
+            key (int): Plex rating key
+            plex_id (str): Plex ID
+            guids (ParsedGuids): Plex GUIDs
+            anilist_id (int | None): AniList ID
+
+        Returns:
+            str: Debug-friendly string of media identifiers
+        """
+        pass
+
+    def _normalize_score(self, score: int | float | None) -> int | float | None:
         """Normalizes a 0-10 point rating to the user's preferred scale.
 
         Note:
