@@ -126,23 +126,8 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
 
     Type Parameters:
         T: Main media type (Movie or Show)
-        S: Subitem type (Movie or Season)
-
-    Attributes:
-        anilist_client (AniListClient): Client for AniList API operations
-        animap_client (AniMapClient): Client for ID mapping lookups
-        plex_client (PlexClient): Client for Plex server operations
-        excluded_sync_fields (list[SyncField]): Fields to ignore during sync
-        destructive_sync (bool): Whether to allow deletions on AniList
-        fuzzy_search_threshold (int): Minimum similarity for title matching
-        sync_stats (SyncStats): Current synchronization statistics
-
-    Core Features:
-        - Media mapping and lookup
-        - Title-based fuzzy matching
-        - Status calculation and progress tracking
-        - Bidirectional sync with conflict resolution
-        - Detailed logging and statistics
+        S: Child item type (Movie or Season)
+        E: Grandchild item type (Movie or Episode)
     """
 
     def __init__(
@@ -154,6 +139,16 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         destructive_sync: bool,
         fuzzy_search_threshold: int,
     ) -> None:
+        """Initializes a new synchronization client.
+
+        Args:
+            anilist_client (AniListClient): AniList API client
+            animap_client (AniMapClient): AniMap API client
+            plex_client (PlexClient): Plex API client
+            excluded_sync_fields (list[SyncField]): Fields to exclude from synchronization
+            destructive_sync (bool): Whether to delete AniList entries not found in Plex
+            fuzzy_search_threshold (int): Minimum match ratio for fuzzy title
+        """
         self.anilist_client = anilist_client
         self.animap_client = animap_client
         self.plex_client = plex_client
@@ -175,21 +170,11 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
     def process_media(self, item: T) -> SyncStats:
         """Processes a single media item for synchronization.
 
-        Main workflow:
-        1. Parse media identifiers
-        2. Map to AniList entries using IDs or title search
-        3. Calculate sync states
-        4. Update AniList as needed
-
         Args:
-            item (T): Plex media item to process
+            item (T): Grandparent Plex media item to sync
 
         Returns:
-            SyncStats: Updated synchronization statistics
-
-        Note:
-            Handles both direct matches and multi-episode seasons
-            through the map_media() abstraction
+            SyncStats: Updated synchronization statistics with counts of synced, deleted, skipped and failed items
         """
         guids = ParsedGuids.from_guids(item.guids)
 
@@ -203,61 +188,42 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             f"{debug_log_title} {debug_log_ids}"
         )
 
-        for subitem, animapping in self.map_media(item=item):
-            debug_log_title = self._debug_log_title(item=item, subitem=subitem)
-
-            try:
-                anilist_media = None
-                if animapping and animapping.anilist_id:
-                    anilist_media = self.anilist_client.get_anime(animapping.anilist_id)
-                    match_method = "mapping lookup"
-                elif subitem.type != "season" or subitem.seasonNumber > 0:
-                    anilist_media = self.search_media(item=item, subitem=subitem)
-                    match_method = "title search"
-
-                debug_log_title = self._debug_log_title(
-                    item=item,
-                    subitem=subitem
-                    if animapping and animapping.tvdb_id not in (None, -1)
-                    else None,
-                    extra_title=f"(001 - {anilist_media.episodes if anilist_media else '???'})"
-                    if animapping and animapping.tvdb_season == -1
-                    else None,
-                )
-                debug_log_ids = self._debug_log_ids(
-                    key=item.ratingKey,
-                    plex_id=item.guid,
-                    guids=guids,
-                    anilist_id=anilist_media.id if anilist_media else None,
-                )
-
-                if not anilist_media:
-                    log.warning(
-                        f"{self.__class__.__name__}: No suitable AniList results found during mapping "
-                        f"lookup or title search for {item.type} {debug_log_title} {debug_log_ids}"
-                    )
-                    self.sync_stats.failed += 1
-                    continue
-
-                animapping = animapping or AniMap(
-                    anilist_id=anilist_media.id,
-                    tvdb_epoffset=0 if item.type == "show" else None,
-                    tvdb_season=subitem.seasonNumber if item.type == "show" else None,
-                )
-
+        for child_item, grandchild_items, animapping, anilist_media in self.map_media(
+            item=item
+        ):
+            if not anilist_media:
                 log.debug(
-                    f"{self.__class__.__name__}: Found AniList entry using {match_method} for {item.type} "
+                    f"{self.__class__.__name__}: No AniList entry found for {item.type} "
                     f"{debug_log_title} {debug_log_ids}"
                 )
+                self.sync_stats.skipped += 1
+                continue
 
+            debug_log_title = self._debug_log_title(
+                item=item, child_item=child_item, grandchild_items=grandchild_items
+            )
+            debug_log_ids = self._debug_log_ids(
+                key=child_item.ratingKey,
+                plex_id=child_item.guid,
+                guids=guids,
+                anilist_id=anilist_media and anilist_media.id,
+            )
+
+            log.debug(
+                f"{self.__class__.__name__}: Found AniList entry for {item.type} "
+                f"{debug_log_title} {debug_log_ids}"
+            )
+
+            try:
                 self.sync_media(
                     item=item,
-                    subitem=subitem,
+                    child_item=child_item,
+                    grandchild_items=grandchild_items,
                     anilist_media=anilist_media,
                     animapping=animapping,
                 )
             except Exception as e:
-                log.exception(
+                log.error(
                     f"{self.__class__.__name__}: Failed to process {item.type} "
                     f"{debug_log_title} {debug_log_ids}",
                     exc_info=e,
@@ -279,7 +245,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             item (T): Plex media item to map
 
         Returns:
-            Iterator[tuple[S, AniMap | None]]: Potential matches
+            Iterator[tuple[S, list[E], AniMap | None, Media | None]]: Mapping matches (child, grandchild, animapping, anilist_media)
         """
         pass
 
@@ -366,14 +332,12 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
 
         debug_log_title = self._debug_log_title(
             item=item,
-            subitem=subitem if animapping.tvdb_id not in (None, -1) else None,
-            extra_title=f"(001 - {anilist_media.episodes})"
-            if animapping.tvdb_season == -1
-            else None,
+            child_item=child_item,
+            grandchild_items=grandchild_items,
         )
         debug_log_ids = self._debug_log_ids(
-            key=subitem.ratingKey,
-            plex_id=subitem.guid,
+            key=child_item.ratingKey,
+            plex_id=child_item.guid,
             guids=guids,
             anilist_id=anilist_media.id,
         )
@@ -381,7 +345,8 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         anilist_media_list = anilist_media.media_list_entry or None
         plex_media_list = self._get_plex_media_list(
             item=item,
-            subitem=subitem,
+            child_item=child_item,
+            grandchild_items=grandchild_items,
             anilist_media=anilist_media,
             animapping=animapping,
         )
