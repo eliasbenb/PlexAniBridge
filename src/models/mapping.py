@@ -10,7 +10,7 @@ class TVDBMapping(BaseModel):
     Handles conversion between string patterns and episode mapping objects.
     """
 
-    season: int = Field(ge=-1)
+    season: int = Field(ge=0)
     start: int = Field(default=1, ge=0)
     end: int | None = Field(default=None, ge=0)
     ratio: int = Field(default=1)
@@ -28,18 +28,30 @@ class TVDBMapping(BaseModel):
         """
         PATTERN = re.compile(
             r"""
-                ^                           # Start of string
-                s(?P<season>\d+):           # Season number (required)
-                (?:                         # Non-capturing group for episode part
-                    (?:e(?P<start>\d+))?    # Optional start episode
-                    (?:                     # Non-capturing group for end part
-                        -(?:e(?P<end>\d+))?     # Optional end episode with optional number
-                    )?                          # End part is optional
-                    |                       # OR
-                    -e(?P<before>\d+)           # Single episode with leading dash
-                )?                          # Entire episode part is optional
-                (?:\|(?P<ratio>-?\d+))?     # Optional ratio with pipe
-                $                           # End of string
+            ^
+            s(?P<season>\d+):                   # Season number (required)
+            (?:
+                (?P<is_ep_range>                # Episode range (e.g. s1:e1-e4)
+                    e(?P<range_start>\d+)
+                    -
+                    e(?P<range_end>\d+)
+                )
+                |
+                (?P<is_single_ep>               # Single episode (e.g. s1:e2)
+                    e(?P<single_ep>\d+)
+                    (?!-)
+                )
+                |
+                (?P<is_open_ep_range_before>    # Open range before (e.g. s1:-e5)
+                    -e(?P<before_end>\d+)
+                )
+                |
+                (?P<is_open_ep_range_after>     # Open range after (e.g. s1:e1-)
+                    e(?P<after_start>\d+)-
+                )
+            )?
+            (?:\|(?P<ratio>-?\d+))?             # Optional ratio for each episode
+            $
             """,
             re.VERBOSE,
         )
@@ -51,23 +63,34 @@ class TVDBMapping(BaseModel):
         groups = match.groupdict()
 
         season = int(groups["season"])
-
-        if groups["before"]:
-            end = int(groups["before"])
-            start = 1
-        else:
-            start = int(groups["start"]) if groups["start"] else 1
-            end = int(groups["end"]) if groups["end"] else None
-
         ratio = int(groups["ratio"]) if groups["ratio"] else 1
 
-        kwargs = {
-            "season": season,
-            "start": start,
-            "end": end,
-            "ratio": ratio,
-        }
-        return cls(**{k: v for k, v in kwargs.items() if v is not None})
+        # Explicit start and end episode range
+        if groups["is_ep_range"]:
+            start = int(groups["range_start"])
+            end = int(groups["range_end"])
+        # Single episode
+        elif groups["is_single_ep"]:
+            start = end = int(groups["single_ep"])
+        # Open range with unknown start and explicit end
+        elif groups["is_open_ep_range_before"]:
+            start = 1
+            end = int(groups["before_end"])
+        # Open range with explicit start and unknown end
+        elif groups["is_open_ep_range_after"]:
+            start = int(groups["after_start"])
+            end = None
+        # Open range starting from episode 1 (full season)
+        else:
+            start = 1
+            end = None
+
+        return cls(
+            season=season,
+            start=start,
+            end=end,
+            ratio=ratio,
+        )
 
     def __contains__(self, episode: tuple[int, int]) -> bool:
         """Check if a season/episode tuple falls within this mapping's range.
