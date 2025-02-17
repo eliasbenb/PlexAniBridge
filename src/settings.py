@@ -1,6 +1,7 @@
 from enum import StrEnum
 from hashlib import md5
 from pathlib import Path
+from typing import Self
 
 from pydantic import Field, model_validator
 from pydantic.alias_generators import to_camel
@@ -154,7 +155,7 @@ class PlexAnibridgeConfig(BaseSettings):
     FUZZY_SEARCH_THRESHOLD: int = Field(90, ge=0, le=100)
 
     @model_validator(mode="after")
-    def absolute_data_path(self) -> "PlexAnibridgeConfig":
+    def absolute_data_path(self) -> Self:
         """Ensures DATA_PATH is an absolute path.
 
         Converts relative paths to absolute using the current working directory
@@ -170,7 +171,7 @@ class PlexAnibridgeConfig(BaseSettings):
         return self
 
     @model_validator(mode="after")
-    def token_validation(self) -> "PlexAnibridgeConfig":
+    def token_validation(self) -> Self:
         """Validates AniList tokens and Plex users.
 
         Performs the following validations:
