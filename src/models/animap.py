@@ -18,7 +18,9 @@ class AniMap(SQLModel, table=True):
     tmdb_movie_id: list[int] | None = Field(sa_type=JSON(none_as_null=True), index=True)
     tmdb_show_id: list[int] | None = Field(sa_type=JSON(none_as_null=True), index=True)
     tvdb_id: int | None = Field(index=True)
-    tvdb_mappings: list[str] | None = Field(sa_type=JSON(none_as_null=True), index=True)
+    tvdb_mappings: dict[str, str] | None = Field(
+        sa_type=JSON(none_as_null=True), index=True
+    )
 
     @cached_property
     def parse_tvdb_mappings(self) -> list[TVDBMapping]:
@@ -27,10 +29,13 @@ class AniMap(SQLModel, table=True):
         if not self.tvdb_mappings:
             return res
 
-        for mapping in self.tvdb_mappings:
-            parsed = TVDBMapping.from_string(mapping)
-            if parsed:
-                res.append(parsed)
+        for season, s in self.tvdb_mappings.items():
+            try:
+                season = int(season.lstrip("s"))
+            except ValueError:
+                continue
+            parsed = TVDBMapping.from_string(season, s)
+            res.extend(parsed)
 
         return res
 
