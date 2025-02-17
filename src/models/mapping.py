@@ -29,7 +29,6 @@ class TVDBMapping(BaseModel):
         PATTERN = re.compile(
             r"""
                 ^                           # Start of string
-                (?P<scope>[+-])?            # Optional +/- for scope
                 s(?P<season>\d+):           # Season number (required)
                 (?:                         # Non-capturing group for episode part
                     (?:e(?P<start>\d+))?    # Optional start episode
