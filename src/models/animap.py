@@ -1,3 +1,5 @@
+from functools import cached_property
+
 from pydantic import field_validator
 from sqlmodel import JSON, Field, SQLModel
 
@@ -18,6 +20,7 @@ class AniMap(SQLModel, table=True):
     tvdb_id: int | None = Field(index=True)
     tvdb_mappings: list[str] | None = Field(sa_type=JSON(none_as_null=True), index=True)
 
+    @cached_property
     def parse_tvdb_mappings(self) -> list[TVDBMapping]:
         res: list[TVDBMapping] = []
 

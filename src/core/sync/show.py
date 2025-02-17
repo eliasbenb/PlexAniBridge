@@ -37,11 +37,9 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             if not animapping.anilist_id:
                 continue
 
-            tvdb_mappings = animapping.parse_tvdb_mappings()
-
             filtered_seasons = {
                 index: seasons.get(index)
-                for index in {m.season for m in tvdb_mappings}
+                for index in {m.season for m in animapping.parse_tvdb_mappings}
                 if index in seasons
             }
             if not filtered_seasons:
@@ -53,7 +51,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             if not anilist_media:
                 continue
 
-            for tvdb_mapping in tvdb_mappings:
+            for tvdb_mapping in animapping.parse_tvdb_mappings:
                 season = filtered_seasons.get(tvdb_mapping.season)
                 if not season:
                     continue
