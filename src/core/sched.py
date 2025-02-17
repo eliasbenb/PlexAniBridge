@@ -1,7 +1,10 @@
 import asyncio
 import signal
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from functools import partial
+from types import CoroutineType
+
+from tzlocal import get_localzone
 
 from src import log
 from src.core import BridgeClient
@@ -68,9 +71,11 @@ class SchedulerClient:
         while self._running:
             try:
                 await self.sync()
-                next_sync = datetime.now() + timedelta(seconds=self.sync_interval)
+                next_sync = datetime.now(timezone.utc) + timedelta(
+                    seconds=self.sync_interval
+                )
                 log.info(
-                    f"{self.__class__.__name__}: Next periodic sync scheduled for: {next_sync}"
+                    f"{self.__class__.__name__}: Next periodic sync scheduled for: {next_sync.astimezone(get_localzone())}"
                 )
                 await asyncio.sleep(self.sync_interval)
             except asyncio.CancelledError:
@@ -103,9 +108,11 @@ class SchedulerClient:
         while self._running:
             try:
                 await asyncio.to_thread(self.bridge.reinit)
-                next_sync = datetime.now() + timedelta(seconds=self.reinit_interval)
+                next_sync = datetime.now(timezone.utc) + timedelta(
+                    seconds=self.reinit_interval
+                )
                 log.info(
-                    f"{self.__class__.__name__}: Next reinit scheduled for: {next_sync}"
+                    f"{self.__class__.__name__}: Next reinit scheduled for: {next_sync.astimezone(get_localzone())}"
                 )
                 await asyncio.sleep(self.reinit_interval)
             except asyncio.CancelledError:
@@ -117,13 +124,13 @@ class SchedulerClient:
                 )
                 await asyncio.sleep(10)
 
-    def _create_task(self, coro) -> None:
+    def _create_task(self, coro: CoroutineType) -> None:
         """Create and track an asyncio task"""
         task = asyncio.create_task(coro)
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
 
-    def _handle_signal(self, sig):
+    def _handle_signal(self, sig: signal.Signals) -> None:
         """Handle termination signals"""
         log.info(f"{self.__class__.__name__}: Received signal {sig.name}")
         if self._current_task and not self._current_task.done():

@@ -282,6 +282,7 @@ class MediaTitle(AniListBaseModel):
     romaji: str | None = None
     english: str | None = None
     native: str | None = None
+    user_preferred: str | None = None
 
     def titles(self) -> list[str]:
         """Return a list of all the available titles
@@ -297,7 +298,7 @@ class MediaTitle(AniListBaseModel):
         Returns:
             str: A title or an empty string
         """
-        return self.english or self.romaji or self.native or ""
+        return self.user_preferred or self.english or self.romaji or self.native or ""
 
 
 @total_ordering
@@ -318,7 +319,7 @@ class FuzzyDate(AniListBaseModel):
         """
         return FuzzyDate(year=d.year, month=d.month, day=d.day)
 
-    def to_datetime(self) -> datetime | None:
+    def to_datetime(self, *args, **kwargs) -> datetime | None:
         """Convert the FuzzyDate to a datetime object
 
         Returns:
@@ -326,7 +327,13 @@ class FuzzyDate(AniListBaseModel):
         """
         if not self.year:
             return None
-        return datetime(year=self.year, month=self.month or 1, day=self.day or 1)
+        return datetime(
+            year=self.year,
+            month=self.month or 1,
+            day=self.day or 1,
+            *args,
+            **kwargs,
+        )
 
     def __eq__(self, other: Any) -> bool:
         if not isinstance(other, FuzzyDate):
@@ -370,6 +377,27 @@ class MediaList(AniListBaseModel):
     completed_at: FuzzyDate | None = None
     created_at: UTCDateTime | None = None
     updated_at: UTCDateTime | None = None
+
+    @staticmethod
+    def diff(old: MediaList, new: MediaList) -> str:
+        """Generate a diff string between two MediaList objects
+
+        Args:
+            old (MediaList): The old MediaList object
+            new (MediaList): The new MediaList object
+
+        Returns:
+            str: A diff string between the two objects
+        """
+        diff_str = "("
+        for field, _ in old.model_fields.items():
+            old_value = getattr(old, field)
+            new_value = getattr(new, field)
+
+            if old_value != new_value:
+                diff_str += f"{field}: {old_value} -> {new_value}, "
+
+        return diff_str.rstrip(", ") + ")"
 
     def __str__(self) -> str:
         notes_truncated = None

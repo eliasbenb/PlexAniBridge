@@ -1,10 +1,10 @@
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Iterator
 
 import plexapi.exceptions
 from cachetools.func import lru_cache
-from plexapi.video import Episode, Season, Show
+from plexapi.video import Episode, EpisodeHistory, Season, Show
 
 from src.models.anilist import FuzzyDate, Media, MediaListStatus
 from src.models.animap import AniMap
@@ -108,8 +108,20 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
         # We've watched all episodes
         if is_viewed:
             return MediaListStatus.COMPLETED
-        # We've watched some episode recently and have more remaining
+        # We've watched some episodes recently and have more remaining
         if is_on_continue_watching:
+            return MediaListStatus.CURRENT
+
+        is_parent_on_continue_watching = self.plex_client.is_on_continue_watching(item)
+        is_in_deck_window = any(
+            e.lastViewedAt.replace(tzinfo=timezone.utc)
+            + self.plex_client.on_deck_window
+            > datetime.now(timezone.utc)
+            for e in watched_episodes
+        )
+
+        # We've watched some episodes recently but the last watched episode is from a different season
+        if is_in_deck_window and is_parent_on_continue_watching:
             return MediaListStatus.CURRENT
 
         all_episodes = self.__filter_mapped_episodes(
@@ -119,10 +131,6 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
             animapping=animapping,
         )
         is_all_available = len(all_episodes) >= (anilist_media.episodes or sys.maxsize)
-        is_in_deck_window = any(
-            e.lastViewedAt + self.plex_client.on_deck_window > datetime.now()
-            for e in watched_episodes
-        )
 
         # We've watched some episodes recently and the Plex server doesn't have all episodes
         if is_in_deck_window and not is_all_available:
@@ -224,18 +232,30 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
         except (plexapi.exceptions.NotFound, IndexError):
             return None
 
-        history = self.plex_client.get_first_history(episode)
-        if not history and not episode.lastViewedAt:
-            return None
-        if not history:
-            return FuzzyDate.from_date(episode.lastViewedAt)
-        if not episode.lastViewedAt:
-            return FuzzyDate.from_date(history.viewedAt)
+        history: EpisodeHistory = self.plex_client.get_first_history(episode)
 
-        return min(
-            FuzzyDate.from_date(history.viewedAt),
-            FuzzyDate.from_date(episode.lastViewedAt),
+        last_viewed = (
+            FuzzyDate.from_date(
+                episode.lastViewedAt.replace(tzinfo=timezone.utc).astimezone(
+                    self.anilist_client.user_tz
+                )
+            )
+            if episode.lastViewedAt
+            else None
         )
+        history_viewed = (
+            FuzzyDate.from_date(
+                history.viewedAt.replace(tzinfo=timezone.utc).astimezone(
+                    self.anilist_client.user_tz
+                )
+            )
+            if history and history.viewedAt
+            else None
+        )
+
+        if last_viewed and history_viewed:
+            return min(last_viewed, history_viewed)
+        return last_viewed or history_viewed
 
     def _calculate_completed_at(
         self, item: Show, subitem: Season, anilist_media: Media, animapping: AniMap
@@ -274,17 +294,29 @@ class ShowSyncClient(BaseSyncClient[Show, Season]):
                 return None
 
         history = self.plex_client.get_first_history(episode)
-        if not history and not episode.lastViewedAt:
-            return None
-        if not history:
-            return FuzzyDate.from_date(episode.lastViewedAt)
-        if not episode.lastViewedAt:
-            return FuzzyDate.from_date(history.viewedAt)
 
-        return min(
-            FuzzyDate.from_date(history.viewedAt),
-            FuzzyDate.from_date(episode.lastViewedAt),
+        last_viewed = (
+            FuzzyDate.from_date(
+                episode.lastViewedAt.replace(tzinfo=timezone.utc).astimezone(
+                    self.anilist_client.user_tz
+                )
+            )
+            if episode.lastViewedAt
+            else None
         )
+        history_viewed = (
+            FuzzyDate.from_date(
+                history.viewedAt.replace(tzinfo=timezone.utc).astimezone(
+                    self.anilist_client.user_tz
+                )
+            )
+            if history and history.viewedAt
+            else None
+        )
+
+        if last_viewed and history_viewed:
+            return min(last_viewed, history_viewed)
+        return last_viewed or history_viewed
 
     @lru_cache(maxsize=32)
     def __filter_mapped_episodes(
