@@ -14,7 +14,7 @@ from .base import BaseSyncClient, ParsedGuids
 class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
     def map_media(
         self, item: Show, **_
-    ) -> Iterator[tuple[Season, list[Episode], AniMap | None, Media | None]]:
+    ) -> Iterator[tuple[Season, list[Episode], AniMap, Media]]:
         """Maps a Plex item to potential AniList matches.
 
         Args:
@@ -97,7 +97,20 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             if index < 1:
                 continue
             season = seasons[index]
-            yield season, season.episodes(), None, None
+
+            anilist_media = self.search_media(item, season)
+            if not anilist_media:
+                continue
+
+            animapping = AniMap(
+                anilist_id=anilist_media.id,
+                imdb_id=guids.imdb,
+                tmdb_show_id=guids.tmdb,
+                tvdb_id=guids.tvdb,
+                tvdb_mappings=[f"s{index}:"],
+            )
+
+            yield season, season.episodes(), animapping, anilist_media
 
     def search_media(self, item: Show, child_item: Season) -> Media | None:
         """Searches for matching AniList entry by title.
@@ -115,7 +128,9 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         if child_item.parentIndex == 0:
             return None
         episodes = child_item.leafCount
-        results = self.anilist_client.search_anime(item.title, False, episodes)
+        results = self.anilist_client.search_anime(
+            item.title, is_movie=False, episodes=episodes
+        )
         return self._best_search_result(item.title, results)
 
     def _calculate_status(

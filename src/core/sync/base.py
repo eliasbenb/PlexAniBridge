@@ -191,7 +191,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         )
 
         for child_item, grandchild_items, animapping, anilist_media in self.map_media(
-            item=item
+            item
         ):
             if not anilist_media:
                 log.debug(
@@ -235,9 +235,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         return self.sync_stats
 
     @abstractmethod
-    def map_media(
-        self, item: T
-    ) -> Iterator[tuple[S, list[E], AniMap | None, Media | None]]:
+    def map_media(self, item: T) -> Iterator[tuple[S, list[E], AniMap, Media]]:
         """Maps a Plex item to potential AniList matches.
 
         Must be implemented by subclasses to handle different
@@ -247,7 +245,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             item (T): Plex media item to map
 
         Returns:
-            Iterator[tuple[S, list[E], AniMap | None, Media | None]]: Mapping matches (child, grandchild, animapping, anilist_media)
+            Iterator[tuple[S, list[E], AniMap, Media]]: Mapping matches (child, grandchild, animapping, anilist_media)
         """
         pass
 

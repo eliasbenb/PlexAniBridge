@@ -12,7 +12,7 @@ from .base import BaseSyncClient, ParsedGuids
 class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
     def map_media(
         self, item: Movie, **_
-    ) -> Iterator[tuple[Movie, list[Movie], AniMap | None, Media | None]]:
+    ) -> Iterator[tuple[Movie, list[Movie], AniMap, Media]]:
         """Maps a Plex item to potential AniList matches.
 
         Args:
@@ -23,16 +23,24 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
         """
         guids = ParsedGuids.from_guids(item.guids)
 
-        for animapping in self.animap_client.get_mappings(**dict(guids), is_movie=True):
+        animapping: AniMap = next(
+            iter(self.animap_client.get_mappings(**dict(guids), is_movie=True)),
+            None,
+        ) or AniMap(
+            imdb_id=guids.imdb,
+            tmdb_movie_id=guids.tmdb,
+            tvdb_id=guids.tvdb,
+        )
+
+        if animapping.anilist_id:
             anilist_media = self.anilist_client.get_anime(animapping.anilist_id)
+        else:
+            anilist_media = self.search_media(item)
 
-            if not anilist_media:
-                continue
-
-            yield item, [item], animapping, anilist_media
+        if not anilist_media:
             return
 
-        yield item, [item], None, None
+        yield item, [item], animapping, anilist_media
 
     def search_media(self, item: Movie, **_) -> Media | None:
         """Searches for matching AniList entry by title.
