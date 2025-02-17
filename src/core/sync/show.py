@@ -265,8 +265,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
     def _debug_log_title(
         self,
         item: Show,
-        child_item: Season | None = None,
-        grandchild_items: list[Episode] | None = None,
+        animapping: AniMap | None = None,
     ) -> str:
         """Creates a debug-friendly string of media titles.
 
@@ -274,22 +273,21 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
 
         Args:
             item (Show): Grandparent Plex media item
-            child_item (Season | None): Target child item to log
-            grandchild_items (list[Episode] | None): Grandchild items to extract data from
+            animapping (AniMap | None): AniMap entry for the media
 
         Returns:
             str: Debug-friendly string of media titles
         """
-        unique_seasons = (
-            set(e.parentIndex for e in grandchild_items) if grandchild_items else set()
-        )
-        extra_seasons = (
-            f" ({', '.join(f'S{season:02}' for season in sorted(unique_seasons))})"
-            if len(unique_seasons) > 1
+        mappings_str = (
+            ", ".join(str(m) for m in animapping.parse_tvdb_mappings)
+            if animapping
             else ""
         )
-        child_title = f" | {child_item.title}" if child_item else ""
-        return f"$$'{item.title}{child_title}{extra_seasons}'$$"
+        return (
+            f"$$'{item.title} ({mappings_str})'$$"
+            if mappings_str
+            else f"$$'{item.title}'$$"
+        )
 
     def _debug_log_ids(
         self,

@@ -85,7 +85,7 @@ class TVDBMapping(BaseModel):
             return self.start <= episode[1] <= self.end
         return self.start <= episode[1]
 
-    def __str__(self) -> str:
+    def __repr__(self) -> str:
         """Convert the mapping object to its string representation.
 
         Returns:
@@ -94,3 +94,19 @@ class TVDBMapping(BaseModel):
         return f"s{self.season}:e{self.start}" + (
             f"|{self.ratio}" if self.ratio is not None else ""
         )
+
+    def __str__(self) -> str:
+        season = f"S{self.season:02d}"
+        if self.start == 1 and self.end is None:
+            return season
+        result = f"{season}E{self.start:02d}"
+        return result + (
+            "+"
+            if self.end is None and self.start != 1
+            else f"-E{self.end:02d}"
+            if self.end and self.end != self.start
+            else ""
+        )
+
+    def __hash__(self) -> int:
+        return hash(repr(self))

@@ -193,22 +193,12 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         for child_item, grandchild_items, animapping, anilist_media in self.map_media(
             item
         ):
-            if not anilist_media:
-                log.debug(
-                    f"{self.__class__.__name__}: No AniList entry found for {item.type} "
-                    f"{debug_log_title} {debug_log_ids}"
-                )
-                self.sync_stats.skipped += 1
-                continue
-
-            debug_log_title = self._debug_log_title(
-                item=item, child_item=child_item, grandchild_items=grandchild_items
-            )
+            debug_log_title = self._debug_log_title(item=item, animapping=animapping)
             debug_log_ids = self._debug_log_ids(
                 key=child_item.ratingKey,
                 plex_id=child_item.guid,
                 guids=guids,
-                anilist_id=anilist_media and anilist_media.id,
+                anilist_id=anilist_media.id,
             )
 
             log.debug(
@@ -311,11 +301,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         """
         guids = ParsedGuids.from_guids(item.guids)
 
-        debug_log_title = self._debug_log_title(
-            item=item,
-            child_item=child_item,
-            grandchild_items=grandchild_items,
-        )
+        debug_log_title = self._debug_log_title(item=item, animapping=animapping)
         debug_log_ids = self._debug_log_ids(
             key=child_item.ratingKey,
             plex_id=child_item.guid,
@@ -597,8 +583,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
     def _debug_log_title(
         self,
         item: T,
-        child_item: S | None = None,
-        grandchild_items: list[E] | None = None,
+        animapping: AniMap | None = None,
     ) -> str:
         """Creates a debug-friendly string of media titles.
 
@@ -606,8 +591,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
 
         Args:
             item (T): Grandparent Plex media item
-            child_item (S): Target child item to sync
-            grandchild_items (list[E]): Grandchild items to extract data from
+            animapping (AniMap | None): AniMap entry for the media
 
         Returns:
             str: Debug-friendly string of media titles
