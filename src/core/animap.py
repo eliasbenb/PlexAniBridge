@@ -5,8 +5,18 @@ from typing import Any
 
 import requests
 from pydantic import ValidationError
-from sqlmodel import Session, column, delete, exists, func, select
-from sqlmodel.sql.expression import UnaryExpression, or_
+from sqlmodel import (
+    Session,
+    and_,
+    column,
+    delete,
+    exists,
+    func,
+    or_,
+    select,
+    true,
+)
+from sqlmodel.sql.expression import InstrumentedAttribute, UnaryExpression
 
 from src import log
 from src.database import db
@@ -270,39 +280,66 @@ class AniMapClient:
         if not imdb and not tmdb and not tvdb:
             return []
 
-        def json_contains(field: str, value: Any) -> UnaryExpression:
+        def json_array_contains(
+            field: InstrumentedAttribute, value: Any
+        ) -> UnaryExpression:
             """Generates a JSON_CONTAINS function for the given field.
 
             Args:
-                field (str): Field name to search in
+                field (InstrumentedAttribute): Field to search in
                 value (Any): Value to search for
 
             Returns:
-                Any: JSON_CONTAINS function
+                UnaryExpression: JSON_CONTAINS function
             """
             return exists(
                 select(1)
-                .select_from(func.json_each(column(field)))
+                .select_from(func.json_each(field))
                 .where(column("value") == value)
             )
 
+        def json_dict_contains(
+            field: InstrumentedAttribute, key: str
+        ) -> UnaryExpression:
+            """
+
+            Args:
+                field (InstrumentedAttribute): Field to search in
+                key (str): Value to search for
+
+            Returns:
+                UnaryExpression: JSON_CONTAINS function
+            """
+            return func.json_type(field, f"$.{key}").is_not(None)
+
         with Session(db.engine) as session:
-            conditions = []
+            or_conditions = []
+            and_conditions = []
+
             if is_movie:
                 if imdb:
-                    conditions.append(json_contains("imdb_id", imdb))
+                    or_conditions.append(json_array_contains(AniMap.imdb_id, imdb))
                 if tmdb:
-                    conditions.append(json_contains("tmdb_movie_id", tmdb))
+                    or_conditions.append(
+                        json_array_contains(AniMap.tmdb_movie_id, tmdb)
+                    )
             else:
-                if tmdb:
-                    conditions.append(json_contains("tmdb_show_id", tmdb))
                 if imdb:
-                    conditions.append(json_contains("imdb_id", imdb))
+                    or_conditions.append(json_array_contains(AniMap.imdb_id, imdb))
+                if tmdb:
+                    or_conditions.append(json_array_contains(AniMap.tmdb_show_id, tmdb))
                 if tvdb:
-                    conditions.append(AniMap.tvdb_id == tvdb)
+                    or_conditions.append(AniMap.tvdb_id == tvdb)
+                if season:
+                    and_conditions.append(
+                        json_dict_contains(AniMap.tvdb_mappings, f"s{season}")
+                    )
 
-            if not conditions:
-                return []
+            final_conditions = true()
+            if or_conditions:
+                final_conditions = and_(final_conditions, or_(*or_conditions))
+            if and_conditions:
+                final_conditions = and_(final_conditions, *and_conditions)
 
-            query = select(AniMap).where(or_(*conditions)).group_by(AniMap.anilist_id)
+            query = select(AniMap).where(final_conditions)
             return session.exec(query).all()
