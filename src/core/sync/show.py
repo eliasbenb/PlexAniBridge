@@ -105,7 +105,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
                 imdb_id=guids.imdb,
                 tmdb_show_id=guids.tmdb,
                 tvdb_id=guids.tvdb,
-                tvdb_mappings=[f"s{index}:"],
+                tvdb_mappings={f"s{index}": ""},
             )
 
             yield season, season.episodes(), animapping, anilist_media
