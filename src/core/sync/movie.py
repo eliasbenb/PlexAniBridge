@@ -9,24 +9,38 @@ from src.models.animap import AniMap
 from .base import BaseSyncClient, ParsedGuids
 
 
-class MovieSyncClient(BaseSyncClient[Movie, Movie]):
-    def map_media(self, item: Movie) -> Iterator[tuple[Movie, AniMap | None]]:
+class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
+    def map_media(
+        self, item: Movie, **_
+    ) -> Iterator[tuple[Movie, list[Movie], AniMap, Media]]:
         """Maps a Plex item to potential AniList matches.
-
-        For movies, only a single match is yielded.
 
         Args:
             item (Movie): Plex media item to map
 
         Returns:
-            Iterator[tuple[Movie, AniMap | None]]: Potential matches
+            Iterator[tuple[Movie, list[Movie], AniMap | None, Media | None]]: Mapping matches (child, grandchild, animapping, anilist_media)
         """
         guids = ParsedGuids.from_guids(item.guids)
-        animapping = next(
-            iter(self.animap_client.get_mappings(**dict(guids), is_movie=True)), None
+
+        animapping: AniMap = next(
+            iter(self.animap_client.get_mappings(**dict(guids), is_movie=True)),
+            None,
+        ) or AniMap(
+            imdb_id=guids.imdb,
+            tmdb_movie_id=guids.tmdb,
+            tvdb_id=guids.tvdb,
         )
 
-        yield item, animapping
+        if animapping.anilist_id:
+            anilist_media = self.anilist_client.get_anime(animapping.anilist_id)
+        else:
+            anilist_media = self.search_media(item)
+
+        if not anilist_media:
+            return
+
+        yield item, [item], animapping, anilist_media
 
     def search_media(self, item: Movie, **_) -> Media | None:
         """Searches for matching AniList entry by title.
@@ -66,6 +80,7 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie]):
             return MediaListStatus.PAUSED
 
         is_on_watchlist = self.plex_client.is_on_watchlist(item)
+
         # We've watched part of it and it's not on continue watching. However, we've watchlisted it
         if is_on_watchlist and is_partially_viewed:
             return MediaListStatus.PAUSED
@@ -155,3 +170,38 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie]):
             FuzzyDate | None: Completion date for the media item
         """
         return self._calculate_started_at(item, **_)
+
+    def _debug_log_title(self, item: Movie, **_) -> str:
+        """Creates a debug-friendly string of media titles.
+
+        The outputted string uses color formatting syntax with the `$$` delimiters.
+
+        Args
+            item (T): Plex media item
+
+        Returns:
+            str: Debug-friendly string of media titles
+        """
+        return f"$$'{item.title} | {item.title}'$$"
+
+    def _debug_log_ids(
+        self,
+        key: int,
+        plex_id: str,
+        guids: ParsedGuids,
+        anilist_id: int | None = None,
+    ) -> str:
+        """Creates a debug-friendly string of media identifiers.
+
+        The outputted string uses color formatting syntax with the `$$` delimiters.
+
+        Args:
+            key (int): Plex rating key
+            plex_id (str): Plex ID
+            guids (ParsedGuids): Plex GUIDs
+            anilist_id (int | None): AniList ID
+
+        Returns:
+            str: Debug-friendly string of media identifiers
+        """
+        return f"$${{key: {key}, plex_id: {plex_id}, {guids}{f', anilist_id: {anilist_id}' if anilist_id else ''}}}$$"

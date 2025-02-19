@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from textwrap import dedent
+from typing import TypeAlias
 
 import plexapi.utils
 import requests
@@ -10,6 +11,11 @@ from plexapi.video import Episode, EpisodeHistory, Movie, MovieHistory, Season, 
 from tzlocal import get_localzone
 
 from src import log
+
+Media: TypeAlias = Movie | Show | Season | Episode
+MediaHistory: TypeAlias = MovieHistory | EpisodeHistory
+Section: TypeAlias = MovieSection | ShowSection
+History: TypeAlias = MovieHistory | EpisodeHistory
 
 
 class PlexClient:
@@ -126,14 +132,15 @@ class PlexClient:
 
     def get_section_items(
         self,
-        section: MovieSection | ShowSection,
+        section: Section,
         min_last_modified: datetime | None = None,
         require_watched: bool = False,
+        **kwargs,
     ) -> list[Movie] | list[Show]:
         """Retrieves items from a specified Plex library section with optional filtering.
 
         Args:
-            section (MovieSection | ShowSection): The library section to query
+            section (Section): The library section to query
             min_last_modified (datetime | None): If provided, only returns items modified, viewed, or rated after this timestamp
             require_watched (bool): If True, only returns items that have been watched at least once. Defaults to False
 
@@ -172,17 +179,17 @@ class PlexClient:
                 }
             )
 
-        return section.search(filters=filters)
+        return section.search(filters=filters, **kwargs)
 
     @lru_cache(maxsize=32)
-    def get_user_review(self, item: Movie | Show | Season) -> str | None:
+    def get_user_review(self, item: Media) -> str | None:
         """Retrieves user review for a media item from Plex community.
 
         Makes a GraphQL query to the Plex community API to fetch review content.
         Only works for admin users due to API limitations.
 
         Args:
-            item (Movie | Show | Season): Media item to get review for
+            item (Media): Media item to get review for
 
         Returns:
             str | None: Review message if found, None if not found
@@ -196,9 +203,6 @@ class PlexClient:
             Results are cached using functools.cache decorator
         """
         if not self.is_admin_user:
-            return None
-
-        if item.type not in ("movie", "show", "season"):
             return None
 
         query = dedent("""
@@ -262,31 +266,46 @@ class PlexClient:
             )
             return None
 
-    def get_episodes(self, item: Show | Season, start: int, end: int) -> list[Episode]:
+    @lru_cache(maxsize=32)
+    def get_episodes(
+        self,
+        item: Show,
+        start: tuple[int, int] | None = None,
+        end: tuple[int, int] | None = None,
+    ) -> list[Episode]:
         """Retrieves episodes within a specified range for a season.
 
         Args:
-            item (Show | Season): The item to get episodes from
-            start (int): Starting episode number (inclusive)
-            end (int): Ending episode number (inclusive)
+            item (Show): The show to get episodes from
+            start (tuple[int, int] | None): Starting season and episode number (inclusive)
+            end (tuple[int, int] | None): Ending season and episode number (inclusive)
 
         Returns:
             list[Episode]: List of episodes with index between start and end
-
-        Note:
-            Episode numbers must match exactly - partial episodes or alternative numbering schemes are not supported
         """
-        return [
-            e
-            for e in item.episodes(
-                index__gte=start,
-            )
-            if e.index <= end
-        ]
+        kwargs = {}
+        server_side_filter = ""
 
-    def get_watched_episodes(
-        self, item: Show | Season, start: int, end: int
-    ) -> list[Episode]:
+        if start:
+            kwargs["parentIndex__gte"] = start[0]
+            kwargs["index__gte"] = start[1]
+            server_side_filter = "start"
+        elif end:
+            kwargs["parentIndex__lte"] = end[0]
+            kwargs["index__lte"] = end[1]
+            server_side_filter = "end"
+
+        def client_side_filter(episode: Episode):
+            if server_side_filter == "start":
+                return episode.parentIndex <= end[0] and episode.index <= end[1]
+            if server_side_filter == "end":
+                return episode.parentIndex >= start[0] and episode.index >= start[1]
+            return True
+
+        return [i for i in item.episodes(**kwargs) if client_side_filter(i)]
+
+    @lru_cache(maxsize=32)
+    def get_watched_episodes(self, item: Show, **kwargs) -> list[Episode]:
         """Retrieves watched episodes within a specified range for a season.
 
         Similar to get_episodes() but only returns episodes that have been
@@ -294,73 +313,57 @@ class PlexClient:
 
         Args:
             item (Show | Season): The item to get episodes from
-            start (int): Starting episode number (inclusive)
-            end (int): Ending episode number (inclusive)
+            **kwargs: Additional arguments to pass to get_episodes()
 
         Returns:
             list[Episode]: List of watched episodes with index between start and end
         """
-        return [
-            e
-            for e in item.episodes(
-                index__gte=start,
-                viewCount__gt=0,
-            )
-            if e.index <= end
-        ]
+        return [i for i in self.get_episodes(item, **kwargs) if i.viewCount > 0]
 
     def get_continue_watching(
-        self,
-        item: Movie | Show | Season,
-        **kwargs,
+        self, item: Media, **kwargs
     ) -> list[Movie] | list[Episode]:
         """Retrieves items from the 'Continue Watching' hub for a media item.
 
         Args:
-            item (Movie | Season): Media item to check
+            item (Media): Media item(s) to check
             **kwargs: Additional arguments to pass to fetchItems()
 
         Returns:
             list[Movie] | list[Episode]: Media items in Continue Watching hub
         """
-        if item.type == "movie":
-            return self.user_client.fetchItems(
-                "/hubs/continueWatching/items",
-                ratingKey=item.ratingKey,
-                **kwargs,
-            )
-        elif item.type == "show":
-            return self.user_client.fetchItems(
-                "/hubs/continueWatching/items",
-                grandparentRatingKey=item.ratingKey,
-                **kwargs,
-            )
-        elif item.type == "season":
-            return self.user_client.fetchItems(
-                "/hubs/continueWatching/items",
-                parentRatingKey=item.ratingKey,
-                **kwargs,
-            )
-        return []
+        arg_key_map = {
+            "movie": "ratingKey",
+            "show": "grandparentRatingKey",
+            "season": "parentRatingKey",
+            "episode": "ratingKey",
+        }
+
+        key = arg_key_map.get(item.type, "ratingKey")
+        return self.user_client.fetchItems(
+            "/hubs/continueWatching/items",
+            **{key: item.ratingKey},
+            **kwargs,
+        )
 
     @lru_cache(maxsize=32)
     def get_history(
         self,
-        item: Movie | Show | Season | Episode,
+        item: Media,
         min_date: datetime | None = None,
         sort_asc: bool = True,
         **kwargs,
-    ) -> list[MovieHistory] | list[EpisodeHistory]:
+    ) -> list[History]:
         """Retrieves watch history for a media item.
 
         Args:
-            item (Movie | Show | Season | Episode): Media item to get history for
+            item (Media): Media item(s) to get history for
             min_date (datetime | None): If provided, only returns history after this date
             sort_asc (bool): Sort order for results
             **kwargs: Additional arguments to pass to fetchItems()
 
         Returns:
-            list[MovieHistory] | list[EpisodeHistory]: Watch history entries for the item
+            list[History]: Watch history entries for the item
 
         Note:
             Results are cached using functools.cache decorator
@@ -377,39 +380,35 @@ class PlexClient:
             f"/status/sessions/history/all{plexapi.utils.joinArgs(args)}", **kwargs
         )
 
-    def get_first_history(
-        self, item: Movie | Show | Season | Episode, **kwargs
-    ) -> MovieHistory | EpisodeHistory | None:
+    def get_first_history(self, item: Media, **kwargs) -> History | None:
         """Retrieves the oldest watch history entry for a media item.
 
         A convenience wrapper around get_history() that returns only the
         first (oldest) history entry.
 
         Args:
-            item (Movie | Show | Season | Episode): Media item to get history for
+            item (Media): Media item to get history for
             **kwargs: Additional arguments to pass to get_history()
 
         Returns:
-            MovieHistory | EpisodeHistory | None: Oldest history entry if found, None if no history exists
+            History | None: Oldest history entry if found, None if no history exists
         """
         return next(
             iter(self.get_history(item, maxresults=1, sort_asc=True, **kwargs)), None
         )
 
-    def get_last_history(
-        self, item: Movie | Show | Season | Episode, **kwargs
-    ) -> MovieHistory | EpisodeHistory | None:
+    def get_last_history(self, item: Media, **kwargs) -> History | None:
         """Retrieves the most recent watch history entry for a media item.
 
         A convenience wrapper around get_history() that returns only the
         most recent history entry.
 
         Args:
-            item (Movie | Show | Season | Episode): Media item to get history for
+            item (Media): Media item to get history for
             **kwargs: Additional arguments to pass to get_history()
 
         Returns:
-            MovieHistory | EpisodeHistory | None: Most recent history entry if found, None if no history exists
+            History | None: Most recent history entry if found, None if no history exists
         """
         return next(
             iter(self.get_history(item, maxresults=1, sort_asc=False, **kwargs)), None

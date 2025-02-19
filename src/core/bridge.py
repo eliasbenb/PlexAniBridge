@@ -41,6 +41,13 @@ class BridgeClient:
     MIN_DATETIME = datetime.min.replace(tzinfo=timezone.utc)
 
     def __init__(self, config: PlexAnibridgeConfig) -> None:
+        """Initialize the AniList client.
+
+        Args:
+            anilist_token (str): Authentication token for AniList API access
+            backup_dir (Path): Directory path where backup files will be stored
+            dry_run (bool): If True, simulates API calls without making actual changes
+        """
         self.config = config
 
         self.token_user_pairs = list(zip(config.ANILIST_TOKEN, config.PLEX_USER))
@@ -53,10 +60,9 @@ class BridgeClient:
         self.last_config_encoded = self._get_last_config_encoded()
 
     def reinit(self) -> None:
-        """Reinitializes the AniMap database client.
+        """Reinitializes the Plex and AniList clients to refresh user data during polling.
 
-        This method is called during the application startup to ensure
-        the database is properly connected and ready for use.
+        Refreshes Plex and AniList user data, clear caches, and reinitialize clients.
         """
         self.animap_client.reinit()
         for plex_client in self.plex_clients.values():
@@ -310,6 +316,13 @@ class BridgeClient:
 
         sync_client = self.movie_sync if section.type == "movie" else self.show_sync
         for item in items:
-            sync_client.process_media(item)
+            try:
+                sync_client.process_media(item)
+            except Exception as e:
+                log.error(
+                    f"{self.__class__.__name__}: Failed to sync item $$'{item.title}'$$: {e}",
+                    exc_info=True,
+                )
+                sync_client.sync_stats.failed += 1
 
         return sync_client.sync_stats

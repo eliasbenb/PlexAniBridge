@@ -17,7 +17,7 @@ Before any scheduled sync job, PlexAniBridge will create a backup of your curren
 
     These backups are automatically deleted after 7 days.
 
-To restore from a backup, use the [restore script](https://github.com/eliasbenb/PlexAniBridge/blob/main/scripts/anilist_restore.py) in the `scripts` folder. You will need to pass the backup file and AniList token as arguments:
+To restore from a backup, use the [restore script](https://github.com/eliasbenb/PlexAniBridge/blob/HEAD/scripts/anilist_restore.py) in the `scripts` folder. You will need to pass the backup file and AniList token as arguments:
 
 ```shell
 pip install requests pydantic # Python 3.10+

@@ -1,12 +1,18 @@
 {
-  "$schema": "https://cdn.jsdelivr.net/gh/eliasbenb/PlexAniBridge-Mappings/mappings.schema.json",
-  "21234": {
-    "anidb_id": 11292,
-    "tvdb_id": 303071,
-    "tvdb_season": 1,
-    "tvdb_epoffset": 0,
-    "mal_id": 31043,
-    "imdb_id": "tt5249462",
-    "tmdb_show_id": 65249
+  "$schema": "https://raw.githubusercontent.com/eliasbenb/PlexAniBridge-Mappings/v2/mappings.schema.json",
+  "1006": {
+    "tvdb_mappings": {
+      "s0": "e2"
+    }
+  },
+  "1060": {
+    "anidb_id": 150,
+    "imdb_id": "tt0366064",
+    "mal_id": 1060,
+    "tmdb_show_id": 19238,
+    "tvdb_id": 73492,
+    "tvdb_mappings": {
+      "s1": ""
+    }
   }
 }

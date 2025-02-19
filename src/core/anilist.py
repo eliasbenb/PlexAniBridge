@@ -4,7 +4,7 @@ from textwrap import dedent
 from time import sleep
 
 import requests
-from cachetools.func import lru_cache, ttl_cache
+from cachetools.func import ttl_cache
 
 from src import log
 from src.models.anilist import (
@@ -41,6 +41,13 @@ class AniListClient:
     BACKUP_RETENTION_DAYS = 7
 
     def __init__(self, anilist_token: str, backup_dir: Path, dry_run: bool) -> None:
+        """Initialize the AniList client.
+
+        Args:
+            anilist_token (str): Authentication token for AniList API
+            backup_dir (Path): Directory path where backup files will be stored
+            dry_run (bool): If True, simulates API calls without making actual changes
+        """
         self.anilist_token = anilist_token
         self.backup_dir = backup_dir
         self.dry_run = dry_run
@@ -106,7 +113,7 @@ class AniListClient:
         values for status, score, progress, etc.
 
         Args:
-            media_list_entry (MediaList): Updated entry containing the following fields:
+            media_list_entry (MediaList): Updated AniList entry to save
 
         Raises:
             requests.HTTPError: If the API request fails
@@ -202,7 +209,7 @@ class AniListClient:
         """
         log.debug(
             f"{self.__class__.__name__}: Searching for {'movie' if is_movie else 'show'} "
-            f"with title $$'{search_str}'$$ that has {episodes or 'unknown'} episodes"
+            f"with title $$'{search_str}'$$ that is releasing has {episodes or 'unknown'} episodes"
         )
 
         res = self._search_anime(search_str, is_movie, limit)
@@ -214,7 +221,7 @@ class AniListClient:
             or not episodes
         ]
 
-    @lru_cache(maxsize=None)
+    @ttl_cache(maxsize=None, ttl=604800)
     def _search_anime(
         self,
         search_str: str,

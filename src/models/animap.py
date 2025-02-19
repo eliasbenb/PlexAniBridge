@@ -1,5 +1,9 @@
+from functools import cached_property
+
 from pydantic import field_validator
 from sqlmodel import JSON, Field, SQLModel
+
+from .mapping import TVDBMapping
 
 
 class AniMap(SQLModel, table=True):
@@ -14,8 +18,26 @@ class AniMap(SQLModel, table=True):
     tmdb_movie_id: list[int] | None = Field(sa_type=JSON(none_as_null=True), index=True)
     tmdb_show_id: list[int] | None = Field(sa_type=JSON(none_as_null=True), index=True)
     tvdb_id: int | None = Field(index=True)
-    tvdb_epoffset: int | None
-    tvdb_season: int | None
+    tvdb_mappings: dict[str, str] | None = Field(
+        sa_type=JSON(none_as_null=True), index=True
+    )
+
+    @cached_property
+    def parse_tvdb_mappings(self) -> list[TVDBMapping]:
+        res: list[TVDBMapping] = []
+
+        if not self.tvdb_mappings:
+            return res
+
+        for season, s in self.tvdb_mappings.items():
+            try:
+                season = int(season.lstrip("s"))
+            except ValueError:
+                continue
+            parsed = TVDBMapping.from_string(season, s)
+            res.extend(parsed)
+
+        return res
 
     @field_validator(
         "imdb_id", "mal_id", "tmdb_movie_id", "tmdb_show_id", mode="before"
