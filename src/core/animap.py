@@ -301,7 +301,7 @@ class AniMapClient:
         def json_dict_contains(
             field: InstrumentedAttribute, key: str
         ) -> UnaryExpression:
-            """
+            """Generate a SQL expression for checking if a JSON field contains a key.
 
             Args:
                 field (InstrumentedAttribute): Field to search in

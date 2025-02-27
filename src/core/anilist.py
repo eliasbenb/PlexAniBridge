@@ -209,7 +209,7 @@ class AniListClient:
         """
         log.debug(
             f"{self.__class__.__name__}: Searching for {'movie' if is_movie else 'show'} "
-            f"with title $$'{search_str}'$$ that is releasing has {episodes or 'unknown'} episodes"
+            f"with title $$'{search_str}'$$ that is releasing and has {episodes or 'unknown'} episodes"
         )
 
         res = self._search_anime(search_str, is_movie, limit)
