@@ -16,3 +16,20 @@ PlexAniBridge is a tool designed to keep your AniList profile automatically sync
 - **Multi-User Support**: Sync multiple [Plex users](https://plexanibridge.elias.eu.org/configuration#plex_user) and home users with their respective [AniList users](https://plexanibridge.elias.eu.org/configuration#anilist_token).
 - **Optimized Performance**: Intelligent caching of requests to minimize API rate limits.
 - **Easy Deployment**: Fully compatible with [Docker deployments](https://plexanibridge.elias.eu.org/quick-start/docker) 🐳.
+
+## Docker Quick Start
+
+```yaml
+services:
+  plexanibridge:
+    image: ghcr.io/eliasbenb/plexanibridge:latest
+    environment:
+      ANILIST_TOKEN: eyJ...
+      PLEX_TOKEN: 2Sb...
+      PLEX_USER: username
+      PLEX_URL: http://plex:32400
+      PLEX_SECTIONS: '["Anime", "Anime Movies"]'
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+```
