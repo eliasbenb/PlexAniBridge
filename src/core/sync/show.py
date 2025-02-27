@@ -26,7 +26,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         guids = ParsedGuids.from_guids(item.guids)
         seasons: dict[int, Season] = {
             s.index: s
-            for s in item.seasons(index__ge=0)
+            for s in item.seasons()
             if s.leafCount and (self.destructive_sync or s.viewedLeafCount)
         }
         unyielded_seasons = set(seasons.keys())
@@ -82,12 +82,13 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
                     ) * -tvdb_mapping.ratio
                     episodes = episodes[:target_length][:: -tvdb_mapping.ratio]
 
+            all_seasons = Counter(e.parentIndex for e in episodes)
+            unyielded_seasons -= set(all_seasons.keys())
+
             if not episodes:
                 continue
 
-            all_seasons = Counter(e.parentIndex for e in episodes)
             primary_season = filtered_seasons[all_seasons.most_common(1)[0][0]]
-            unyielded_seasons -= set(all_seasons.keys())
 
             yield primary_season, episodes, animapping, anilist_media
 
