@@ -7,7 +7,7 @@ icon: material/cog
 
 Below is an example `.env` file for PlexAniBridge with example values. Optional environment variables are commented out.
 
-```env title=".env"
+```dosini title=".env"
 --8<-- ".env.example"
 ```
 
@@ -17,7 +17,9 @@ Below is an example `.env` file for PlexAniBridge with example values. Optional 
 
 `str | list[str]` (Required)
 
-AniList API access token. You can [generate one here](https://anilist.co/login?apiVersion=v2&client_id=23079&response_type=token).
+AniList API access token.
+
+[:simple-anilist: Generate AniList Token](https://anilist.co/login?apiVersion=v2&client_id=23079&response_type=token){: .md-button .md-button--primary}
 
 ??? info "Multiple Users"
 
@@ -30,7 +32,9 @@ AniList API access token. You can [generate one here](https://anilist.co/login?a
 
 `str` (Required)
 
-Plex API access token. [Find your token here](https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/).
+Plex API access token.
+
+[:material-plex: Finding the Plex Token](https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/){: .md-button .md-button--primary}
 
 !!! note
 
@@ -41,6 +45,7 @@ Plex API access token. [Find your token here](https://support.plex.tv/articles/2
 ### `PLEX_USER`
 
 `str | list[str]` (Required)
+
 Plex user(s) to sync. Can be identified by:
 
 - Plex account username: `"username"`
@@ -61,6 +66,7 @@ Plex user(s) to sync. Can be identified by:
 ### `PLEX_URL`
 
 `str` (Required)
+
 URL to your Plex server that the PlexAniBridge host can access.
 
 ??? tip "Docker Networking"
@@ -72,6 +78,7 @@ URL to your Plex server that the PlexAniBridge host can access.
 ### `PLEX_SECTIONS`
 
 `list[str]` (Required)
+
 List of Plex library sections to consider, specified in Python list syntax:
 
 ```python
@@ -127,6 +134,7 @@ Scans all Plex media, regardless of activity. By default, only watched items are
 ### `DESTRUCTIVE_SYNC`
 
 `bool` (Optional, default: `False`)
+
 Allows regressive updates and deletions, which **can cause data loss**.
 
 !!! warning
