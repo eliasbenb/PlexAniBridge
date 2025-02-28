@@ -187,7 +187,7 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
         Returns:
             str: Debug-friendly string of media titles
         """
-        return f"$$'{item.title} | {item.title}'$$"
+        return f"$$'{item.title}'$$"
 
     def _debug_log_ids(
         self,
