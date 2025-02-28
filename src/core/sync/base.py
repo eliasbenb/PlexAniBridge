@@ -64,6 +64,18 @@ class ParsedGuids(BaseModel):
             setattr(parsed_guids, split_guid[0], split_guid[1])
         return parsed_guids
 
+    def __str__(self) -> str:
+        """Creates a string representation of the parsed IDs.
+
+        Returns:
+            str: String representation of the parsed IDs in a format like "id: xxx, id: xxx, id: xxx"
+        """
+        return ", ".join(
+            f"{field}: {getattr(self, field)}"
+            for field in self.model_fields
+            if getattr(self, field) is not None
+        )
+
     def __iter__(self) -> Iterator[tuple[str, int | str | None]]:
         """Enables iteration over non-None GUIDs.
 
@@ -95,8 +107,8 @@ class SyncStats(BaseModel):
     not_found: int = 0
     failed: int = 0
 
-    possible: set[int] = set()
-    covered: set[int] = set()
+    possible: set = set()
+    covered: set = set()
 
     @property
     def coverage(self) -> float:
@@ -105,17 +117,17 @@ class SyncStats(BaseModel):
         Returns:
             float: Coverage percentage of successfully synced items
         """
-        return len(self.covered) / len(self.possible)
+        return len(self.covered) / len(self.possible) if self.possible else 0.0
 
     def __add__(self, other: "SyncStats") -> "SyncStats":
         return SyncStats(
-            self.synced + other.synced,
-            self.deleted + other.deleted,
-            self.skipped + other.skipped,
-            self.not_found + other.not_found,
-            self.failed + other.failed,
-            self.possible.union(other.possible),
-            self.covered.union(other.covered),
+            synced=self.synced + other.synced,
+            deleted=self.deleted + other.deleted,
+            skipped=self.skipped + other.skipped,
+            not_found=self.not_found + other.not_found,
+            failed=self.failed + other.failed,
+            possible=self.possible.union(other.possible),
+            covered=self.covered.union(other.covered),
         )
 
 
@@ -215,6 +227,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
                     anilist_media=anilist_media,
                     animapping=animapping,
                 )
+                self.sync_stats.covered |= set(grandchild_items)
             except Exception:
                 log.error(
                     f"{self.__class__.__name__}: Failed to process {item.type} "
@@ -287,7 +300,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         grandchild_items: list[E],
         anilist_media: Media,
         animapping: AniMap,
-    ) -> SyncStats:
+    ) -> None:
         """Synchronizes a matched media item with AniList.
 
         Args:
@@ -296,9 +309,6 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             grandchild_items (list[E]): Grandchild items to extract data from
             anilist_media (Media): Matched AniList entry
             animapping (AniMap): ID mapping information
-
-        Returns:
-            SyncStats: Updated synchronization statistics
         """
         guids = ParsedGuids.from_guids(item.guids)
 
@@ -335,7 +345,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             self.sync_stats.skipped += 1
             return
 
-        if self.destructive_sync and anilist_media_list and not final_media_list.status:
+        if self.destructive_sync and anilist_media_list and not plex_media_list.status:
             log.info(
                 f"{self.__class__.__name__}: Deleting AniList entry with variables:"
             )
