@@ -200,6 +200,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         item: Show,
         child_item: Season,
         grandchild_items: list[Episode],
+        animapping: AniMap,
         **_,
     ) -> int | None:
         """Calculates the user rating for a media item.
@@ -208,12 +209,15 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             item (Show): Main Plex media item
             child_item (Season): Specific item to sync
             grandchild_items (list[Episode]): List of relevant episodes
+            animapping (AniMap): Matched AniMap entry
 
         Returns:
             int | None: User rating for the media item
         """
         if all(e.userRating for e in grandchild_items):
             score = sum(e.userRating for e in grandchild_items) / len(grandchild_items)
+        elif animapping.length == len(grandchild_items) == 1:
+            score = grandchild_items[0].userRating
         elif child_item.userRating:
             score = child_item.userRating
         elif item.userRating:

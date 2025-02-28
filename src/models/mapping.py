@@ -15,6 +15,15 @@ class TVDBMapping(BaseModel):
     end: int | None = Field(default=None, gt=0)
     ratio: int = Field(default=1)
 
+    @property
+    def length(self) -> int:
+        """Calculate the number of episodes in the range.
+
+        Returns:
+            int: Number of episodes in the range or -1 if the end is not specified
+        """
+        return self.end - self.start + 1 if self.end else -1
+
     @classmethod
     def from_string(cls, season: int, s: str) -> list[Self]:
         """Parse a string pattern into a TVDBMapping instance.

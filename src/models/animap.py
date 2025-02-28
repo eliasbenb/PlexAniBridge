@@ -23,6 +23,10 @@ class AniMap(SQLModel, table=True):
     )
 
     @cached_property
+    def length(self) -> int:
+        return sum(m.length for m in self.parsed_tvdb_mappings)
+
+    @cached_property
     def parsed_tvdb_mappings(self) -> list[TVDBMapping]:
         res: list[TVDBMapping] = []
 
