@@ -23,7 +23,7 @@ class AniMap(SQLModel, table=True):
     )
 
     @cached_property
-    def parse_tvdb_mappings(self) -> list[TVDBMapping]:
+    def parsed_tvdb_mappings(self) -> list[TVDBMapping]:
         res: list[TVDBMapping] = []
 
         if not self.tvdb_mappings:
