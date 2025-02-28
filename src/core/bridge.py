@@ -274,6 +274,16 @@ class BridgeClient:
             f"{self.__class__.__name__}: Syncing Plex user $$'{plex_user}'$$ to AniList user "
             f"$$'{anilist_client.user.name}'$$ completed"
         )
+
+        unsynced_items = sorted(
+            list(sync_stats.possible - sync_stats.covered),
+            key=lambda x: (x.type, x.parentRatingKey, x.parentIndex, x.index),
+        )
+        unsynced_items_str = ", ".join(str(i) for i in unsynced_items)
+        log.debug(
+            f"{self.__class__.__name__}: The following items could not be synced: {unsynced_items_str}"
+        )
+
         log.info(
             f"{self.__class__.__name__}: {sync_stats.synced} items synced, {sync_stats.deleted} items deleted, "
             f"{sync_stats.skipped} items skipped, {sync_stats.not_found} items not found, "

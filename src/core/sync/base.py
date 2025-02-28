@@ -85,7 +85,7 @@ class ParsedGuids(BaseModel):
         return iter(self.model_dump(exclude_none=True).items())
 
 
-class SyncStats(BaseModel):
+class SyncStats(BaseModel, arbitrary_types_allowed=True):
     """Statistics tracker for synchronization operations.
 
     Keeps count of various sync outcomes for reporting and monitoring.
@@ -107,8 +107,8 @@ class SyncStats(BaseModel):
     not_found: int = 0
     failed: int = 0
 
-    possible: set = set()
-    covered: set = set()
+    possible: set[E] = set()
+    covered: set[E] = set()
 
     @property
     def coverage(self) -> float:
