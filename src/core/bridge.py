@@ -271,8 +271,13 @@ class BridgeClient:
             sync_stats += self._sync_section(plex_client, section, poll)
 
         log.info(
+            f"{self.__class__.__name__}: Syncing Plex user $$'{plex_user}'$$ to AniList user "
+            f"$$'{anilist_client.user.name}'$$ completed"
+        )
+        log.info(
             f"{self.__class__.__name__}: {sync_stats.synced} items synced, {sync_stats.deleted} items deleted, "
-            f"{sync_stats.skipped} items skipped, {sync_stats.failed} items failed"
+            f"{sync_stats.skipped} items skipped, {sync_stats.not_found} items not found, "
+            f"and {sync_stats.failed} items failed"
         )
 
     def _sync_section(
@@ -322,11 +327,10 @@ class BridgeClient:
         for item in items:
             try:
                 sync_client.process_media(item)
-            except Exception as e:
+            except Exception:
                 log.error(
-                    f"{self.__class__.__name__}: Failed to sync item $$'{item.title}'$$: {e}",
+                    f"{self.__class__.__name__}: Failed to sync item $$'{item.title}'$$: ",
                     exc_info=True,
                 )
-                sync_client.sync_stats.failed += 1
 
         return sync_client.sync_stats

@@ -109,6 +109,7 @@ class SyncStats:
     synced: int = 0
     deleted: int = 0
     skipped: int = 0
+    not_found: int = 0
     failed: int = 0
 
     def __add__(self, other: "SyncStats") -> "SyncStats":
@@ -216,11 +217,11 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
                     anilist_media=anilist_media,
                     animapping=animapping,
                 )
-            except Exception as e:
+            except Exception:
                 log.error(
                     f"{self.__class__.__name__}: Failed to process {item.type} "
-                    f"{debug_log_title} {debug_log_ids}",
-                    exc_info=e,
+                    f"{debug_log_title} {debug_log_ids}: ",
+                    exc_info=True,
                 )
                 self.sync_stats.failed += 1
 
@@ -311,7 +312,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             anilist_id=anilist_media.id,
         )
 
-        anilist_media_list = anilist_media.media_list_entry or None
+        anilist_media_list = anilist_media.media_list_entry
         plex_media_list = self._get_plex_media_list(
             item=item,
             child_item=child_item,
@@ -336,7 +337,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             self.sync_stats.skipped += 1
             return
 
-        if self.destructive_sync and anilist_media_list and not plex_media_list.status:
+        if self.destructive_sync and anilist_media_list and not final_media_list.status:
             log.info(
                 f"{self.__class__.__name__}: Deleting AniList entry with variables:"
             )
@@ -345,6 +346,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
                 anilist_media.media_list_entry.id,
                 anilist_media.media_list_entry.media_id,
             )
+            self.sync_stats.synced += 1
             self.sync_stats.deleted += 1
             return
 
