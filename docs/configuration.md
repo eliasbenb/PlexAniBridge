@@ -222,11 +222,17 @@ When enabled:
 
 Determines the similarity percentage required for AniList title matching.
 
+Title matching is only used when a mapping could not be found in your [custom mappings](./advanced/custom-mappings.md) or the [mapping database](https://github.com/eliasbenb/PlexAniBridge-Mappings).
+
 - Lower values allow **more** matches (but may increase false positives).
 - Higher values allow **fewer** matches (but reduce false positives).
 
 ??? tip "Disabling Fuzzy Search"
 
     Set this to `100` to only allow **exact matches**.
+
+??? tip "Disabling Search"
+
+    Set this to `-1` to diable **search fallback** entirely. This makes it so only mappings in the database or custom mappings are used.
 
 ---
