@@ -137,8 +137,11 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         Returns:
             Media | None: Matching AniList entry or None if not found
         """
+        if self.fuzzy_search_threshold == -1:
+            return None
         if child_item.parentIndex == 0:
             return None
+
         episodes = child_item.leafCount
         results = self.anilist_client.search_anime(
             item.title, is_movie=False, episodes=episodes
