@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 from typing import Generic, Iterator, TypeVar
 
 from plexapi.media import Guid
@@ -11,14 +10,14 @@ from src.core import AniListClient, AniMapClient, PlexClient
 from src.models.anilist import FuzzyDate, Media, MediaList, MediaListStatus, ScoreFormat
 from src.models.animap import AniMap
 from src.settings import SyncField
+from pydantic import BaseModel
 
 T = TypeVar("T", bound=Movie | Show)  # Section item
 S = TypeVar("S", bound=Movie | Season)  # Item child (season)
 E = TypeVar("E", bound=Movie | Episode)  # Item grandchild (episode)
 
 
-@dataclass
-class ParsedGuids:
+class ParsedGuids(BaseModel):
     """Container for parsed media identifiers from different services.
 
     Handles parsing and storage of media IDs from various services (TVDB, TMDB, IMDB)
@@ -65,32 +64,28 @@ class ParsedGuids:
             setattr(parsed_guids, split_guid[0], split_guid[1])
         return parsed_guids
 
+    def __str__(self) -> str:
+        """Creates a string representation of the parsed IDs.
+
+        Returns:
+            str: String representation of the parsed IDs in a format like "id: xxx, id: xxx, id: xxx"
+        """
+        return ", ".join(
+            f"{field}: {getattr(self, field)}"
+            for field in self.model_fields
+            if getattr(self, field) is not None
+        )
+
     def __iter__(self) -> Iterator[tuple[str, int | str | None]]:
         """Enables iteration over non-None GUIDs.
 
         Returns:
             Iterator[tuple[str, int | str | None]]: Iterator of (service, id) pairs
         """
-        return iter(self.__dict__.items())
-
-    def __repr__(self) -> str:
-        """Creates a debug-friendly string representation.
-
-        Returns:
-            str: Comma-separated list of non-None IDs
-            Example: "tvdb_id: 123456, imdb_id: tt1234567"
-        """
-        return ", ".join(f"{k}_id: {v}" for k, v in self if v is not None)
-
-    def __str__(self) -> str:
-        return repr(self)
-
-    def __hash__(self) -> int:
-        return hash(repr(self))
+        return iter(self.model_dump(exclude_none=True).items())
 
 
-@dataclass
-class SyncStats:
+class SyncStats(BaseModel):
     """Statistics tracker for synchronization operations.
 
     Keeps count of various sync outcomes for reporting and monitoring.
@@ -112,12 +107,27 @@ class SyncStats:
     not_found: int = 0
     failed: int = 0
 
+    possible: set = set()
+    covered: set = set()
+
+    @property
+    def coverage(self) -> float:
+        """Calculates the coverage percentage of successfully synced items.
+
+        Returns:
+            float: Coverage percentage of successfully synced items
+        """
+        return len(self.covered) / len(self.possible) if self.possible else 0.0
+
     def __add__(self, other: "SyncStats") -> "SyncStats":
         return SyncStats(
-            self.synced + other.synced,
-            self.deleted + other.deleted,
-            self.skipped + other.skipped,
-            self.failed + other.failed,
+            synced=self.synced + other.synced,
+            deleted=self.deleted + other.deleted,
+            skipped=self.skipped + other.skipped,
+            not_found=self.not_found + other.not_found,
+            failed=self.failed + other.failed,
+            possible=self.possible.union(other.possible),
+            covered=self.covered.union(other.covered),
         )
 
 
@@ -217,6 +227,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
                     anilist_media=anilist_media,
                     animapping=animapping,
                 )
+                self.sync_stats.covered |= set(grandchild_items)
             except Exception:
                 log.error(
                     f"{self.__class__.__name__}: Failed to process {item.type} "
@@ -289,7 +300,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         grandchild_items: list[E],
         anilist_media: Media,
         animapping: AniMap,
-    ) -> SyncStats:
+    ) -> None:
         """Synchronizes a matched media item with AniList.
 
         Args:
@@ -298,9 +309,6 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             grandchild_items (list[E]): Grandchild items to extract data from
             anilist_media (Media): Matched AniList entry
             animapping (AniMap): ID mapping information
-
-        Returns:
-            SyncStats: Updated synchronization statistics
         """
         guids = ParsedGuids.from_guids(item.guids)
 
@@ -337,7 +345,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             self.sync_stats.skipped += 1
             return
 
-        if self.destructive_sync and anilist_media_list and not final_media_list.status:
+        if self.destructive_sync and anilist_media_list and not plex_media_list.status:
             log.info(
                 f"{self.__class__.__name__}: Deleting AniList entry with variables:"
             )
