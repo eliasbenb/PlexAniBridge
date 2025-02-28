@@ -24,11 +24,15 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             Iterator[tuple[Season, list[Episode], AniMap | None, Media | None]]: Mapping matches (child, grandchild, animapping, anilist_media)
         """
         guids = ParsedGuids.from_guids(item.guids)
+
         seasons: dict[int, Season] = {
             s.index: s
             for s in item.seasons()
             if s.leafCount and (self.full_scan or s.viewedLeafCount)
         }
+        all_episodes: list[Episode] = [
+            e for e in item.episodes() if e.parentIndex in seasons
+        ]
         unyielded_seasons = set(seasons.keys())
 
         for animapping in self.animap_client.get_mappings(
@@ -59,12 +63,16 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
                 if tvdb_mapping.end:
                     episodes.extend(
                         e
-                        for e in season.episodes()
-                        if tvdb_mapping.start <= e.index <= tvdb_mapping.end
+                        for e in all_episodes
+                        if e.parentIndex == season.index
+                        and tvdb_mapping.start <= e.index <= tvdb_mapping.end
                     )
                 else:
                     episodes.extend(
-                        e for e in season.episodes() if e.index >= tvdb_mapping.start
+                        e
+                        for e in all_episodes
+                        if e.parentIndex == season.index
+                        if e.index >= tvdb_mapping.start
                     )
 
                 if tvdb_mapping.ratio > 0:
@@ -102,6 +110,8 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
                 self.sync_stats.not_found += 1
                 continue
 
+            episodes = [e for e in all_episodes if e.parentIndex == season.index]
+
             animapping = AniMap(
                 anilist_id=anilist_media.id,
                 imdb_id=guids.imdb,
@@ -110,7 +120,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
                 tvdb_mappings={f"s{index}": ""},
             )
 
-            yield season, season.episodes(), animapping, anilist_media
+            yield season, episodes, animapping, anilist_media
 
     def search_media(self, item: Show, child_item: Season) -> Media | None:
         """Searches for matching AniList entry by title.
