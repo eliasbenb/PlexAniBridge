@@ -112,12 +112,27 @@ class SyncStats:
     not_found: int = 0
     failed: int = 0
 
+    possible: set[int] = set()
+    covered: set[int] = set()
+
+    @property
+    def coverage(self) -> float:
+        """Calculates the coverage percentage of successfully synced items.
+
+        Returns:
+            float: Coverage percentage of successfully synced items
+        """
+        return len(self.covered) / len(self.possible)
+
     def __add__(self, other: "SyncStats") -> "SyncStats":
         return SyncStats(
             self.synced + other.synced,
             self.deleted + other.deleted,
             self.skipped + other.skipped,
+            self.not_found + other.not_found,
             self.failed + other.failed,
+            self.possible.union(other.possible),
+            self.covered.union(other.covered),
         )
 
 
