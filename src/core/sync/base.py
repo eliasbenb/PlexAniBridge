@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 from typing import Generic, Iterator, TypeVar
 
 from plexapi.media import Guid
@@ -11,14 +10,14 @@ from src.core import AniListClient, AniMapClient, PlexClient
 from src.models.anilist import FuzzyDate, Media, MediaList, MediaListStatus, ScoreFormat
 from src.models.animap import AniMap
 from src.settings import SyncField
+from pydantic import BaseModel
 
 T = TypeVar("T", bound=Movie | Show)  # Section item
 S = TypeVar("S", bound=Movie | Season)  # Item child (season)
 E = TypeVar("E", bound=Movie | Episode)  # Item grandchild (episode)
 
 
-@dataclass
-class ParsedGuids:
+class ParsedGuids(BaseModel):
     """Container for parsed media identifiers from different services.
 
     Handles parsing and storage of media IDs from various services (TVDB, TMDB, IMDB)
@@ -71,26 +70,10 @@ class ParsedGuids:
         Returns:
             Iterator[tuple[str, int | str | None]]: Iterator of (service, id) pairs
         """
-        return iter(self.__dict__.items())
-
-    def __repr__(self) -> str:
-        """Creates a debug-friendly string representation.
-
-        Returns:
-            str: Comma-separated list of non-None IDs
-            Example: "tvdb_id: 123456, imdb_id: tt1234567"
-        """
-        return ", ".join(f"{k}_id: {v}" for k, v in self if v is not None)
-
-    def __str__(self) -> str:
-        return repr(self)
-
-    def __hash__(self) -> int:
-        return hash(repr(self))
+        return iter(self.model_dump(exclude_none=True).items())
 
 
-@dataclass
-class SyncStats:
+class SyncStats(BaseModel):
     """Statistics tracker for synchronization operations.
 
     Keeps count of various sync outcomes for reporting and monitoring.
