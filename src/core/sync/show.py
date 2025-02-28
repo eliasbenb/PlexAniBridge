@@ -195,17 +195,33 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             return MediaListStatus.DROPPED
         return None
 
-    def _calculate_score(self, item: Show, child_item: Season, **_) -> int | None:
+    def _calculate_score(
+        self,
+        item: Show,
+        child_item: Season,
+        grandchild_items: list[Episode],
+        **_,
+    ) -> int | None:
         """Calculates the user rating for a media item.
 
         Args:
             item (Show): Main Plex media item
             child_item (Season): Specific item to sync
+            grandchild_items (list[Episode]): List of relevant episodes
 
         Returns:
             int | None: User rating for the media item
         """
-        return self._normalize_score(child_item.userRating or item.userRating)
+        if all(e.userRating for e in grandchild_items):
+            score = sum(e.userRating for e in grandchild_items) / len(grandchild_items)
+        elif child_item.userRating:
+            score = child_item.userRating
+        elif item.userRating:
+            score = item.userRating
+        else:
+            score = None
+
+        return self._normalize_score(score)
 
     def _calculate_progress(
         self, grandchild_items: list[Episode], anilist_media: Media, **_

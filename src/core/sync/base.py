@@ -632,6 +632,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         """
         if score is None:
             return None
+        score = round(score)
 
         scale = self.anilist_client.user.media_list_options.score_format
 
