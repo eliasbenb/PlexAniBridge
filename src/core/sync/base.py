@@ -138,6 +138,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         animap_client: AniMapClient,
         plex_client: PlexClient,
         excluded_sync_fields: list[SyncField],
+        full_scan: bool,
         destructive_sync: bool,
         fuzzy_search_threshold: int,
     ) -> None:
@@ -156,6 +157,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         self.plex_client = plex_client
 
         self.excluded_sync_fields = excluded_sync_fields
+        self.full_scan = full_scan
         self.destructive_sync = destructive_sync
         self.fuzzy_search_threshold = fuzzy_search_threshold
 

@@ -27,7 +27,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         seasons: dict[int, Season] = {
             s.index: s
             for s in item.seasons()
-            if s.leafCount and (self.destructive_sync or s.viewedLeafCount)
+            if s.leafCount and (self.full_scan or s.viewedLeafCount)
         }
         unyielded_seasons = set(seasons.keys())
 

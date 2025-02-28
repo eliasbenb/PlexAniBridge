@@ -5,7 +5,7 @@ from sqlmodel import Session
 
 from src import log
 from src.core import AniListClient, AniMapClient, PlexClient
-from src.core.sync import MovieSyncClient, ShowSyncClient, SyncStats
+from src.core.sync import BaseSyncClient, MovieSyncClient, ShowSyncClient, SyncStats
 from src.database import db
 from src.models.housekeeping import Housekeeping
 from src.settings import PlexAnibridgeConfig
@@ -256,6 +256,7 @@ class BridgeClient:
             "animap_client": self.animap_client,
             "plex_client": plex_client,
             "excluded_sync_fields": self.config.EXCLUDED_SYNC_FIELDS,
+            "full_scan": self.config.FULL_SCAN,
             "destructive_sync": self.config.DESTRUCTIVE_SYNC,
             "fuzzy_search_threshold": self.config.FUZZY_SEARCH_THRESHOLD,
         }
@@ -314,7 +315,10 @@ class BridgeClient:
             require_watched=not self.config.FULL_SCAN,
         )
 
-        sync_client = self.movie_sync if section.type == "movie" else self.show_sync
+        sync_client: BaseSyncClient = {
+            "movie": self.movie_sync,
+            "show": self.show_sync,
+        }[section.type]
         for item in items:
             try:
                 sync_client.process_media(item)
