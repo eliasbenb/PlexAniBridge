@@ -70,9 +70,6 @@ class TVDBMapping(BaseModel):
 
         range_matches = list(PATTERN.finditer(s))
 
-        if not range_matches or any(m.end() < len(s) for m in range_matches[:-1]):
-            return []
-
         episode_ranges = []
         for match in range_matches:
             groups = match.groupdict()
