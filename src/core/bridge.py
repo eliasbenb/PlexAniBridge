@@ -277,7 +277,7 @@ class BridgeClient:
         log.info(
             f"{self.__class__.__name__}: {sync_stats.synced} items synced, {sync_stats.deleted} items deleted, "
             f"{sync_stats.skipped} items skipped, {sync_stats.not_found} items not found, "
-            f"and {sync_stats.failed} items failed"
+            f"and {sync_stats.failed} items failed with a coverage of {sync_stats.coverage:.2%}"
         )
 
     def _sync_section(

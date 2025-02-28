@@ -21,6 +21,8 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
         Returns:
             Iterator[tuple[Movie, list[Movie], AniMap | None, Media | None]]: Mapping matches (child, grandchild, animapping, anilist_media)
         """
+        self.sync_stats.possible.add(item)
+
         guids = ParsedGuids.from_guids(item.guids)
 
         animapping: AniMap = next(
@@ -53,6 +55,9 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
         Returns:
             Media | None: Matching AniList entry or None if not found
         """
+        if self.fuzzy_search_threshold == -1:
+            return None
+
         results = self.anilist_client.search_anime(item.title, True, 1)
         return self._best_search_result(item.title, results)
 

@@ -33,6 +33,8 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         all_episodes: list[Episode] = [
             e for e in item.episodes() if e.parentIndex in seasons
         ]
+
+        self.sync_stats.possible |= set(all_episodes)
         unyielded_seasons = set(seasons.keys())
 
         for animapping in self.animap_client.get_mappings(
