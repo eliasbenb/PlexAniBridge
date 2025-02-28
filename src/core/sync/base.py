@@ -216,11 +216,11 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
                     anilist_media=anilist_media,
                     animapping=animapping,
                 )
-            except Exception as e:
+            except Exception:
                 log.error(
                     f"{self.__class__.__name__}: Failed to process {item.type} "
-                    f"{debug_log_title} {debug_log_ids}",
-                    exc_info=e,
+                    f"{debug_log_title} {debug_log_ids}: ",
+                    exc_info=True,
                 )
                 self.sync_stats.failed += 1
 
