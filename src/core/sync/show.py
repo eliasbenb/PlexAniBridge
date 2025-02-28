@@ -99,6 +99,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
 
             anilist_media = self.search_media(item, season)
             if not anilist_media:
+                self.sync_stats.not_found += 1
                 continue
 
             animapping = AniMap(
