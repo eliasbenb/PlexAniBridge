@@ -97,6 +97,10 @@ List of Plex library sections to consider, specified in Python list syntax:
 
 An optional list of Plex genres to filter by. If specified, only items with these genres will be synced.
 
+```python
+["Anime", "Animation"]
+```
+
 This is useful for syncing only Anime content in a mixed library.
 
 ??? tip "Finding Possible Genres"
