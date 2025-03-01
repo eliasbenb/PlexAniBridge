@@ -426,18 +426,12 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         if media_list.status is None:
             return media_list
 
-        notes = None
-        if "notes" not in self.excluded_sync_fields:
-            notes = self.plex_client.get_user_review(
-                child_item
-            ) or self.plex_client.get_user_review(item)
-
         if media_list.status > MediaListStatus.PLANNING:
             media_list.started_at = self._calculate_started_at(**kwargs)
         if media_list.status >= MediaListStatus.COMPLETED:
             media_list.completed_at = self._calculate_completed_at(**kwargs)
             media_list.score = self._calculate_score(**kwargs)
-            media_list.notes = notes
+            media_list.notes = self._calculate_notes(**kwargs)
 
         return media_list
 
@@ -588,6 +582,31 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
 
         Returns:
             FuzzyDate | None: Completion date for the media item
+        """
+        pass
+
+    @abstractmethod
+    def _calculate_notes(
+        self,
+        item: T,
+        child_item: S,
+        grandchild_items: list[E],
+        anilist_media: Media,
+        animapping: AniMap,
+    ) -> str | None:
+        """Chooses the most relevant user notes for a media item.
+
+        Must be implemented by subclasses to handle different media types.
+
+        Args:
+            item (T): Grandparent Plex media item
+            child_item (S): Target child item to sync
+            grandchild_items (list[E]): Grandchild items to extract data from
+            anilist_media (Media): Matched AniList entry
+            animapping (AniMap): ID mapping information
+
+        Returns:
+            str | None: User notes for the media item
         """
         pass
 
