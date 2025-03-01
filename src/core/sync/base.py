@@ -107,8 +107,8 @@ class SyncStats(BaseModel, arbitrary_types_allowed=True):
     not_found: int = 0
     failed: int = 0
 
-    possible: set[E] = set()
-    covered: set[E] = set()
+    possible: set[str] = set()
+    covered: set[str] = set()
 
     @property
     def coverage(self) -> float:
@@ -241,7 +241,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
                     anilist_media=anilist_media,
                     animapping=animapping,
                 )
-                self.sync_stats.covered |= set(grandchild_items)
+                self.sync_stats.covered |= {str(e) for e in grandchild_items}
             except Exception:
                 log.error(
                     f"{self.__class__.__name__}: Failed to process {item.type} "

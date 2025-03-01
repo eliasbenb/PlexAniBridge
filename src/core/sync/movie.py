@@ -22,7 +22,7 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
         Returns:
             Iterator[tuple[Movie, list[Movie], AniMap | None, Media | None]]: Mapping matches (child, grandchild, animapping, anilist_media)
         """
-        self.sync_stats.possible.add(item)
+        self.sync_stats.possible.add(str(item))
 
         guids = ParsedGuids.from_guids(item.guids)
 
