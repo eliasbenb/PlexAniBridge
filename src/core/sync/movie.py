@@ -118,16 +118,17 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
         score = item.userRating
         return self._normalize_score(score) if score else None
 
-    def _calculate_progress(self, item: Movie, **_) -> int | None:
+    def _calculate_progress(self, item: Movie, anilist_media: Media, **_) -> int | None:
         """Calculates the progress for a media item.
 
         Args:
             item (Movie): Main Plex media item
+            anilist_media (Media): AniList media item
 
         Returns:
             int | None: Progress for the media item
         """
-        return 1 if item.viewCount else None
+        return (anilist_media.episodes or 1) if item.viewCount else None
 
     def _calculate_repeats(self, item: Movie, **_) -> int | None:
         """Calculates the number of repeats for a media item.
