@@ -31,7 +31,7 @@ class ColorFormatter(logging.Formatter):
     COLORS = {
         "DEBUG": Fore.CYAN,
         "INFO": Fore.GREEN,
-        "SUCCESS": Fore.LIGHTCYAN_EX,
+        "SUCCESS": Fore.GREEN + Style.BRIGHT,
         "WARNING": Fore.YELLOW,
         "ERROR": Fore.RED,
         "CRITICAL": Fore.RED + Style.BRIGHT,
