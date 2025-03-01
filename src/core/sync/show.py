@@ -308,6 +308,35 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         """
         return self._get_last_watched_date(grandchild_items[-1])
 
+    def _calculate_notes(
+        self,
+        item: Show,
+        child_item: Season,
+        grandchild_items: list[Episode],
+        anilist_media: Media,
+        **_,
+    ) -> str | None:
+        """Chooses the most relevant user notes for a media item.
+
+        Must be implemented by subclasses to handle different media types.
+
+        Args:
+            item (Show): Grandparent Plex media item
+            child_item (Season): Parent Plex media item
+            grandchild_items (list[Episode]): List of relevant episodes
+            anilist_media (Media): Matched AniList entry
+
+        Returns:
+            str | None: User notes for the media item
+        """
+        if "notes" in self.excluded_sync_fields:
+            return None
+        if len(grandchild_items) == anilist_media.episodes == 1:
+            return self.plex_client.get_user_review(grandchild_items[0])
+        return self.plex_client.get_user_review(
+            child_item
+        ) or self.plex_client.get_user_review(item)
+
     def _debug_log_title(
         self,
         item: Show,
