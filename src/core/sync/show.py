@@ -22,7 +22,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             item (Show): Plex media item to map
 
         Returns:
-            Iterator[tuple[Season, list[Episode], AniMap | None, Media | None]]: Mapping matches (child, grandchild, animapping, anilist_media)
+            Iterator[tuple[Season, list[Episode], AniMap, Media]]: Mapping matches (child, grandchild, animapping, anilist_media)
         """
         guids = ParsedGuids.from_guids(item.guids)
 

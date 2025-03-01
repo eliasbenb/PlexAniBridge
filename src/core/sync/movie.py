@@ -20,7 +20,7 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
             item (Movie): Plex media item to map
 
         Returns:
-            Iterator[tuple[Movie, list[Movie], AniMap | None, Media | None]]: Mapping matches (child, grandchild, animapping, anilist_media)
+            Iterator[tuple[Movie, list[Movie], AniMap, Media]]: Mapping matches (child, grandchild, animapping, anilist_media)
         """
         self.sync_stats.possible.add(str(item))
 
