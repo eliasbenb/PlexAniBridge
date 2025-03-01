@@ -329,8 +329,6 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         Returns:
             str | None: User notes for the media item
         """
-        if "notes" in self.excluded_sync_fields:
-            return None
         if len(grandchild_items) == anilist_media.episodes == 1:
             return self.plex_client.get_user_review(grandchild_items[0])
         return self.plex_client.get_user_review(

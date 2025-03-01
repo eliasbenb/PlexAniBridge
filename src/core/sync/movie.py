@@ -199,8 +199,6 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
         Returns:
             str | None: User notes for the media item
         """
-        if "notes" in self.excluded_sync_fields:
-            return None
         return self.plex_client.get_user_review(item)
 
     def _debug_log_title(self, item: Movie, **_) -> str:
