@@ -7,6 +7,7 @@ services:
       PLEX_USER: username
       PLEX_URL: http://plex:32400
       PLEX_SECTIONS: '["Anime", "Anime Movies"]'
+      # PLEX_GENRES: []
       # SYNC_INTERVAL: 3600
       # POLLING_SCAN: False
       # FULL_SCAN: False
