@@ -2,7 +2,6 @@ import sys
 from pathlib import Path
 
 import tomlkit
-from git import InvalidGitRepositoryError, Repo
 
 
 def get_pyproject_version() -> str:
@@ -30,7 +29,23 @@ def get_git_hash() -> str:
         str: PlexAniBridge's current commit hash
     """
     try:
-        repo = Repo(Path(sys.argv[0]), search_parent_directories=True)
-        return repo.head.commit.hexsha
-    except InvalidGitRepositoryError:
+        git_dir_path = Path(sys.argv[0]).parent / ".git"
+        if not git_dir_path.exists() or not git_dir_path.is_dir():
+            return "unknown"
+
+        with open(git_dir_path / "HEAD") as f:
+            ref = f.read().strip().split(": ")[1]
+
+        if ref.startswith("refs/heads/"):
+            ref = ref[11:]
+        else:
+            return "unknown"
+
+        ref_path = git_dir_path / "refs" / "heads" / ref
+        if not ref_path.exists() or not ref_path.is_file():
+            return "unknown"
+
+        with open(ref_path) as f:
+            return f.read().strip()
+    except Exception:
         return "unknown"

@@ -5,7 +5,6 @@ description = "Synchronize your Plex watch history, ratings, and reviews with An
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "gitpython>=3.1.43",
     "plexapi>=4.16.0",
     "pydantic-settings>=2.7.0",
     "pydantic>=2.10.4",
