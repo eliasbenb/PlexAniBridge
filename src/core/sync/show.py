@@ -118,6 +118,12 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
                 )
 
             if not anilist_media:
+                log.debug(
+                    f"No AniList entry could be found for {self._debug_log_title(item)}",
+                    extra=self._debug_log_ids(
+                        item.ratingKey, item.ratingKey, guids, anilist_media.id
+                    ),
+                )
                 self.sync_stats.not_found += 1
                 continue
 
