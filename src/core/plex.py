@@ -42,11 +42,13 @@ class PlexClient:
         plex_user: str,
         plex_url: str,
         plex_sections: list[str],
+        plex_genres: list[str],
     ) -> None:
         self.plex_token = plex_token
         self.plex_user = plex_user
         self.plex_url = plex_url
         self.plex_sections = plex_sections
+        self.plex_genres = plex_genres
 
         self.admin_client = PlexServer(plex_url, plex_token)
         self._init_user_client()
@@ -179,6 +181,13 @@ class PlexClient:
                     ]
                 }
             )
+
+        if self.plex_genres:
+            log.debug(
+                f"{self.__class__.__name__}: Filtering section $$'{section.title}'$$ by "
+                f"genres: {self.plex_genres}"
+            )
+            filters["and"].append({"genre": self.plex_genres})
 
         return section.search(filters=filters, **kwargs)
 

@@ -237,6 +237,7 @@ class BridgeClient:
                 plex_user,
                 self.config.PLEX_URL,
                 self.config.PLEX_SECTIONS,
+                self.config.PLEX_GENRES,
             )
         plex_client = self.plex_clients[plex_user]
 
