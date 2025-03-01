@@ -7,6 +7,12 @@ on:
       - develop
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      tag_version:
+        description: 'Version tag (e.g., v1.0.0)'
+        required: true
+        type: string
 
 env:
   REGISTRY: ghcr.io
@@ -52,6 +58,7 @@ jobs:
             type=ref,event=branch
             type=match,pattern=v*alpha*,value=alpha
             type=match,pattern=v*beta*,value=beta
+            type=raw,value=${{ github.event.inputs.tag_version }},enable=${{ github.event_name == 'workflow_dispatch' }}
           labels: |
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.created=${{ github.event.head_commit.timestamp }}
