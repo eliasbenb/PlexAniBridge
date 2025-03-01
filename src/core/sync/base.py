@@ -196,7 +196,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             ):
                 getattr(self, attr).cache_clear()
 
-    def process_media(self, item: T) -> SyncStats:
+    def process_media(self, item: T) -> None:
         """Processes a single media item for synchronization.
 
         Args:
@@ -249,8 +249,6 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
                     exc_info=True,
                 )
                 self.sync_stats.failed += 1
-
-        return self.sync_stats
 
     @abstractmethod
     def map_media(self, item: T) -> Iterator[tuple[S, list[E], AniMap, Media]]:
