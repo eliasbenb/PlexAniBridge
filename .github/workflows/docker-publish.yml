@@ -51,6 +51,8 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          flavor: |
+            latest=false
           tags: |
             type=semver,pattern=v{{version}}
             type=semver,pattern=v{{major}}.{{minor}}
@@ -58,8 +60,7 @@ jobs:
             type=ref,event=branch
             type=match,pattern=v*alpha*,value=alpha
             type=match,pattern=v*beta*,value=beta
-            type=match,pattern=v[0-9]*,value=latest,enable=${{ github.ref_type == 'tag' && !contains(github.ref, 'alpha') && !contains(github.ref, 'beta') }}
-            type=raw,value=${{ github.event.inputs.tag_version }},enable=${{ github.event_name == 'workflow_dispatch' }}
+            type=raw,value=latest,enable=${{ github.ref_type == 'tag' && !contains(github.ref, 'alpha') && !contains(github.ref, 'beta') }}
           labels: |
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.created=${{ github.event.head_commit.timestamp }}
