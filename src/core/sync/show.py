@@ -86,11 +86,15 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
                 if tvdb_mapping.ratio > 0:
                     episodes = [e for e in episodes for _ in range(tvdb_mapping.ratio)]
                 elif tvdb_mapping.ratio < 0:
-                    episodes = [
+                    tmp_episodes = {
                         e
                         for i, e in enumerate(episodes, start=1)
                         if i % tvdb_mapping.ratio != 0
-                    ]
+                    }
+                    self.sync_stats.covered |= {
+                        str(e) for e in set(episodes) - tmp_episodes
+                    }
+                    episodes = list(tmp_episodes)
 
             all_seasons = Counter(e.parentIndex for e in episodes)
             unyielded_seasons -= set(all_seasons.keys())
