@@ -102,6 +102,7 @@ class PlexAnibridgeConfig(BaseSettings):
     PLEX_USER: str | list[str]
     PLEX_URL: str = "http://localhost:32400"
     PLEX_SECTIONS: list[str]
+    PLEX_GENRES: list[str] = []
 
     # General
     SYNC_INTERVAL: int = Field(3600, ge=-1)

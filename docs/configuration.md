@@ -91,6 +91,27 @@ List of Plex library sections to consider, specified in Python list syntax:
 
 ---
 
+### `PLEX_GENRES`
+
+`list[str]` (Optional, default: `[]`)
+
+An optional list of Plex genres to filter by. If specified, only items with these genres will be synced.
+
+```python
+["Anime", "Animation"]
+```
+
+This is useful for syncing only Anime content in a mixed library.
+
+??? tip "Finding Possible Genres"
+
+    Genres are sources from the metdata you use (typically TheMovieDB or TheTVDB). You can find the possible genres below:
+
+    - [TheTVDB Genres](https://thetvdb.com/genres)
+    - [TheMovieDB Genres](https://www.themoviedb.org/talk/644a4b69f794ad04fe3cf1b9)
+
+---
+
 ### `SYNC_INTERVAL`
 
 `int` (Optional, default: `3600`)
@@ -147,7 +168,8 @@ Allows regressive updates and deletions, which **can cause data loss**.
     - Making regressive updates (e.g., if AniList progress is higher than Plex, AniList will be **lowered** to match Plex).
 
 !!! note
-To delete AniList entries for unwatched Plex content, enable both `FULL_SCAN` and `DESTRUCTIVE_SYNC`.
+
+    To delete AniList entries for unwatched Plex content, enable both `FULL_SCAN` and `DESTRUCTIVE_SYNC`.
 
 ---
 
