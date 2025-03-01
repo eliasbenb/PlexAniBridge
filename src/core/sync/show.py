@@ -35,7 +35,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             e for e in item.episodes() if e.parentIndex in seasons
         ]
 
-        self.sync_stats.possible |= set(all_episodes)
+        self.sync_stats.possible |= {str(e) for e in all_episodes}
         unyielded_seasons = set(seasons.keys())
 
         for animapping in self.animap_client.get_mappings(
@@ -329,8 +329,6 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         Returns:
             str | None: User notes for the media item
         """
-        if "notes" in self.excluded_sync_fields:
-            return None
         if len(grandchild_items) == anilist_media.episodes == 1:
             return self.plex_client.get_user_review(grandchild_items[0])
         return self.plex_client.get_user_review(

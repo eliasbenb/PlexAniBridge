@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Generic, Iterator, TypeVar
+from typing import Any, Generic, Iterator, TypeVar, Callable
 
 from plexapi.media import Guid
 from plexapi.video import Episode, Movie, Season, Show
@@ -107,8 +107,8 @@ class SyncStats(BaseModel, arbitrary_types_allowed=True):
     not_found: int = 0
     failed: int = 0
 
-    possible: set[E] = set()
-    covered: set[E] = set()
+    possible: set[str] = set()
+    covered: set[str] = set()
 
     @property
     def coverage(self) -> float:
@@ -174,6 +174,20 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
 
         self.sync_stats = SyncStats()
 
+        __extra_fields: dict[SyncField, Callable] = {
+            "progress": self._calculate_progress,
+            "repeat": self._calculate_repeats,
+            "score": self._calculate_score,
+            "notes": self._calculate_notes,
+            "started_at": self._calculate_started_at,
+            "completed_at": self._calculate_completed_at,
+        }
+        self.__extra_fields = {
+            k: v
+            for k, v in __extra_fields.items()
+            if k not in self.excluded_sync_fields
+        }
+
     def clear_cache(self) -> None:
         """Clears the cache for all decorated methods in the class."""
         for attr in dir(self):
@@ -182,7 +196,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             ):
                 getattr(self, attr).cache_clear()
 
-    def process_media(self, item: T) -> SyncStats:
+    def process_media(self, item: T) -> None:
         """Processes a single media item for synchronization.
 
         Args:
@@ -227,7 +241,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
                     anilist_media=anilist_media,
                     animapping=animapping,
                 )
-                self.sync_stats.covered |= set(grandchild_items)
+                self.sync_stats.covered |= {str(e) for e in grandchild_items}
             except Exception:
                 log.error(
                     f"{self.__class__.__name__}: Failed to process {item.type} "
@@ -235,8 +249,6 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
                     exc_info=True,
                 )
                 self.sync_stats.failed += 1
-
-        return self.sync_stats
 
     @abstractmethod
     def map_media(self, item: T) -> Iterator[tuple[S, list[E], AniMap, Media]]:
@@ -419,19 +431,33 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             user_id=self.anilist_client.user.id,
             media_id=anilist_media.id,
             status=self._calculate_status(**kwargs),
-            progress=self._calculate_progress(**kwargs),
-            repeat=self._calculate_repeats(**kwargs),
         )
 
         if media_list.status is None:
             return media_list
 
-        if media_list.status > MediaListStatus.PLANNING:
-            media_list.started_at = self._calculate_started_at(**kwargs)
-        if media_list.status >= MediaListStatus.COMPLETED:
-            media_list.completed_at = self._calculate_completed_at(**kwargs)
-            media_list.score = self._calculate_score(**kwargs)
-            media_list.notes = self._calculate_notes(**kwargs)
+        for field in self.__extra_fields:
+            match field:
+                case "score":
+                    media_list.score = (
+                        self._calculate_score(**kwargs)
+                        if media_list.status >= MediaListStatus.COMPLETED
+                        else None
+                    )
+                case "started_at":
+                    media_list.started_at = (
+                        self.__extra_fields[field](**kwargs)
+                        if media_list.status > MediaListStatus.PLANNING
+                        else None
+                    )
+                case "completed_at":
+                    media_list.completed_at = (
+                        self.__extra_fields[field](**kwargs)
+                        if media_list.status >= MediaListStatus.COMPLETED
+                        else None
+                    )
+                case _:
+                    setattr(media_list, field, self.__extra_fields[field](**kwargs))
 
         return media_list
 
@@ -707,38 +733,38 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             "completed_at": "lt",
         }
 
-        def should_update(op: str, p_val, a_val) -> bool:
-            """Determines if a field should be updated based on the comparison rule.
-
-            Args:
-                op (str): Comparison rule
-                p_val: Plex value
-                a_val: AniList value
-
-            Returns:
-                    bool: True if the field should be updated, False otherwise
-            """
-            if p_val is None:
-                return False
-            if a_val is None:
-                return True
-            match op:
-                case "ne":
-                    return p_val != a_val
-                case "gt":
-                    return self.destructive_sync or p_val > a_val
-                case "gte":
-                    return self.destructive_sync or p_val >= a_val
-                case "lt":
-                    return self.destructive_sync or p_val < a_val
-                case "lte":
-                    return self.destructive_sync or p_val <= a_val
-            return False
-
         for key, rule in COMPARISON_RULES.items():
             plex_val = getattr(plex_media_list, key)
             anilist_val = getattr(anilist_media_list, key)
-            if should_update(rule, plex_val, anilist_val):
+            if self.__should_update_field(rule, plex_val, anilist_val):
                 setattr(res_media_list, key, plex_val)
 
         return res_media_list
+
+    def __should_update_field(self, op: str, plex_val: Any, anilist_val: Any) -> bool:
+        """Determines if a field should be updated based on the comparison rule.
+
+        Args:
+            op (str): Comparison rule
+            plex_val: Plex value
+            anilist_val: AniList value
+
+        Returns:
+                bool: True if the field should be updated, False otherwise
+        """
+        if plex_val is None:
+            return False
+        if anilist_val is None:
+            return True
+        match op:
+            case "ne":
+                return plex_val != anilist_val
+            case "gt":
+                return self.destructive_sync or plex_val > anilist_val
+            case "gte":
+                return self.destructive_sync or plex_val >= anilist_val
+            case "lt":
+                return self.destructive_sync or plex_val < anilist_val
+            case "lte":
+                return self.destructive_sync or plex_val <= anilist_val
+        return False
