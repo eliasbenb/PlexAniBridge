@@ -358,10 +358,10 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             return
 
         if self.destructive_sync and anilist_media_list and not plex_media_list.status:
-            log.info(
+            log.success(
                 f"{self.__class__.__name__}: Deleting AniList entry with variables:"
             )
-            log.info(f"\t\t{anilist_media_list}")
+            log.success(f"\t\t{anilist_media_list}")
             self.anilist_client.delete_anime_entry(
                 anilist_media.media_list_entry.id,
                 anilist_media.media_list_entry.media_id,
@@ -378,19 +378,19 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             self.sync_stats.skipped += 1
             return
 
-        log.info(
+        log.success(
             f"{self.__class__.__name__}: Syncing AniList entry for {item.type} "
             f"{debug_log_title} {debug_log_ids}"
         )
-        log.info(f"\t\tBEFORE => {anilist_media_list}")
-        log.info(f"\t\tAFTER  => {final_media_list}")
-        log.info(
+        log.success(f"\t\tBEFORE => {anilist_media_list}")
+        log.success(f"\t\tAFTER  => {final_media_list}")
+        log.success(
             f"\t\tDIFF   => {MediaList.diff(anilist_media_list, final_media_list)}"
         )
 
         self.anilist_client.update_anime_entry(final_media_list)
 
-        log.info(
+        log.success(
             f"{self.__class__.__name__}: Synced {item.type} "
             f"{debug_log_title} {debug_log_ids}"
         )

@@ -383,7 +383,9 @@ class AniListClient:
             backup_file.parent.mkdir(parents=True)
 
         backup_file.write_text(data.model_dump_json(indent=2))
-        log.info(f"{self.__class__.__name__}: Exported AniList data to '{backup_file}'")
+        log.success(
+            f"{self.__class__.__name__}: Exported AniList data to '{backup_file}'"
+        )
 
         cutoff_date = datetime.now() - timedelta(days=self.BACKUP_RETENTION_DAYS)
 
