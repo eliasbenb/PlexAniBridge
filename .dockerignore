@@ -29,6 +29,16 @@ venv.bak/
 /.devcontainer
 /.vscode
 
+# Git
+/.git
+!/.git/HEAD
+!/.git/refs/heads/
+
 # GitHub
 /.github
 
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
