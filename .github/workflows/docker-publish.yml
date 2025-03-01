@@ -58,8 +58,8 @@ jobs:
             type=semver,pattern=v{{major}}.{{minor}}
             type=semver,pattern=v{{major}}
             type=ref,event=branch
-            type=match,pattern=v*alpha*,value=alpha,event=tag
-            type=match,pattern=v*beta*,value=beta,event=tag
+            type=match,pattern=v*alpha*,value=alpha,enable=${{ github.ref_type == 'tag' }}
+            type=match,pattern=v*beta*,value=beta,enable=${{ github.ref_type == 'tag' }}
             type=raw,value=latest,enable=${{ github.ref_type == 'tag' && !contains(github.ref, 'alpha') && !contains(github.ref, 'beta') }}
           labels: |
             org.opencontainers.image.revision=${{ github.sha }}
