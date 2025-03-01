@@ -84,19 +84,13 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
                     )
 
                 if tvdb_mapping.ratio > 0:
-                    target_length = (
-                        anilist_media.episodes or sys.maxsize // tvdb_mapping.ratio
-                    )
+                    episodes = [e for e in episodes for _ in range(tvdb_mapping.ratio)]
+                elif tvdb_mapping.ratio < 0:
                     episodes = [
                         e
-                        for e in episodes[:target_length]
-                        for _ in range(tvdb_mapping.ratio)
+                        for i, e in enumerate(episodes, start=1)
+                        if i % tvdb_mapping.ratio != 0
                     ]
-                elif tvdb_mapping.ratio < 0:
-                    target_length = (
-                        anilist_media.episodes or sys.maxsize
-                    ) * -tvdb_mapping.ratio
-                    episodes = episodes[:target_length][:: -tvdb_mapping.ratio]
 
             all_seasons = Counter(e.parentIndex for e in episodes)
             unyielded_seasons -= set(all_seasons.keys())
