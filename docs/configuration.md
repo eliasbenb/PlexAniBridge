@@ -103,6 +103,10 @@ An optional list of Plex genres to filter by. If specified, only items with thes
 
 This is useful for syncing only Anime content in a mixed library.
 
+!!! tip "Allowing All Genres"
+
+    To sync all genres, set this to an empty list: `[]` or don't set it at all.
+
 ??? tip "Finding Possible Genres"
 
     Genres are sources from the metdata you use (typically TheMovieDB or TheTVDB). You can find the possible genres below:
@@ -189,7 +193,7 @@ Specifies which fields should **not** be synced. Available fields:
 
 !!! tip "Allowing All Fields"
 
-    To sync all fields, set this to an empty list: `[]`.
+    To sync all fields, set this to an empty list: `[]` or don't set it at all.
 
 ---
 
