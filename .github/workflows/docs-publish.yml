@@ -2,7 +2,7 @@ name: MkDocs
 on:
   push:
     branches:
-      - main
+      - develop
     paths:
       - "docs/**"
       - "mkdocs.yml"
