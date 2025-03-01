@@ -1,4 +1,4 @@
-from .logging import setup_logger
+from .logging import Logger, get_logger
 from .settings import PlexAnibridgeConfig
 from .utils.version import get_git_hash, get_pyproject_version
 
@@ -26,4 +26,6 @@ PLEXANIBDRIGE_HEADER = f"""
 
 config = PlexAnibridgeConfig()
 
-log = setup_logger(log_name="PlexAniBridge", log_level=config.LOG_LEVEL, log_dir="logs")
+log: Logger = get_logger(
+    log_name="PlexAniBridge", log_level=config.LOG_LEVEL, log_dir="logs"
+)
