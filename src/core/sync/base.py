@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Generic, Iterator, TypeVar, Callable
+from typing import Any, Generic, Iterator, TypeVar, Callable
 
 from plexapi.media import Guid
 from plexapi.video import Episode, Movie, Season, Show
@@ -174,7 +174,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
 
         self.sync_stats = SyncStats()
 
-        extra_fields: dict[SyncField, Callable] = {
+        __extra_fields: dict[SyncField, Callable] = {
             "progress": self._calculate_progress,
             "repeat": self._calculate_repeats,
             "score": self._calculate_score,
@@ -182,8 +182,10 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             "started_at": self._calculate_started_at,
             "completed_at": self._calculate_completed_at,
         }
-        self.extra_fields = {
-            k: v for k, v in extra_fields.items() if k not in self.excluded_sync_fields
+        self.__extra_fields = {
+            k: v
+            for k, v in __extra_fields.items()
+            if k not in self.excluded_sync_fields
         }
 
     def clear_cache(self) -> None:
@@ -436,7 +438,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         if media_list.status is None:
             return media_list
 
-        for field in self.extra_fields:
+        for field in self.__extra_fields:
             match field:
                 case "score":
                     media_list.score = (
@@ -446,18 +448,18 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
                     )
                 case "started_at":
                     media_list.started_at = (
-                        self.extra_fields[field](**kwargs)
+                        self.__extra_fields[field](**kwargs)
                         if media_list.status > MediaListStatus.PLANNING
                         else None
                     )
                 case "completed_at":
                     media_list.completed_at = (
-                        self.extra_fields[field](**kwargs)
+                        self.__extra_fields[field](**kwargs)
                         if media_list.status >= MediaListStatus.COMPLETED
                         else None
                     )
                 case _:
-                    setattr(media_list, field, self.extra_fields[field](**kwargs))
+                    setattr(media_list, field, self.__extra_fields[field](**kwargs))
 
         return media_list
 
@@ -733,38 +735,38 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             "completed_at": "lt",
         }
 
-        def should_update(op: str, p_val, a_val) -> bool:
-            """Determines if a field should be updated based on the comparison rule.
-
-            Args:
-                op (str): Comparison rule
-                p_val: Plex value
-                a_val: AniList value
-
-            Returns:
-                    bool: True if the field should be updated, False otherwise
-            """
-            if p_val is None:
-                return False
-            if a_val is None:
-                return True
-            match op:
-                case "ne":
-                    return p_val != a_val
-                case "gt":
-                    return self.destructive_sync or p_val > a_val
-                case "gte":
-                    return self.destructive_sync or p_val >= a_val
-                case "lt":
-                    return self.destructive_sync or p_val < a_val
-                case "lte":
-                    return self.destructive_sync or p_val <= a_val
-            return False
-
         for key, rule in COMPARISON_RULES.items():
             plex_val = getattr(plex_media_list, key)
             anilist_val = getattr(anilist_media_list, key)
-            if should_update(rule, plex_val, anilist_val):
+            if self.__should_update_field(rule, plex_val, anilist_val):
                 setattr(res_media_list, key, plex_val)
 
         return res_media_list
+
+    def __should_update_field(self, op: str, plex_val: Any, anilist_val: Any) -> bool:
+        """Determines if a field should be updated based on the comparison rule.
+
+        Args:
+            op (str): Comparison rule
+            plex_val: Plex value
+            anilist_val: AniList value
+
+        Returns:
+                bool: True if the field should be updated, False otherwise
+        """
+        if plex_val is None:
+            return False
+        if anilist_val is None:
+            return True
+        match op:
+            case "ne":
+                return plex_val != anilist_val
+            case "gt":
+                return self.destructive_sync or plex_val > anilist_val
+            case "gte":
+                return self.destructive_sync or plex_val >= anilist_val
+            case "lt":
+                return self.destructive_sync or plex_val < anilist_val
+            case "lte":
+                return self.destructive_sync or plex_val <= anilist_val
+        return False
