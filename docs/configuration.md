@@ -217,9 +217,14 @@ Sets logging verbosity. Available levels:
 
 - `DEBUG`
 - `INFO`
+- `SUCCESS`
 - `WARNING`
 - `ERROR`
 - `CRITICAL`
+
+!!! tip "Minimal Logging"
+
+    For minimal logging, set the verbosity to `SUCCESS` which only logs successful operations like syncing entries.
 
 !!! tip "Debugging"
 

@@ -65,6 +65,7 @@ class LogLevel(StrEnum):
     Values:
         DEBUG: Detailed information for debugging
         INFO: General information about program execution
+        SUCCESS: Positive confirmation of a successful operation
         WARNING: Indicates a potential problem
         ERROR: Error that prevented a specific operation
         CRITICAL: Error that prevents further program execution
@@ -72,6 +73,7 @@ class LogLevel(StrEnum):
 
     DEBUG = "DEBUG"
     INFO = "INFO"
+    SUCCESS = "SUCCESS"
     WARNING = "WARNING"
     ERROR = "ERROR"
     CRITICAL = "CRITICAL"

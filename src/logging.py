@@ -9,6 +9,46 @@ import colorama
 from colorama import Fore, Style
 
 
+def add_logging_level(level_name, level_num, method_name=None):
+    """
+    Comprehensively adds a new logging level to the `logging` module and the
+    currently configured logging class.
+
+    Args:
+        level_name (str): Name of the level (e.g., 'SUCCESS')
+        level_num (int): Numeric value for the level (e.g., logging.DEBUG - 5)
+        method_name (str, optional): Name of the method to add to Logger class.
+                                    Defaults to level_name.lower().
+
+    Raises:
+        AttributeError: If the level or method name already exists in logging
+    """
+    if not method_name:
+        method_name = level_name.lower()
+
+    if hasattr(logging, level_name):
+        raise AttributeError(f"{level_name} already defined in logging module")
+    if hasattr(logging, method_name):
+        raise AttributeError(f"{method_name} already defined in logging module")
+    if hasattr(logging.getLoggerClass(), method_name):
+        raise AttributeError(f"{method_name} already defined in logger class")
+
+    def log_for_level(self, message, *args, **kwargs):
+        if self.isEnabledFor(level_num):
+            self._log(level_num, message, args, **kwargs)
+
+    def log_to_root(message, *args, **kwargs):
+        logging.log(level_num, message, *args, **kwargs)
+
+    logging.addLevelName(level_num, level_name)
+    setattr(logging, level_name, level_num)
+    setattr(logging.getLoggerClass(), method_name, log_for_level)
+    setattr(logging, method_name, log_to_root)
+
+
+add_logging_level("SUCCESS", logging.INFO + 5)
+
+
 def supports_color() -> bool:
     """Check if the terminal supports ANSI color codes.
 
@@ -75,21 +115,18 @@ class ColorFormatter(logging.Formatter):
     Color Scheme:
         DEBUG: Cyan
         INFO: Green
+        SUCCESS: Light Cyan
         WARNING: Yellow
         ERROR: Red
         CRITICAL: Bright Red
         Quoted values: Light Blue (e.g., $$'example'$$)
         Bracketed values: Dimmed (e.g., $${key: value}$$)
-
-    Note:
-        - Uses colorama for cross-platform color support
-        - Color markers ($$) in the message must be balanced
-        - Original message is preserved after formatting
     """
 
     COLORS = {
         "DEBUG": Fore.CYAN,
         "INFO": Fore.GREEN,
+        "SUCCESS": Fore.LIGHTCYAN_EX,
         "WARNING": Fore.YELLOW,
         "ERROR": Fore.RED,
         "CRITICAL": Fore.RED + Style.BRIGHT,
@@ -98,21 +135,11 @@ class ColorFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         """Formats a log record with ANSI color codes.
 
-        Applies color formatting to:
-        1. Log level name based on severity
-        2. Special markers in the message:
-           - $$'text'$$ -> Light blue quoted text
-           - $${text}$$ -> Dimmed bracketed text
-
         Args:
             record (logging.LogRecord): Log record to format
 
         Returns:
             str: Color-formatted log message
-
-        Note:
-            Temporarily modifies the record but restores original values
-            before returning to prevent side effects in other formatters
         """
         orig_msg = record.msg
         orig_levelname = record.levelname
@@ -146,15 +173,6 @@ class CleanFormatter(logging.Formatter):
     Used for file output where color codes are unnecessary and would
     reduce readability. Removes the special markers while preserving
     the content within them.
-
-    Transformation Examples:
-        $$'example'$$ -> 'example'
-        $${key: value}$$ -> {key: value}
-
-    Note:
-        - Preserves the original message structure
-        - Only processes string messages
-        - Original message is restored after formatting
     """
 
     def format(self, record: logging.LogRecord) -> str:
@@ -166,8 +184,6 @@ class CleanFormatter(logging.Formatter):
         Returns:
             str: Clean log message without color markers
 
-        Note:
-            Only processes string messages, passes through other types unchanged
         """
         if isinstance(record.msg, str):
             orig_msg = record.msg
@@ -194,36 +210,17 @@ def setup_logger(log_name: str, log_level: str, log_dir: str) -> logging.Logger:
 
     Args:
         log_name (str): Name of the logger and base name for log file
-        log_level (str): Logging level ('DEBUG', 'INFO', etc.)
+        log_level (str): Logging level ('DEBUG', 'INFO', 'SUCCESS', etc.)
         log_dir (str): Directory where log files will be stored
 
     Returns:
         logging.Logger: Configured logger instance
-
-    Log File Details:
-        - Location: {log_dir}/{log_name}.{log_level}.log
-        - Rotation: 10MB max file size
-        - Retention: Keeps 5 backup files
-
-    Format Patterns:
-        Debug Level:
-            {timestamp} - {name} - {level}    {file}:{line}    {message}
-        Other Levels:
-            {timestamp} - {name} - {level}    {message}
-
-    Example:
-        >>> logger = setup_logger('myapp', 'DEBUG', '/var/log/myapp')
-        >>> logger.debug("Processing item $$'foo'$$ $${id: 123}$$")
-        2024-01-04 12:34:56 - myapp - DEBUG    main.py:42    Processing item 'foo' {id: 123}
-
-    Note:
-        - Creates log directory if it doesn't exist
-        - Only configures handlers if none exist
-        - Uses ColorFormatter for console output
-        - Uses CleanFormatter for file output
-        - Timestamp format: YYYY-MM-DD HH:MM:SS
     """
-    log_level_literal = getattr(logging, log_level)
+    if log_level == "SUCCESS":
+        log_level_literal = logging.SUCCESS
+    else:
+        log_level_literal = getattr(logging, log_level)
+
     log_path = Path(log_dir)
     log_path.mkdir(parents=True, exist_ok=True)
 
@@ -233,7 +230,7 @@ def setup_logger(log_name: str, log_level: str, log_dir: str) -> logging.Logger:
     if not logger.handlers:
         log_format = (
             "%(asctime)s - %(name)s - %(levelname)s\t%(filename)s:%(lineno)d\t%(message)s"
-            if log_level_literal == logging.DEBUG
+            if log_level_literal <= logging.DEBUG
             else "%(asctime)s - %(name)s - %(levelname)s\t%(message)s"
         )
 
