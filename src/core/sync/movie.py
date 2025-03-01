@@ -3,6 +3,7 @@ from typing import Iterator
 
 from plexapi.video import Movie, MovieHistory
 
+from src import log
 from src.models.anilist import FuzzyDate, Media, MediaListStatus
 from src.models.animap import AniMap
 
@@ -34,10 +35,18 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
             tvdb_id=guids.tvdb,
         )
 
-        if animapping.anilist_id:
-            anilist_media = self.anilist_client.get_anime(animapping.anilist_id)
-        else:
-            anilist_media = self.search_media(item)
+        try:
+            if animapping.anilist_id:
+                anilist_media = self.anilist_client.get_anime(animapping.anilist_id)
+            else:
+                anilist_media = self.search_media(item)
+        except Exception:
+            self.sync_stats.failed.add(item)
+            log.error(
+                f"Failed to fetch AniList data for {self._debug_log_title(item)}: ",
+                exc_info=True,
+            )
+            return
 
         if not anilist_media:
             return

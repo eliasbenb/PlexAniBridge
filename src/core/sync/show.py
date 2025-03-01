@@ -5,6 +5,7 @@ from typing import Iterator
 
 from plexapi.video import Episode, Season, Show
 
+from src import log
 from src.models.anilist import FuzzyDate, Media, MediaListStatus
 from src.models.animap import AniMap
 
@@ -53,7 +54,12 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
 
             episodes: list[Episode] = []
 
-            anilist_media = self.anilist_client.get_anime(animapping.anilist_id)
+            try:
+                anilist_media = self.anilist_client.get_anime(animapping.anilist_id)
+            except Exception:
+                anilist_media = None
+                self.sync_stats.failed += 1
+
             if not anilist_media:
                 continue
 
@@ -107,7 +113,16 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
                 continue
             season = seasons[index]
 
-            anilist_media = self.search_media(item, season)
+            try:
+                anilist_media = self.search_media(item, season)
+            except Exception:
+                anilist_media = None
+                self.sync_stats.failed += 1
+                log.error(
+                    f"Failed to fetch AniList data for {self._debug_log_title(item)}: ",
+                    exc_info=True,
+                )
+
             if not anilist_media:
                 self.sync_stats.not_found += 1
                 continue
