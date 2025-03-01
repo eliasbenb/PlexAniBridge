@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Generic, Iterator, TypeVar
+from typing import Generic, Iterator, TypeVar, Callable
 
 from plexapi.media import Guid
 from plexapi.video import Episode, Movie, Season, Show
@@ -173,6 +173,18 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         self.fuzzy_search_threshold = fuzzy_search_threshold
 
         self.sync_stats = SyncStats()
+
+        extra_fields: dict[SyncField, Callable] = {
+            "progress": self._calculate_progress,
+            "repeat": self._calculate_repeats,
+            "score": self._calculate_score,
+            "notes": self._calculate_notes,
+            "started_at": self._calculate_started_at,
+            "completed_at": self._calculate_completed_at,
+        }
+        self.extra_fields = {
+            k: v for k, v in extra_fields.items() if k not in self.excluded_sync_fields
+        }
 
     def clear_cache(self) -> None:
         """Clears the cache for all decorated methods in the class."""
@@ -419,19 +431,33 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             user_id=self.anilist_client.user.id,
             media_id=anilist_media.id,
             status=self._calculate_status(**kwargs),
-            progress=self._calculate_progress(**kwargs),
-            repeat=self._calculate_repeats(**kwargs),
         )
 
         if media_list.status is None:
             return media_list
 
-        if media_list.status > MediaListStatus.PLANNING:
-            media_list.started_at = self._calculate_started_at(**kwargs)
-        if media_list.status >= MediaListStatus.COMPLETED:
-            media_list.completed_at = self._calculate_completed_at(**kwargs)
-            media_list.score = self._calculate_score(**kwargs)
-            media_list.notes = self._calculate_notes(**kwargs)
+        for field in self.extra_fields:
+            match field:
+                case "score":
+                    media_list.score = (
+                        self._calculate_score(**kwargs)
+                        if media_list.status >= MediaListStatus.COMPLETED
+                        else None
+                    )
+                case "started_at":
+                    media_list.started_at = (
+                        self.extra_fields[field](**kwargs)
+                        if media_list.status > MediaListStatus.PLANNING
+                        else None
+                    )
+                case "completed_at":
+                    media_list.completed_at = (
+                        self.extra_fields[field](**kwargs)
+                        if media_list.status >= MediaListStatus.COMPLETED
+                        else None
+                    )
+                case _:
+                    setattr(media_list, field, self.extra_fields[field](**kwargs))
 
         return media_list
 
