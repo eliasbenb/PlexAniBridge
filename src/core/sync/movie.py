@@ -186,6 +186,23 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
         """
         return self._calculate_started_at(item, **_)
 
+    def _calculate_notes(
+        self,
+        item: Movie,
+        **_,
+    ) -> str | None:
+        """Chooses the most relevant user notes for a media item.
+
+        Args:
+            item (Movie): Plex media item
+
+        Returns:
+            str | None: User notes for the media item
+        """
+        if "notes" in self.excluded_sync_fields:
+            return None
+        return self.plex_client.get_user_review(item)
+
     def _debug_log_title(self, item: Movie, **_) -> str:
         """Creates a debug-friendly string of media titles.
 
