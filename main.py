@@ -17,8 +17,8 @@ async def create_scheduler(bridge: BridgeClient, **scheduler_kwargs):
 
 
 async def main():
-    log.success(f"\n{PLEXANIBDRIGE_HEADER}")
-    log.success(f"PlexAniBridge: [CONFIG] => {config}")
+    log.info(f"\n{PLEXANIBDRIGE_HEADER}")
+    log.info(f"PlexAniBridge: [CONFIG] => {config}")
 
     bridge = BridgeClient(config)
     stop_event = asyncio.Event()

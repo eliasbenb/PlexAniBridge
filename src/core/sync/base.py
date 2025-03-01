@@ -378,7 +378,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             self.sync_stats.skipped += 1
             return
 
-        log.success(
+        log.info(
             f"{self.__class__.__name__}: Syncing AniList entry for {item.type} "
             f"{debug_log_title} {debug_log_ids}"
         )
