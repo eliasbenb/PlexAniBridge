@@ -277,7 +277,12 @@ class BridgeClient:
 
         unsynced_items = sorted(
             list(sync_stats.possible - sync_stats.covered),
-            key=lambda x: (x.type, x.parentRatingKey, x.parentIndex, x.index),
+            key=lambda x: (
+                x.type,
+                getattr(x, "parentRatingKey", 0),
+                getattr(x, "parentIndex", 0),
+                getattr(x, "index", 0),
+            ),
         )
         unsynced_items_str = ", ".join(str(i) for i in unsynced_items)
         log.debug(
