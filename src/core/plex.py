@@ -408,3 +408,14 @@ class PlexClient:
             bool: True if item appears in Continue Watching hub, False otherwise
         """
         return bool(self.get_continue_watching(item))
+
+    def is_discover_item(self, item: Media) -> bool:
+        """Checks if a media item is from the Discover server.
+
+        Args:
+            item (Movie | Show | Season | Episode): Media item to check
+
+        Returns:
+            bool: True if item is from Discover server, False otherwise
+        """
+        return isnan(item.librarySectionID)
