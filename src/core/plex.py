@@ -294,57 +294,6 @@ class PlexClient:
             return None
 
     @lru_cache(maxsize=32)
-    def get_episodes(
-        self,
-        item: Show,
-        start: tuple[int, int] | None = None,
-        end: tuple[int, int] | None = None,
-    ) -> list[Episode]:
-        """Retrieves episodes within a specified range for a season.
-
-        Args:
-            item (Show): The show to get episodes from
-            start (tuple[int, int] | None): Starting season and episode number (inclusive)
-            end (tuple[int, int] | None): Ending season and episode number (inclusive)
-
-        Returns:
-            list[Episode]: List of episodes with index between start and end
-        """
-
-        def client_side_filter(episode: Episode):
-            if start and (
-                episode.parentIndex < start[0]
-                or (episode.parentIndex == start[0] and episode.index < start[1])
-            ):
-                return False
-            if end and (
-                episode.parentIndex > end[0]
-                or (episode.parentIndex == end[0] and episode.index > end[1])
-            ):
-                return False
-            return True
-
-        return [
-            e for s in item.seasons() for e in s.episodes() if client_side_filter(e)
-        ]
-
-    @lru_cache(maxsize=32)
-    def get_watched_episodes(self, item: Show, **kwargs) -> list[Episode]:
-        """Retrieves watched episodes within a specified range for a season.
-
-        Similar to get_episodes() but only returns episodes that have been
-        watched at least once (viewCount > 0).
-
-        Args:
-            item (Show | Season): The item to get episodes from
-            **kwargs: Additional arguments to pass to get_episodes()
-
-        Returns:
-            list[Episode]: List of watched episodes with index between start and end
-        """
-        return [i for i in self.get_episodes(item, **kwargs) if i.viewCount > 0]
-
-    @lru_cache(maxsize=32)
     def get_continue_watching(
         self, item: Media | None = None
     ) -> list[Movie] | list[Episode]:
