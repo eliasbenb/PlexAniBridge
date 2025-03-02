@@ -1,14 +1,29 @@
+import sys
 from collections import defaultdict
 from functools import cached_property, wraps
 from itertools import islice
-from typing import Any, Callable
+from time import sleep
+from typing import (
+    Any,
+    Callable,
+)
+from xml.etree import ElementTree
 
+from plexapi import log, utils
 from plexapi.base import PlexObject
-from plexapi.exceptions import BadRequest
-from plexapi.library import Library, LibrarySection, MovieSection, ShowSection
+from plexapi.exceptions import BadRequest, NotFound, Unauthorized
+from plexapi.library import (
+    Library,
+    LibrarySection,
+    MovieSection,
+    ShowSection,
+)
 from plexapi.myplex import UserState
 from plexapi.server import PlexServer
 from plexapi.video import Episode, Movie, Season, Show, Video
+from requests.status_codes import _codes as codes
+
+from src.utils.rate_limitter import RateLimiter
 
 
 def with_discover_server(func: Callable[..., Any]) -> Callable[..., Any]:
@@ -75,8 +90,7 @@ class DiscoverPlexObject(PlexObject):
 
 
 class DiscoverVideo(DiscoverPlexObject, Video):
-    def _loadData(self, data):
-        super()._loadData(data)
+    pass
 
 
 class DiscoverMovie(DiscoverVideo, Movie):
@@ -187,6 +201,12 @@ class DiscoverLibrary(DiscoverPlexObject, Library):
 
 
 class DiscoverPlexServer(DiscoverPlexObject, PlexServer):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.rate_limiter = RateLimiter(
+            self.__class__.__name__, requests_per_minute=sys.maxsize
+        )
+
     @cached_property
     def library(self):
         try:
@@ -194,3 +214,40 @@ class DiscoverPlexServer(DiscoverPlexObject, PlexServer):
         except BadRequest:
             data = self.query("/library/sections/")
         return DiscoverLibrary(self, data)
+
+    def query(
+        self, key, method=None, headers=None, params=None, timeout=None, **kwargs
+    ):
+        if self._baseurl == self.myPlexAccount().DISCOVER:
+            self.rate_limiter.wait_if_needed()
+
+        url = self.url(key)
+        method = method or self._session.get
+        timeout = timeout or self._timeout
+        log.debug("%s %s", method.__name__.upper(), url)
+        headers = self._headers(**headers or {})
+        response = method(
+            url, headers=headers, params=params, timeout=timeout, **kwargs
+        )
+
+        if response.status_code == 429:  # Handle rate limit retries
+            retry_after = int(response.headers.get("Retry-After", 60))
+            log.warning(
+                f"{self.__class__.__name__}: Rate limit exceeded, waiting {retry_after} seconds"
+            )
+            sleep(retry_after + 1)
+            return self.query(key, method, headers, params, timeout, **kwargs)
+
+        if response.status_code not in (200, 201, 204):
+            codename = codes.get(response.status_code)[0]
+            errtext = response.text.replace("\n", " ")
+            message = f"({response.status_code}) {codename}; {response.url} {errtext}"
+            if response.status_code == 401:
+                raise Unauthorized(message)
+            elif response.status_code == 404:
+                raise NotFound(message)
+            else:
+                raise BadRequest(message)
+
+        data = utils.cleanXMLString(response.text).encode("utf8")
+        return ElementTree.fromstring(data) if data.strip() else None
