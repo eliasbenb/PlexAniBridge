@@ -230,7 +230,7 @@ class PlexClient:
         }
         """).strip()
 
-        guid = item.guid[13:] if item.type == "movie" else item.guid[12:]
+        guid = item.guid.rsplit("/", 1)[-1]
 
         headers = {
             "Content-Type": "application/json",
@@ -295,26 +295,23 @@ class PlexClient:
         Returns:
             list[Episode]: List of episodes with index between start and end
         """
-        kwargs = {}
-        server_side_filter = ""
-
-        if start:
-            kwargs["parentIndex__gte"] = start[0]
-            kwargs["index__gte"] = start[1]
-            server_side_filter = "start"
-        elif end:
-            kwargs["parentIndex__lte"] = end[0]
-            kwargs["index__lte"] = end[1]
-            server_side_filter = "end"
 
         def client_side_filter(episode: Episode):
-            if server_side_filter == "start":
-                return episode.parentIndex <= end[0] and episode.index <= end[1]
-            if server_side_filter == "end":
-                return episode.parentIndex >= start[0] and episode.index >= start[1]
+            if start and (
+                episode.parentIndex < start[0]
+                or (episode.parentIndex == start[0] and episode.index < start[1])
+            ):
+                return False
+            if end and (
+                episode.parentIndex > end[0]
+                or (episode.parentIndex == end[0] and episode.index > end[1])
+            ):
+                return False
             return True
 
-        return [i for i in item.episodes(**kwargs) if client_side_filter(i)]
+        return [
+            e for s in item.seasons() for e in s.episodes() if client_side_filter(e)
+        ]
 
     @lru_cache(maxsize=32)
     def get_watched_episodes(self, item: Show, **kwargs) -> list[Episode]:
