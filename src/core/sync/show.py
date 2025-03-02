@@ -57,8 +57,13 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             try:
                 anilist_media = self.anilist_client.get_anime(animapping.anilist_id)
             except Exception:
-                anilist_media = None
+                log.error(
+                    f"Failed to fetch AniList data for {self._debug_log_title(item, animapping)} "
+                    f"{self._debug_log_ids(item.ratingKey, item.guid, guids, animapping.anilist_id)}",
+                    exc_info=True,
+                )
                 self.sync_stats.failed += 1
+                anilist_media = None
 
             if not anilist_media:
                 continue
@@ -123,12 +128,9 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
 
             if not anilist_media:
                 log.debug(
-                    f"No AniList entry could be found for {self._debug_log_title(item)}"
-                    f"{
-                        self._debug_log_ids(
-                            item.ratingKey, item.ratingKey, guids, animapping.anilist_id
-                        )
-                    }"
+                    f"No AniList entry could be found for "
+                    f"{self._debug_log_title(item, AniMap(anilist_id=None, tvdb_mappings={f's{index}': ''}))}"
+                    f"{self._debug_log_ids(item.ratingKey, season.guid, guids)}"
                 )
                 self.sync_stats.not_found += 1
                 continue
