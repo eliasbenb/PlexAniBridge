@@ -255,7 +255,7 @@ class PlexClient:
 
         log.debug(
             f"{self.__class__.__name__}: Getting reviews for {item.type} "
-            f"$$'{item.title}'$$ $${{plex_id: {item.guid}}}$$"
+            f"$$'{item.title}'$$ $${{key: {item.ratingKey}, plex_id: {item.guid}}}$$"
         )
 
         try:
@@ -281,14 +281,14 @@ class PlexClient:
         except requests.HTTPError:
             log.error(
                 f"Failed to get review for {item.type} $$'{item.title}'$$ "
-                f"{{plex_key: {item.ratingKey}}}: ",
+                f"$${{key: {item.ratingKey}, plex_id: {item.guid}}}$$: ",
                 exc_info=True,
             )
             return None
         except (KeyError, ValueError):
             log.error(
                 f"Failed to parse review for {item.type} $$'{item.title}'$$ "
-                f"{{plex_key: {item.ratingKey}}}: ",
+                f"$${{key: {item.ratingKey}, plex_id: {item.guid}}}$$: ",
                 exc_info=True,
             )
             return None
@@ -344,37 +344,37 @@ class PlexClient:
         """
         return [i for i in self.get_episodes(item, **kwargs) if i.viewCount > 0]
 
+    @lru_cache(maxsize=32)
     def get_continue_watching(
-        self, item: Media, **kwargs
+        self, item: Media | None = None
     ) -> list[Movie] | list[Episode]:
-        """Retrieves items from the 'Continue Watching' hub for a media item.
+        """Retrieves all items in the Continue Watching hub.
 
         Args:
-            item (Media): Media item(s) to check
-            **kwargs: Additional arguments to pass to fetchItems()
+            item (Media | None): If provided, only returns items in Continue Watching for this media item
 
         Returns:
             list[Movie] | list[Episode]: Media items in Continue Watching hub
         """
-        arg_key_map = {
-            "movie": "ratingKey",
+        hub = self.user_client.continueWatching()
+        if not item:
+            return hub
+
+        target_key = {
             "show": "grandparentRatingKey",
             "season": "parentRatingKey",
             "episode": "ratingKey",
-        }
+            "movie": "ratingKey",
+        }.get(item.type, None)
+        if not target_key:
+            return []
 
-        key = arg_key_map.get(item.type, "ratingKey")
-        return self.user_client.fetchItems(
-            "/hubs/continueWatching/items",
-            **{key: item.ratingKey},
-            **kwargs,
-        )
+        return [i for i in hub if getattr(i, target_key, None) == item.ratingKey]
 
     @lru_cache(maxsize=32)
     def get_history(
         self,
         item: Media,
-        min_date: datetime | None = None,
         sort_asc: bool = True,
         **kwargs,
     ) -> list[History]:
@@ -382,7 +382,6 @@ class PlexClient:
 
         Args:
             item (Media): Media item(s) to get history for
-            min_date (datetime | None): If provided, only returns history after this date
             sort_asc (bool): Sort order for results
             **kwargs: Additional arguments to pass to fetchItems()
 
@@ -392,13 +391,14 @@ class PlexClient:
         Note:
             Results are cached using functools.cache decorator
         """
+        if self.plex_metadata_source == PlexMetadataSource.DISCOVER:
+            return []
+
         args = {
             "metadataItemID": item.ratingKey,
             "accountID": self.user_account_id,
             "sort": "viewedAt:asc" if sort_asc else "viewedAt:desc",
         }
-        if min_date:
-            args["viewedAt>"] = int(min_date.timestamp())
 
         return self.admin_client.fetchItems(
             f"/status/sessions/history/all{plexapi.utils.joinArgs(args)}", **kwargs
@@ -438,36 +438,6 @@ class PlexClient:
             iter(self.get_history(item, maxresults=1, sort_asc=False, **kwargs)), None
         )
 
-    def get_on_deck(
-        self,
-        item: Show | Season,
-        **kwargs,
-    ) -> Episode | None:
-        """Retrieves the 'On Deck' episode for a show or season.
-
-        Args:
-            item (Show | Season): Show or season to check
-            **kwargs: Additional arguments to pass to fetchItems()
-
-        Returns:
-            Episode | None: Next unwatched episode if found in On Deck, None if no episode is on deck
-
-        Note:
-            The On Deck system considers partially watched episodes and
-            next episodes in sequence when determining what's on deck
-        """
-        return next(
-            iter(
-                self.user_client.fetchItems(
-                    f"{item.ratingKey}?includeOnDeck=1",
-                    cls=Episode,
-                    rtag="OnDeck",
-                    **kwargs,
-                )
-            ),
-            None,
-        )
-
     def is_on_watchlist(self, item: Movie | Show) -> bool:
         """Checks if a media item is on the user's watchlist.
 
@@ -479,26 +449,14 @@ class PlexClient:
         """
         return bool(item.onWatchlist()) if self.is_admin_user else False
 
-    def is_on_continue_watching(self, item: Movie | Show | Season, **kwargs) -> bool:
+    def is_on_continue_watching(self, item: Media) -> bool:
         """Checks if a media item appears in the Continue Watching hub.
 
         Args:
-            item (Movie | Season): Media item to check
+            item (Movie | Show | Season): Media item to check
             **kwargs: Additional arguments to pass to get_continue_watching()
 
         Returns:
             bool: True if item appears in Continue Watching hub, False otherwise
         """
-        return bool(self.get_continue_watching(item, maxresults=1, **kwargs))
-
-    def is_on_deck(self, item: Movie | Show, **kwargs) -> bool:
-        """Checks if a media item has any episodes in the On Deck hub.
-
-        Args:
-            item (Movie | Show): Media item to check
-            **kwargs: Additional arguments to pass to get_on_deck()
-
-        Returns:
-            bool: True if item has any episodes in On Deck hub, False otherwise
-        """
-        return bool(self.get_on_deck(item, **kwargs))
+        return bool(self.get_continue_watching(item))
