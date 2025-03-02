@@ -11,6 +11,9 @@ from plexapi.video import Episode, EpisodeHistory, Movie, MovieHistory, Season, 
 from tzlocal import get_localzone
 
 from src import log
+from src.settings import PlexMetadataSource
+
+from .plexapi.discover import DiscoverPlexServer
 
 Media: TypeAlias = Movie | Show | Season | Episode
 MediaHistory: TypeAlias = MovieHistory | EpisodeHistory
@@ -52,8 +55,9 @@ class PlexClient:
         self.plex_genres = plex_genres
         self.plex_metadata_source = plex_metadata_source
 
-        self.admin_client = PlexServer(plex_url, plex_token)
+        self._init_admin_client()
         self._init_user_client()
+
         self.on_deck_window = self._get_on_deck_window()
 
     def clear_cache(self) -> None:
@@ -63,6 +67,17 @@ class PlexClient:
                 getattr(self, attr), "cache_clear"
             ):
                 getattr(self, attr).cache_clear()
+
+    def _init_admin_client(self) -> None:
+        """Initializes the Plex client for the admin account.
+
+        Handles authentication and client setup for the admin account.
+        """
+        self.admin_client = (
+            PlexServer(self.plex_url, self.plex_token)
+            if self.plex_metadata_source == PlexMetadataSource.LOCAL
+            else DiscoverPlexServer(self.plex_url, self.plex_token)
+        )
 
     def _init_user_client(self) -> PlexServer:
         """Initializes the Plex client for the specified user account.
@@ -116,7 +131,7 @@ class PlexClient:
         """
         return timedelta(weeks=self.admin_client.settings.get("onDeckWindow").value)
 
-    def get_sections(self) -> list[MovieSection] | list[ShowSection]:
+    def get_sections(self) -> list[Section]:
         """Retrieves configured Plex library sections.
 
         Returns only the sections that are specified in self.plex_sections,
@@ -140,7 +155,7 @@ class PlexClient:
         min_last_modified: datetime | None = None,
         require_watched: bool = False,
         **kwargs,
-    ) -> list[Movie] | list[Show]:
+    ) -> list[Media]:
         """Retrieves items from a specified Plex library section with optional filtering.
 
         Args:
