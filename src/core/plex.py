@@ -74,11 +74,10 @@ class PlexClient:
 
         Handles authentication and client setup for the admin account.
         """
-        self.admin_client = (
-            PlexServer(self.plex_url, self.plex_token)
-            if self.plex_metadata_source == PlexMetadataSource.LOCAL
-            else DiscoverPlexServer(self.plex_url, self.plex_token)
-        )
+        self.admin_client = PlexServer(self.plex_url, self.plex_token)
+        self._discover_client = None
+        if self.plex_metadata_source == PlexMetadataSource.DISCOVER:
+            self._discover_client = DiscoverPlexServer(self.plex_url, self.plex_token)
 
     def _init_user_client(self) -> PlexServer:
         """Initializes the Plex client for the specified user account.
@@ -102,9 +101,19 @@ class PlexClient:
         ) or (admin_account.title == self.plex_user and not admin_account.username)
 
         if self.is_admin_user:
-            self.user_client = self.admin_client
+            self.user_client = self.admin_client = self._discover_client
             self.user_account_id = 1
         else:
+            if (
+                self.plex_metadata_source == PlexMetadataSource.DISCOVER
+                and self.is_admin_user
+            ):
+                log.warning(
+                    f"{self.__class__.__name__}: PLEX_METADATA_SOURCE=discover was configured "
+                    f"but the user $$'{self.plex_user}'$$ is not an admin user. Discover data "
+                    "will not be available for this user."
+                )
+
             self.user_client = self.admin_client.switchUser(self.plex_user)
             self.user_account_id = next(
                 u.id
@@ -121,6 +130,7 @@ class PlexClient:
             if self.is_admin_user
             else f"{self.__class__.__name__}: User is not an admin, using user client"
         )
+        log.debug(f"{self.__class__.__name__}: Plex server URL: $$'{self.plex_url}'$$")
 
     def _get_on_deck_window(self) -> timedelta:
         """Gets the configured cutoff time for Continue Watching items on Plex.
@@ -306,7 +316,10 @@ class PlexClient:
             list[Movie | Episode]
         """
         if item:
-            if self.plex_metadata_source == PlexMetadataSource.DISCOVER:
+            if (
+                self.plex_metadata_source == PlexMetadataSource.DISCOVER
+                and self.is_admin_user
+            ):
                 tmp_item = None
                 for section in self.get_sections():
                     tmp_item = next(
@@ -352,7 +365,10 @@ class PlexClient:
         Note:
             Results are cached using functools.cache decorator
         """
-        if self.plex_metadata_source == PlexMetadataSource.DISCOVER:
+        if (
+            self.plex_metadata_source == PlexMetadataSource.DISCOVER
+            and self.is_admin_user
+        ):
             tmp_item = None
             for section in self.get_sections():
                 tmp_item = next(
