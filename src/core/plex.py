@@ -132,6 +132,7 @@ class PlexClient:
         """
         return timedelta(weeks=self.admin_client.settings.get("onDeckWindow").value)
 
+    @lru_cache(maxsize=32)
     def get_sections(self) -> list[Section]:
         """Retrieves configured Plex library sections.
 
