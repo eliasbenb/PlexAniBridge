@@ -140,6 +140,7 @@ class DiscoverLibrarySection(DiscoverPlexObject, LibrarySection):
         container_size=None,
         limit=None,
         filters=None,
+        load_discover_data=True,
         **kwargs,
     ):
         data = super().search(
@@ -153,6 +154,9 @@ class DiscoverLibrarySection(DiscoverPlexObject, LibrarySection):
             filters,
             **kwargs,
         )
+
+        if load_discover_data is False:
+            return data
 
         metadata_guids = [item.guid.rsplit("/", 1)[-1] for item in data]
 

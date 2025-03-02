@@ -306,6 +306,19 @@ class PlexClient:
             list[Movie | Episode]
         """
         if item:
+            if self.plex_metadata_source == PlexMetadataSource.DISCOVER:
+                tmp_item = None
+                for section in self.get_sections():
+                    tmp_item = next(
+                        iter(section.search(guid=item.guid, load_discover_data=False)),
+                        None,
+                    )
+                    if tmp_item:
+                        break
+                if not tmp_item:
+                    return []
+                item = tmp_item
+
             key = {
                 "movie": "ratingKey",
                 "show": "grandparentRatingKey",
@@ -340,7 +353,16 @@ class PlexClient:
             Results are cached using functools.cache decorator
         """
         if self.plex_metadata_source == PlexMetadataSource.DISCOVER:
-            return []
+            tmp_item = None
+            for section in self.get_sections():
+                tmp_item = next(
+                    iter(section.search(guid=item.guid, load_discover_data=False)), None
+                )
+                if tmp_item:
+                    break
+            if not tmp_item:
+                return []
+            item = tmp_item
 
         args = {
             "metadataItemID": item.ratingKey,
