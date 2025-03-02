@@ -193,14 +193,9 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
 
         is_discover_item = self.plex_client.is_discover_item(item)
 
-        if is_discover_item:
-            continue_watching_episode = None
-            is_parent_on_continue_watching = False
-            is_on_continue_watching = False
-        else:
-            continue_watching_episode = self.plex_client.get_continue_watching(item)
-            is_parent_on_continue_watching = bool(continue_watching_episode)
-            is_on_continue_watching = continue_watching_episode in all_episodes
+        continue_watching_episode = self.plex_client.get_continue_watching(item)
+        is_parent_on_continue_watching = bool(continue_watching_episode)
+        is_on_continue_watching = continue_watching_episode in all_episodes
 
         # We've watched all episodes and are in the process of watching them again
         if is_all_watched and is_on_continue_watching:
