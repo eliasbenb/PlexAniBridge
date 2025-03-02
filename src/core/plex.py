@@ -43,12 +43,14 @@ class PlexClient:
         plex_url: str,
         plex_sections: list[str],
         plex_genres: list[str],
+        plex_metadata_source: PlexMetadataSource,
     ) -> None:
         self.plex_token = plex_token
         self.plex_user = plex_user
         self.plex_url = plex_url
         self.plex_sections = plex_sections
         self.plex_genres = plex_genres
+        self.plex_metadata_source = plex_metadata_source
 
         self.admin_client = PlexServer(plex_url, plex_token)
         self._init_user_client()
