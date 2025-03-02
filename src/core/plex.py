@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from math import isnan
 from textwrap import dedent
 from typing import TypeAlias
 
@@ -245,8 +246,6 @@ class PlexClient:
         }
         """).strip()
 
-        guid = item.guid.rsplit("/", 1)[-1]
-
         headers = {
             "Content-Type": "application/json",
             "Accept": "application/json",
@@ -265,7 +264,7 @@ class PlexClient:
                 json={
                     "query": query,
                     "variables": {
-                        "metadataID": guid,
+                        "metadataID": item.ratingKey,
                     },
                     "operationName": "GetReview",
                 },
