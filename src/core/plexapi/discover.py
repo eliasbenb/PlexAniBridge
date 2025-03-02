@@ -44,11 +44,6 @@ class DiscoverPlexObject(PlexObject):
     def _reload(self, *args, **kwargs):
         return super()._reload(*args, **kwargs)
 
-
-class DiscoverVideo(DiscoverPlexObject, Video):
-    def _loadData(self, data):
-        super()._loadData(data)
-
     @with_discover_server
     def _loadUserState(self, items, **kwargs):
         key = ",".join([item.guid.rsplit("/", 1)[-1] for item in items])
@@ -77,6 +72,11 @@ class DiscoverVideo(DiscoverPlexObject, Video):
                     if guid_value:
                         setattr(item, field[0], guid_value.rsplit("/", 1)[-1])
         return items
+
+
+class DiscoverVideo(DiscoverPlexObject, Video):
+    def _loadData(self, data):
+        super()._loadData(data)
 
 
 class DiscoverMovie(DiscoverVideo, Movie):
@@ -151,7 +151,8 @@ class DiscoverLibrarySection(DiscoverPlexObject, LibrarySection):
                     f"/library/metadata/{','.join(chunk)}", cls, **kwargs
                 )
             )
-        return res
+
+        return self._loadUserState(res)
 
 
 class DiscoverMovieSection(DiscoverLibrarySection, MovieSection):
