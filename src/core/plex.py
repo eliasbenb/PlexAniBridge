@@ -130,7 +130,6 @@ class PlexClient:
             if self.is_admin_user
             else f"{self.__class__.__name__}: User is not an admin, using user client"
         )
-        log.debug(f"{self.__class__.__name__}: Plex server URL: $$'{self.plex_url}'$$")
 
     def _get_on_deck_window(self) -> timedelta:
         """Gets the configured cutoff time for Continue Watching items on Plex.
@@ -315,7 +314,9 @@ class PlexClient:
         Returns:
             list[Movie | Episode]
         """
-        if item:
+        _item: Media | None = item
+        if _item:
+            tmp_item: Media | None = None
             if (
                 self.plex_metadata_source == PlexMetadataSource.DISCOVER
                 and self.is_admin_user
@@ -337,8 +338,8 @@ class PlexClient:
                 "show": "grandparentRatingKey",
                 "season": "parentRatingKey",
                 "episode": "ratingKey",
-            }.get(item.type, "ratingKey")
-            kwargs.update({key: item.ratingKey})
+            }.get(_item.type, "ratingKey")
+            kwargs.update({key: _item.ratingKey})
 
         return self.user_client.fetchItems(
             "/hubs/continueWatching/items",
@@ -365,6 +366,7 @@ class PlexClient:
         Note:
             Results are cached using functools.cache decorator
         """
+        _item: Media = item
         if (
             self.plex_metadata_source == PlexMetadataSource.DISCOVER
             and self.is_admin_user
@@ -378,10 +380,10 @@ class PlexClient:
                     break
             if not tmp_item:
                 return []
-            item = tmp_item
+            _item = tmp_item
 
         args = {
-            "metadataItemID": item.ratingKey,
+            "metadataItemID": _item.ratingKey,
             "accountID": self.user_account_id,
             "sort": "viewedAt:asc" if sort_asc else "viewedAt:desc",
         }
