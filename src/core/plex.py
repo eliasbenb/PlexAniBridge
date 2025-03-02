@@ -154,11 +154,10 @@ class PlexClient:
         """
         log.debug(f"{self.__class__.__name__}: Getting all sections")
 
-        return [
-            section
-            for section in self.user_client.library.sections()
-            if section.title in self.plex_sections
-        ]
+        sections = {
+            section.title: section for section in self.user_client.library.sections()
+        }
+        return [sections[title] for title in self.plex_sections if title in sections]
 
     def get_section_items(
         self,
