@@ -33,8 +33,12 @@ class DiscoverPlexObject(PlexObject):
         self._server: DiscoverPlexServer
 
     @with_discover_server
-    def _fetchItemsDiscover(self, *args, **kwargs):
-        return super().fetchItems(*args, **kwargs)
+    def fetchItemDiscover(self, *args, **kwargs):
+        return super().fetchItem(*args, **kwargs)
+
+    @with_discover_server
+    def fetchItemsDiscover(self, *args, **kwargs):
+        return self.fetchItems(*args, **kwargs)
 
     @with_discover_server
     def _reload(self, *args, **kwargs):
@@ -46,10 +50,33 @@ class DiscoverVideo(DiscoverPlexObject, Video):
         super()._loadData(data)
 
     @with_discover_server
-    def userState(self, key: str, **kwargs):
-        return self.fetchItems(
+    def _loadUserState(self, items, **kwargs):
+        key = ",".join([item.guid.rsplit("/", 1)[-1] for item in items])
+        user_states = self.fetchItems(
             f"/library/metadata/{key}/userState", UserState, **kwargs
         )
+
+        for item, user_state in zip(items, user_states):
+            for field in (
+                "lastViewedAt",
+                "viewCount",
+                "viewedLeafCount",
+                "viewOffset",
+                "viewState",
+                "watchlistedAt",
+            ):
+                if hasattr(user_state, field):
+                    setattr(item, field, getattr(user_state, field))
+
+            for field in zip(
+                ("ratingKey", "parentRatingKey", "grandparentRatingKey"),
+                ("guid", "parentGuid", "grandparentGuid"),
+            ):
+                if hasattr(item, field[1]):
+                    guid_value = getattr(item, field[1], None)
+                    if guid_value:
+                        setattr(item, field[0], guid_value.rsplit("/", 1)[-1])
+        return items
 
 
 class DiscoverMovie(DiscoverVideo, Movie):
@@ -63,56 +90,25 @@ class DiscoverEpisode(DiscoverVideo, Episode):
 class DiscoverSeason(DiscoverVideo, Season):
     @with_discover_server
     def episodes(self, **kwargs):
-        data: list[DiscoverEpisode] = self.fetchItems(
-            f"{self.key}/children", DiscoverEpisode, **kwargs
+        return self._loadUserState(
+            self.fetchItems(f"{self.key}/children", DiscoverEpisode, **kwargs)
         )
-
-        key = ",".join([item.guid.rsplit("/", 1)[-1] for item in data])
-        user_states: list[UserState] = self.userState(key)
-
-        for item, user_state in zip(data, user_states):
-            for field in (
-                "lastViewedAt",
-                "viewCount",
-                "viewedLeafCount",
-                "viewOffset",
-                "viewState",
-                "watchlistedAt",
-            ):
-                setattr(item, field, getattr(user_state, field))
-
-        return data
 
 
 class DiscoverShow(DiscoverVideo, Show):
-    @with_discover_server
     def episodes(self, **kwargs):
-        return [e for s in self.seasons() for e in s.episodes()]
+        return [e for s in self.seasons() for e in s.episodes(**kwargs)]
 
     @with_discover_server
     def seasons(self, **kwargs):
-        data = self.fetchItems(
-            f"{self.key}/children?excludeAllLeaves=1",
-            DiscoverSeason,
-            container_size=self.childCount,
-            **kwargs,
+        return self._loadUserState(
+            self.fetchItems(
+                f"{self.key}/children?excludeAllLeaves=1",
+                DiscoverSeason,
+                container_size=self.childCount,
+                **kwargs,
+            )
         )
-
-        key = ",".join([item.guid.rsplit("/", 1)[-1] for item in data])
-        user_states: list[UserState] = self.userState(key)
-
-        for item, user_state in zip(data, user_states):
-            for field in (
-                "lastViewedAt",
-                "viewCount",
-                "viewedLeafCount",
-                "viewOffset",
-                "viewState",
-                "watchlistedAt",
-            ):
-                setattr(item, field, getattr(user_state, field))
-
-        return data
 
 
 class DiscoverLibrarySection(DiscoverPlexObject, LibrarySection):
@@ -151,8 +147,8 @@ class DiscoverLibrarySection(DiscoverPlexObject, LibrarySection):
         res = []
         for chunk in _chunked(metadata_guids):
             res.extend(
-                self._fetchItemsDiscover(
-                    f"/library/metadata/{','.join(chunk)}", cls=cls, **kwargs
+                self.fetchItemsDiscover(
+                    f"/library/metadata/{','.join(chunk)}", cls, **kwargs
                 )
             )
         return res
