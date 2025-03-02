@@ -62,6 +62,9 @@ class DiscoverPlexObject(PlexObject):
     @with_discover_server
     def _loadUserState(self, items, **kwargs):
         key = ",".join([item.guid.rsplit("/", 1)[-1] for item in items])
+        if not key:
+            return items
+
         user_states = self.fetchItems(
             f"/library/metadata/{key}/userState", UserState, **kwargs
         )
