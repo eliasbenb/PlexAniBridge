@@ -322,7 +322,7 @@ class PlexClient:
                 tmp_item = None
                 for section in self.get_sections():
                     tmp_item = next(
-                        iter(section.search(guid=item.guid, load_discover_data=False)),
+                        iter(section.search(guid=item.guid)),
                         None,
                     )
                     if tmp_item:
@@ -371,9 +371,7 @@ class PlexClient:
         ):
             tmp_item = None
             for section in self.get_sections():
-                tmp_item = next(
-                    iter(section.search(guid=item.guid, load_discover_data=False)), None
-                )
+                tmp_item = next(iter(section.search(guid=item.guid)), None)
                 if tmp_item:
                     break
             if not tmp_item:

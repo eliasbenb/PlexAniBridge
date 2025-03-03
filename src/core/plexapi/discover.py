@@ -26,7 +26,23 @@ from requests.status_codes import _codes as codes
 from src.utils.rate_limitter import RateLimiter
 
 
-def with_discover_server(func: Callable[..., Any]) -> Callable[..., Any]:
+def original_server(func: Callable[..., Any]) -> Callable[..., Any]:
+    @wraps(func)
+    def wrapper(self: "DiscoverPlexObject", *args: Any, **kwargs: Any) -> Any:
+        original_url = self._server._baseurl
+        original_token = self._server._token
+        try:
+            self._server._baseurl = self._server._original_baseurl
+            self._server._token = self._server._original_token
+            return func(self, *args, **kwargs)
+        finally:
+            self._server._baseurl = original_url
+            self._server._token = original_token
+
+    return wrapper
+
+
+def discover_server(func: Callable[..., Any]) -> Callable[..., Any]:
     @wraps(func)
     def wrapper(self: "DiscoverPlexObject", *args: Any, **kwargs: Any) -> Any:
         original_url = self._server._baseurl
@@ -42,25 +58,93 @@ def with_discover_server(func: Callable[..., Any]) -> Callable[..., Any]:
     return wrapper
 
 
+def metadata_server(func: Callable[..., Any]) -> Callable[..., Any]:
+    @wraps(func)
+    def wrapper(self: "DiscoverPlexObject", *args: Any, **kwargs: Any) -> Any:
+        original_url = self._server._baseurl
+        original_token = self._server._token
+        try:
+            self._server._baseurl = self._server.myPlexAccount().METADATA
+            self._server._token = self._server.myPlexAccount().authToken
+            return func(self, *args, **kwargs)
+        finally:
+            self._server._baseurl = original_url
+            self._server._token = original_token
+
+    return wrapper
+
+
 class DiscoverPlexObject(PlexObject):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._server: DiscoverPlexServer
+        self._source: str = self._server._baseurl
 
-    @with_discover_server
-    def fetchItemDiscover(self, *args, **kwargs):
+    @original_server
+    def _fetchItemOriginalServer(self, *args, **kwargs):
         return super().fetchItem(*args, **kwargs)
 
-    @with_discover_server
-    def fetchItemsDiscover(self, *args, **kwargs):
-        return self.fetchItems(*args, **kwargs)
+    @discover_server
+    def _fetchItemDiscoverServer(self, *args, **kwargs):
+        return super().fetchItem(*args, **kwargs)
 
-    @with_discover_server
-    def _reload(self, *args, **kwargs):
+    @metadata_server
+    def _fetchItemMetadataServer(self, *args, **kwargs):
+        return super().fetchItem(*args, **kwargs)
+
+    def fetchItem(self, *args, **kwargs):
+        if self._server._baseurl == self._server._original_baseurl:
+            return self._fetchItemOriginalServer(*args, **kwargs)
+        if self._server._baseurl == self._server.myPlexAccount().DISCOVER:
+            return self._fetchItemDiscoverServer(*args, **kwargs)
+        if self._server._baseurl == self._server.myPlexAccount().METADATA:
+            return self._fetchItemMetadataServer(*args, **kwargs)
+        return super().fetchItem(*args, **kwargs)
+
+    @original_server
+    def _fetchItemsOriginalServer(self, *args, **kwargs):
+        return super().fetchItems(*args, **kwargs)
+
+    @discover_server
+    def _fetchItemsDiscoverServer(self, *args, **kwargs):
+        return super().fetchItems(*args, **kwargs)
+
+    @metadata_server
+    def _fetchItemsMetadataServer(self, *args, **kwargs):
+        return super().fetchItems(*args, **kwargs)
+
+    def fetchItems(self, *args, **kwargs):
+        if self._server._baseurl == self._server._original_baseurl:
+            return self._fetchItemsOriginalServer(*args, **kwargs)
+        if self._server._baseurl == self._server.myPlexAccount().DISCOVER:
+            return self._fetchItemsDiscoverServer(*args, **kwargs)
+        if self._server._baseurl == self._server.myPlexAccount().METADATA:
+            return self._fetchItemsMetadataServer(*args, **kwargs)
+        return super().fetchItems(*args, **kwargs)
+
+    @original_server
+    def _reloadOriginalServer(self, *args, **kwargs):
         return super()._reload(*args, **kwargs)
 
-    @with_discover_server
-    def _loadUserState(self, items, **kwargs):
+    @discover_server
+    def _reloadDiscoverServer(self, *args, **kwargs):
+        return super()._reload(*args, **kwargs)
+
+    @metadata_server
+    def _reloadMetadataServer(self, *args, **kwargs):
+        return super()._reload(*args, **kwargs)
+
+    def _reload(self, *args, **kwargs):
+        if self._source == self._server._original_baseurl:
+            return self._reloadOriginalServer(*args, **kwargs)
+        if self._source == self._server.myPlexAccount().DISCOVER:
+            return self._reloadDiscoverServer(*args, **kwargs)
+        if self._source == self._server.myPlexAccount().METADATA:
+            return self._reloadMetadataServer(*args, **kwargs)
+        return super()._reload(*args, **kwargs)
+
+    @discover_server
+    def _loadUserStates(self, items, **kwargs):
         key = ",".join([item.guid.rsplit("/", 1)[-1] for item in items])
         if not key:
             return items
@@ -91,6 +175,12 @@ class DiscoverPlexObject(PlexObject):
                         setattr(item, field[0], guid_value.rsplit("/", 1)[-1])
         return items
 
+    def _loadUserState(self, item, **kwargs):
+        try:
+            return self._loadUserStates([item], **kwargs)[0]
+        except IndexError:
+            return item
+
 
 class DiscoverVideo(DiscoverPlexObject, Video):
     pass
@@ -105,30 +195,28 @@ class DiscoverEpisode(DiscoverVideo, Episode):
 
 
 class DiscoverSeason(DiscoverVideo, Season):
-    @with_discover_server
+    @metadata_server
     def episodes(self, **kwargs):
-        return self._loadUserState(
-            self.fetchItems(f"{self.key}/children", DiscoverEpisode, **kwargs)
-        )
+        key = f"{self.key}/children?episodeOrder=tvdbAiring"
+        return self._loadUserStates(self.fetchItems(key, DiscoverEpisode, **kwargs))
 
 
 class DiscoverShow(DiscoverVideo, Show):
     def episodes(self, **kwargs):
-        return [e for s in self.seasons() for e in s.episodes(**kwargs)]
+        return sum([season.episodes(**kwargs) for season in self.seasons()], [])
 
-    @with_discover_server
+    @metadata_server
     def seasons(self, **kwargs):
-        return self._loadUserState(
+        key = f"{self.key}/children?excludeAllLeaves=1&episodeOrder=tvdbAiring"
+        return self._loadUserStates(
             self.fetchItems(
-                f"{self.key}/children?excludeAllLeaves=1",
-                DiscoverSeason,
-                container_size=self.childCount,
-                **kwargs,
+                key, DiscoverSeason, container_size=self.childCount, **kwargs
             )
         )
 
 
 class DiscoverLibrarySection(DiscoverPlexObject, LibrarySection):
+    @original_server
     def search(
         self,
         cls=None,
@@ -140,7 +228,6 @@ class DiscoverLibrarySection(DiscoverPlexObject, LibrarySection):
         container_size=None,
         limit=None,
         filters=None,
-        load_discover_data=True,
         **kwargs,
     ):
         data = super().search(
@@ -155,9 +242,6 @@ class DiscoverLibrarySection(DiscoverPlexObject, LibrarySection):
             **kwargs,
         )
 
-        if load_discover_data is False:
-            return data
-
         metadata_guids = [item.guid.rsplit("/", 1)[-1] for item in data]
 
         def _chunked(iterable, size: int = 25):
@@ -168,12 +252,12 @@ class DiscoverLibrarySection(DiscoverPlexObject, LibrarySection):
         res = []
         for chunk in _chunked(metadata_guids):
             res.extend(
-                self.fetchItemsDiscover(
+                self._fetchItemsDiscoverServer(
                     f"/library/metadata/{','.join(chunk)}", cls, **kwargs
                 )
             )
 
-        return self._loadUserState(res)
+        return self._loadUserStates(res)
 
 
 class DiscoverMovieSection(DiscoverLibrarySection, MovieSection):
@@ -210,6 +294,10 @@ class DiscoverLibrary(DiscoverPlexObject, Library):
 class DiscoverPlexServer(DiscoverPlexObject, PlexServer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+        self._original_baseurl = self._baseurl
+        self._original_token = self._token
+
         self.rate_limiter = RateLimiter(
             self.__class__.__name__, requests_per_minute=sys.maxsize
         )
@@ -225,7 +313,10 @@ class DiscoverPlexServer(DiscoverPlexObject, PlexServer):
     def query(
         self, key, method=None, headers=None, params=None, timeout=None, **kwargs
     ):
-        if self._baseurl == self.myPlexAccount().DISCOVER:
+        if self._baseurl in (
+            self.myPlexAccount().DISCOVER,
+            self.myPlexAccount().METADATA,
+        ):
             self.rate_limiter.wait_if_needed()
 
         url = self.url(key)
