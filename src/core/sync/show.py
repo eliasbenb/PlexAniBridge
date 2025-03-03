@@ -57,8 +57,13 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             try:
                 anilist_media = self.anilist_client.get_anime(animapping.anilist_id)
             except Exception:
-                anilist_media = None
+                log.error(
+                    f"Failed to fetch AniList data for {self._debug_log_title(item, animapping)} "
+                    f"{self._debug_log_ids(item.ratingKey, item.guid, guids, animapping.anilist_id)}",
+                    exc_info=True,
+                )
                 self.sync_stats.failed += 1
+                anilist_media = None
 
             if not anilist_media:
                 continue
@@ -123,10 +128,9 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
 
             if not anilist_media:
                 log.debug(
-                    f"No AniList entry could be found for {self._debug_log_title(item)}",
-                    extra=self._debug_log_ids(
-                        item.ratingKey, item.ratingKey, guids, animapping.anilist_id
-                    ),
+                    f"No AniList entry could be found for "
+                    f"{self._debug_log_title(item, AniMap(anilist_id=None, tvdb_mappings={f's{index}': ''}))}"
+                    f"{self._debug_log_ids(item.ratingKey, season.guid, guids)}"
                 )
                 self.sync_stats.not_found += 1
                 continue
@@ -189,6 +193,8 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         )
         is_partially_watched = len(watched_episodes) > 0
 
+        is_discover_item = self.plex_client.is_discover_item(item)
+
         continue_watching_episode = self.plex_client.get_continue_watching(item)
         is_parent_on_continue_watching = bool(continue_watching_episode)
         is_on_continue_watching = continue_watching_episode in all_episodes
@@ -215,6 +221,9 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             return MediaListStatus.CURRENT
         # We've watched some episodes recently and the Plex server doesn't have all episodes
         if is_in_deck_window and not is_all_available:
+            return MediaListStatus.CURRENT
+        # We've watched some episodes recently and it's a discover item, which is impossible to determine the continue watching status of
+        if is_in_deck_window and is_discover_item:
             return MediaListStatus.CURRENT
 
         is_on_watchlist = self.plex_client.is_on_watchlist(item)

@@ -438,6 +438,12 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
 
         for field in self.__extra_fields:
             match field:
+                case "repeat":
+                    media_list.repeat = (
+                        self.__extra_fields[field](**kwargs)
+                        if media_list.status >= MediaListStatus.COMPLETED
+                        else None
+                    )
                 case "score":
                     media_list.score = (
                         self._calculate_score(**kwargs)

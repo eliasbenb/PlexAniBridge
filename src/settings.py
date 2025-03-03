@@ -8,6 +8,27 @@ from pydantic.alias_generators import to_camel
 from pydantic_settings import BaseSettings
 
 
+class PlexMetadataSource(StrEnum):
+    """Defines the source of metadata for Plex media items.
+
+    Values:
+        LOCAL: Metadata is sourced from the local Plex server
+        DISCOVER: Metadata is sourced from Plex's online services
+    """
+
+    LOCAL = "local"
+    DISCOVER = "discover"
+
+    def __repr__(self) -> str:
+        """Provides a string representation of the metadata source.
+
+        Returns:
+            str: Quoted string of the metadata source
+                Example: PlexMetadataSource.LOCAL -> 'local'
+        """
+        return f"'{self.value}'"
+
+
 class SyncField(StrEnum):
     """Enumeration of AniList fields that can be synchronized with Plex.
 
@@ -105,6 +126,7 @@ class PlexAnibridgeConfig(BaseSettings):
     PLEX_URL: str = "http://localhost:32400"
     PLEX_SECTIONS: list[str]
     PLEX_GENRES: list[str] = []
+    PLEX_METADATA_SOURCE: PlexMetadataSource = PlexMetadataSource.LOCAL
 
     # General
     SYNC_INTERVAL: int = Field(3600, ge=-1)
