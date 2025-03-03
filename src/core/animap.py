@@ -4,6 +4,8 @@ from pathlib import Path
 from typing import Any
 
 import requests
+import toml
+import yaml
 from pydantic import ValidationError
 from sqlmodel import (
     Session,
@@ -57,8 +59,15 @@ class AniMapClient:
     CDN_URL = f"https://raw.githubusercontent.com/eliasbenb/PlexAniBridge-Mappings/{SCHEMA_VERSION}/mappings.json"
     SCHEMA_URL = f"https://cdn.statically.io/gh/eliasbenb/PlexAniBridge-Mappings/{SCHEMA_VERSION}/mappings.schema.json"
 
+    MAPPING_FILES = [
+        "mappings.custom.json",
+        "mappings.custom.yaml",
+        "mappings.custom.yml",
+        "mappings.custom.toml",
+    ]
+
     def __init__(self, data_path: Path) -> None:
-        self.custom_mappings_path = data_path / "mappings.custom.json"
+        self.data_path = data_path
         try:
             self._sync_db()
         except Exception as e:
@@ -73,6 +82,55 @@ class AniMapClient:
         Drops all tables and reinitializes the database from scratch.
         """
         self._sync_db()
+
+    def load_custom_mappings(self) -> dict[str, Any]:
+        """Loads custom mappings from the local file.
+
+        Returns:
+            dict[str, Any]: Custom mappings data
+        """
+        existing_files = [
+            f for f in self.MAPPING_FILES if (self.data_path / f).exists()
+        ]
+        if not existing_files:
+            return {}
+        mappings_path = self.data_path / existing_files[0]
+
+        if len(existing_files) > 1:
+            log.warning(
+                f"{self.__class__.__name__}: Found multiple custom mappings files: {existing_files}. "
+                f"Only one mappings file can be used at a time. Defaulting to $$'{mappings_path}'$$"
+            )
+
+        data: dict[str, Any] = {}
+        if mappings_path.suffix == ".json":
+            with mappings_path.open("r") as f:
+                try:
+                    data = json.load(f)
+                except json.JSONDecodeError:
+                    log.warning(
+                        f"{self.__class__.__name__}: Invalid custom mappings file at $$'{mappings_path}$$'"
+                    )
+        elif mappings_path.suffix in [".yaml", ".yml"]:
+            with mappings_path.open("r") as f:
+                try:
+                    data = yaml.safe_load(f)
+                except yaml.YAMLError:
+                    log.warning(
+                        f"{self.__class__.__name__}: Invalid custom mappings file at $$'{mappings_path}$$'"
+                    )
+                data = json.loads(json.dumps(data))
+        elif mappings_path.suffix == ".toml":
+            with mappings_path.open("r") as f:
+                try:
+                    data = toml.load(f)
+                except toml.TomlDecodeError:
+                    log.warning(
+                        f"{self.__class__.__name__}: Invalid custom mappings file at $$'{mappings_path}$$'"
+                    )
+                data = json.loads(json.dumps(data))
+
+        return data
 
     def _sync_db(self) -> None:
         """Synchronizes the local database with the mapping source.
@@ -121,50 +179,38 @@ class AniMapClient:
             response_data: dict = response.json()
             response_data.pop("$schema", None)
 
-            if self.custom_mappings_path.exists():
-                with self.custom_mappings_path.open("r") as f:
-                    try:
-                        custom_data: dict[str, Any] = json.load(f)
-                    except json.JSONDecodeError:
-                        log.warning(
-                            f"{self.__class__.__name__}: Invalid custom mappings file at "
-                            f"$$'{self.custom_mappings_path}'$$"
-                        )
-                        custom_data = {}
+            custom_data = self.load_custom_mappings()
 
-                    animap_defaults = {field: None for field in AniMap.model_fields}
+            animap_defaults = {field: None for field in AniMap.model_fields}
 
-                    validated_count = 0
-                    tmp_custom_data = custom_data.copy()
-                    for anilist_id_str, entry in custom_data.items():
-                        if anilist_id_str.startswith("$"):
-                            continue
+            validated_count = 0
+            tmp_custom_data = custom_data.copy()
+            for key, entry in custom_data.items():
+                try:
+                    anilist_id = int(key)
+                except ValueError:
+                    continue
 
-                        try:
-                            AniMap.model_validate(
-                                {
-                                    **animap_defaults,
-                                    "anilist_id": int(anilist_id_str),
-                                    **entry,
-                                }
-                            )
-                            validated_count += 1
-                        except (ValueError, ValidationError) as e:
-                            log.warning(
-                                f"{self.__class__.__name__}: Found an invalid custom mapping entry "
-                                f"$${{anilist_id: {anilist_id_str}}}$$: {e}"
-                            )
-                            tmp_custom_data.pop(anilist_id_str)
-                    custom_data = tmp_custom_data
-
-                    log.info(
-                        f"{self.__class__.__name__}: Loading {validated_count} custom mapping entries "
-                        f"from $$'{self.custom_mappings_path}'$$"
+                try:
+                    AniMap.model_validate(
+                        {
+                            **animap_defaults,
+                            "anilist_id": anilist_id,
+                            **entry,
+                        }
                     )
-            else:
-                with self.custom_mappings_path.open("w") as f:
-                    json.dump({"$schema": self.SCHEMA_URL}, f, indent=2)
-                custom_data = {}
+                    validated_count += 1
+                except (ValueError, ValidationError) as e:
+                    log.warning(
+                        f"{self.__class__.__name__}: Found an invalid custom mapping entry "
+                        f"$${{anilist_id: {anilist_id}}}$$: {e}"
+                    )
+                    tmp_custom_data.pop(key)
+            custom_data = tmp_custom_data
+
+            log.info(
+                f"{self.__class__.__name__}: Loading {validated_count} custom mapping entries"
+            )
 
             cdn_data: dict[str, Any] = response_data
 
@@ -187,39 +233,42 @@ class AniMapClient:
 
             # Overload the CDN data with custom data
             merged_data: dict[str, dict[str, Any]] = cdn_data.copy()
-            for anilist_id_str, entry in custom_data.items():
-                if anilist_id_str.startswith("$"):
+            for key, entry in custom_data.items():
+                try:
+                    anilist_id = int(key)
+                except ValueError:
                     continue
-                if anilist_id_str in merged_data:
-                    if merged_data[anilist_id_str] == entry:
+
+                if key in merged_data:
+                    if merged_data[key] == entry:
                         log.warning(
                             f"{self.__class__.__name__}: Found an exact duplicate entry in your custom mappings "
-                            f"$${{anilist_id: {anilist_id_str}}}$$"
+                            f"$${{anilist_id: {anilist_id}}}$$"
                         )
                     elif any(
-                        merged_data[anilist_id_str].get(attr) == entry.get(attr)
+                        merged_data[key].get(attr) == entry.get(attr)
                         for attr in AniMap.model_fields
-                        if attr in entry and attr in merged_data[anilist_id_str]
+                        if attr in entry and attr in merged_data[key]
                     ):
                         log.debug(
                             f"{self.__class__.__name__}: Found a partial duplicate entry in your custom mappings "
-                            f"$${{anilist_id: {anilist_id_str}}}$$"
+                            f"$${{anilist_id: {anilist_id}}}$$"
                         )
 
-                    merged_data[anilist_id_str].update(entry)
+                    merged_data[key].update(entry)
                 else:
-                    merged_data[anilist_id_str] = entry
+                    merged_data[key] = entry
 
             values = [
                 {
-                    "anilist_id": int(anilist_id_str),
+                    "anilist_id": int(key),
                     **{
                         field: entry[field]
                         for field in AniMap.model_fields
                         if field in entry
                     },
                 }
-                for anilist_id_str, entry in merged_data.items()
+                for key, entry in merged_data.items()
             ]
 
             session.exec(
