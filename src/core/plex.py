@@ -101,13 +101,12 @@ class PlexClient:
         ) or (admin_account.title == self.plex_user and not admin_account.username)
 
         if self.is_admin_user:
-            self.user_client = self.admin_client = self._discover_client
+            if self.plex_metadata_source == PlexMetadataSource.DISCOVER:
+                self.admin_client = self._discover_client
+            self.user_client = self.admin_client
             self.user_account_id = 1
         else:
-            if (
-                self.plex_metadata_source == PlexMetadataSource.DISCOVER
-                and self.is_admin_user
-            ):
+            if self.plex_metadata_source == PlexMetadataSource.DISCOVER:
                 log.warning(
                     f"{self.__class__.__name__}: PLEX_METADATA_SOURCE=discover was configured "
                     f"but the user $$'{self.plex_user}'$$ is not an admin user. Discover data "
