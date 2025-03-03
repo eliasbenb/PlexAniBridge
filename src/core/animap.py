@@ -119,6 +119,7 @@ class AniMapClient:
                     log.warning(
                         f"{self.__class__.__name__}: Invalid custom mappings file at $$'{mappings_path}$$'"
                     )
+                data = json.loads(json.dumps(data))
         elif mappings_path.suffix == ".toml":
             with mappings_path.open("r") as f:
                 try:
@@ -127,6 +128,7 @@ class AniMapClient:
                     log.warning(
                         f"{self.__class__.__name__}: Invalid custom mappings file at $$'{mappings_path}$$'"
                     )
+                data = json.loads(json.dumps(data))
 
         return data
 
@@ -183,15 +185,17 @@ class AniMapClient:
 
             validated_count = 0
             tmp_custom_data = custom_data.copy()
-            for anilist_id_str, entry in custom_data.items():
-                if anilist_id_str.startswith("$"):
+            for key, entry in custom_data.items():
+                try:
+                    anilist_id = int(key)
+                except ValueError:
                     continue
 
                 try:
                     AniMap.model_validate(
                         {
                             **animap_defaults,
-                            "anilist_id": int(anilist_id_str),
+                            "anilist_id": anilist_id,
                             **entry,
                         }
                     )
@@ -199,9 +203,9 @@ class AniMapClient:
                 except (ValueError, ValidationError) as e:
                     log.warning(
                         f"{self.__class__.__name__}: Found an invalid custom mapping entry "
-                        f"$${{anilist_id: {anilist_id_str}}}$$: {e}"
+                        f"$${{anilist_id: {anilist_id}}}$$: {e}"
                     )
-                    tmp_custom_data.pop(anilist_id_str)
+                    tmp_custom_data.pop(key)
             custom_data = tmp_custom_data
 
             log.info(
@@ -229,39 +233,42 @@ class AniMapClient:
 
             # Overload the CDN data with custom data
             merged_data: dict[str, dict[str, Any]] = cdn_data.copy()
-            for anilist_id_str, entry in custom_data.items():
-                if anilist_id_str.startswith("$"):
+            for key, entry in custom_data.items():
+                try:
+                    anilist_id = int(key)
+                except ValueError:
                     continue
-                if anilist_id_str in merged_data:
-                    if merged_data[anilist_id_str] == entry:
+
+                if key in merged_data:
+                    if merged_data[key] == entry:
                         log.warning(
                             f"{self.__class__.__name__}: Found an exact duplicate entry in your custom mappings "
-                            f"$${{anilist_id: {anilist_id_str}}}$$"
+                            f"$${{anilist_id: {anilist_id}}}$$"
                         )
                     elif any(
-                        merged_data[anilist_id_str].get(attr) == entry.get(attr)
+                        merged_data[key].get(attr) == entry.get(attr)
                         for attr in AniMap.model_fields
-                        if attr in entry and attr in merged_data[anilist_id_str]
+                        if attr in entry and attr in merged_data[key]
                     ):
                         log.debug(
                             f"{self.__class__.__name__}: Found a partial duplicate entry in your custom mappings "
-                            f"$${{anilist_id: {anilist_id_str}}}$$"
+                            f"$${{anilist_id: {anilist_id}}}$$"
                         )
 
-                    merged_data[anilist_id_str].update(entry)
+                    merged_data[key].update(entry)
                 else:
-                    merged_data[anilist_id_str] = entry
+                    merged_data[key] = entry
 
             values = [
                 {
-                    "anilist_id": int(anilist_id_str),
+                    "anilist_id": int(key),
                     **{
                         field: entry[field]
                         for field in AniMap.model_fields
                         if field in entry
                     },
                 }
-                for anilist_id_str, entry in merged_data.items()
+                for key, entry in merged_data.items()
             ]
 
             session.exec(
