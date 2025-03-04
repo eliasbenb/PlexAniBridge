@@ -236,6 +236,10 @@ class DiscoverVideo(Video, DiscoverPlexObject):
         super().__init__(*args, **kwargs)
         self._ratingKey = None
 
+    @original_server
+    def history(self, *args, **kwargs):
+        return self._server.history(ratingKey=self._ratingKey, *args, **kwargs)
+
 
 class DiscoverMovie(Movie, DiscoverVideo):
     pass

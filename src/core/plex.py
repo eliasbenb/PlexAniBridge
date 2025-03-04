@@ -3,7 +3,6 @@ from math import isnan
 from textwrap import dedent
 from typing import TypeAlias
 
-import plexapi.utils
 import requests
 from cachetools.func import lru_cache
 from plexapi.library import MovieSection, ShowSection
@@ -344,15 +343,11 @@ class PlexClient:
     def get_history(
         self,
         item: Media,
-        sort_asc: bool = True,
-        **kwargs,
     ) -> list[History]:
         """Retrieves watch history for a media item.
 
         Args:
             item (Media): Media item(s) to get history for
-            sort_asc (bool): Sort order for results
-            **kwargs: Additional arguments to pass to fetchItems()
 
         Returns:
             list[History]: Watch history entries for the item
@@ -360,20 +355,9 @@ class PlexClient:
         Note:
             Results are cached using functools.cache decorator
         """
-        if self.is_discover_user:
-            return []
+        return item.history()
 
-        args = {
-            "metadataItemID": item.ratingKey,
-            "accountID": self.user_account_id,
-            "sort": "viewedAt:asc" if sort_asc else "viewedAt:desc",
-        }
-
-        return self.admin_client.fetchItems(
-            f"/status/sessions/history/all{plexapi.utils.joinArgs(args)}", **kwargs
-        )
-
-    def get_first_history(self, item: Media, **kwargs) -> History | None:
+    def get_first_history(self, item: Media) -> History | None:
         """Retrieves the oldest watch history entry for a media item.
 
         A convenience wrapper around get_history() that returns only the
@@ -381,16 +365,13 @@ class PlexClient:
 
         Args:
             item (Media): Media item to get history for
-            **kwargs: Additional arguments to pass to get_history()
 
         Returns:
             History | None: Oldest history entry if found, None if no history exists
         """
-        return next(
-            iter(self.get_history(item, maxresults=1, sort_asc=True, **kwargs)), None
-        )
+        return min(self.get_history(item), default=None, key=lambda h: h.viewedAt)
 
-    def get_last_history(self, item: Media, **kwargs) -> History | None:
+    def get_last_history(self, item: Media) -> History | None:
         """Retrieves the most recent watch history entry for a media item.
 
         A convenience wrapper around get_history() that returns only the
@@ -398,14 +379,11 @@ class PlexClient:
 
         Args:
             item (Media): Media item to get history for
-            **kwargs: Additional arguments to pass to get_history()
 
         Returns:
             History | None: Most recent history entry if found, None if no history exists
         """
-        return next(
-            iter(self.get_history(item, maxresults=1, sort_asc=False, **kwargs)), None
-        )
+        return max(self.get_history(item), default=None, key=lambda h: h.viewedAt)
 
     def is_on_watchlist(self, item: Movie | Show) -> bool:
         """Checks if a media item is on the user's watchlist.
