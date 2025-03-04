@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from typing import Any, Set, TypeAlias
+from typing import Any, TypeAlias
 
 import requests
 import tomlkit
@@ -13,6 +13,8 @@ AniMapDict: TypeAlias = dict[str, dict[str, Any]]
 
 
 class MappingsClient:
+    """Load mappings from files or URLs and merge them together."""
+
     SCHEMA_VERSION = "v2"
     CDN_URL = f"https://raw.githubusercontent.com/eliasbenb/PlexAniBridge-Mappings/{SCHEMA_VERSION}/mappings.json"
     SCHEMA_URL = f"https://cdn.statically.io/gh/eliasbenb/PlexAniBridge-Mappings/{SCHEMA_VERSION}/mappings.schema.json"
@@ -27,10 +29,16 @@ class MappingsClient:
         self.data_path = data_path
         self._loaded_sources: set[str] = set()
 
-    def _prepare_includes(self, parent: Path, includes: list[str]) -> list[str]:
-        return [str(parent / include) for include in includes]
+    def _load_includes(self, includes: list[str], loaded_chain: set[str]) -> AniMapDict:
+        """Load mappings from included files or URLs.
 
-    def _load_includes(self, includes: list[str], loaded_chain: Set[str]) -> AniMapDict:
+        Args:
+            includes (list[str]): List of file paths or URLs to include
+            loaded_chain (set[str]): Set of already loaded includes to prevent circular includes
+
+        Returns:
+            AniMapDict: Merged mappings from all included files
+        """
         res = {}
         for include in includes:
             if include in loaded_chain:
@@ -48,7 +56,16 @@ class MappingsClient:
             res = self._deep_merge(res, self._load_mappings(include, new_loaded_chain))
         return res
 
-    def _load_mappings_file(self, file: Path, loaded_chain: Set[str]) -> AniMapDict:
+    def _load_mappings_file(self, file: Path, loaded_chain: set[str]) -> AniMapDict:
+        """Load mappings from a file.
+
+        Args:
+            file (Path): Path to the file to load
+            loaded_chain (set[str]): Set of already loaded includes to prevent circular includes
+
+        Returns:
+            AniMapDict: Mappings loaded from the file
+        """
         res: AniMapDict = {}
         file_str = str(file)
 
@@ -77,7 +94,16 @@ class MappingsClient:
         ]
         return self._deep_merge(res, self._load_includes(includes, loaded_chain))
 
-    def _load_mappings_url(self, url: str, loaded_chain: Set[str]) -> AniMapDict:
+    def _load_mappings_url(self, url: str, loaded_chain: set[str]) -> AniMapDict:
+        """Load mappings from a URL.
+
+        Args:
+            url (str): URL to load mappings from
+            loaded_chain (set[str]): Set of already loaded includes to prevent circular includes
+
+        Returns:
+            AniMapDict: Mappings loaded from the URL
+        """
         res: AniMapDict = {}
         try:
             raw_res = requests.get(url)
@@ -101,7 +127,16 @@ class MappingsClient:
         includes = res.get("$includes", [])
         return self._deep_merge(res, self._load_includes(includes, loaded_chain))
 
-    def _load_mappings(self, src: str, loaded_chain: Set[str] = None) -> AniMapDict:
+    def _load_mappings(self, src: str, loaded_chain: set[str] = None) -> AniMapDict:
+        """Load mappings from a file or URL.
+
+        Args:
+            src (str): Path to the file or URL to load mappings from
+            loaded_chain (set[str], optional): Set of already loaded includes to prevent circular includes. Defaults to None.
+
+        Returns:
+            AniMapDict: Mappings loaded from the file or URL
+        """
         if loaded_chain is None:
             loaded_chain = set()
 
@@ -124,6 +159,17 @@ class MappingsClient:
             return {}
 
     def _deep_merge(self, d1: AniMapDict, d2: AniMapDict) -> AniMapDict:
+        """Recursively merge two dictionaries.
+
+        Special handling for "tvdb_mappings" key to prevent overwriting.
+
+        Args:
+            d1 (AniMapDict): First dictionary
+            d2 (AniMapDict): Second dictionary
+
+        Returns:
+            AniMapDict: Merged dictionary
+        """
         result = d1.copy()
 
         for key, value in d2.items():
@@ -137,6 +183,11 @@ class MappingsClient:
         return result
 
     def load_mappings(self) -> AniMapDict:
+        """Load mappings from files and URLs and merge them together.
+
+        Returns:
+            AniMapDict: Merged mappings
+        """
         self._loaded_sources = set()
 
         existing_custom_mapping_files = [
