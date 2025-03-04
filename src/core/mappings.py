@@ -35,11 +35,13 @@ class MappingsClient:
         for include in includes:
             if include in loaded_chain:
                 log.warning(
-                    f"Circular include detected: '{include}' has already been loaded in this chain"
+                    f"{self.__class__.__name__}: Circular include detected: '{include}' has already been loaded in this chain"
                 )
                 continue
             if include in self._loaded_sources:
-                log.info(f"Skipping already loaded include: '{include}'")
+                log.info(
+                    f"{self.__class__.__name__}: Skipping already loaded include: '{include}'"
+                )
                 continue
 
             new_loaded_chain = loaded_chain | {include}
@@ -61,9 +63,11 @@ class MappingsClient:
                 with file.open() as f:
                     res = tomlkit.load(f)
         except (json.JSONDecodeError, yaml.YAMLError, TOMLKitError) as e:
-            log.error(f"Error decoding file {file}: {e}")
+            log.error(f"{self.__class__.__name__}: Error decoding file {file}: {e}")
         except Exception as e:
-            log.error(f"Unexpected error reading file {file}: {e}")
+            log.error(
+                f"{self.__class__.__name__}: Unexpected error reading file {file}: {e}"
+            )
 
         self._loaded_sources.add(file_str)
 
@@ -77,11 +81,17 @@ class MappingsClient:
             raw_res.raise_for_status()
             res = raw_res.json()
         except requests.RequestException as e:
-            log.error(f"Error reaching mappings URL {url}: {e}")
+            log.error(
+                f"{self.__class__.__name__}: Error reaching mappings URL {url}: {e}"
+            )
         except json.JSONDecodeError as e:
-            log.error(f"Error decoding mappings from URL {url}: {e}")
+            log.error(
+                f"{self.__class__.__name__}: Error decoding mappings from URL {url}: {e}"
+            )
         except Exception as e:
-            log.error(f"Unexpected error fetching mappings from URL {url}: {e}")
+            log.error(
+                f"{self.__class__.__name__}: Unexpected error fetching mappings from URL {url}: {e}"
+            )
 
         self._loaded_sources.add(url)
 
@@ -95,13 +105,19 @@ class MappingsClient:
         loaded_chain = loaded_chain | {src}
 
         if Path(src).is_file():
-            log.info(f"Loading mappings from file $$'{src}'$$")
+            log.info(
+                f"{self.__class__.__name__}: Loading mappings from file $$'{src}'$$"
+            )
             return self._load_mappings_file(Path(src), loaded_chain)
         elif src.startswith("http"):
-            log.info(f"Loading mappings from URL $$'{src}'$$")
+            log.info(
+                f"{self.__class__.__name__}: Loading mappings from URL $$'{src}'$$"
+            )
             return self._load_mappings_url(src, loaded_chain)
         else:
-            log.warning(f"Invalid mappings source: '{src}', skipping")
+            log.warning(
+                f"{self.__class__.__name__}: Invalid mappings source: '{src}', skipping"
+            )
             return {}
 
     def _deep_merge(self, d1: AniMapDict, d2: AniMapDict) -> AniMapDict:
