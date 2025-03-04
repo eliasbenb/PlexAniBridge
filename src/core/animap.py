@@ -134,8 +134,7 @@ class AniMapClient:
                         f"{self.__class__.__name__}: Found an invalid mapping entry "
                         f"$${{anilist_id: {anilist_id}}}$$: {e}"
                     )
-                    tmp_mappings.pop(key)
-            mappings = tmp_mappings
+                    mappings.pop(key)
 
             log.info(
                 f"{self.__class__.__name__}: Loading {validated_count} mapping entries"
