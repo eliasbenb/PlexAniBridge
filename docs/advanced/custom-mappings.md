@@ -1,27 +1,56 @@
 ---
 title: Custom Mappings
-icon: material/cable-data
+icon: material/map
 ---
 
 # Custom Mappings
 
-PlexAniBridge allows you to define custom mappings for Plex content to AniList, complementing the default mappings database. This feature is particularly helpful for content that is missing or incorrectly mapped in the default database.
-
-## Local Custom Mappings
-
-Custom mappings are stored in a JSON file named `mappings.custom.json`, located in the `DATA_PATH` directory. Any mappings added here will take precedence over existing entries in the default database.
+PlexAniBridge allows you to define custom mappings for Plex content to AniList, supplementing the [default mappings database](https://github.com/eliasbenb/PlexAniBridge-Mappings). This feature is particularly helpful for content that is missing or incorrectly mapped in the default database.
 
 !!! note
 
-    Entries in the custom mappings file *merge* with the pre-existing entries, they do not override them. This means that if you add a custom mapping for a series that is already in the default database, only the fields specified in the custom mapping will be updated. The remaining pre-existing fields will remain unchanged.
+    Custom mappings *merge* with the default mappings, they do not override them. This means that if you add a custom mapping for a series that is already in the default database, only the fields specified in the custom mapping will be updated. The remaining pre-existing fields will remain unchanged.
 
-The custom mappings file adheres to [the same JSON schema](https://github.com/eliasbenb/PlexAniBridge-Mappings/blob/HEAD/mappings.schema.json) used in [PlexAniBridge-Mappings](https://github.com/eliasbenb/PlexAniBridge-Mappings). You can refer to the default database or the schema for guidance. Below is an example of a `mappings.custom.json` file:
+Below is an example mappings file. You can use [the JSON schema](https://github.com/eliasbenb/PlexAniBridge-Mappings/blob/HEAD/mappings.schema.json) or the [PlexAniBridge-Mappings database](https://github.com/eliasbenb/PlexAniBridge-Mappings) as reference.
 
 ```json title="mappings.custom.json"
 --8<-- "mappings.example.json"
 ```
 
-## Remote Custom Mappings
+!!! tip "Including External Mappings"
+
+    To include external mappings within a mappings file, you can use the `$includes` key. This key should contain an array of paths or HTTP URLs to other mappings files. The included mappings will be merged with the current mappings file in the order they are specified.
+
+    ```json title="mappings.custom.json"
+    {
+      "$includes": [
+        "https://example.com/mappings.json",
+        "/path/to/mappings.json",
+        "./relative/path/to/mappings.json"
+      ]
+    }
+    ```
+
+## Local Custom Mappings
+
+PlexAniBridge will look for a custom mappings file with the name `mappings.custom.(json|yaml|yml|toml)` in the `DATA_PATH` directory. The file extension determines the format of the file (JSON, YAML, or TOML).
+
+## Community Custom Mappings
+
+There are community maintained mappings repositories that you can use to get pre-made mappings for your content. You can include these mappings in your custom mappings file using the `$includes` key as explained above.
+
+## Community Custom Mappings
+
+There are community maintained mappings repositories that you can use to get pre-made mappings for your content. You can include these mappings in your custom mappings file using the `$includes` key as explained above.
+
+- <p style="display: flex; align-items: center;">
+      <a href="https://github.com/LuceoEtzio/PlexAniBridge-Custom-Mappings" style="text-decoration: none; color: inherit;">
+          <img src="https://avatars.githubusercontent.com/u/40282884?s=24&v=4" alt="LuceoEtzio" style="margin-right: 4px; border-radius: 50%; vertical-align: middle;">
+          <span>LuceoEtzio/PlexAniBridge-Custom-Mappings</span>
+      </a>
+  </p>
+
+## Default Mappings
 
 If you want to contribute your custom mappings to the community, you can submit a pull request to the [PlexAniBridge-Mappings](https://github.com/eliasbenb/PlexAniBridge-Mappings) repository. Your pull request should modify the [`mappings.edits.json`](https://github.com/eliasbenb/PlexAniBridge-Mappings/blob/HEAD/mappings.edits.json) and **not** the [`mappings.json`](https://github.com/eliasbenb/PlexAniBridge-Mappings/blob/HEAD/mappings.json) file.
 
