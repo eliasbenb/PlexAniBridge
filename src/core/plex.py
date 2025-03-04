@@ -2,8 +2,8 @@ from datetime import datetime, timedelta, timezone
 from math import isnan
 from textwrap import dedent
 from typing import TypeAlias
+from xml.etree import ElementTree
 
-import plexapi.utils
 import requests
 from cachetools.func import lru_cache
 from plexapi.library import MovieSection, ShowSection
@@ -295,6 +295,7 @@ class PlexClient:
             log.error(
                 f"Failed to get review for {item.type} $$'{item.title}'$$ "
                 f"$${{key: {item.ratingKey}, plex_id: {item.guid}}}$$: ",
+                f"{response.text}",
                 exc_info=True,
             )
             return None
@@ -302,52 +303,54 @@ class PlexClient:
             log.error(
                 f"Failed to parse review for {item.type} $$'{item.title}'$$ "
                 f"$${{key: {item.ratingKey}, plex_id: {item.guid}}}$$: ",
+                f"{response.text}",
                 exc_info=True,
             )
             return None
 
-    @lru_cache(maxsize=32)
-    def get_continue_watching(
-        self, item: Media | None = None, **kwargs
-    ) -> list[Movie | Episode]:
+    @lru_cache(maxsize=1)
+    def _continue_watching_hub(self) -> list[Movie | Episode]:
         """Retrieves all items in the Continue Watching hub.
-
-        Args:
-            item (Media | None): If provided, only returns items in Continue Watching for this media item
 
         Returns:
             list[Movie | Episode]
         """
+        return self.user_client.fetchItems("/hubs/continueWatching/items")
+
+    def get_continue_watching(self, item: Movie | Show) -> Movie | Episode:
+        """Retrieves all items in the Continue Watching hub.
+
+        Args:
+            item (Movie | Show): The media to get any continue watching items for
+
+        Returns:
+            Movie | Episode | None: The continue watching item if found, None otherwise
+        """
+        rating_key = item.ratingKey
         if self.is_discover_user:
+            rating_key = getattr(item, "_ratingKey", None)
+        if not rating_key:
             return []
 
-        if item:
-            key = {
-                "movie": "ratingKey",
-                "show": "grandparentRatingKey",
-                "season": "parentRatingKey",
-                "episode": "ratingKey",
-            }.get(item.type, "ratingKey")
-            kwargs.update({key: item.ratingKey})
-
-        return self.user_client.fetchItems(
-            "/hubs/continueWatching/items",
-            **kwargs,
+        return next(
+            (
+                e
+                for e in self._continue_watching_hub()
+                if rating_key == e.ratingKey
+                or rating_key == getattr(e, "grandParentRatingKey", None)
+            ),
+            None,
         )
 
     @lru_cache(maxsize=32)
     def get_history(
         self,
         item: Media,
-        sort_asc: bool = True,
-        **kwargs,
     ) -> list[History]:
         """Retrieves watch history for a media item.
 
         Args:
             item (Media): Media item(s) to get history for
-            sort_asc (bool): Sort order for results
-            **kwargs: Additional arguments to pass to fetchItems()
 
         Returns:
             list[History]: Watch history entries for the item
@@ -355,20 +358,90 @@ class PlexClient:
         Note:
             Results are cached using functools.cache decorator
         """
-        if self.is_discover_user:
-            return []
+        if not self.is_discover_user:
+            return item.history()
 
-        args = {
-            "metadataItemID": item.ratingKey,
-            "accountID": self.user_account_id,
-            "sort": "viewedAt:asc" if sort_asc else "viewedAt:desc",
+        query = dedent("""
+        query GetActivityFeed($metadataID: ID!, $first: PaginationInt!) {
+            activityFeed(metadataID: $metadataID, first: $first, types: [WATCH_HISTORY], includeDescendants: true) {
+                nodes {
+                    ... on ActivityWatchHistory {
+                        id
+                        date
+                        metadataItem {
+                            id
+                        }
+                        userV2 {
+                            id
+                        }
+                    }
+                }
+            }
+        }
+        """).strip()
+
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "X-Plex-Token": self.plex_token,
         }
 
-        return self.admin_client.fetchItems(
-            f"/status/sessions/history/all{plexapi.utils.joinArgs(args)}", **kwargs
-        )
+        try:
+            response = requests.post(
+                "https://community.plex.tv/api",
+                headers=headers,
+                json={
+                    "query": query,
+                    "variables": {"metadataID": item.ratingKey, "first": 100},
+                    "operationName": "GetActivityFeed",
+                },
+            )
+            response.raise_for_status()
 
-    def get_first_history(self, item: Media, **kwargs) -> History | None:
+            data = response.json()["data"]["activityFeed"]["nodes"]
+
+            res = []
+            for entry in data:
+                if not entry or not entry.get("date"):
+                    continue
+                formatted_data = ElementTree.Element(
+                    "History",
+                    attrib={
+                        **item._data.attrib,
+                        "accountID": entry["userV2"]["id"],
+                        "deviceID": None,
+                        "historyKey": entry["id"],
+                        "viewedAt": datetime.fromisoformat(entry["date"]).timestamp(),
+                    },
+                )
+                kwargs = {"server": self.user_client._server, "data": formatted_data}
+                history = (
+                    MovieHistory(**kwargs)
+                    if item.type == "movie"
+                    else EpisodeHistory(**kwargs)
+                )
+                res.append(history)
+
+            return res
+
+        except requests.HTTPError:
+            log.error(
+                f"Failed to get watch hsitory for {item.type} $$'{item.title}'$$ "
+                f"$${{key: {item.ratingKey}, plex_id: {item.guid}}}$$: ",
+                f"{response.text}",
+                exc_info=True,
+            )
+            return []
+        except (KeyError, ValueError):
+            log.error(
+                f"Failed to parse watch hsitory for {item.type} $$'{item.title}'$$ "
+                f"$${{key: {item.ratingKey}, plex_id: {item.guid}}}$$: ",
+                f"{response.text}",
+                exc_info=True,
+            )
+            return []
+
+    def get_first_history(self, item: Media) -> History | None:
         """Retrieves the oldest watch history entry for a media item.
 
         A convenience wrapper around get_history() that returns only the
@@ -376,16 +449,13 @@ class PlexClient:
 
         Args:
             item (Media): Media item to get history for
-            **kwargs: Additional arguments to pass to get_history()
 
         Returns:
             History | None: Oldest history entry if found, None if no history exists
         """
-        return next(
-            iter(self.get_history(item, maxresults=1, sort_asc=True, **kwargs)), None
-        )
+        return min(self.get_history(item), key=lambda h: h.viewedAt, default=None)
 
-    def get_last_history(self, item: Media, **kwargs) -> History | None:
+    def get_last_history(self, item: Media) -> History | None:
         """Retrieves the most recent watch history entry for a media item.
 
         A convenience wrapper around get_history() that returns only the
@@ -393,14 +463,11 @@ class PlexClient:
 
         Args:
             item (Media): Media item to get history for
-            **kwargs: Additional arguments to pass to get_history()
 
         Returns:
             History | None: Most recent history entry if found, None if no history exists
         """
-        return next(
-            iter(self.get_history(item, maxresults=1, sort_asc=False, **kwargs)), None
-        )
+        return
 
     def is_on_watchlist(self, item: Movie | Show) -> bool:
         """Checks if a media item is on the user's watchlist.
