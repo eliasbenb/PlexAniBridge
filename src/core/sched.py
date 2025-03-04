@@ -144,12 +144,6 @@ class SchedulerClient:
         for sig in (signal.SIGTERM, signal.SIGINT):
             loop.add_signal_handler(sig, partial(self._handle_signal, sig))
 
-        if self.reinit_interval >= 0:
-            log.info(
-                f"{self.__class__.__name__}: Starting reinit scheduler (interval: {self.reinit_interval}s)"
-            )
-            self._create_task(self._reinit())
-
         if self.polling_scan:
             log.info(
                 f"{self.__class__.__name__}: Starting polling scheduler (interval: {self.poll_interval}s)"
@@ -167,6 +161,13 @@ class SchedulerClient:
                 )
                 await self.sync()
                 exit(0)
+
+        if self.reinit_interval >= 0:
+            log.info(
+                f"{self.__class__.__name__}: Starting reinit scheduler (interval: {self.reinit_interval}s)"
+            )
+            await asyncio.sleep(self.reinit_interval)
+            self._create_task(self._reinit())
 
     async def stop(self) -> None:
         """Stop the scheduler and clean up"""
