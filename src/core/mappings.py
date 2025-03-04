@@ -3,8 +3,9 @@ from pathlib import Path
 from typing import Any, Set, TypeAlias
 
 import requests
-import toml
+import tomlkit
 import yaml
+from tomlkit.exceptions import TOMLKitError
 
 from src import log
 
@@ -58,8 +59,8 @@ class MappingsClient:
                     res = yaml.safe_load(f)
             elif file.suffix == ".toml":
                 with file.open() as f:
-                    res = toml.load(f)
-        except (json.JSONDecodeError, yaml.YAMLError, toml.TomlDecodeError) as e:
+                    res = tomlkit.load(f)
+        except (json.JSONDecodeError, yaml.YAMLError, TOMLKitError) as e:
             log.error(f"Error decoding file {file}: {e}")
         except Exception as e:
             log.error(f"Unexpected error reading file {file}: {e}")
