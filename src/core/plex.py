@@ -310,9 +310,6 @@ class PlexClient:
     def _continue_watching_hub(self) -> list[Movie | Episode]:
         """Retrieves all items in the Continue Watching hub.
 
-        Args:
-            item (Media | None): If provided, only returns items in Continue Watching for this media item
-
         Returns:
             list[Movie | Episode]
         """
@@ -337,7 +334,8 @@ class PlexClient:
             (
                 e
                 for e in self._continue_watching_hub()
-                if rating_key in (e.ratingKey, e.grandparentRatingKey)
+                if rating_key == e.ratingKey
+                or rating_key == getattr(e, "grandParentRatingKey", None)
             ),
             None,
         )
