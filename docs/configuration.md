@@ -123,19 +123,20 @@ This is useful for syncing only Anime content in a mixed library.
 Determines the source of metadata for Plex content:
 
 - `local`: Use metadata stored locally on the Plex server.
-- `discover`: Fetch metadata from the [Plex Discover API](https://discover.provider.plex.tv).
+- `discover`: Fetch metadata from the [Plex Discover](https://discover.provider.plex.tv) and [Plex Metadata](https://metadata.provider.plex.tv) APIs.
 
 !!! warning "Discover Advantages and Limitations"
 
-    The main advantage of using Discover is that it provides the most complete library possible. All episodes and movies will exist in the database, even if they are not in your library. This is useful if you regularly delete content from your library and keep incomplete shows.
+    The main advantage of using Discover is that it provides the most complete library possible. A complete set of seasons and episodes will exist, even if they are not in your library. This is useful if you regularly delete content and keep incomplete shows.
 
     Additionally, Discover merges your activity across all Plex servers, so you can sync content from multiple servers or even previously deleted servers.
 
     However, Discover has some limitations:
 
     - Being online, it's subject to outages and rate limits, causing sync times to drastically increase.
-    - It may not be as up-to-date with your activity as the local server
-    - Only the admin user can use the Discover API. All other users must use the local metadata source.
+    - You are required to enable [Plex Sync](https://support.plex.tv/articles/sync-watch-state-and-ratings/) for the Discover API to work.
+    - It may not be as up-to-date with your activity as the local server in the event Plex Sync fails.
+    - Due to API limitations, only the admin user can use the Discover API. All other users will be forced to use the local metadata source.
 
 ---
 
