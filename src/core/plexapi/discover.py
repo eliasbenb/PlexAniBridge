@@ -27,6 +27,15 @@ from src.utils.rate_limitter import RateLimiter
 
 
 def original_server(func: Callable[..., Any]) -> Callable[..., Any]:
+    """Decorator to temporarily switch to the original server context.
+
+    Args:
+        func (Callable): The function to wrap
+
+    Returns:
+        Callable: The wrapped function that will execute with original server context
+    """
+
     @wraps(func)
     def wrapper(self: "DiscoverPlexObject", *args: Any, **kwargs: Any) -> Any:
         original_url = self._server._baseurl
@@ -43,6 +52,15 @@ def original_server(func: Callable[..., Any]) -> Callable[..., Any]:
 
 
 def discover_server(func: Callable[..., Any]) -> Callable[..., Any]:
+    """Decorator to temporarily switch to discover.provider.plex.tv server context.
+
+    Args:
+        func (Callable): The function to wrap
+
+    Returns:
+        Callable: The wrapped function that will execute with the Discover server context
+    """
+
     @wraps(func)
     def wrapper(self: "DiscoverPlexObject", *args: Any, **kwargs: Any) -> Any:
         original_url = self._server._baseurl
@@ -59,6 +77,15 @@ def discover_server(func: Callable[..., Any]) -> Callable[..., Any]:
 
 
 def metadata_server(func: Callable[..., Any]) -> Callable[..., Any]:
+    """Decorator to temporarily switch to metadata.provider.plex.tv server context.
+
+    Args:
+        func (Callable): The function to wrap
+
+    Returns:
+        Callable: The wrapped function that will execute with the Metadata server context
+    """
+
     @wraps(func)
     def wrapper(self: "DiscoverPlexObject", *args: Any, **kwargs: Any) -> Any:
         original_url = self._server._baseurl
@@ -75,6 +102,12 @@ def metadata_server(func: Callable[..., Any]) -> Callable[..., Any]:
 
 
 class DiscoverPlexObject(PlexObject):
+    """Base class for Plex objects that can interact with Discover API.
+
+    This class extends the standard PlexObject with capabilities to fetch data
+    from different Plex endpoints (original server, Discover API, Metadata API).
+    """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._server: DiscoverPlexServer
@@ -145,6 +178,18 @@ class DiscoverPlexObject(PlexObject):
 
     @discover_server
     def _loadUserStatesDiscoverServer(self, items, **kwargs):
+        """Load user state information for multiple items from the Discover API.
+
+        Fetches user state data (watched status, view progress, etc.) using the Discover
+        API for the provided items and applies it to the item objects.
+
+        Args:
+            items: List of Plex media objects to load user states for
+            **kwargs: Additional arguments to pass to fetchItems
+
+        Returns:
+            list: List of Plex media objects with user state information applied
+        """
         key = ",".join([item.guid.rsplit("/", 1)[-1] for item in items])
         if not key:
             return items
@@ -272,6 +317,10 @@ class DiscoverLibrarySection(DiscoverPlexObject, LibrarySection):
         filters=None,
         **kwargs,
     ):
+        """Search for items in the library section.
+
+        Automatically fetches user state information for items from the Discover API.
+        """
         data = super().search(
             title,
             sort,
@@ -355,6 +404,10 @@ class DiscoverPlexServer(DiscoverPlexObject, PlexServer):
     def query(
         self, key, method=None, headers=None, params=None, timeout=None, **kwargs
     ):
+        """Query the Plex server for data.
+
+        Includes rate limiting and error handling for rate limit exceeded responses.
+        """
         if self._baseurl in (
             self.myPlexAccount().DISCOVER,
             self.myPlexAccount().METADATA,
