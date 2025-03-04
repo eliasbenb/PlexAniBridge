@@ -144,7 +144,7 @@ class DiscoverPlexObject(PlexObject):
         return super()._reload(*args, **kwargs)
 
     @discover_server
-    def _loadUserStates(self, items, **kwargs):
+    def _loadUserStatesDiscoverServer(self, items, **kwargs):
         key = ",".join([item.guid.rsplit("/", 1)[-1] for item in items])
         if not key:
             return items
@@ -175,6 +175,11 @@ class DiscoverPlexObject(PlexObject):
                         setattr(item, field[0], guid_value.rsplit("/", 1)[-1])
         return items
 
+    def _loadUserStates(self, items, **kwargs):
+        if self._source == self._server.myPlexAccount().DISCOVER:
+            return self._loadUserStatesDiscoverServer(items, **kwargs)
+        return items
+
     def _loadUserState(self, item, **kwargs):
         try:
             return self._loadUserStates([item], **kwargs)[0]
@@ -195,24 +200,62 @@ class DiscoverEpisode(DiscoverVideo, Episode):
 
 
 class DiscoverSeason(DiscoverVideo, Season):
-    @metadata_server
-    def episodes(self, **kwargs):
+    def _episodes(self, **kwargs):
         key = f"{self.key}/children?episodeOrder=tvdbAiring"
         return self._loadUserStates(self.fetchItems(key, DiscoverEpisode, **kwargs))
+
+    @original_server
+    def _episodesOriginalServer(self, **kwargs):
+        return self._episodes(**kwargs)
+
+    @discover_server
+    def _episodesDiscoverServer(self, **kwargs):
+        return self._episodes(**kwargs)
+
+    @metadata_server
+    def _episodesMetadataServer(self, **kwargs):
+        return self._loadUserStates(self._episodes(DiscoverEpisode, **kwargs))
+
+    def episodes(self, **kwargs):
+        if self._source == self._server._original_baseurl:
+            return self._episodesOriginalServer(**kwargs)
+        if self._source == self._server.myPlexAccount().DISCOVER:
+            return self._episodesDiscoverServer(**kwargs)
+        if self._source == self._server.myPlexAccount().METADATA:
+            return self._episodesMetadataServer(**kwargs)
 
 
 class DiscoverShow(DiscoverVideo, Show):
     def episodes(self, **kwargs):
         return sum([season.episodes(**kwargs) for season in self.seasons()], [])
 
-    @metadata_server
-    def seasons(self, **kwargs):
+    def _seasons(self, **kwargs):
         key = f"{self.key}/children?excludeAllLeaves=1&episodeOrder=tvdbAiring"
         return self._loadUserStates(
             self.fetchItems(
                 key, DiscoverSeason, container_size=self.childCount, **kwargs
             )
         )
+
+    @original_server
+    def _seasonsOriginalServer(self, **kwargs):
+        return self._seasons(**kwargs)
+
+    @discover_server
+    def _seasonsDiscoverServer(self, **kwargs):
+        return self._seasons(**kwargs)
+
+    @metadata_server
+    def _seasonsMetadataServer(self, **kwargs):
+        return self._loadUserStates(self._seasons(DiscoverSeason, **kwargs))
+
+    def seasons(self, **kwargs):
+        if self._source == self._server._original_baseurl:
+            return self._seasonsOriginalServer(**kwargs)
+        if self._source == self._server.myPlexAccount().DISCOVER:
+            return self._seasonsDiscoverServer(**kwargs)
+        if self._source == self._server.myPlexAccount().METADATA:
+            return self._seasonsMetadataServer(**kwargs)
 
 
 class DiscoverLibrarySection(DiscoverPlexObject, LibrarySection):
