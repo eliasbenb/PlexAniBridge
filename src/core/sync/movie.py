@@ -41,14 +41,20 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
             else:
                 anilist_media = self.search_media(item)
         except Exception:
-            self.sync_stats.failed.add(item)
             log.error(
-                f"Failed to fetch AniList data for {self._debug_log_title(item)}: ",
+                f"Failed to fetch AniList data for {self._debug_log_title(item)}: "
+                f"{self._debug_log_ids(item.ratingKey, item.guid, guids, animapping.anilist_id)}",
                 exc_info=True,
             )
+            self.sync_stats.failed += 1
             return
 
         if not anilist_media:
+            log.debug(
+                f"No AniList entry could be found for {self._debug_log_title(item)} "
+                f"{self._debug_log_ids(item.ratingKey, item.guid, guids)}"
+            )
+            self.sync_stats.not_found += 1
             return
 
         yield item, [item], animapping, anilist_media
