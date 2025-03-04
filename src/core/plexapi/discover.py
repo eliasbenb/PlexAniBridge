@@ -238,7 +238,7 @@ class DiscoverVideo(Video, DiscoverPlexObject):
 
     @original_server
     def history(self, *args, **kwargs):
-        return self._server.history(ratingKey=self._ratingKey, *args, **kwargs)
+        return self._server.history(ratingKey=self.guid, *args, **kwargs)
 
 
 class DiscoverMovie(Movie, DiscoverVideo):
