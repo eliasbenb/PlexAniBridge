@@ -3,9 +3,6 @@ from hashlib import md5
 from pathlib import Path
 from typing import Any
 
-import requests
-import toml
-import yaml
 from pydantic import ValidationError
 from sqlmodel import (
     Session,
@@ -21,6 +18,7 @@ from sqlmodel import (
 from sqlmodel.sql.expression import InstrumentedAttribute, UnaryExpression
 
 from src import log
+from src.core.mappings import MappingsClient
 from src.database import db
 from src.models.animap import AniMap
 from src.models.housekeeping import Housekeeping
@@ -36,23 +34,8 @@ class AniMapClient:
     The database is automatically synchronized on client initialization and maintains
     a hash of the CDN data to minimize unnecessary updates.
 
-    Attributes:
-        CDN_URL (str): URL to the mappings JSON file in the PlexAniBridge-Mappings repository on GitHub
-
-    Database Schema:
-        The client manages the following tables:
-        - AniMap: Stores the ID mappings between services
-        - Housekeeping: Stores metadata like the CDN hash for sync management
-
     Mapping Source:
         https://github.com/eliasbenb/PlexAniBridge-Mappings
-
-    Note:
-        The client maintains data integrity by:
-        - Only syncing when CDN content has changed (verified via MD5 hash)
-        - Properly handling multi-value fields (mal_id, imdb_id)
-        - Removing entries that no longer exist in the CDN
-        - Using database transactions for atomic updates
     """
 
     SCHEMA_VERSION = "v2"
@@ -67,7 +50,9 @@ class AniMapClient:
     ]
 
     def __init__(self, data_path: Path) -> None:
+        self.mappings_client = MappingsClient(data_path)
         self.data_path = data_path
+
         try:
             self._sync_db()
         except Exception as e:
@@ -82,55 +67,6 @@ class AniMapClient:
         Drops all tables and reinitializes the database from scratch.
         """
         self._sync_db()
-
-    def load_custom_mappings(self) -> dict[str, Any]:
-        """Loads custom mappings from the local file.
-
-        Returns:
-            dict[str, Any]: Custom mappings data
-        """
-        existing_files = [
-            f for f in self.MAPPING_FILES if (self.data_path / f).exists()
-        ]
-        if not existing_files:
-            return {}
-        mappings_path = self.data_path / existing_files[0]
-
-        if len(existing_files) > 1:
-            log.warning(
-                f"{self.__class__.__name__}: Found multiple custom mappings files: {existing_files}. "
-                f"Only one mappings file can be used at a time. Defaulting to $$'{mappings_path}'$$"
-            )
-
-        data: dict[str, Any] = {}
-        if mappings_path.suffix == ".json":
-            with mappings_path.open("r") as f:
-                try:
-                    data = json.load(f)
-                except json.JSONDecodeError:
-                    log.warning(
-                        f"{self.__class__.__name__}: Invalid custom mappings file at $$'{mappings_path}$$'"
-                    )
-        elif mappings_path.suffix in [".yaml", ".yml"]:
-            with mappings_path.open("r") as f:
-                try:
-                    data = yaml.safe_load(f)
-                except yaml.YAMLError:
-                    log.warning(
-                        f"{self.__class__.__name__}: Invalid custom mappings file at $$'{mappings_path}$$'"
-                    )
-                data = json.loads(json.dumps(data))
-        elif mappings_path.suffix == ".toml":
-            with mappings_path.open("r") as f:
-                try:
-                    data = toml.load(f)
-                except toml.TomlDecodeError:
-                    log.warning(
-                        f"{self.__class__.__name__}: Invalid custom mappings file at $$'{mappings_path}$$'"
-                    )
-                data = json.loads(json.dumps(data))
-
-        return data
 
     def _sync_db(self) -> None:
         """Synchronizes the local database with the mapping source.
@@ -170,22 +106,15 @@ class AniMapClient:
             return [value] if not isinstance(value, list) else value
 
         with Session(db.engine) as session:
-            # First check if the CDN or custom data have changed. If not, we can skip the sync
-            last_custom_hash = session.get(Housekeeping, "animap_custom_hash")
-            last_cdn_hash = session.get(Housekeeping, "animap_cdn_hash")
-
-            response = requests.get(self.CDN_URL)
-            response.raise_for_status()
-            response_data: dict = response.json()
-            response_data.pop("$schema", None)
-
-            custom_data = self.load_custom_mappings()
+            last_mappings_hash = session.get(Housekeeping, "animap_mappings_hash")
 
             animap_defaults = {field: None for field in AniMap.model_fields}
-
             validated_count = 0
-            tmp_custom_data = custom_data.copy()
-            for key, entry in custom_data.items():
+
+            mappings = self.mappings_client.load_mappings()
+            tmp_mappings = mappings.copy()
+
+            for key, entry in tmp_mappings.items():
                 try:
                     anilist_id = int(key)
                 except ValueError:
@@ -202,26 +131,21 @@ class AniMapClient:
                     validated_count += 1
                 except (ValueError, ValidationError) as e:
                     log.warning(
-                        f"{self.__class__.__name__}: Found an invalid custom mapping entry "
+                        f"{self.__class__.__name__}: Found an invalid mapping entry "
                         f"$${{anilist_id: {anilist_id}}}$$: {e}"
                     )
-                    tmp_custom_data.pop(key)
-            custom_data = tmp_custom_data
+                    tmp_mappings.pop(key)
+            mappings = tmp_mappings
 
             log.info(
-                f"{self.__class__.__name__}: Loading {validated_count} custom mapping entries"
+                f"{self.__class__.__name__}: Loading {validated_count} mapping entries"
             )
 
-            cdn_data: dict[str, Any] = response_data
-
-            curr_custom_hash = md5(
-                json.dumps(custom_data, sort_keys=True).encode()
+            curr_mappings_hash = md5(
+                json.dumps(mappings, sort_keys=True).encode()
             ).hexdigest()
-            curr_cdn_hash = md5(response.content).hexdigest()
 
-            if (last_cdn_hash and last_cdn_hash.value == curr_cdn_hash) and (
-                last_custom_hash and last_custom_hash.value == curr_custom_hash
-            ):
+            if last_mappings_hash and last_mappings_hash.value == curr_mappings_hash:
                 log.debug(
                     f"{self.__class__.__name__}: Cache is still valid, skipping sync"
                 )
@@ -230,34 +154,6 @@ class AniMapClient:
             log.debug(
                 f"{self.__class__.__name__}: Anime mapping changes detected, syncing database"
             )
-
-            # Overload the CDN data with custom data
-            merged_data: dict[str, dict[str, Any]] = cdn_data.copy()
-            for key, entry in custom_data.items():
-                try:
-                    anilist_id = int(key)
-                except ValueError:
-                    continue
-
-                if key in merged_data:
-                    if merged_data[key] == entry:
-                        log.warning(
-                            f"{self.__class__.__name__}: Found an exact duplicate entry in your custom mappings "
-                            f"$${{anilist_id: {anilist_id}}}$$"
-                        )
-                    elif any(
-                        merged_data[key].get(attr) == entry.get(attr)
-                        for attr in AniMap.model_fields
-                        if attr in entry and attr in merged_data[key]
-                    ):
-                        log.debug(
-                            f"{self.__class__.__name__}: Found a partial duplicate entry in your custom mappings "
-                            f"$${{anilist_id: {anilist_id}}}$$"
-                        )
-
-                    merged_data[key].update(entry)
-                else:
-                    merged_data[key] = entry
 
             values = [
                 {
@@ -268,7 +164,7 @@ class AniMapClient:
                         if field in entry
                     },
                 }
-                for key, entry in merged_data.items()
+                for key, entry in mappings.items()
             ]
 
             session.exec(
@@ -284,9 +180,8 @@ class AniMapClient:
                 session.merge(AniMap(**value))
 
             session.merge(
-                Housekeeping(key="animap_custom_hash", value=curr_custom_hash)
+                Housekeeping(key="animap_mappings_hash", value=curr_mappings_hash)
             )
-            session.merge(Housekeeping(key="animap_cdn_hash", value=curr_cdn_hash))
             session.commit()
 
             log.debug(f"{self.__class__.__name__}: Database sync complete")
