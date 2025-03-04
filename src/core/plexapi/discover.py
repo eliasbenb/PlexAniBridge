@@ -231,19 +231,19 @@ class DiscoverPlexObject(PlexObject):
             return item
 
 
-class DiscoverVideo(DiscoverPlexObject, Video):
+class DiscoverVideo(Video, DiscoverPlexObject):
     pass
 
 
-class DiscoverMovie(DiscoverVideo, Movie):
+class DiscoverMovie(Movie, DiscoverVideo):
     pass
 
 
-class DiscoverEpisode(DiscoverVideo, Episode):
+class DiscoverEpisode(Episode, DiscoverVideo):
     pass
 
 
-class DiscoverSeason(DiscoverVideo, Season):
+class DiscoverSeason(Season, DiscoverVideo):
     def _episodes(self, **kwargs):
         key = f"{self.key}/children?episodeOrder=tvdbAiring"
         return self._loadUserStates(self.fetchItems(key, DiscoverEpisode, **kwargs))
@@ -269,7 +269,7 @@ class DiscoverSeason(DiscoverVideo, Season):
             return self._episodesMetadataServer(**kwargs)
 
 
-class DiscoverShow(DiscoverVideo, Show):
+class DiscoverShow(Show, DiscoverVideo):
     def episodes(self, **kwargs):
         return sum([season.episodes(**kwargs) for season in self.seasons()], [])
 
@@ -302,7 +302,7 @@ class DiscoverShow(DiscoverVideo, Show):
             return self._seasonsMetadataServer(**kwargs)
 
 
-class DiscoverLibrarySection(DiscoverPlexObject, LibrarySection):
+class DiscoverLibrarySection(LibrarySection, DiscoverPlexObject):
     @original_server
     def search(
         self,
@@ -351,17 +351,17 @@ class DiscoverLibrarySection(DiscoverPlexObject, LibrarySection):
         return self._loadUserStates(res)
 
 
-class DiscoverMovieSection(DiscoverLibrarySection, MovieSection):
+class DiscoverMovieSection(MovieSection, DiscoverLibrarySection):
     def search(self, *args, **kwargs):
         return super().search(cls=DiscoverMovie, *args, **kwargs)
 
 
-class DiscoverShowSection(DiscoverLibrarySection, ShowSection):
+class DiscoverShowSection(ShowSection, DiscoverLibrarySection):
     def search(self, *args, **kwargs):
         return super().search(cls=DiscoverShow, *args, **kwargs)
 
 
-class DiscoverLibrary(DiscoverPlexObject, Library):
+class DiscoverLibrary(Library, DiscoverPlexObject):
     def _loadSections(self):
         key = "/library/sections"
         sectionsByID = {}
@@ -382,7 +382,7 @@ class DiscoverLibrary(DiscoverPlexObject, Library):
         self._sectionsByTitle = dict(sectionsByTitle)
 
 
-class DiscoverPlexServer(DiscoverPlexObject, PlexServer):
+class DiscoverPlexServer(PlexServer, DiscoverPlexObject):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
