@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from typing import Any, TypeAlias
+from typing import Any, Set, TypeAlias
 
 import requests
 import toml
@@ -24,18 +24,31 @@ class MappingsClient:
 
     def __init__(self, data_path: Path) -> None:
         self.data_path = data_path
+        self._loaded_sources: set[str] = set()
 
     def _prepare_includes(self, parent: Path, includes: list[str]) -> list[str]:
         return [str(parent / include) for include in includes]
 
-    def _load_includes(self, includes: list[str]) -> AniMapDict:
+    def _load_includes(self, includes: list[str], loaded_chain: Set[str]) -> AniMapDict:
         res = {}
         for include in includes:
-            res = self._deep_merge(res, self._load_mappings(include))
+            if include in loaded_chain:
+                log.warning(
+                    f"Circular include detected: '{include}' has already been loaded in this chain"
+                )
+                continue
+            if include in self._loaded_sources:
+                log.info(f"Skipping already loaded include: '{include}'")
+                continue
+
+            new_loaded_chain = loaded_chain | {include}
+            res = self._deep_merge(res, self._load_mappings(include, new_loaded_chain))
         return res
 
-    def _load_mappings_file(self, file: Path) -> AniMapDict:
+    def _load_mappings_file(self, file: Path, loaded_chain: Set[str]) -> AniMapDict:
         res: AniMapDict = {}
+        file_str = str(file)
+
         try:
             if file.suffix == ".json":
                 with file.open() as f:
@@ -51,10 +64,12 @@ class MappingsClient:
         except Exception as e:
             log.error(f"Unexpected error reading file {file}: {e}")
 
-        includes = [str(file.parent / include) for include in res.get("$includes", [])]
-        return self._deep_merge(res, self._load_includes(includes))
+        self._loaded_sources.add(file_str)
 
-    def _load_mappings_url(self, url: str) -> AniMapDict:
+        includes = [str(file.parent / include) for include in res.get("$includes", [])]
+        return self._deep_merge(res, self._load_includes(includes, loaded_chain))
+
+    def _load_mappings_url(self, url: str, loaded_chain: Set[str]) -> AniMapDict:
         res: AniMapDict = {}
         try:
             raw_res = requests.get(url)
@@ -67,18 +82,26 @@ class MappingsClient:
         except Exception as e:
             log.error(f"Unexpected error fetching mappings from URL {url}: {e}")
 
-        includes = res.get("$includes", [])
-        return self._deep_merge(res, self._load_includes(includes))
+        self._loaded_sources.add(url)
 
-    def _load_mappings(self, src: str) -> AniMapDict:
+        includes = res.get("$includes", [])
+        return self._deep_merge(res, self._load_includes(includes, loaded_chain))
+
+    def _load_mappings(self, src: str, loaded_chain: Set[str] = None) -> AniMapDict:
+        if loaded_chain is None:
+            loaded_chain = set()
+
+        loaded_chain = loaded_chain | {src}
+
         if Path(src).is_file():
             log.info(f"Loading mappings from file $$'{src}'$$")
-            return self._load_mappings_file(Path(src))
+            return self._load_mappings_file(Path(src), loaded_chain)
         elif src.startswith("http"):
             log.info(f"Loading mappings from URL $$'{src}'$$")
-            return self._load_mappings_url(src)
+            return self._load_mappings_url(src, loaded_chain)
         else:
-            raise ValueError(f"Invalid mappings source: '{src}'")
+            log.warning(f"Invalid mappings source: '{src}', skipping")
+            return {}
 
     def _deep_merge(self, d1: AniMapDict, d2: AniMapDict) -> AniMapDict:
         result = d1.copy()
@@ -94,6 +117,8 @@ class MappingsClient:
         return result
 
     def load_mappings(self) -> AniMapDict:
+        self._loaded_sources = set()
+
         existing_custom_mapping_files = [
             f for f in self.MAPPING_FILES if (self.data_path / f).exists()
         ]
