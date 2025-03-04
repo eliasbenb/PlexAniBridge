@@ -165,14 +165,13 @@ class DiscoverPlexObject(PlexObject):
                 if hasattr(user_state, field):
                     setattr(item, field, getattr(user_state, field))
 
-            for field in zip(
+            for key_field, guid_field in zip(
                 ("ratingKey", "parentRatingKey", "grandparentRatingKey"),
                 ("guid", "parentGuid", "grandparentGuid"),
             ):
-                if hasattr(item, field[1]):
-                    guid_value = getattr(item, field[1], None)
-                    if guid_value:
-                        setattr(item, field[0], guid_value.rsplit("/", 1)[-1])
+                guid_value = getattr(item, guid_field, None)
+                if guid_value:
+                    setattr(item, key_field, guid_value.rsplit("/", 1)[-1])
         return items
 
     def _loadUserStates(self, items, **kwargs):

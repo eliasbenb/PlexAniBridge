@@ -75,9 +75,11 @@ class PlexClient:
         Handles authentication and client setup for the admin account.
         """
         self.admin_client = PlexServer(self.plex_url, self.plex_token)
-        self._discover_client = None
-        if self.plex_metadata_source == PlexMetadataSource.DISCOVER:
-            self._discover_client = DiscoverPlexServer(self.plex_url, self.plex_token)
+        self.discover_client = self.discover_client = (
+            DiscoverPlexServer(self.plex_url, self.plex_token)
+            if self.plex_metadata_source == PlexMetadataSource.DISCOVER
+            else None
+        )
 
     def _init_user_client(self) -> PlexServer:
         """Initializes the Plex client for the specified user account.
@@ -99,10 +101,15 @@ class PlexClient:
             admin_account.username,
             admin_account.email,
         ) or (admin_account.title == self.plex_user and not admin_account.username)
+        self.is_discover_user = (
+            self.plex_metadata_source == PlexMetadataSource.DISCOVER
+            and self.is_admin_user
+        )
 
-        if self.is_admin_user:
-            if self.plex_metadata_source == PlexMetadataSource.DISCOVER:
-                self.admin_client = self._discover_client
+        if self.is_discover_user:
+            self.user_client = self.admin_client = self.discover_client
+            self.user_account_id = 1
+        elif self.is_admin_user:
             self.user_client = self.admin_client
             self.user_account_id = 1
         else:
@@ -173,7 +180,7 @@ class PlexClient:
             require_watched (bool): If True, only returns items that have been watched at least once. Defaults to False
 
         Returns:
-            list[Movie] | list[Show]: List of media items matching the criteria
+            list[Media]: List of media items matching the criteria
         """
         filters = {"and": []}
 
@@ -312,32 +319,17 @@ class PlexClient:
         Returns:
             list[Movie | Episode]
         """
-        _item: Media | None = item
-        if _item:
-            tmp_item: Media | None = None
-            if (
-                self.plex_metadata_source == PlexMetadataSource.DISCOVER
-                and self.is_admin_user
-            ):
-                tmp_item = None
-                for section in self.get_sections():
-                    tmp_item = next(
-                        iter(section.search(guid=item.guid)),
-                        None,
-                    )
-                    if tmp_item:
-                        break
-                if not tmp_item:
-                    return []
-                item = tmp_item
+        if self.is_discover_user:
+            return []
 
+        if item:
             key = {
                 "movie": "ratingKey",
                 "show": "grandparentRatingKey",
                 "season": "parentRatingKey",
                 "episode": "ratingKey",
-            }.get(_item.type, "ratingKey")
-            kwargs.update({key: _item.ratingKey})
+            }.get(item.type, "ratingKey")
+            kwargs.update({key: item.ratingKey})
 
         return self.user_client.fetchItems(
             "/hubs/continueWatching/items",
@@ -364,22 +356,11 @@ class PlexClient:
         Note:
             Results are cached using functools.cache decorator
         """
-        _item: Media = item
-        if (
-            self.plex_metadata_source == PlexMetadataSource.DISCOVER
-            and self.is_admin_user
-        ):
-            tmp_item = None
-            for section in self.get_sections():
-                tmp_item = next(iter(section.search(guid=item.guid)), None)
-                if tmp_item:
-                    break
-            if not tmp_item:
-                return []
-            _item = tmp_item
+        if self.is_discover_user:
+            return []
 
         args = {
-            "metadataItemID": _item.ratingKey,
+            "metadataItemID": item.ratingKey,
             "accountID": self.user_account_id,
             "sort": "viewedAt:asc" if sort_asc else "viewedAt:desc",
         }
