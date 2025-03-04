@@ -31,6 +31,10 @@ Below is an example mappings file. You can use [the JSON schema](https://github.
     }
     ```
 
+!!! tip "Mapping File Formats"
+
+    Any of JSON, YAML, or TOML can be used as the format for the custom mappings file. The file extension determines the format of the file (`.json`, `.yaml`, `.yml`, or `.toml`).
+
 ## Local Custom Mappings
 
 PlexAniBridge will look for a custom mappings file with the name `mappings.custom.(json|yaml|yml|toml)` in the `DATA_PATH` directory. The file extension determines the format of the file (JSON, YAML, or TOML).
@@ -43,12 +47,10 @@ There are community maintained mappings repositories that you can use to get pre
 
 There are community maintained mappings repositories that you can use to get pre-made mappings for your content. You can include these mappings in your custom mappings file using the `$includes` key as explained above.
 
-- <p style="display: flex; align-items: center;">
-      <a href="https://github.com/LuceoEtzio/PlexAniBridge-Custom-Mappings" style="text-decoration: none; color: inherit;">
-          <img src="https://avatars.githubusercontent.com/u/40282884?s=24&v=4" alt="LuceoEtzio" style="margin-right: 4px; border-radius: 50%; vertical-align: middle;">
-          <span>LuceoEtzio/PlexAniBridge-Custom-Mappings</span>
-      </a>
-  </p>
+- <a href="https://github.com/LuceoEtzio/PlexAniBridge-Custom-Mappings">
+    <img src="https://avatars.githubusercontent.com/u/40282884?s=24&v=4" alt="LuceoEtzio" style="margin-right: 4px; border-radius: 50%; vertical-align: middle;">
+    <span>LuceoEtzio/PlexAniBridge-Custom-Mappings</span>
+  </a>
 
 ## Default Mappings
 
