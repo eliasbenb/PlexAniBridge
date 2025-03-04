@@ -71,7 +71,10 @@ class MappingsClient:
 
         self._loaded_sources.add(file_str)
 
-        includes = [str(file.parent / include) for include in res.get("$includes", [])]
+        includes = [
+            include if Path(include).is_absolute() else str(file.parent / include)
+            for include in res.get("$includes", [])
+        ]
         return self._deep_merge(res, self._load_includes(includes, loaded_chain))
 
     def _load_mappings_url(self, url: str, loaded_chain: Set[str]) -> AniMapDict:
