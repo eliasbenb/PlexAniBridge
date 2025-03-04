@@ -53,7 +53,7 @@ class ColorFormatter(logging.Formatter):
         if isinstance(record.msg, str):
             # Color strings in quotes
             record.msg = re.sub(
-                r"\$\$\'(.*?)\'\$\$",
+                r"\$\$'((?:[^']|'(?!\$\$))*)'\$\$",
                 f"{Fore.LIGHTBLUE_EX}'\\1'{Style.RESET_ALL}",
                 record.msg,
             )
