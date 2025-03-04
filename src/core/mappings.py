@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 from typing import Any, TypeAlias
+from urllib.parse import urljoin, urlparse
 
 import requests
 import tomlkit
@@ -29,70 +30,152 @@ class MappingsClient:
         self.data_path = data_path
         self._loaded_sources: set[str] = set()
 
-    def _load_includes(self, includes: list[str], loaded_chain: set[str]) -> AniMapDict:
+    def _is_file(self, src: str) -> bool:
+        """Check if the source is a file.
+
+        Args:
+            src (str): Source to check
+
+        Returns:
+            bool: True if the source is a file, False otherwise
+        """
+        try:
+            parsed = Path(src)
+        except Exception:
+            return False
+        return parsed.is_file()
+
+    def _is_url(self, src: str) -> bool:
+        """Check if the source is a URL.
+
+        Args:
+            src (str): Source to check
+
+        Returns:
+            bool: True if the source is a URL, False otherwise
+        """
+        parsed = urlparse(src)
+        return bool(parsed.scheme) and bool(parsed.netloc)
+
+    def _dict_str_keys(self, d: dict[str, Any]) -> dict[str, Any]:
+        """Ensure all keys in a dictionary are strings.
+
+        Args:
+            d (dict[str, Any]): Dictionary to convert
+
+        Returns:
+            dict[str, Any]: Dictionary with all keys as strings
+        """
+        if isinstance(d, dict):
+            return {str(k): self._dict_str_keys(v) for k, v in d.items()}
+        elif isinstance(d, list):
+            return [self._dict_str_keys(i) for i in d]
+        else:
+            return d
+
+    def _resolve_path(self, include_path: str, parent_path: Path | str) -> str:
+        """Resolve a path relative to the parent path.
+
+        Args:
+            include_path (str): Path to resolve
+            parent_path (Path | str): Parent path to resolve against
+
+        Returns:
+            str: Resolved path
+        """
+        is_url = self._is_url(include_path)
+        is_file = self._is_file(include_path)
+        is_parent_url = self._is_url(str(parent_path))
+        is_parent_file = self._is_file(parent_path)
+
+        # Absolute URL or absolute path
+        if is_url or (is_file and parent_path.is_absolute()):
+            return include_path
+        # Relative URL
+        if is_parent_url:
+            return urljoin(parent_path, include_path)
+        # Relative path
+        if is_parent_file:
+            parent_dir = Path(parent_path).parent
+            resolved_path = (parent_dir / include_path).resolve()
+            return resolved_path.as_posix()
+        # Invalid path
+        return include_path
+
+    def _load_includes(
+        self, includes: list[str], loaded_chain: set[str], parent: Path | str
+    ) -> AniMapDict:
         """Load mappings from included files or URLs.
 
         Args:
             includes (list[str]): List of file paths or URLs to include
             loaded_chain (set[str]): Set of already loaded includes to prevent circular includes
+            parent (Path | str): Parent path or URL to resolve relative paths against
 
         Returns:
             AniMapDict: Merged mappings from all included files
         """
         res = {}
         for include in includes:
-            if include in loaded_chain:
+            resolved_include = self._resolve_path(include, parent)
+
+            if resolved_include in loaded_chain:
                 log.warning(
-                    f"{self.__class__.__name__}: Circular include detected: '{include}' has already been loaded in this chain"
+                    f"{self.__class__.__name__}: Circular include detected: '{resolved_include}' has already been loaded in this chain"
                 )
                 continue
-            if include in self._loaded_sources:
+            if resolved_include in self._loaded_sources:
                 log.info(
-                    f"{self.__class__.__name__}: Skipping already loaded include: '{include}'"
+                    f"{self.__class__.__name__}: Skipping already loaded include: '{resolved_include}'"
                 )
                 continue
 
-            new_loaded_chain = loaded_chain | {include}
-            res = self._deep_merge(res, self._load_mappings(include, new_loaded_chain))
+            new_loaded_chain = loaded_chain | {resolved_include}
+            res = self._deep_merge(
+                res, self._load_mappings(resolved_include, new_loaded_chain)
+            )
         return res
 
-    def _load_mappings_file(self, file: Path, loaded_chain: set[str]) -> AniMapDict:
+    def _load_mappings_file(self, file: str, loaded_chain: set[str]) -> AniMapDict:
         """Load mappings from a file.
 
         Args:
-            file (Path): Path to the file to load
+            file (str): Path to the file to load
             loaded_chain (set[str]): Set of already loaded includes to prevent circular includes
 
         Returns:
             AniMapDict: Mappings loaded from the file
         """
         res: AniMapDict = {}
-        file_str = str(file)
+        file_path = Path(file)
 
         try:
-            if file.suffix == ".json":
-                with file.open() as f:
+            if file_path.suffix == ".json":
+                with file_path.open() as f:
                     res = json.load(f)
-            elif file.suffix in [".yaml", ".yml"]:
-                with file.open() as f:
-                    res = yaml.safe_load(f)
-            elif file.suffix == ".toml":
-                with file.open() as f:
+            elif file_path.suffix in [".yaml", ".yml"]:
+                with file_path.open() as f:
+                    res = self._dict_str_keys(yaml.safe_load(f))
+            elif file_path.suffix == ".toml":
+                with file_path.open() as f:
                     res = tomlkit.load(f)
         except (json.JSONDecodeError, yaml.YAMLError, TOMLKitError) as e:
-            log.error(f"{self.__class__.__name__}: Error decoding file {file}: {e}")
+            log.error(
+                f"{self.__class__.__name__}: Error decoding file "
+                f"{file_path.absolute().as_posix()}: {e}"
+            )
         except Exception as e:
             log.error(
-                f"{self.__class__.__name__}: Unexpected error reading file {file}: {e}"
+                f"{self.__class__.__name__}: Unexpected error reading file "
+                f"{file_path.absolute().as_posix()}: {e}"
             )
 
-        self._loaded_sources.add(file_str)
+        self._loaded_sources.add(file)
 
-        includes = [
-            include if Path(include).is_absolute() else str(file.parent / include)
-            for include in res.get("$includes", [])
-        ]
-        return self._deep_merge(res, self._load_includes(includes, loaded_chain))
+        return self._deep_merge(
+            res,
+            self._load_includes(res.get("$includes", []), loaded_chain, file_path),
+        )
 
     def _load_mappings_url(self, url: str, loaded_chain: set[str]) -> AniMapDict:
         """Load mappings from a URL.
@@ -124,8 +207,10 @@ class MappingsClient:
 
         self._loaded_sources.add(url)
 
-        includes = res.get("$includes", [])
-        return self._deep_merge(res, self._load_includes(includes, loaded_chain))
+        return self._deep_merge(
+            res,
+            self._load_includes(res.get("$includes", []), loaded_chain, url),
+        )
 
     def _load_mappings(self, src: str, loaded_chain: set[str] = None) -> AniMapDict:
         """Load mappings from a file or URL.
@@ -142,12 +227,12 @@ class MappingsClient:
 
         loaded_chain = loaded_chain | {src}
 
-        if Path(src).is_file():
+        if self._is_file(src):
             log.info(
                 f"{self.__class__.__name__}: Loading mappings from file $$'{src}'$$"
             )
-            return self._load_mappings_file(Path(src), loaded_chain)
-        elif src.startswith("http"):
+            return self._load_mappings_file(src, loaded_chain)
+        elif self._is_url(src):
             log.info(
                 f"{self.__class__.__name__}: Loading mappings from URL $$'{src}'$$"
             )
@@ -202,8 +287,9 @@ class MappingsClient:
                 f"{self.__class__.__name__}: Found multiple custom mappings files: {existing_custom_mapping_files}. "
                 f"Only one mappings file can be used at a time. Defaulting to $$'{custom_mappings_path}'$$"
             )
+        custom_mappings_path_str = custom_mappings_path.absolute().as_posix()
 
-        custom_mappings = self._load_mappings(str(custom_mappings_path))
+        custom_mappings = self._load_mappings(custom_mappings_path_str)
         db_mappings = self._load_mappings(self.CDN_URL)
         merged_mappings = self._deep_merge(db_mappings, custom_mappings)
 
