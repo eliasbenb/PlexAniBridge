@@ -232,7 +232,9 @@ class DiscoverPlexObject(PlexObject):
 
 
 class DiscoverVideo(Video, DiscoverPlexObject):
-    pass
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._ratingKey = None
 
 
 class DiscoverMovie(Movie, DiscoverVideo):
@@ -333,7 +335,7 @@ class DiscoverLibrarySection(LibrarySection, DiscoverPlexObject):
             **kwargs,
         )
 
-        metadata_guids = [item.guid.rsplit("/", 1)[-1] for item in data]
+        metadata_guids = {item.guid.rsplit("/", 1)[-1]: item.ratingKey for item in data}
 
         def _chunked(iterable, size: int = 25):
             it = iter(iterable)
@@ -341,12 +343,16 @@ class DiscoverLibrarySection(LibrarySection, DiscoverPlexObject):
                 yield chunk
 
         res = []
-        for chunk in _chunked(metadata_guids):
-            res.extend(
-                self._fetchItemsDiscoverServer(
-                    f"/library/metadata/{','.join(chunk)}", cls, **kwargs
-                )
+        for chunk in _chunked(metadata_guids.keys()):
+            fetched_items = self._fetchItemsDiscoverServer(
+                f"/library/metadata/{','.join(chunk)}", cls, **kwargs
             )
+            for item in fetched_items:
+                guid_id = item.guid.rsplit("/", 1)[-1]
+                if guid_id in metadata_guids:
+                    item._ratingKey = metadata_guids[guid_id]
+
+            res.extend(fetched_items)
 
         return self._loadUserStates(res)
 

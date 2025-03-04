@@ -306,10 +306,8 @@ class PlexClient:
             )
             return None
 
-    @lru_cache(maxsize=32)
-    def get_continue_watching(
-        self, item: Media | None = None, **kwargs
-    ) -> list[Movie | Episode]:
+    @lru_cache(maxsize=1)
+    def _continue_watching_hub(self) -> list[Movie | Episode]:
         """Retrieves all items in the Continue Watching hub.
 
         Args:
@@ -318,21 +316,30 @@ class PlexClient:
         Returns:
             list[Movie | Episode]
         """
+        return self.user_client.fetchItems("/hubs/continueWatching/items")
+
+    def get_continue_watching(self, item: Movie | Show) -> Movie | Episode:
+        """Retrieves all items in the Continue Watching hub.
+
+        Args:
+            item (Movie | Show): The media to get any continue watching items for
+
+        Returns:
+            Movie | Episode | None: The continue watching item if found, None otherwise
+        """
+        rating_key = item.ratingKey
         if self.is_discover_user:
+            rating_key = getattr(item, "_ratingKey", None)
+        if not rating_key:
             return []
 
-        if item:
-            key = {
-                "movie": "ratingKey",
-                "show": "grandparentRatingKey",
-                "season": "parentRatingKey",
-                "episode": "ratingKey",
-            }.get(item.type, "ratingKey")
-            kwargs.update({key: item.ratingKey})
-
-        return self.user_client.fetchItems(
-            "/hubs/continueWatching/items",
-            **kwargs,
+        return next(
+            (
+                e
+                for e in self._continue_watching_hub()
+                if rating_key in (e.ratingKey, e.grandparentRatingKey)
+            ),
+            None,
         )
 
     @lru_cache(maxsize=32)
