@@ -257,7 +257,7 @@ class MappingsClient:
         result = d1.copy()
 
         for key, value in d2.items():
-            if key not in result or key == "tvdb_mappings":
+            if key == "tvdb_mappings" or key not in result:
                 result[key] = value
             elif isinstance(result[key], dict) and isinstance(value, dict):
                 result[key] = self._deep_merge(result[key], value)
@@ -277,18 +277,24 @@ class MappingsClient:
         existing_custom_mapping_files = [
             f for f in self.MAPPING_FILES if (self.data_path / f).exists()
         ]
-        if not existing_custom_mapping_files:
-            return {}
 
-        custom_mappings_path = self.data_path / existing_custom_mapping_files[0]
+        if existing_custom_mapping_files:
+            custom_mappings_path = (
+                (self.data_path / existing_custom_mapping_files[0])
+                .absolute()
+                .as_posix()
+            )
+            custom_mappings = self._load_mappings(custom_mappings_path)
+        else:
+            custom_mappings_path = ""
+            custom_mappings = {}
+
         if len(existing_custom_mapping_files) > 1:
             log.warning(
                 f"{self.__class__.__name__}: Found multiple custom mappings files: {existing_custom_mapping_files}. "
                 f"Only one mappings file can be used at a time. Defaulting to $$'{custom_mappings_path}'$$"
             )
-        custom_mappings_path_str = custom_mappings_path.absolute().as_posix()
 
-        custom_mappings = self._load_mappings(custom_mappings_path_str)
         db_mappings = self._load_mappings(self.CDN_URL)
         merged_mappings = self._deep_merge(db_mappings, custom_mappings)
 
