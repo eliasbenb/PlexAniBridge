@@ -14,7 +14,7 @@ from tzlocal import get_localzone
 from src import log
 from src.settings import PlexMetadataSource
 
-from .plexapi.discover import DiscoverPlexServer
+from .plexapi.metadata import PlexMetadataServer
 
 Media: TypeAlias = Movie | Show | Season | Episode
 MediaHistory: TypeAlias = MovieHistory | EpisodeHistory
@@ -75,9 +75,9 @@ class PlexClient:
         Handles authentication and client setup for the admin account.
         """
         self.admin_client = PlexServer(self.plex_url, self.plex_token)
-        self.discover_client = self.discover_client = (
-            DiscoverPlexServer(self.plex_url, self.plex_token)
-            if self.plex_metadata_source == PlexMetadataSource.DISCOVER
+        self.online_client = (
+            PlexMetadataServer(self.plex_url, self.plex_token)
+            if self.plex_metadata_source == PlexMetadataSource.ONLINE
             else None
         )
 
@@ -101,22 +101,22 @@ class PlexClient:
             admin_account.username,
             admin_account.email,
         ) or (admin_account.title == self.plex_user and not admin_account.username)
-        self.is_discover_user = (
-            self.plex_metadata_source == PlexMetadataSource.DISCOVER
+        self.is_online_user = (
+            self.plex_metadata_source == PlexMetadataSource.ONLINE
             and self.is_admin_user
         )
 
-        if self.is_discover_user:
-            self.user_client = self.admin_client = self.discover_client
+        if self.is_online_user:
+            self.user_client = self.admin_client = self.is_online_user
             self.user_account_id = 1
         elif self.is_admin_user:
             self.user_client = self.admin_client
             self.user_account_id = 1
         else:
-            if self.plex_metadata_source == PlexMetadataSource.DISCOVER:
+            if self.plex_metadata_source == PlexMetadataSource.ONLINE:
                 log.warning(
-                    f"{self.__class__.__name__}: PLEX_METADATA_SOURCE=discover was configured "
-                    f"but the user $$'{self.plex_user}'$$ is not an admin user. Discover data "
+                    f"{self.__class__.__name__}: PLEX_METADATA_SOURCE=online was configured "
+                    f"but the user $$'{self.plex_user}'$$ is not an admin user. Online data "
                     "will not be available for this user."
                 )
 
@@ -325,7 +325,7 @@ class PlexClient:
             Movie | Episode | None: The continue watching item if found, None otherwise
         """
         rating_key = item.ratingKey
-        if self.is_discover_user:
+        if self.is_online_user:
             rating_key = getattr(item, "_ratingKey", None)
         if not rating_key:
             return []
@@ -356,7 +356,7 @@ class PlexClient:
         Note:
             Results are cached using functools.cache decorator
         """
-        if not self.is_discover_user:
+        if not self.is_online_user:
             return item.history()
 
         query = dedent("""
@@ -490,13 +490,13 @@ class PlexClient:
         """
         return bool(self.get_continue_watching(item))
 
-    def is_discover_item(self, item: Media) -> bool:
-        """Checks if a media item is from the Discover server.
+    def is_online_item(self, item: Media) -> bool:
+        """Checks if a media item is from Plex's online API.
 
         Args:
-            item (Movie | Show | Season | Episode): Media item to check
+            item (Media): Media item to check
 
         Returns:
-            bool: True if item is from Discover server, False otherwise
+            bool: True if item is from Plex's online servers, False otherwise
         """
         return isnan(item.librarySectionID)

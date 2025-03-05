@@ -35,7 +35,7 @@ def original_server(func: Callable[..., Any]) -> Callable[..., Any]:
     """
 
     @wraps(func)
-    def wrapper(self: "DiscoverPlexObject", *args: Any, **kwargs: Any) -> Any:
+    def wrapper(self: "PlexMetadataObject", *args: Any, **kwargs: Any) -> Any:
         original_url = self._server._baseurl
         original_token = self._server._token
         try:
@@ -60,7 +60,7 @@ def metadata_server(func: Callable[..., Any]) -> Callable[..., Any]:
     """
 
     @wraps(func)
-    def wrapper(self: "DiscoverPlexObject", *args: Any, **kwargs: Any) -> Any:
+    def wrapper(self: "PlexMetadataObject", *args: Any, **kwargs: Any) -> Any:
         original_url = self._server._baseurl
         original_token = self._server._token
         try:
@@ -74,16 +74,16 @@ def metadata_server(func: Callable[..., Any]) -> Callable[..., Any]:
     return wrapper
 
 
-class DiscoverPlexObject(PlexObject):
-    """Base class for Plex objects that can interact with Discover API.
+class PlexMetadataObject(PlexObject):
+    """Base class for Plex objects that can interact with Metadata API.
 
     This class extends the standard PlexObject with capabilities to fetch data
-    from different Plex endpoints (original server, Discover API, Metadata API).
+    from different Plex endpoints based on the source of the object.
     """
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._server: DiscoverPlexServer
+        self._server: PlexMetadataServer
         self._source: str = self._server._baseurl
 
     @original_server
@@ -102,19 +102,19 @@ class DiscoverPlexObject(PlexObject):
         return super()._reload(*args, **kwargs)
 
 
-class DiscoverVideo(Video, DiscoverPlexObject):
+class MetadataVideo(Video, PlexMetadataObject):
     def _loadData(self, data):
         super()._loadData(data)
         self.ratingKey = data.attrib.get("ratingKey")
 
 
-class DiscoverMovie(Movie, DiscoverVideo):
+class MetadataMovie(Movie, MetadataVideo):
     def _loadData(self, data):
         super()._loadData(data)
         self.ratingKey = data.attrib.get("ratingKey")
 
 
-class DiscoverEpisode(Episode, DiscoverVideo):
+class MetadataEpisode(Episode, MetadataVideo):
     def _loadData(self, data):
         super()._loadData(data)
         self.ratingKey = data.attrib.get("ratingKey")
@@ -122,7 +122,7 @@ class DiscoverEpisode(Episode, DiscoverVideo):
         self.grandparentRatingKey = data.attrib.get("grandparentRatingKey")
 
 
-class DiscoverSeason(Season, DiscoverVideo):
+class MetadataSeason(Season, MetadataVideo):
     def _loadData(self, data):
         super()._loadData(data)
         self.ratingKey = data.attrib.get("ratingKey")
@@ -131,10 +131,10 @@ class DiscoverSeason(Season, DiscoverVideo):
     @metadata_server
     def episodes(self, **kwargs):
         key = f"{self.key}/children?includeUserState=1&episodeOrder=tvdbAiring"
-        return self.fetchItems(key, DiscoverEpisode, **kwargs)
+        return self.fetchItems(key, MetadataEpisode, **kwargs)
 
 
-class DiscoverShow(Show, DiscoverVideo):
+class MetadataShow(Show, MetadataVideo):
     def _loadData(self, data):
         super()._loadData(data)
         self.ratingKey = data.attrib.get("ratingKey")
@@ -146,11 +146,11 @@ class DiscoverShow(Show, DiscoverVideo):
     def seasons(self, **kwargs):
         key = f"{self.key}/children?excludeAllLeaves=1&includeUserState=1&episodeOrder=tvdbAiring"
         return self.fetchItems(
-            key, DiscoverSeason, container_size=self.childCount, **kwargs
+            key, MetadataSeason, container_size=self.childCount, **kwargs
         )
 
 
-class DiscoverLibrarySection(LibrarySection, DiscoverPlexObject):
+class MetadataLibrarySection(LibrarySection, PlexMetadataObject):
     @original_server
     def _search(self, *args, **kwargs):
         return super().search(*args, **kwargs)
@@ -171,7 +171,7 @@ class DiscoverLibrarySection(LibrarySection, DiscoverPlexObject):
     ):
         """Search for items in the library section.
 
-        Automatically fetches user state information for items from the Discover API.
+        Automatically fetches user state information for items from the Metadata API.
         """
         data = self._search(
             title,
@@ -193,28 +193,28 @@ class DiscoverLibrarySection(LibrarySection, DiscoverPlexObject):
         )
 
 
-class DiscoverMovieSection(MovieSection, DiscoverLibrarySection):
+class MetadataMovieSection(MovieSection, MetadataLibrarySection):
     def search(self, *args, **kwargs):
-        return super().search(cls=DiscoverMovie, *args, **kwargs)
+        return super().search(cls=MetadataMovie, *args, **kwargs)
 
 
-class DiscoverShowSection(ShowSection, DiscoverLibrarySection):
+class MetadataShowSection(ShowSection, MetadataLibrarySection):
     def search(self, *args, **kwargs):
-        return super().search(cls=DiscoverShow, *args, **kwargs)
+        return super().search(cls=MetadataShow, *args, **kwargs)
 
 
-class DiscoverLibrary(Library, DiscoverPlexObject):
+class MetadataLibrary(Library, PlexMetadataObject):
     def _loadSections(self):
         key = "/library/sections"
         sectionsByID = {}
         sectionsByTitle = defaultdict(list)
         libcls = {
-            "movie": DiscoverMovieSection,
-            "show": DiscoverShowSection,
+            "movie": MetadataMovieSection,
+            "show": MetadataShowSection,
         }
 
         for elem in self._server.query(key):
-            section = libcls.get(elem.attrib.get("type"), DiscoverLibrarySection)(
+            section = libcls.get(elem.attrib.get("type"), MetadataLibrarySection)(
                 self._server, elem, initpath=key
             )
             sectionsByID[section.key] = section
@@ -224,7 +224,7 @@ class DiscoverLibrary(Library, DiscoverPlexObject):
         self._sectionsByTitle = dict(sectionsByTitle)
 
 
-class DiscoverPlexServer(PlexServer, DiscoverPlexObject):
+class PlexMetadataServer(PlexServer, PlexMetadataObject):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -238,10 +238,10 @@ class DiscoverPlexServer(PlexServer, DiscoverPlexObject):
     @cached_property
     def library(self):
         try:
-            data = self.query(DiscoverLibrary.key)
+            data = self.query(MetadataLibrary.key)
         except BadRequest:
             data = self.query("/library/sections/")
-        return DiscoverLibrary(self, data)
+        return MetadataLibrary(self, data)
 
     def query(
         self, key, method=None, headers=None, params=None, timeout=None, **kwargs
