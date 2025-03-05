@@ -268,7 +268,7 @@ class PlexClient:
 
         log.debug(
             f"{self.__class__.__name__}: Getting reviews for {item.type} "
-            f"$$'{item.title}'$$ $${{key: {item.ratingKey}, plex_id: {item.guid}}}$$"
+            f"$$'{item.title}'$$ $${{ plex_id: {item.guid}}}$$"
         )
 
         try:
@@ -277,9 +277,7 @@ class PlexClient:
                 headers=headers,
                 json={
                     "query": query,
-                    "variables": {
-                        "metadataID": item.ratingKey,
-                    },
+                    "variables": {"metadataID": item.guid},
                     "operationName": "GetReview",
                 },
             )
