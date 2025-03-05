@@ -115,7 +115,7 @@ class MappingsClient:
         Returns:
             AniMapDict: Merged mappings from all included files
         """
-        res = {}
+        mappings = {}
         for include in includes:
             resolved_include = self._resolve_path(include, parent)
 
@@ -131,10 +131,9 @@ class MappingsClient:
                 continue
 
             new_loaded_chain = loaded_chain | {resolved_include}
-            res = self._deep_merge(
-                res, self._load_mappings(resolved_include, new_loaded_chain)
-            )
-        return res
+            include_mappings = self._load_mappings(resolved_include, new_loaded_chain)
+            mappings = self._deep_merge(include_mappings, mappings)
+        return mappings
 
     def _load_mappings_file(self, file: str, loaded_chain: set[str]) -> AniMapDict:
         """Load mappings from a file.
@@ -146,19 +145,19 @@ class MappingsClient:
         Returns:
             AniMapDict: Mappings loaded from the file
         """
-        res: AniMapDict = {}
+        mappings: AniMapDict = {}
         file_path = Path(file)
 
         try:
             if file_path.suffix == ".json":
                 with file_path.open() as f:
-                    res = json.load(f)
+                    mappings = json.load(f)
             elif file_path.suffix in [".yaml", ".yml"]:
                 with file_path.open() as f:
-                    res = self._dict_str_keys(yaml.safe_load(f))
+                    mappings = self._dict_str_keys(yaml.safe_load(f))
             elif file_path.suffix == ".toml":
                 with file_path.open() as f:
-                    res = tomlkit.load(f)
+                    mappings = tomlkit.load(f)
         except (json.JSONDecodeError, yaml.YAMLError, TOMLKitError) as e:
             log.error(
                 f"{self.__class__.__name__}: Error decoding file "
@@ -173,8 +172,8 @@ class MappingsClient:
         self._loaded_sources.add(file)
 
         return self._deep_merge(
-            res,
-            self._load_includes(res.get("$includes", []), loaded_chain, file_path),
+            self._load_includes(mappings.get("$includes", []), loaded_chain, file_path),
+            mappings,
         )
 
     def _load_mappings_url(self, url: str, loaded_chain: set[str]) -> AniMapDict:
@@ -187,11 +186,11 @@ class MappingsClient:
         Returns:
             AniMapDict: Mappings loaded from the URL
         """
-        res: AniMapDict = {}
+        mappings: AniMapDict = {}
         try:
             raw_res = requests.get(url)
             raw_res.raise_for_status()
-            res = raw_res.json()
+            mappings = raw_res.json()
         except requests.RequestException as e:
             log.error(
                 f"{self.__class__.__name__}: Error reaching mappings URL {url}: {e}"
@@ -208,8 +207,8 @@ class MappingsClient:
         self._loaded_sources.add(url)
 
         return self._deep_merge(
-            res,
-            self._load_includes(res.get("$includes", []), loaded_chain, url),
+            self._load_includes(mappings.get("$includes", []), loaded_chain, url),
+            mappings,
         )
 
     def _load_mappings(self, src: str, loaded_chain: set[str] = None) -> AniMapDict:
