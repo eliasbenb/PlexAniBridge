@@ -88,9 +88,9 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
                         if e.index >= tvdb_mapping.start
                     )
 
-                if tvdb_mapping.ratio > 0:
+                if tvdb_mapping.ratio < 0:
                     episodes = [e for e in episodes for _ in range(tvdb_mapping.ratio)]
-                elif tvdb_mapping.ratio < 0:
+                elif tvdb_mapping.ratio > 0:
                     tmp_episodes = {
                         e
                         for i, e in enumerate(episodes, start=1)
