@@ -31,9 +31,10 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             for s in item.seasons()
             if s.leafCount and (self.full_scan or s.viewedLeafCount)
         }
-        all_episodes: list[Episode] = [
-            e for e in item.episodes() if e.parentIndex in seasons
-        ]
+        all_episodes: list[Episode] = sorted(
+            (e for e in item.episodes() if e.parentIndex in seasons),
+            key=lambda e: (e.parentIndex, e.index),
+        )
 
         self.sync_stats.possible |= {str(e) for e in all_episodes}
         unyielded_seasons = set(seasons.keys())
