@@ -49,6 +49,31 @@ def original_server(func: Callable[..., Any]) -> Callable[..., Any]:
     return wrapper
 
 
+def discover_server(func: Callable[..., Any]) -> Callable[..., Any]:
+    """Decorator to temporarily switch to discover.plex.tv server context.
+
+    Args:
+        func (Callable): The function to wrap
+
+    Returns:
+        Callable: The wrapped function that will execute with the Discover server context
+    """
+
+    @wraps(func)
+    def wrapper(self: "PlexMetadataObject", *args: Any, **kwargs: Any) -> Any:
+        original_url = self._server._baseurl
+        original_token = self._server._token
+        try:
+            self._server._baseurl = self._server.myPlexAccount().DISCOVER
+            self._server._token = self._server.myPlexAccount().authToken
+            return func(self, *args, **kwargs)
+        finally:
+            self._server._baseurl = original_url
+            self._server._token = original_token
+
+    return wrapper
+
+
 def metadata_server(func: Callable[..., Any]) -> Callable[..., Any]:
     """Decorator to temporarily switch to metadata.provider.plex.tv server context.
 
