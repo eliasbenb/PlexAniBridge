@@ -16,7 +16,7 @@ from src.models.anilist import (
     MediaStatus,
     User,
 )
-from src.utils.rate_limitter import RateLimiter
+from src.utils.rate_limiter import RateLimiter
 
 
 class AniListClient:

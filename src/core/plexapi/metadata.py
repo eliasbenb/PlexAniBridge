@@ -21,7 +21,7 @@ from plexapi.server import PlexServer
 from plexapi.video import Episode, Movie, Season, Show, Video
 from requests.status_codes import _codes as codes
 
-from src.utils.rate_limitter import RateLimiter
+from src.utils.rate_limiter import RateLimiter
 
 
 def original_server(func: Callable[..., Any]) -> Callable[..., Any]:
