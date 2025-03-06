@@ -163,6 +163,17 @@ class PlexClient:
         """
         return timedelta(weeks=self.admin_client.settings.get("onDeckWindow").value)
 
+    def _guid_to_key(self, guid: str) -> int:
+        """Converts a Plex GUID to a Plex rating key.
+
+        Args:
+            guid (str): Plex GUID to convert
+
+        Returns:
+            int: Plex rating key
+        """
+        return guid.rsplit("/", 1)[-1]
+
     def get_sections(self) -> list[Section]:
         """Retrieves configured Plex library sections.
 
@@ -262,62 +273,26 @@ class PlexClient:
         """
         if not self.is_admin_user:
             return None
-
-        query = dedent("""
-        query GetReview($metadataID: ID!) {
-            metadataReviewV2(metadata: {id: $metadataID}) {
-                ... on ActivityReview {
-                    message
-                }
-                ... on ActivityWatchReview {
-                    message
-                }
-            }
-        }
-        """).strip()
-
-        headers = {
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-            "X-Plex-Token": self.plex_token,
-        }
-
-        log.debug(
-            f"{self.__class__.__name__}: Getting reviews for {item.type} "
-            f"$$'{item.title}'$$ $${{ plex_id: {item.guid}}}$$"
-        )
+        if not item.guid:
+            return None
 
         try:
-            response = requests.post(
-                "https://community.plex.tv/api",
-                headers=headers,
-                json={
-                    "query": query,
-                    "variables": {"metadataID": item.guid},
-                    "operationName": "GetReview",
-                },
+            log.debug(
+                f"{self.__class__.__name__}: Getting reviews for {item.type} "
+                f"$$'{item.title}'$$ $${{ plex_id: {item.guid}}}$$"
             )
-            response.raise_for_status()
-
-            data = response.json()["data"]["metadataReviewV2"]
-            if not data or "message" not in data:
-                return None
-
-            return data["message"]
-
+            return self.community_client.get_reviews(self._guid_to_key(item.guid))
         except requests.HTTPError:
             log.error(
                 f"Failed to get review for {item.type} $$'{item.title}'$$ "
-                f"$${{key: {item.ratingKey}, plex_id: {item.guid}}}$$: ",
-                f"{response.text}",
+                f"$${{key: {item.ratingKey}, plex_id: {item.guid}}}$$",
                 exc_info=True,
             )
             return None
-        except (KeyError, ValueError):
+        except Exception:
             log.error(
                 f"Failed to parse review for {item.type} $$'{item.title}'$$ "
-                f"$${{key: {item.ratingKey}, plex_id: {item.guid}}}$$: ",
-                f"{response.text}",
+                f"$${{key: {item.ratingKey}, plex_id: {item.guid}}}$$",
                 exc_info=True,
             )
             return None
