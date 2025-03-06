@@ -31,9 +31,10 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             for s in item.seasons()
             if s.leafCount and (self.full_scan or s.viewedLeafCount)
         }
-        all_episodes: list[Episode] = [
-            e for e in item.episodes() if e.parentIndex in seasons
-        ]
+        all_episodes: list[Episode] = sorted(
+            (e for e in item.episodes() if e.parentIndex in seasons),
+            key=lambda e: (e.parentIndex, e.index),
+        )
 
         self.sync_stats.possible |= {str(e) for e in all_episodes}
         unyielded_seasons = set(seasons.keys())
@@ -191,7 +192,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         )
         is_partially_watched = len(watched_episodes) > 0
 
-        is_discover_item = self.plex_client.is_discover_item(item)
+        is_online_item = self.plex_client.is_online_item(item)
 
         continue_watching_episode = self.plex_client.get_continue_watching(item)
         is_parent_on_continue_watching = bool(continue_watching_episode)
@@ -220,8 +221,8 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         # We've watched some episodes recently and the Plex server doesn't have all episodes
         if is_in_deck_window and not is_all_available:
             return MediaListStatus.CURRENT
-        # We've watched some episodes recently and it's a discover item, which is impossible to determine the continue watching status of
-        if is_in_deck_window and is_discover_item:
+        # We've watched some episodes recently and it's an online item, which is impossible to determine the continue watching status of
+        if is_in_deck_window and is_online_item:
             return MediaListStatus.CURRENT
 
         is_on_watchlist = self.plex_client.is_on_watchlist(item)

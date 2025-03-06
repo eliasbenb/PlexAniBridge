@@ -13,11 +13,11 @@ class PlexMetadataSource(StrEnum):
 
     Values:
         LOCAL: Metadata is sourced from the local Plex server
-        DISCOVER: Metadata is sourced from Plex's online services
+        ONLINE: Metadata is sourced from Plex's online services
     """
 
     LOCAL = "local"
-    DISCOVER = "discover"
+    ONLINE = "online"
 
     def __repr__(self) -> str:
         """Provides a string representation of the metadata source.
