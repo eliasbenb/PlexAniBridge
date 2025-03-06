@@ -185,7 +185,10 @@ class MetadataLibrarySection(LibrarySection, PlexMetadataObject):
             **kwargs,
         )
 
-        metadata_guids = {item.guid.rsplit("/", 1)[-1]: item.ratingKey for item in data}
+        metadata_guids = {item.guid.rsplit("/", 1)[-1] for item in data if item.guid}
+        if not metadata_guids:
+            return []
+
         return self.fetchItems(
             f"/library/metadata/{','.join(metadata_guids)}?includeUserState=1",
             cls,
