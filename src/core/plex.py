@@ -1,6 +1,5 @@
 from datetime import datetime, timedelta, timezone
 from math import isnan
-from textwrap import dedent
 from typing import TypeAlias
 from xml.etree import ElementTree
 
@@ -8,12 +7,21 @@ import requests
 from cachetools.func import lru_cache
 from plexapi.library import MovieSection, ShowSection
 from plexapi.server import PlexServer
-from plexapi.video import Episode, EpisodeHistory, Movie, MovieHistory, Season, Show
+from plexapi.video import (
+    Episode,
+    EpisodeHistory,
+    Movie,
+    MovieHistory,
+    PlexHistory,
+    Season,
+    Show,
+)
 from tzlocal import get_localzone
 
 from src import log
 from src.settings import PlexMetadataSource
 
+from .plexapi.community import PlexCommunityClient
 from .plexapi.metadata import PlexMetadataServer
 
 Media: TypeAlias = Movie | Show | Season | Episode
@@ -58,6 +66,7 @@ class PlexClient:
 
         self._init_admin_client()
         self._init_user_client()
+        self._init_community_client()
 
         self.on_deck_window = self._get_on_deck_window()
 
@@ -107,7 +116,7 @@ class PlexClient:
         )
 
         if self.is_online_user:
-            self.user_client = self.admin_client = self.is_online_user
+            self.user_client = self.online_client
             self.user_account_id = 1
         elif self.is_admin_user:
             self.user_client = self.admin_client
@@ -136,6 +145,13 @@ class PlexClient:
             if self.is_admin_user
             else f"{self.__class__.__name__}: User is not an admin, using user client"
         )
+
+    def _init_community_client(self) -> None:
+        """Initializes the Plex Community API client.
+
+        Handles authentication and client setup for the Plex Community API.
+        """
+        self.community_client = PlexCommunityClient(self.plex_token)
 
     def _get_on_deck_window(self) -> timedelta:
         """Gets the configured cutoff time for Continue Watching items on Plex.
@@ -357,86 +373,61 @@ class PlexClient:
             Results are cached using functools.cache decorator
         """
         if not self.is_online_user:
-            return item.history()
-
-        query = dedent("""
-        query GetActivityFeed($metadataID: ID!, $first: PaginationInt!) {
-            activityFeed(metadataID: $metadataID, first: $first, types: [WATCH_HISTORY], includeDescendants: true) {
-                nodes {
-                    ... on ActivityWatchHistory {
-                        id
-                        date
-                        metadataItem {
-                            id
-                        }
-                        userV2 {
-                            id
-                        }
-                    }
-                }
-            }
-        }
-        """).strip()
-
-        headers = {
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-            "X-Plex-Token": self.plex_token,
-        }
-
-        try:
-            response = requests.post(
-                "https://community.plex.tv/api",
-                headers=headers,
-                json={
-                    "query": query,
-                    "variables": {"metadataID": item.ratingKey, "first": 100},
-                    "operationName": "GetActivityFeed",
-                },
-            )
-            response.raise_for_status()
-
-            data = response.json()["data"]["activityFeed"]["nodes"]
-
-            res = []
-            for entry in data:
-                if not entry or not entry.get("date"):
-                    continue
-                formatted_data = ElementTree.Element(
-                    "History",
-                    attrib={
-                        **item._data.attrib,
-                        "accountID": entry["userV2"]["id"],
-                        "deviceID": None,
-                        "historyKey": entry["id"],
-                        "viewedAt": datetime.fromisoformat(entry["date"]).timestamp(),
-                    },
-                )
-                kwargs = {"server": self.user_client._server, "data": formatted_data}
-                history = (
-                    MovieHistory(**kwargs)
-                    if item.type == "movie"
-                    else EpisodeHistory(**kwargs)
-                )
-                res.append(history)
-
+            res = item.history()
+            print(res)
             return res
 
+        try:
+            data = self.community_client.get_watch_activity(
+                self._guid_to_key(item.guid)
+            )
+            history = []
+            for entry in data:
+                metadata = entry["metadataItem"]
+                user = entry["userV2"]
+
+                history_data = ElementTree.Element(
+                    "History",
+                    attrib={
+                        "accountID": str(user["id"]),
+                        "deviceID": "",
+                        "historyKey": f"/status/sessions/history/{entry['id']}",
+                        "viewedAt": entry["date"],
+                        "grandparentTitle": item.grandparentTitle
+                        if hasattr(item, "grandparentTitle")
+                        else "",
+                        "index": item.index if hasattr(item, "index") else "",
+                        "parentIndex": item.parentIndex
+                        if hasattr(item, "parentIndex")
+                        else "",
+                    },
+                )
+                history_kwargs = {
+                    "server": self.online_client._server,
+                    "data": history_data,
+                }
+
+                history.append(
+                    EpisodeHistory(**history_kwargs)
+                    if metadata["type"] == "EPISODE"
+                    else MovieHistory(**history_kwargs)
+                    if metadata["type"] == "MOVIE"
+                    else PlexHistory(**history_kwargs)
+                )
+            return history
         except requests.HTTPError:
             log.error(
                 f"Failed to get watch hsitory for {item.type} $$'{item.title}'$$ "
-                f"$${{key: {item.ratingKey}, plex_id: {item.guid}}}$$: ",
-                f"{response.text}",
+                f"$${{key: {item.ratingKey}, plex_id: {item.guid}}}$$",
                 exc_info=True,
             )
-            return []
-        except (KeyError, ValueError):
+        except Exception:
             log.error(
                 f"Failed to parse watch hsitory for {item.type} $$'{item.title}'$$ "
-                f"$${{key: {item.ratingKey}, plex_id: {item.guid}}}$$: ",
-                f"{response.text}",
+                f"$${{key: {item.ratingKey}, plex_id: {item.guid}}}$$",
                 exc_info=True,
             )
+        finally:
             return []
 
     def get_first_history(self, item: Media) -> History | None:
@@ -465,7 +456,7 @@ class PlexClient:
         Returns:
             History | None: Most recent history entry if found, None if no history exists
         """
-        return
+        return max(self.get_history(item), key=lambda h: h.viewedAt, default=None)
 
     def is_on_watchlist(self, item: Movie | Show) -> bool:
         """Checks if a media item is on the user's watchlist.
