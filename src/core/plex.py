@@ -348,9 +348,7 @@ class PlexClient:
             Results are cached using functools.cache decorator
         """
         if not self.is_online_user:
-            res = item.history()
-            print(res)
-            return res
+            return item.history()
 
         try:
             data = self.community_client.get_watch_activity(
