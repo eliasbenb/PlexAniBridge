@@ -1,6 +1,6 @@
 from .logging import Logger, get_logger
 from .settings import PlexAnibridgeConfig
-from .utils.version import get_git_hash, get_pyproject_version
+from .utils.version import get_docker_status, get_git_hash, get_pyproject_version
 
 __author__ = "Elias Benbourenane <eliasbenbourenane@gmail.com>"
 __credits__ = ["eliasbenb"]
@@ -17,6 +17,7 @@ PLEXANIBDRIGE_HEADER = f"""
 ║                                                                               ║
 ║  Version: {__version__:<68}║
 ║  Git Hash: {__git_hash__:<67}║
+║  Docker: {"Yes" if get_docker_status() else "No":<69}║
 ║  Author: {f"{__author__} @{__maintainer__}":<69}║
 ║  License: {__license__:<68}║
 ║  Repository: https://github.com/eliasbenb/PlexAniBridge                       ║

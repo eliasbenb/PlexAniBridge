@@ -49,3 +49,13 @@ def get_git_hash() -> str:
             return f.read().strip()
     except Exception:
         return "unknown"
+
+
+def get_docker_status() -> bool:
+    """Check if PlexAniBridge is running inside a Docker container"
+
+    Returns:
+        bool: True if running inside a Docker container, False otherwise
+    """
+    dockerenv_path = Path("/.dockerenv")
+    return dockerenv_path.exists() and dockerenv_path.is_file()
