@@ -31,10 +31,9 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             for s in item.seasons()
             if s.leafCount and (self.full_scan or s.viewedLeafCount)
         }
-        all_episodes: list[Episode] = sorted(
-            (e for e in item.episodes() if e.parentIndex in seasons),
-            key=lambda e: (e.parentIndex, e.index),
-        )
+        all_episodes: list[Episode] = [
+            e for e in item.episodes() if e.parentIndex in seasons
+        ]
 
         self.sync_stats.possible |= {str(e) for e in all_episodes}
         unyielded_seasons = set(seasons.keys())
@@ -105,6 +104,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
 
             if not episodes:
                 continue
+            episodes = sorted(episodes, key=lambda e: (e.parentIndex, e.index))
 
             primary_season = filtered_seasons[all_seasons.most_common(1)[0][0]]
 
@@ -134,7 +134,10 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
                 self.sync_stats.not_found += 1
                 continue
 
-            episodes = [e for e in all_episodes if e.parentIndex == season.index]
+            episodes = sorted(
+                [e for e in all_episodes if e.parentIndex == season.index],
+                key=lambda e: e.index,
+            )
 
             animapping = AniMap(
                 anilist_id=anilist_media.id,
