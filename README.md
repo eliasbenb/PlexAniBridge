@@ -25,6 +25,7 @@ services:
   plexanibridge:
     image: ghcr.io/eliasbenb/plexanibridge:latest
     environment:
+      TZ: America/New_York
       ANILIST_TOKEN: eyJ...
       PLEX_TOKEN: 2Sb...
       PLEX_USER: username
