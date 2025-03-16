@@ -43,7 +43,7 @@ def run_migrations_offline():
 def run_migrations_online():
     connectable = create_engine(
         db_url,
-        echo=True,
+        echo=False,
         future=True,
     )
 
