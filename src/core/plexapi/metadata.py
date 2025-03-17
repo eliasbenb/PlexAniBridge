@@ -154,9 +154,13 @@ class MetadataSeason(Season, MetadataVideo):
         self.ratingKey = data.attrib.get("ratingKey")
         self.parentRatingKey = data.attrib.get("parentRatingKey")
 
+    @property
+    def viewedLeafCount(self):
+        return sum(1 for episode in self.episodes() if episode.viewCount)
+
     @metadata_server
     def episodes(self, **kwargs):
-        key = f"{self.key}/children?includeUserState=1&episodeOrder=tvdbAiring"
+        key = f"{self.key}/children?includeUserState=1"
         return self.fetchItems(key, MetadataEpisode, **kwargs)
 
 
@@ -165,43 +169,18 @@ class MetadataShow(Show, MetadataVideo):
         super()._loadData(data)
         self.ratingKey = data.attrib.get("ratingKey")
 
+    @property
+    def viewedLeafCount(self):
+        return sum((season.viewedLeafCount or 0) for season in self.seasons())
+
     def episodes(self, **kwargs):
         return sum([season.episodes(**kwargs) for season in self.seasons()], [])
 
-    @discover_server
-    def __loadUserStates(self, seasons):
-        if not seasons:
-            return seasons
-        rating_keys = [s.ratingKey.rsplit("/", 1)[-1] for s in seasons]
-        key = f"/library/metadata/{','.join(rating_keys)}/userState"
-
-        data = self._server.query(key)
-        if data is None:
-            return seasons
-
-        user_states = {
-            elem.attrib.get("ratingKey"): elem
-            for elem in data
-            if elem.attrib.get("ratingKey")
-        }
-
-        for season in seasons:
-            rating_key = season.guid.rsplit("/", 1)[-1]
-            if rating_key in user_states:
-                user_state_elem = user_states[rating_key]
-                season._data.attrib.update(user_state_elem.attrib)
-                for child in user_state_elem:
-                    season._data.append(child)
-                season._loadData(season._data)
-        return seasons
-
     @metadata_server
     def seasons(self, **kwargs):
-        key = f"{self.key}/children?excludeAllLeaves=1&episodeOrder=tvdbAiring"  # &includeUserState=1
-        return self.__loadUserStates(
-            self.fetchItems(
-                key, MetadataSeason, container_size=self.childCount, **kwargs
-            )
+        key = f"{self.key}/children?excludeAllLeaves=1&episodeOrder=tvdbAiring&includeUserState=1"
+        return self.fetchItems(
+            key, MetadataSeason, container_size=self.childCount, **kwargs
         )
 
 
