@@ -8,6 +8,7 @@ from plexapi.video import Episode, Season, Show
 from src import log
 from src.models.anilist import FuzzyDate, Media, MediaListStatus
 from src.models.animap import AniMap
+from src.utils.cache import generic_lru_cache
 
 from .base import BaseSyncClient, ParsedGuids
 
@@ -26,6 +27,10 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         """
         guids = ParsedGuids.from_guids(item.guids)
 
+        episodes_by_season: dict[int, list[Episode]] = {}
+        for e in item.episodes():
+            episodes_by_season.setdefault(e.parentIndex, []).append(e)
+
         seasons: dict[int, Season] = {
             s.index: s
             for s in item.seasons()
@@ -36,11 +41,13 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
                 or (item.viewedLeafCount and self.plex_client.is_online_user)
             )
         }
-        all_episodes: list[Episode] = [
-            e for e in item.episodes() if e.parentIndex in seasons
-        ]
 
-        self.sync_stats.possible |= {str(e) for e in all_episodes}
+        all_possible_episodes = []
+        for index, eps in episodes_by_season.items():
+            if index in seasons:
+                all_possible_episodes.extend(eps)
+        self.sync_stats.possible |= {str(e) for e in all_possible_episodes}
+
         unyielded_seasons = set(seasons.keys())
 
         for animapping in self.animap_client.get_mappings(
@@ -78,19 +85,16 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
                 if not season:
                     continue
 
+                season_episodes = episodes_by_season.get(season.index, [])
                 if tvdb_mapping.end:
                     episodes.extend(
                         e
-                        for e in all_episodes
-                        if e.parentIndex == season.index
-                        and tvdb_mapping.start <= e.index <= tvdb_mapping.end
+                        for e in season_episodes
+                        if tvdb_mapping.start <= e.index <= tvdb_mapping.end
                     )
                 else:
                     episodes.extend(
-                        e
-                        for e in all_episodes
-                        if e.parentIndex == season.index
-                        if e.index >= tvdb_mapping.start
+                        e for e in season_episodes if e.index >= tvdb_mapping.start
                     )
 
                 if tvdb_mapping.ratio < 0:
@@ -104,15 +108,13 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
                     }
                     episodes = list(tmp_episodes)
 
-            all_seasons = Counter(e.parentIndex for e in episodes)
-            unyielded_seasons -= set(all_seasons.keys())
+            season_counts = Counter(e.parentIndex for e in episodes)
+            unyielded_seasons -= set(season_counts.keys())
 
             if not episodes:
                 continue
             episodes = sorted(episodes, key=lambda e: (e.parentIndex, e.index))
-
-            primary_season = filtered_seasons[all_seasons.most_common(1)[0][0]]
-
+            primary_season = filtered_seasons[season_counts.most_common(1)[0][0]]
             yield primary_season, episodes, animapping, anilist_media
 
         for index in unyielded_seasons:
@@ -139,10 +141,8 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
                 self.sync_stats.not_found += 1
                 continue
 
-            episodes = sorted(
-                [e for e in all_episodes if e.parentIndex == season.index],
-                key=lambda e: e.index,
-            )
+            season_episodes = episodes_by_season.get(season.index, [])
+            episodes = sorted(season_episodes, key=lambda e: e.index)
 
             animapping = AniMap(
                 anilist_id=anilist_media.id,
@@ -443,6 +443,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             return min(last_viewed, history_viewed)
         return last_viewed or history_viewed
 
+    @generic_lru_cache(maxsize=32)
     def _filter_watched_episodes(self, episodes: list[Episode]) -> list[Episode]:
         """Filters watched episodes based on AniList entry.
 

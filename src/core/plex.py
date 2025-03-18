@@ -301,14 +301,19 @@ class PlexClient:
             )
             return None
 
-    @lru_cache(maxsize=1)
-    def _continue_watching_hub(self) -> list[Movie | Episode]:
+    @lru_cache(maxsize=32)
+    def get_continue_watching_hub(
+        self, section: MovieSection | ShowSection
+    ) -> list[Movie | Episode]:
         """Retrieves all items in the Continue Watching hub.
+
+        Args:
+            section (MovieSection | ShowSection): The library section to query
 
         Returns:
             list[Movie | Episode]
         """
-        return self.user_client.fetchItems("/hubs/continueWatching/items")
+        return section.continueWatching()
 
     def get_continue_watching(self, item: Movie | Show) -> Movie | Episode:
         """Retrieves all items in the Continue Watching hub.
@@ -319,21 +324,27 @@ class PlexClient:
         Returns:
             Movie | Episode | None: The continue watching item if found, None otherwise
         """
-        rating_key = item.ratingKey
         if self.is_online_user:
-            rating_key = getattr(item, "_ratingKey", None)
-        if not rating_key:
-            return []
+            return None
 
-        return next(
-            (
-                e
-                for e in self._continue_watching_hub()
-                if rating_key == e.ratingKey
-                or rating_key == getattr(e, "grandParentRatingKey", None)
-            ),
-            None,
-        )
+        if item.type == "movie":
+            return next(
+                (
+                    e
+                    for e in self.get_continue_watching_hub(item.section())
+                    if item.ratingKey == e.ratingKey
+                ),
+                None,
+            )
+        elif item.type == "show":
+            return next(
+                (
+                    e
+                    for e in self.get_continue_watching_hub(item.section())
+                    if item.ratingKey == e.grandparentRatingKey
+                ),
+                None,
+            )
 
     @lru_cache(maxsize=32)
     def get_history(

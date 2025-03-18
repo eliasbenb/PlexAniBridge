@@ -1,6 +1,7 @@
 import sys
 from collections import defaultdict
 from functools import cached_property, wraps
+from itertools import chain
 from time import sleep
 from typing import (
     Any,
@@ -8,7 +9,6 @@ from typing import (
 )
 from xml.etree import ElementTree
 
-from cachetools import TTLCache, cached
 from plexapi import log, utils
 from plexapi.base import PlexObject
 from plexapi.exceptions import BadRequest, NotFound, Unauthorized
@@ -22,6 +22,7 @@ from plexapi.server import PlexServer
 from plexapi.video import Episode, Movie, Season, Show, Video
 from requests.status_codes import _codes as codes
 
+from src.utils.cache import generic_ttl_cache
 from src.utils.rate_limiter import RateLimiter
 
 
@@ -166,7 +167,9 @@ class MetadataShow(Show, MetadataVideo):
         self.ratingKey = data.attrib.get("ratingKey")
 
     def episodes(self, **kwargs):
-        return sum([season.episodes(**kwargs) for season in self.seasons()], [])
+        return list(
+            chain.from_iterable(season.episodes(**kwargs) for season in self.seasons())
+        )
 
     @discover_server
     def __loadUserStates(self, seasons):
@@ -239,8 +242,7 @@ class MetadataLibrarySection(LibrarySection, PlexMetadataObject):
             filters,
             **kwargs,
         )
-
-        metadata_guids = {item.guid.rsplit("/", 1)[-1] for item in data if item.guid}
+        metadata_guids = [item.guid.rsplit("/", 1)[-1] for item in data if item.guid]
         if not metadata_guids:
             return []
 
@@ -301,12 +303,7 @@ class PlexMetadataServer(PlexServer, PlexMetadataObject):
             data = self.query("/library/sections/")
         return MetadataLibrary(self, data)
 
-    def _query_cache_key(
-        self, key, method=None, headers=None, params=None, timeout=None, **kwargs
-    ):
-        return f"{key}{method}{headers}{params}{timeout}{kwargs}"
-
-    @cached(cache=TTLCache(maxsize=512, ttl=30), key=_query_cache_key)
+    @generic_ttl_cache(maxsize=None, ttl=30)
     def query(
         self, key, method=None, headers=None, params=None, timeout=None, **kwargs
     ):
@@ -324,7 +321,7 @@ class PlexMetadataServer(PlexServer, PlexMetadataObject):
         method = method or self._session.get
         timeout = timeout or self._timeout
         log.debug("%s %s", method.__name__.upper(), url)
-        headers = self._headers(**headers or {})
+        headers = self._headers(**(headers or {}))
         response = method(
             url, headers=headers, params=params, timeout=timeout, **kwargs
         )
