@@ -242,8 +242,7 @@ class MetadataLibrarySection(LibrarySection, PlexMetadataObject):
             filters,
             **kwargs,
         )
-
-        metadata_guids = {item.guid.rsplit("/", 1)[-1] for item in data if item.guid}
+        metadata_guids = [item.guid.rsplit("/", 1)[-1] for item in data if item.guid]
         if not metadata_guids:
             return []
 
