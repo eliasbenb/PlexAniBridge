@@ -1,8 +1,9 @@
 from abc import ABC, abstractmethod
-from typing import Any, Generic, Iterator, TypeVar, Callable
+from typing import Any, Callable, Generic, Iterator, TypeVar
 
 from plexapi.media import Guid
 from plexapi.video import Episode, Movie, Season, Show
+from pydantic import BaseModel
 from thefuzz import fuzz
 
 from src import log
@@ -10,7 +11,6 @@ from src.core import AniListClient, AniMapClient, PlexClient
 from src.models.anilist import FuzzyDate, Media, MediaList, MediaListStatus, ScoreFormat
 from src.models.animap import AniMap
 from src.settings import SyncField
-from pydantic import BaseModel
 
 T = TypeVar("T", bound=Movie | Show)  # Section item
 S = TypeVar("S", bound=Movie | Season)  # Item child (season)
@@ -291,16 +291,14 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         Returns:
             Media | None: Best matching Media entry above threshold, or None if no match meets threshold
         """
-        best_result, best_ratio = max(
-            (
-                (r, max(fuzz.ratio(title, t) for t in r.title.titles() if t))
-                for r in results
-                if r.title
-            ),
-            default=(None, 0),
-            key=lambda x: x[1],
-        )
-
+        best_result, best_ratio = None, 0
+        for r in results:
+            if r.title:
+                for t in r.title.titles():
+                    current_ratio = fuzz.ratio(title, t)
+                    if current_ratio > best_ratio:
+                        best_ratio = current_ratio
+                        best_result = r
         if best_ratio < self.fuzzy_search_threshold:
             return None
         return best_result
