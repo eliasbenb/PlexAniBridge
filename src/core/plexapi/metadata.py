@@ -1,6 +1,7 @@
 import sys
 from collections import defaultdict
 from functools import cached_property, wraps
+from itertools import chain
 from time import sleep
 from typing import (
     Any,
@@ -166,7 +167,9 @@ class MetadataShow(Show, MetadataVideo):
         self.ratingKey = data.attrib.get("ratingKey")
 
     def episodes(self, **kwargs):
-        return sum([season.episodes(**kwargs) for season in self.seasons()], [])
+        return list(
+            chain.from_iterable(season.episodes(**kwargs) for season in self.seasons())
+        )
 
     @discover_server
     def __loadUserStates(self, seasons):
@@ -319,7 +322,7 @@ class PlexMetadataServer(PlexServer, PlexMetadataObject):
         method = method or self._session.get
         timeout = timeout or self._timeout
         log.debug("%s %s", method.__name__.upper(), url)
-        headers = self._headers(**headers or {})
+        headers = self._headers(**(headers or {}))
         response = method(
             url, headers=headers, params=params, timeout=timeout, **kwargs
         )
