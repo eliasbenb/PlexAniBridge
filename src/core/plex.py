@@ -301,6 +301,7 @@ class PlexClient:
             )
             return None
 
+    @lru_cache(maxsize=32)
     def get_continue_watching_hub(
         self, section: MovieSection | ShowSection
     ) -> list[Movie | Episode]:

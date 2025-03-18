@@ -8,7 +8,6 @@ from typing import (
 )
 from xml.etree import ElementTree
 
-from cachetools import TTLCache, cached
 from plexapi import log, utils
 from plexapi.base import PlexObject
 from plexapi.exceptions import BadRequest, NotFound, Unauthorized
@@ -22,6 +21,7 @@ from plexapi.server import PlexServer
 from plexapi.video import Episode, Movie, Season, Show, Video
 from requests.status_codes import _codes as codes
 
+from src.utils.cache import generic_ttl_cache
 from src.utils.rate_limiter import RateLimiter
 
 
@@ -301,12 +301,7 @@ class PlexMetadataServer(PlexServer, PlexMetadataObject):
             data = self.query("/library/sections/")
         return MetadataLibrary(self, data)
 
-    def _query_cache_key(
-        self, key, method=None, headers=None, params=None, timeout=None, **kwargs
-    ):
-        return f"{key}{method}{headers}{params}{timeout}{kwargs}"
-
-    @cached(cache=TTLCache(maxsize=512, ttl=30), key=_query_cache_key)
+    @generic_ttl_cache(maxsize=None, ttl=30)
     def query(
         self, key, method=None, headers=None, params=None, timeout=None, **kwargs
     ):

@@ -8,6 +8,7 @@ from plexapi.video import Episode, Season, Show
 from src import log
 from src.models.anilist import FuzzyDate, Media, MediaListStatus
 from src.models.animap import AniMap
+from src.utils.cache import generic_lru_cache
 
 from .base import BaseSyncClient, ParsedGuids
 
@@ -442,6 +443,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             return min(last_viewed, history_viewed)
         return last_viewed or history_viewed
 
+    @generic_lru_cache(maxsize=32)
     def _filter_watched_episodes(self, episodes: list[Episode]) -> list[Episode]:
         """Filters watched episodes based on AniList entry.
 
