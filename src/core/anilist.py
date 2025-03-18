@@ -11,6 +11,7 @@ from src.models.anilist import (
     Media,
     MediaFormat,
     MediaList,
+    MediaListCollection,
     MediaListCollectionWithMedia,
     MediaListWithMedia,
     MediaStatus,
@@ -381,7 +382,15 @@ class AniListClient:
         if not backup_file.parent.exists():
             backup_file.parent.mkdir(parents=True)
 
-        backup_file.write_text(data.model_dump_json(indent=2))
+        data_without_media = MediaListCollection(
+            **{
+                field: getattr(data, field)
+                for field in MediaListCollection.model_fields
+                if hasattr(data, field)
+            }
+        )
+
+        backup_file.write_text(data_without_media.model_dump_json(indent=2))
         log.info(f"{self.__class__.__name__}: Exported AniList data to '{backup_file}'")
 
         cutoff_date = datetime.now() - timedelta(days=self.BACKUP_RETENTION_DAYS)
