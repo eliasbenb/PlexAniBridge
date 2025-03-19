@@ -61,18 +61,6 @@ jobs:
             type=raw,value=alpha,enable=${{ github.ref_type == 'tag' && contains(github.ref, 'alpha') }}
             type=raw,value=beta,enable=${{ github.ref_type == 'tag' && contains(github.ref, 'beta') }}
             type=raw,value=latest,enable=${{ github.ref_type == 'tag' && !contains(github.ref, 'alpha') && !contains(github.ref, 'beta') }}
-          labels: |
-            description=Synchronize your Plex watch history, ratings, and reviews with AniList
-            maintainer=Elias Benbourenane <eliasbenbourenane@gmail.com
-            org.opencontainers.image.title=PlexAniBridge
-            org.opencontainers.image.description=Synchronize your Plex watch history, ratings, and reviews with AniList
-            org.opencontainers.image.authors=Elias Benbourenane <eliasbenbourenane@gmail.com>
-            org.opencontainers.image.url=https://plexanibridge.elias.eu.org
-            org.opencontainers.image.documentation=https://plexanibridge.elias.eu.org
-            org.opencontainers.image.source=https://github.com/eliasbenb/PlexAniBridge
-            org.opencontainers.image.licenses=MIT
-            org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.created=${{ github.event.head_commit.timestamp }}
 
       - name: Build and push Docker image
         id: build-and-push
