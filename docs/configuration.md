@@ -273,21 +273,16 @@ When enabled:
 
 ### `FUZZY_SEARCH_THRESHOLD`
 
-`int` (Optional, default: `90`)
+`int` (Optional, default: `-1`)
 
 Determines the similarity percentage required for AniList title matching.
 
-Title matching is only used when a mapping could not be found in your [custom mappings](./advanced/custom-mappings.md) or the [mapping database](https://github.com/eliasbenb/PlexAniBridge-Mappings).
+The default behavior is to disable searching completely and only relying on the [community and local mappings database](./advanced/custom-mappings.md).
 
-- Lower values allow **more** matches (but may increase false positives).
-- Higher values allow **fewer** matches (but reduce false positives).
+??? tip "Enabling Fuzzy Search"
 
-??? tip "Disabling Fuzzy Search"
+    Set this to a value between `0` and `100` to enable **search fallback**. The higher the value, the more strict the title matching.
 
-    Set this to `100` to only allow **exact matches**.
-
-??? tip "Disabling Search"
-
-    Set this to `-1` to diable **search fallback** entirely. This makes it so only mappings in the database or custom mappings are used.
+    A value of `100` requires an exact match, while `0` will match the first result returned by AniList, regardless of similarity.
 
 ---

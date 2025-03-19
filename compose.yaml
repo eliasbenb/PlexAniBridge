@@ -18,7 +18,7 @@ services:
       # DATA_PATH: ./data
       # DRY_RUN: False
       # LOG_LEVEL: INFO
-      # FUZZY_SEARCH_THRESHOLD: 90
+      # FUZZY_SEARCH_THRESHOLD: -1
     volumes:
       - ./data:/app/data
       # - ./logs:/app/logs
