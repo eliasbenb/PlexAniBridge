@@ -70,7 +70,7 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
         Returns:
             Media | None: Matching AniList entry or None if not found
         """
-        if self.fuzzy_search_threshold == -1:
+        if self.search_fallback_threshold == -1:
             return None
 
         results = self.anilist_client.search_anime(item.title, True, 1)

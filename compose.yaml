@@ -15,10 +15,10 @@ services:
       # FULL_SCAN: False
       # DESTRUCTIVE_SYNC: False
       # EXCLUDED_SYNC_FIELDS: '["notes", "score"]'
-      # DATA_PATH: ./data
       # DRY_RUN: False
       # LOG_LEVEL: INFO
-      # FUZZY_SEARCH_THRESHOLD: -1
+      # SEARCH_FALLBACK_THRESHOLD=-1
+      # DATA_PATH: ./data
     volumes:
       - ./data:/app/data
       # - ./logs:/app/logs

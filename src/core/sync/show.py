@@ -167,7 +167,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         Returns:
             Media | None: Matching AniList entry or None if not found
         """
-        if self.fuzzy_search_threshold == -1:
+        if self.search_fallback_threshold == -1:
             return None
         if child_item.parentIndex == 0:
             return None

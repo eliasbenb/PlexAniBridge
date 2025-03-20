@@ -151,7 +151,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         excluded_sync_fields: list[SyncField],
         full_scan: bool,
         destructive_sync: bool,
-        fuzzy_search_threshold: int,
+        search_fallback_threshold: int,
     ) -> None:
         """Initializes a new synchronization client.
 
@@ -161,7 +161,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             plex_client (PlexClient): Plex API client
             excluded_sync_fields (list[SyncField]): Fields to exclude from synchronization
             destructive_sync (bool): Whether to delete AniList entries not found in Plex
-            fuzzy_search_threshold (int): Minimum match ratio for fuzzy title
+            search_fallback_threshold (int): Minimum match ratio for fuzzy title
         """
         self.anilist_client = anilist_client
         self.animap_client = animap_client
@@ -170,7 +170,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         self.excluded_sync_fields = excluded_sync_fields
         self.full_scan = full_scan
         self.destructive_sync = destructive_sync
-        self.fuzzy_search_threshold = fuzzy_search_threshold
+        self.search_fallback_threshold = search_fallback_threshold
 
         self.sync_stats = SyncStats()
 
@@ -299,7 +299,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
                     if current_ratio > best_ratio:
                         best_ratio = current_ratio
                         best_result = r
-        if best_ratio < self.fuzzy_search_threshold:
+        if best_ratio < self.search_fallback_threshold:
             return None
         return best_result
 

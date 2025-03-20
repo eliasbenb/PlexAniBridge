@@ -140,7 +140,7 @@ class PlexAnibridgeConfig(BaseSettings):
     DATA_PATH: Path = "./data"
     DRY_RUN: bool = False
     LOG_LEVEL: LogLevel = LogLevel.INFO
-    FUZZY_SEARCH_THRESHOLD: int = Field(-1, ge=-1, le=100)
+    SEARCH_FALLBACK_THRESHOLD: int = Field(-1, ge=-1, le=100)
 
     @model_validator(mode="after")
     def absolute_data_path(self) -> Self:

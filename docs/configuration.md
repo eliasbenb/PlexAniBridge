@@ -221,18 +221,6 @@ Specifies which fields should **not** be synced. Available fields:
 
 ---
 
-### `DATA_PATH`
-
-`str` (Optional, default: `./data`)
-
-Path to store the database, backups, and custom mappings.
-
-??? note "Docker"
-
-    If running in Docker, **do not change this path** unless properly mapped in your Docker volume/mount.
-
----
-
 ### `LOG_LEVEL`
 
 `str` (Optional, default: `INFO`)
@@ -271,18 +259,30 @@ When enabled:
 
 ---
 
-### `FUZZY_SEARCH_THRESHOLD`
+### `SEARCH_FALLBACK_THRESHOLD`
 
 `int` (Optional, default: `-1`)
 
-Determines the similarity percentage required for AniList title matching.
+Determines how similar (as a percentage) a title must be to the search query to be considered a match.
 
 The default behavior is to disable searching completely and only relying on the [community and local mappings database](./advanced/custom-mappings.md).
 
-??? tip "Enabling Fuzzy Search"
+??? tip "Enabling Search Fallback"
 
     Set this to a value between `0` and `100` to enable **search fallback**. The higher the value, the more strict the title matching.
 
     A value of `100` requires an exact match, while `0` will match the first result returned by AniList, regardless of similarity.
+
+---
+
+### `DATA_PATH`
+
+`str` (Optional, default: `./data`)
+
+Path to store the database, backups, and custom mappings.
+
+??? note "Docker"
+
+    If running in Docker, **do not change this path** unless properly mapped in your Docker volume/mount.
 
 ---

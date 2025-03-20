@@ -32,7 +32,7 @@ class BridgeClient:
         - FULL_SCAN: Allow scanning items that don't have any activity
         - DESTRUCTIVE_SYNC: Allow deletion of AniList entries
         - EXCLUDED_SYNC_FIELDS: Fields to ignore during sync
-        - FUZZY_SEARCH_THRESHOLD: Matching threshold for title comparison
+        - SEARCH_FALLBACK_THRESHOLD: Matching threshold for title comparison
 
     Args:
         config (PlexAnibridgeConfig): Application configuration settings
@@ -260,7 +260,7 @@ class BridgeClient:
             "excluded_sync_fields": self.config.EXCLUDED_SYNC_FIELDS,
             "full_scan": self.config.FULL_SCAN,
             "destructive_sync": self.config.DESTRUCTIVE_SYNC,
-            "fuzzy_search_threshold": self.config.FUZZY_SEARCH_THRESHOLD,
+            "search_fallback_threshold": self.config.SEARCH_FALLBACK_THRESHOLD,
         }
 
         self.movie_sync = MovieSyncClient(**sync_client_args)
