@@ -142,6 +142,29 @@ class PlexAnibridgeConfig(BaseSettings):
     LOG_LEVEL: LogLevel = LogLevel.INFO
     SEARCH_FALLBACK_THRESHOLD: int = Field(-1, ge=-1, le=100)
 
+    @model_validator(mode="before")
+    def catch_extra_env_vars(cls, values) -> Self:
+        """Catches extra environment variables not defined in the model and logs them."""
+        from src.logging import Logger, get_logger
+
+        log: Logger = get_logger(log_name="PlexAniBridge", log_dir="logs")
+
+        DEPRECATED = {"fuzzy_search_threshold": "SEARCH_FALLBACK_THRESHOLD"}
+
+        wanted: set[str] = set(cls.model_fields.keys())
+        extra: set[str] = set(values.keys()) - wanted
+
+        for key in extra:
+            if key in DEPRECATED:
+                log.warning(
+                    f"Skipping deprecated configuration setting: $$'{key.upper()}'$$. Use $$'{DEPRECATED[key]}'$$ instead."
+                )
+            else:
+                log.warning(f"Skipping unrecognized configuration setting: $$'{key}'$$")
+            del values[key]
+
+        return values
+
     @model_validator(mode="after")
     def absolute_data_path(self) -> Self:
         """Ensures DATA_PATH is an absolute path.
@@ -238,4 +261,4 @@ class PlexAnibridgeConfig(BaseSettings):
 
     class Config:
         env_file = ".env"
-        extra = "ignore"
+        extra = "allow"
