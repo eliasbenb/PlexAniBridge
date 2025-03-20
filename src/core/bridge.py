@@ -208,7 +208,7 @@ class BridgeClient:
         if config_encoded != self.last_config_encoded:
             self._set_last_config_encoded(config_encoded)
 
-        log.success(
+        log.info(
             f"{self.__class__.__name__}: {'Polling' if poll else 'Periodic'} sync completed"
         )
 
@@ -272,7 +272,7 @@ class BridgeClient:
         for section in plex_sections:
             sync_stats += self._sync_section(plex_client, section, poll)
 
-        log.success(
+        log.info(
             f"{self.__class__.__name__}: Syncing Plex user $$'{plex_user}'$$ to AniList user "
             f"$$'{anilist_client.user.name}'$$ completed"
         )
@@ -283,7 +283,7 @@ class BridgeClient:
             f"{self.__class__.__name__}: The following items could not be synced: {unsynced_items_str}"
         )
 
-        log.success(
+        log.info(
             f"{self.__class__.__name__}: {sync_stats.synced} items synced, {sync_stats.deleted} items deleted, "
             f"{sync_stats.skipped} items skipped, {sync_stats.not_found} items not found, "
             f"and {sync_stats.failed} items failed with a coverage of {sync_stats.coverage:.2%}"

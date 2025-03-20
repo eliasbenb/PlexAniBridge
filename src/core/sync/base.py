@@ -352,7 +352,6 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
                 f"{self.__class__.__name__}: Skipping {item.type} because it is already up to date "
                 f"{debug_log_title} {debug_log_ids}"
             )
-            log.debug(f"\t\tCURRENT => {final_media_list}")
             self.sync_stats.skipped += 1
             return
 
