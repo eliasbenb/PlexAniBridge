@@ -149,7 +149,10 @@ class PlexAnibridgeConfig(BaseSettings):
 
         log: Logger = get_logger(log_name="PlexAniBridge", log_dir="logs")
 
-        DEPRECATED = {"fuzzy_search_threshold": "SEARCH_FALLBACK_THRESHOLD"}
+        DEPRECATED: dict[str, str] = {}
+        DEPRECATED_ALIAS: dict[str, str] = {
+            "fuzzy_search_threshold": "SEARCH_FALLBACK_THRESHOLD"
+        }
 
         wanted: set[str] = set(cls.model_fields.keys())
         extra: set[str] = set(values.keys()) - wanted
@@ -157,10 +160,15 @@ class PlexAnibridgeConfig(BaseSettings):
         for key in extra:
             if key in DEPRECATED:
                 log.warning(
-                    f"Skipping deprecated configuration setting: $$'{key.upper()}'$$. Use $$'{DEPRECATED[key]}'$$ instead."
+                    f"$$'{key.upper()}'$$ is going to become deprecated soon, use $$'{DEPRECATED[key].upper()}'$$ instead"
                 )
+            elif key in DEPRECATED_ALIAS:
+                log.warning(
+                    f"$$'{key.upper()}'$$ is going to become deprecated soon, use $$'{DEPRECATED_ALIAS[key].upper()}'$$ instead"
+                )
+                values[DEPRECATED_ALIAS[key]] = values[key]
             else:
-                log.warning(f"Skipping unrecognized configuration setting: $$'{key}'$$")
+                log.warning(f"Unrecognized configuration setting: $$'{key}'$$")
             del values[key]
 
         return values
