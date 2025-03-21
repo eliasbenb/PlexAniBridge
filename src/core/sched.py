@@ -17,6 +17,7 @@ class SchedulerClient:
         sync_interval: int,
         polling_scan: bool,
         poll_interval: int = 30,
+        stop_event: asyncio.Event | None = None,
     ):
         self.bridge = bridge
         self.sync_interval = sync_interval
@@ -28,7 +29,7 @@ class SchedulerClient:
         self._tasks: set[asyncio.Task] = set()
         self._sync_lock = asyncio.Lock()
         self._current_task = None
-        self.stop_event = asyncio.Event()
+        self.stop_event = stop_event or asyncio.Event()
 
     async def run_sync(self, poll: bool) -> None:
         """Function to run a sync job
@@ -66,7 +67,7 @@ class SchedulerClient:
 
     async def _periodic_sync(self) -> None:
         """Handle periodic synchronization"""
-        while self._running:
+        while self._running and not self.stop_event.is_set():
             try:
                 await self.sync()
                 next_sync = datetime.now(timezone.utc) + timedelta(
@@ -75,7 +76,10 @@ class SchedulerClient:
                 log.info(
                     f"{self.__class__.__name__}: Next periodic sync scheduled for: {next_sync.astimezone(get_localzone())}"
                 )
-                await asyncio.sleep(self.sync_interval)
+                try:
+                    await asyncio.wait_for(self.stop_event.wait(), self.sync_interval)
+                except asyncio.TimeoutError:
+                    pass
             except asyncio.CancelledError:
                 log.info(f"{self.__class__.__name__}: Periodic sync cancelled")
                 break
@@ -172,6 +176,7 @@ class SchedulerClient:
     async def stop(self) -> None:
         """Stop the scheduler and clean up"""
         self._running = False
+        self.stop_event.set()
 
         if self._tasks:
             log.info(f"{self.__class__.__name__}: Stopping all scheduler tasks...")
