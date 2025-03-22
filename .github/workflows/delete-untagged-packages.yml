@@ -1,3 +1,5 @@
+name: Delete Untagged Packages
+
 on:
   schedule:
     - cron: '0 0 1 * *'
@@ -10,6 +12,6 @@ jobs:
       - uses: actions/delete-package-versions@v5
         with:
           package-name: plexanibridge
-          package-type: container"
-          min-versions-to-keep: 10
+          package-type: container
+          min-versions-to-keep: 50
           delete-only-untagged-versions: true
