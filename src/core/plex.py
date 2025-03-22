@@ -3,6 +3,7 @@ from math import isnan
 from typing import TypeAlias
 from xml.etree import ElementTree
 
+import plexapi.utils
 import requests
 from cachetools.func import lru_cache
 from plexapi.library import MovieSection, ShowSection
@@ -363,7 +364,10 @@ class PlexClient:
             Results are cached using functools.cache decorator
         """
         if not self.is_online_user:
-            return item.history()
+            args = {"metadataItemID": item.ratingKey, "accountID": self.user_account_id}
+            return self.admin_client.fetchItems(
+                f"/status/sessions/history/all{plexapi.utils.joinArgs(args)}"
+            )
 
         try:
             data = self.community_client.get_watch_activity(
