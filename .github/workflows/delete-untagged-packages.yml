@@ -13,5 +13,5 @@ jobs:
         with:
           package-name: plexanibridge
           package-type: container
-          min-versions-to-keep: 50
+          min-versions-to-keep: 0
           delete-only-untagged-versions: true
