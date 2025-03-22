@@ -1,18 +1,30 @@
 [project]
 name = "PlexAniBridge"
-version = "0.3.3"
+version = "0.5.0"
 description = "Synchronize your Plex watch history, ratings, and reviews with AniList"
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = [
-    "gitpython>=3.1.43",
-    "plexapi>=4.16.0",
-    "pydantic-settings>=2.7.0",
-    "pydantic>=2.10.4",
-    "sqlmodel>=0.0.22",
-    "thefuzz>=0.22.1",
-    "colorama>=0.4.6",
-    "tomlkit>=0.13.2",
-    "PyYAML>=6.0.2",
-    "alembic>=1.14.0",
+license = { text = "MIT" }
+
+authors = [
+    { name = "Elias Benbourenane", email = "eliasbenbourenane@gmail.com" }
 ]
+maintainers = [
+    { name = "Elias Benbourenane", email = "eliasbenbourenane@gmail.com" }
+]
+
+keywords = ["plex", "anilist", "sync", "anime", "syncronization", "scrobble", "docker", "plexanibridge"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Topic :: Multimedia :: Video :: Front-Ends",
+    "Topic :: Utilities"
+]
+
+[project.urls]
+Homepage = "https://plexanibridge.elias.eu.org"
+Documentation = "https://plexanibridge.elias.eu.org"
+Source = "https://github.com/eliasbenb/PlexAniBridge"
+Issues = "https://github.com/eliasbenb/PlexAniBridge/issues"

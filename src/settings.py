@@ -1,10 +1,32 @@
 from enum import StrEnum
 from hashlib import md5
 from pathlib import Path
+from typing import Self
 
 from pydantic import Field, model_validator
 from pydantic.alias_generators import to_camel
 from pydantic_settings import BaseSettings
+
+
+class PlexMetadataSource(StrEnum):
+    """Defines the source of metadata for Plex media items.
+
+    Values:
+        LOCAL: Metadata is sourced from the local Plex server
+        ONLINE: Metadata is sourced from Plex's online services
+    """
+
+    LOCAL = "local"
+    ONLINE = "online"
+
+    def __repr__(self) -> str:
+        """Provides a string representation of the metadata source.
+
+        Returns:
+            str: Quoted string of the metadata source
+                Example: PlexMetadataSource.LOCAL -> 'local'
+        """
+        return f"'{self.value}'"
 
 
 class SyncField(StrEnum):
@@ -64,6 +86,7 @@ class LogLevel(StrEnum):
     Values:
         DEBUG: Detailed information for debugging
         INFO: General information about program execution
+        SUCCESS: Positive confirmation of a successful operation
         WARNING: Indicates a potential problem
         ERROR: Error that prevented a specific operation
         CRITICAL: Error that prevents further program execution
@@ -71,6 +94,7 @@ class LogLevel(StrEnum):
 
     DEBUG = "DEBUG"
     INFO = "INFO"
+    SUCCESS = "SUCCESS"
     WARNING = "WARNING"
     ERROR = "ERROR"
     CRITICAL = "CRITICAL"
@@ -91,43 +115,6 @@ class PlexAnibridgeConfig(BaseSettings):
     Handles loading, validation, and storage of configuration settings from
     environment variables or .env file. Provides type checking and validation
     rules for all settings.
-
-    Settings Categories:
-        AniList Settings:
-            ANILIST_TOKEN (str | list[str]): Authentication token(s) for AniList API
-
-        Plex Settings:
-            PLEX_TOKEN (str): Authentication token for Plex server
-            PLEX_USER (str | list[str]): Plex username(s) to sync
-            PLEX_URL (str): Plex server URL, defaults to "http://localhost:32400"
-            PLEX_SECTIONS (list[str]): Library sections to sync
-
-        General Settings:
-            SYNC_INTERVAL (int): Time between syncs in seconds (>= -1)
-            POLLING_SCAN (bool): Enable polling for new media, default False
-            FULL_SCAN (bool): Enable a full scan of all media, even if not watched, default False
-            DESTRUCTIVE_SYNC (bool): Allow deletion of entries, default False
-            EXCLUDED_SYNC_FIELDS (list[SyncField]): Fields to ignore during sync
-
-        Advanced Settings:
-            DATA_PATH (Path): Storage location for database and logs
-            DRY_RUN (bool): Simulate operations without making changes
-            LOG_LEVEL (LogLevel): Logging verbosity
-            FUZZY_SEARCH_THRESHOLD (int): Title matching threshold (0-100)
-
-    Environment Variables:
-        All settings can be configured via environment variables.
-        Lists should be comma-separated.
-        Example: PLEX_SECTIONS=Anime,Movies
-
-    File Configuration:
-        Settings can also be loaded from a .env file in the current directory.
-
-    Validation Rules:
-        - DATA_PATH is converted to absolute path
-        - ANILIST_TOKEN and PLEX_USER must have matching lengths
-        - SYNC_INTERVAL must be >= -1
-        - FUZZY_SEARCH_THRESHOLD must be between 0 and 100
     """
 
     # AniList
@@ -138,6 +125,8 @@ class PlexAnibridgeConfig(BaseSettings):
     PLEX_USER: str | list[str]
     PLEX_URL: str = "http://localhost:32400"
     PLEX_SECTIONS: list[str]
+    PLEX_GENRES: list[str] = []
+    PLEX_METADATA_SOURCE: PlexMetadataSource = PlexMetadataSource.LOCAL
 
     # General
     SYNC_INTERVAL: int = Field(3600, ge=-1)
@@ -151,10 +140,41 @@ class PlexAnibridgeConfig(BaseSettings):
     DATA_PATH: Path = "./data"
     DRY_RUN: bool = False
     LOG_LEVEL: LogLevel = LogLevel.INFO
-    FUZZY_SEARCH_THRESHOLD: int = Field(90, ge=0, le=100)
+    SEARCH_FALLBACK_THRESHOLD: int = Field(-1, ge=-1, le=100)
+
+    @model_validator(mode="before")
+    def catch_extra_env_vars(cls, values) -> Self:
+        """Catches extra environment variables not defined in the model and logs them."""
+        from src.logging import Logger, get_logger
+
+        log: Logger = get_logger(log_name="PlexAniBridge", log_dir="logs")
+
+        DEPRECATED: dict[str, str] = {}
+        DEPRECATED_ALIAS: dict[str, str] = {
+            "fuzzy_search_threshold": "SEARCH_FALLBACK_THRESHOLD"
+        }
+
+        wanted: set[str] = set(cls.model_fields.keys())
+        extra: set[str] = set(values.keys()) - wanted
+
+        for key in extra:
+            if key in DEPRECATED:
+                log.warning(
+                    f"$$'{key.upper()}'$$ is going to become deprecated soon, use $$'{DEPRECATED[key].upper()}'$$ instead"
+                )
+            elif key in DEPRECATED_ALIAS:
+                log.warning(
+                    f"$$'{key.upper()}'$$ is going to become deprecated soon, use $$'{DEPRECATED_ALIAS[key].upper()}'$$ instead"
+                )
+                values[DEPRECATED_ALIAS[key]] = values[key]
+            else:
+                log.warning(f"Unrecognized configuration setting: $$'{key}'$$")
+            del values[key]
+
+        return values
 
     @model_validator(mode="after")
-    def absolute_data_path(self) -> "PlexAnibridgeConfig":
+    def absolute_data_path(self) -> Self:
         """Ensures DATA_PATH is an absolute path.
 
         Converts relative paths to absolute using the current working directory
@@ -170,7 +190,7 @@ class PlexAnibridgeConfig(BaseSettings):
         return self
 
     @model_validator(mode="after")
-    def token_validation(self) -> "PlexAnibridgeConfig":
+    def token_validation(self) -> Self:
         """Validates AniList tokens and Plex users.
 
         Performs the following validations:
@@ -249,4 +269,4 @@ class PlexAnibridgeConfig(BaseSettings):
 
     class Config:
         env_file = ".env"
-        extra = "ignore"
+        extra = "allow"

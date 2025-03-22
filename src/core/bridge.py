@@ -5,7 +5,7 @@ from sqlmodel import Session
 
 from src import log
 from src.core import AniListClient, AniMapClient, PlexClient
-from src.core.sync import MovieSyncClient, ShowSyncClient, SyncStats
+from src.core.sync import BaseSyncClient, MovieSyncClient, ShowSyncClient, SyncStats
 from src.database import db
 from src.models.housekeeping import Housekeeping
 from src.settings import PlexAnibridgeConfig
@@ -32,7 +32,7 @@ class BridgeClient:
         - FULL_SCAN: Allow scanning items that don't have any activity
         - DESTRUCTIVE_SYNC: Allow deletion of AniList entries
         - EXCLUDED_SYNC_FIELDS: Fields to ignore during sync
-        - FUZZY_SEARCH_THRESHOLD: Matching threshold for title comparison
+        - SEARCH_FALLBACK_THRESHOLD: Matching threshold for title comparison
 
     Args:
         config (PlexAnibridgeConfig): Application configuration settings
@@ -41,6 +41,13 @@ class BridgeClient:
     MIN_DATETIME = datetime.min.replace(tzinfo=timezone.utc)
 
     def __init__(self, config: PlexAnibridgeConfig) -> None:
+        """Initialize the AniList client.
+
+        Args:
+            anilist_token (str): Authentication token for AniList API access
+            backup_dir (Path): Directory path where backup files will be stored
+            dry_run (bool): If True, simulates API calls without making actual changes
+        """
         self.config = config
 
         self.token_user_pairs = list(zip(config.ANILIST_TOKEN, config.PLEX_USER))
@@ -53,10 +60,9 @@ class BridgeClient:
         self.last_config_encoded = self._get_last_config_encoded()
 
     def reinit(self) -> None:
-        """Reinitializes the AniMap database client.
+        """Reinitializes the Plex and AniList clients to refresh user data during polling.
 
-        This method is called during the application startup to ensure
-        the database is properly connected and ready for use.
+        Refreshes Plex and AniList user data, clear caches, and reinitialize clients.
         """
         self.animap_client.reinit()
         for plex_client in self.plex_clients.values():
@@ -231,6 +237,8 @@ class BridgeClient:
                 plex_user,
                 self.config.PLEX_URL,
                 self.config.PLEX_SECTIONS,
+                self.config.PLEX_GENRES,
+                self.config.PLEX_METADATA_SOURCE,
             )
         plex_client = self.plex_clients[plex_user]
 
@@ -250,8 +258,9 @@ class BridgeClient:
             "animap_client": self.animap_client,
             "plex_client": plex_client,
             "excluded_sync_fields": self.config.EXCLUDED_SYNC_FIELDS,
+            "full_scan": self.config.FULL_SCAN,
             "destructive_sync": self.config.DESTRUCTIVE_SYNC,
-            "fuzzy_search_threshold": self.config.FUZZY_SEARCH_THRESHOLD,
+            "search_fallback_threshold": self.config.SEARCH_FALLBACK_THRESHOLD,
         }
 
         self.movie_sync = MovieSyncClient(**sync_client_args)
@@ -264,8 +273,20 @@ class BridgeClient:
             sync_stats += self._sync_section(plex_client, section, poll)
 
         log.info(
+            f"{self.__class__.__name__}: Syncing Plex user $$'{plex_user}'$$ to AniList user "
+            f"$$'{anilist_client.user.name}'$$ completed"
+        )
+
+        unsynced_items = sorted(list(sync_stats.possible - sync_stats.covered))
+        unsynced_items_str = ", ".join(str(i) for i in unsynced_items)
+        log.debug(
+            f"{self.__class__.__name__}: The following items could not be synced: {unsynced_items_str}"
+        )
+
+        log.info(
             f"{self.__class__.__name__}: {sync_stats.synced} items synced, {sync_stats.deleted} items deleted, "
-            f"{sync_stats.skipped} items skipped, {sync_stats.failed} items failed"
+            f"{sync_stats.skipped} items skipped, {sync_stats.not_found} items not found, "
+            f"and {sync_stats.failed} items failed with a coverage of {sync_stats.coverage:.2%}"
         )
 
     def _sync_section(
@@ -308,8 +329,17 @@ class BridgeClient:
             require_watched=not self.config.FULL_SCAN,
         )
 
-        sync_client = self.movie_sync if section.type == "movie" else self.show_sync
+        sync_client: BaseSyncClient = {
+            "movie": self.movie_sync,
+            "show": self.show_sync,
+        }[section.type]
         for item in items:
-            sync_client.process_media(item)
+            try:
+                sync_client.process_media(item)
+            except Exception:
+                log.error(
+                    f"{self.__class__.__name__}: Failed to sync item $$'{item.title}'$$: ",
+                    exc_info=True,
+                )
 
         return sync_client.sync_stats

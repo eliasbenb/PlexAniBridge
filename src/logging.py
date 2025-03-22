@@ -9,61 +9,6 @@ import colorama
 from colorama import Fore, Style
 
 
-def supports_color() -> bool:
-    """Check if the terminal supports ANSI color codes.
-
-    Detects if the terminal supports ANSI color codes by checking platform-specific
-    conditions and environment variables. On Windows, it also checks the Windows
-    registry for the VirtualTerminalLevel key.
-
-    Returns:
-        bool: True if the terminal supports color, False otherwise
-    """
-
-    def vt_codes_enabled_in_windows_registry():
-        try:
-            import winreg
-        except ImportError:
-            return False
-
-        try:
-            reg_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Console")
-            reg_key_value, _ = winreg.QueryValueEx(reg_key, "VirtualTerminalLevel")
-            return reg_key_value == 1
-        except FileNotFoundError:
-            return False
-
-    is_a_tty = hasattr(sys.stdout, "isatty") and sys.stdout.isatty()
-
-    if not is_a_tty:
-        return False
-
-    if sys.platform == "win32":
-        return (
-            getattr(colorama, "fixed_windows_console", False)
-            or "ANSICON" in os.environ
-            or "WT_SESSION" in os.environ  # Windows Terminal
-            or os.environ.get("TERM_PROGRAM") == "vscode"
-            or vt_codes_enabled_in_windows_registry()
-        )
-
-    return True
-
-
-if supports_color():
-    try:
-        if sys.platform == "win32":
-            colorama.just_fix_windows_console()
-        else:
-            colorama.init()
-    except (AttributeError, ImportError, OSError):
-        HAS_COLOR_SUPPORT = False
-    else:
-        HAS_COLOR_SUPPORT = True
-else:
-    HAS_COLOR_SUPPORT = False
-
-
 class ColorFormatter(logging.Formatter):
     """Custom formatter that adds terminal colors to log messages.
 
@@ -75,21 +20,18 @@ class ColorFormatter(logging.Formatter):
     Color Scheme:
         DEBUG: Cyan
         INFO: Green
+        SUCCESS: Light Cyan
         WARNING: Yellow
         ERROR: Red
         CRITICAL: Bright Red
         Quoted values: Light Blue (e.g., $$'example'$$)
         Bracketed values: Dimmed (e.g., $${key: value}$$)
-
-    Note:
-        - Uses colorama for cross-platform color support
-        - Color markers ($$) in the message must be balanced
-        - Original message is preserved after formatting
     """
 
     COLORS = {
         "DEBUG": Fore.CYAN,
         "INFO": Fore.GREEN,
+        "SUCCESS": Fore.GREEN + Style.BRIGHT,
         "WARNING": Fore.YELLOW,
         "ERROR": Fore.RED,
         "CRITICAL": Fore.RED + Style.BRIGHT,
@@ -98,21 +40,11 @@ class ColorFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         """Formats a log record with ANSI color codes.
 
-        Applies color formatting to:
-        1. Log level name based on severity
-        2. Special markers in the message:
-           - $$'text'$$ -> Light blue quoted text
-           - $${text}$$ -> Dimmed bracketed text
-
         Args:
             record (logging.LogRecord): Log record to format
 
         Returns:
             str: Color-formatted log message
-
-        Note:
-            Temporarily modifies the record but restores original values
-            before returning to prevent side effects in other formatters
         """
         orig_msg = record.msg
         orig_levelname = record.levelname
@@ -121,7 +53,7 @@ class ColorFormatter(logging.Formatter):
         if isinstance(record.msg, str):
             # Color strings in quotes
             record.msg = re.sub(
-                r"\$\$\'(.*?)\'\$\$",
+                r"\$\$'((?:[^']|'(?!\$\$))*)'\$\$",
                 f"{Fore.LIGHTBLUE_EX}'\\1'{Style.RESET_ALL}",
                 record.msg,
             )
@@ -146,15 +78,6 @@ class CleanFormatter(logging.Formatter):
     Used for file output where color codes are unnecessary and would
     reduce readability. Removes the special markers while preserving
     the content within them.
-
-    Transformation Examples:
-        $$'example'$$ -> 'example'
-        $${key: value}$$ -> {key: value}
-
-    Note:
-        - Preserves the original message structure
-        - Only processes string messages
-        - Original message is restored after formatting
     """
 
     def format(self, record: logging.LogRecord) -> str:
@@ -166,8 +89,6 @@ class CleanFormatter(logging.Formatter):
         Returns:
             str: Clean log message without color markers
 
-        Note:
-            Only processes string messages, passes through other types unchanged
         """
         if isinstance(record.msg, str):
             orig_msg = record.msg
@@ -186,54 +107,112 @@ class CleanFormatter(logging.Formatter):
         return super().format(record)
 
 
-def setup_logger(log_name: str, log_level: str, log_dir: str) -> logging.Logger:
-    """Configures a logger with console and file output.
+class Logger(logging.Logger):
+    """Extended Logger class with additional log levels and color support."""
 
-    Creates a logger that writes to both console (with colors) and a rotating
-    log file (without colors). The log format varies based on log level.
+    SUCCESS = logging.INFO + 5
 
-    Args:
-        log_name (str): Name of the logger and base name for log file
-        log_level (str): Logging level ('DEBUG', 'INFO', etc.)
-        log_dir (str): Directory where log files will be stored
+    def __init__(self, name, level=logging.NOTSET):
+        """Initialize the enhanced logger.
 
-    Returns:
-        logging.Logger: Configured logger instance
+        Args:
+            name (str): Logger name
+            level (int, optional): Initial logging level. Defaults to NOTSET.
+        """
+        super().__init__(name, level)
 
-    Log File Details:
-        - Location: {log_dir}/{log_name}.{log_level}.log
-        - Rotation: 10MB max file size
-        - Retention: Keeps 5 backup files
+        if not hasattr(logging, "SUCCESS"):
+            logging.addLevelName(self.SUCCESS, "SUCCESS")
 
-    Format Patterns:
-        Debug Level:
-            {timestamp} - {name} - {level}    {file}:{line}    {message}
-        Other Levels:
-            {timestamp} - {name} - {level}    {message}
+    def success(self, msg, *args, **kwargs):
+        """Log a message with SUCCESS level.
 
-    Example:
-        >>> logger = setup_logger('myapp', 'DEBUG', '/var/log/myapp')
-        >>> logger.debug("Processing item $$'foo'$$ $${id: 123}$$")
-        2024-01-04 12:34:56 - myapp - DEBUG    main.py:42    Processing item 'foo' {id: 123}
+        Args:
+            msg: Message to log
+            *args: Variable length argument list
+            **kwargs: Arbitrary keyword arguments
+        """
+        if self.isEnabledFor(self.SUCCESS):
+            self._log(self.SUCCESS, msg, args, **kwargs)
 
-    Note:
-        - Creates log directory if it doesn't exist
-        - Only configures handlers if none exist
-        - Uses ColorFormatter for console output
-        - Uses CleanFormatter for file output
-        - Timestamp format: YYYY-MM-DD HH:MM:SS
-    """
-    log_level_literal = getattr(logging, log_level)
-    log_path = Path(log_dir)
-    log_path.mkdir(parents=True, exist_ok=True)
+    @staticmethod
+    def supports_color() -> bool:
+        """Check if the terminal supports ANSI color codes.
 
-    logger = logging.getLogger(log_name)
-    logger.setLevel(log_level_literal)
+        Detects if the terminal supports ANSI color codes by checking platform-specific
+        conditions and environment variables. On Windows, it also checks the Windows
+        registry for the VirtualTerminalLevel key.
 
-    if not logger.handlers:
+        Returns:
+            bool: True if the terminal supports color, False otherwise
+        """
+
+        def vt_codes_enabled_in_windows_registry():
+            try:
+                import winreg
+            except ImportError:
+                return False
+
+            try:
+                reg_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Console")
+                reg_key_value, _ = winreg.QueryValueEx(reg_key, "VirtualTerminalLevel")
+                return reg_key_value == 1
+            except FileNotFoundError:
+                return False
+
+        is_a_tty = hasattr(sys.stdout, "isatty") and sys.stdout.isatty()
+
+        if not is_a_tty:
+            return False
+
+        if sys.platform == "win32":
+            return (
+                getattr(colorama, "fixed_windows_console", False)
+                or "ANSICON" in os.environ
+                or "WT_SESSION" in os.environ  # Windows Terminal
+                or os.environ.get("TERM_PROGRAM") == "vscode"
+                or vt_codes_enabled_in_windows_registry()
+            )
+
+        return True
+
+    def setup(self, log_level: str, log_dir: str) -> None:
+        """Configure the logger with console and file output.
+
+        Creates a logger that writes to both console (with colors) and a rotating
+        log file (without colors). The log format varies based on log level.
+
+        Args:
+            log_level (str): Logging level ('DEBUG', 'INFO', 'SUCCESS', etc.)
+            log_dir (str): Directory where log files will be stored
+        """
+        has_color_support = False
+        if self.supports_color():
+            try:
+                if sys.platform == "win32":
+                    colorama.just_fix_windows_console()
+                else:
+                    colorama.init()
+                has_color_support = True
+            except (AttributeError, ImportError, OSError):
+                has_color_support = False
+
+        if log_level == "SUCCESS":
+            log_level_literal = self.SUCCESS
+        else:
+            log_level_literal = getattr(logging, log_level)
+
+        self.setLevel(log_level_literal)
+
+        for handler in self.handlers[:]:
+            self.removeHandler(handler)
+
+        log_path = Path(log_dir)
+        log_path.mkdir(parents=True, exist_ok=True)
+
         log_format = (
             "%(asctime)s - %(name)s - %(levelname)s\t%(filename)s:%(lineno)d\t%(message)s"
-            if log_level_literal == logging.DEBUG
+            if log_level_literal <= logging.DEBUG
             else "%(asctime)s - %(name)s - %(levelname)s\t%(message)s"
         )
 
@@ -247,14 +226,14 @@ def setup_logger(log_name: str, log_level: str, log_dir: str) -> logging.Logger:
                 log_format,
                 datefmt="%Y-%m-%d %H:%M:%S",
             )
-            if HAS_COLOR_SUPPORT
+            if has_color_support
             else CleanFormatter(
                 log_format,
                 datefmt="%Y-%m-%d %H:%M:%S",
             )
         )
 
-        log_file = log_path / f"{log_name}.{log_level}.log"
+        log_file = log_path / f"{self.name}.{log_level}.log"
         file_handler = RotatingFileHandler(
             log_file,
             maxBytes=10 * 1024 * 1024,  # 10MB
@@ -262,12 +241,34 @@ def setup_logger(log_name: str, log_level: str, log_dir: str) -> logging.Logger:
         )
         file_handler.setFormatter(file_formatter)
         file_handler.setLevel(log_level_literal)
+        self.addHandler(file_handler)
 
         console_handler = logging.StreamHandler()
         console_handler.setFormatter(console_formatter)
         console_handler.setLevel(log_level_literal)
+        self.addHandler(console_handler)
 
-        logger.addHandler(file_handler)
-        logger.addHandler(console_handler)
+
+logging.setLoggerClass(Logger)
+
+
+def get_logger(log_name: str, log_level: str = "INFO", log_dir: str = "logs") -> Logger:
+    """Get a configured instance of Logger.
+
+    Args:
+        log_name (str): Name of the logger and base name for log file
+        log_level (str, optional): Logging level. Defaults to "INFO".
+        log_dir (str, optional): Directory where log files will be stored. Defaults to "logs".
+
+    Returns:
+        Logger: Configured logger instance
+    """
+    logger = logging.getLogger(log_name)
+
+    if isinstance(logger, Logger):
+        logger.setup(log_level, log_dir)
+    else:
+        logger = Logger(log_name)
+        logger.setup(log_level, log_dir)
 
     return logger

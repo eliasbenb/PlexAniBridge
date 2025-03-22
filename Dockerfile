@@ -1,8 +1,8 @@
-FROM python:3.12-alpine
+FROM python:3.13-alpine
 
 LABEL maintainer="Elias Benbourenane <eliasbenbourenane@gmail.com>" \
     org.opencontainers.image.title="PlexAniBridge" \
-    org.opencontainers.image.description=" Synchronize your Plex watch history, ratings, and reviews with AniList" \
+    org.opencontainers.image.description="Synchronize your Plex watch history, ratings, and reviews with AniList" \
     org.opencontainers.image.authors="Elias Benbourenane <eliasbenbourenane@gmail.com>" \
     org.opencontainers.image.url="https://plexanibridge.elias.eu.org" \
     org.opencontainers.image.documentation="https://plexanibridge.elias.eu.org" \
@@ -12,8 +12,6 @@ LABEL maintainer="Elias Benbourenane <eliasbenbourenane@gmail.com>" \
 ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
-
-RUN apk add --no-cache git
 
 COPY requirements.txt .
 

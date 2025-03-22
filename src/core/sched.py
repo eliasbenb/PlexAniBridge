@@ -17,6 +17,7 @@ class SchedulerClient:
         sync_interval: int,
         polling_scan: bool,
         poll_interval: int = 30,
+        stop_event: asyncio.Event | None = None,
     ):
         self.bridge = bridge
         self.sync_interval = sync_interval
@@ -28,7 +29,7 @@ class SchedulerClient:
         self._tasks: set[asyncio.Task] = set()
         self._sync_lock = asyncio.Lock()
         self._current_task = None
-        self.stop_event = asyncio.Event()
+        self.stop_event = stop_event or asyncio.Event()
 
     async def run_sync(self, poll: bool) -> None:
         """Function to run a sync job
@@ -38,10 +39,8 @@ class SchedulerClient:
         """
         try:
             await asyncio.to_thread(self.bridge.sync, poll=poll)
-        except Exception as e:
-            log.error(
-                f"{self.__class__.__name__}: Sync process error: {e}", exc_info=True
-            )
+        except Exception:
+            log.error(f"{self.__class__.__name__}: Sync process error: ", exc_info=True)
 
     async def sync(self, poll: bool = False) -> None:
         """Execute a single synchronization cycle with error handling
@@ -63,12 +62,12 @@ class SchedulerClient:
                     except asyncio.CancelledError:
                         pass
                 raise
-            except Exception as e:
-                log.error(f"{self.__class__.__name__}: Sync error: {e}", exc_info=True)
+            except Exception:
+                log.error(f"{self.__class__.__name__}: Sync error: ", exc_info=True)
 
     async def _periodic_sync(self) -> None:
         """Handle periodic synchronization"""
-        while self._running:
+        while self._running and not self.stop_event.is_set():
             try:
                 await self.sync()
                 next_sync = datetime.now(timezone.utc) + timedelta(
@@ -77,13 +76,16 @@ class SchedulerClient:
                 log.info(
                     f"{self.__class__.__name__}: Next periodic sync scheduled for: {next_sync.astimezone(get_localzone())}"
                 )
-                await asyncio.sleep(self.sync_interval)
+                try:
+                    await asyncio.wait_for(self.stop_event.wait(), self.sync_interval)
+                except asyncio.TimeoutError:
+                    pass
             except asyncio.CancelledError:
                 log.info(f"{self.__class__.__name__}: Periodic sync cancelled")
                 break
-            except Exception as e:
+            except Exception:
                 log.error(
-                    f"{self.__class__.__name__}: Periodic sync error: {e}",
+                    f"{self.__class__.__name__}: Periodic sync error: ",
                     exc_info=True,
                 )
                 await asyncio.sleep(10)
@@ -97,9 +99,9 @@ class SchedulerClient:
             except asyncio.CancelledError:
                 log.info(f"{self.__class__.__name__}: Poll sync cancelled")
                 break
-            except Exception as e:
+            except Exception:
                 log.error(
-                    f"{self.__class__.__name__}: Poll sync error: {e}", exc_info=True
+                    f"{self.__class__.__name__}: Poll sync error: ", exc_info=True
                 )
                 await asyncio.sleep(10)
 
@@ -118,10 +120,8 @@ class SchedulerClient:
             except asyncio.CancelledError:
                 log.info(f"{self.__class__.__name__}: Reinit task cancelled")
                 break
-            except Exception as e:
-                log.error(
-                    f"{self.__class__.__name__}: Reinit error: {e}", exc_info=True
-                )
+            except Exception:
+                log.error(f"{self.__class__.__name__}: Reinit error: ", exc_info=True)
                 await asyncio.sleep(10)
 
     def _create_task(self, coro: CoroutineType) -> None:
@@ -148,12 +148,6 @@ class SchedulerClient:
         for sig in (signal.SIGTERM, signal.SIGINT):
             loop.add_signal_handler(sig, partial(self._handle_signal, sig))
 
-        if self.reinit_interval >= 0:
-            log.info(
-                f"{self.__class__.__name__}: Starting reinit scheduler (interval: {self.reinit_interval}s)"
-            )
-            self._create_task(self._reinit())
-
         if self.polling_scan:
             log.info(
                 f"{self.__class__.__name__}: Starting polling scheduler (interval: {self.poll_interval}s)"
@@ -172,9 +166,17 @@ class SchedulerClient:
                 await self.sync()
                 exit(0)
 
+        if self.reinit_interval >= 0:
+            log.info(
+                f"{self.__class__.__name__}: Starting reinit scheduler (interval: {self.reinit_interval}s)"
+            )
+            await asyncio.sleep(self.reinit_interval)
+            self._create_task(self._reinit())
+
     async def stop(self) -> None:
         """Stop the scheduler and clean up"""
         self._running = False
+        self.stop_event.set()
 
         if self._tasks:
             log.info(f"{self.__class__.__name__}: Stopping all scheduler tasks...")

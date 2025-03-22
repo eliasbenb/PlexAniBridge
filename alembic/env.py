@@ -33,6 +33,7 @@ def run_migrations_offline():
         target_metadata=target_metadata,
         literal_binds=True,
         compare_type=True,
+        render_as_batch=True,
         dialect_opts={"paramstyle": "named"},
     )
     with context.begin_transaction():
@@ -42,7 +43,7 @@ def run_migrations_offline():
 def run_migrations_online():
     connectable = create_engine(
         db_url,
-        echo=True,
+        echo=False,
         future=True,
     )
 
@@ -51,6 +52,7 @@ def run_migrations_online():
             connection=connection,
             target_metadata=target_metadata,
             compare_type=True,
+            render_as_batch=True,
         )
 
         with context.begin_transaction():

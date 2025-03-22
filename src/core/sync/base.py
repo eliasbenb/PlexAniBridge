@@ -1,9 +1,9 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from typing import Generic, Iterator, TypeVar
+from typing import Any, Callable, Generic, Iterator, TypeVar
 
 from plexapi.media import Guid
-from plexapi.video import Movie, Season, Show
+from plexapi.video import Episode, Movie, Season, Show
+from pydantic import BaseModel
 from thefuzz import fuzz
 
 from src import log
@@ -14,10 +14,10 @@ from src.settings import SyncField
 
 T = TypeVar("T", bound=Movie | Show)  # Section item
 S = TypeVar("S", bound=Movie | Season)  # Item child (season)
+E = TypeVar("E", bound=Movie | Episode)  # Item grandchild (episode)
 
 
-@dataclass
-class ParsedGuids:
+class ParsedGuids(BaseModel):
     """Container for parsed media identifiers from different services.
 
     Handles parsing and storage of media IDs from various services (TVDB, TMDB, IMDB)
@@ -49,10 +49,6 @@ class ParsedGuids:
 
         Returns:
             ParsedGuids: New instance with parsed IDs
-
-        Note:
-            - Handles both string (IMDB) and integer (TVDB/TMDB) IDs
-            - Silently skips invalid or unknown GUID formats
         """
         parsed_guids = ParsedGuids()
         for guid in guids:
@@ -68,26 +64,28 @@ class ParsedGuids:
             setattr(parsed_guids, split_guid[0], split_guid[1])
         return parsed_guids
 
+    def __str__(self) -> str:
+        """Creates a string representation of the parsed IDs.
+
+        Returns:
+            str: String representation of the parsed IDs in a format like "id: xxx, id: xxx, id: xxx"
+        """
+        return ", ".join(
+            f"{field}: {getattr(self, field)}"
+            for field in self.model_fields
+            if getattr(self, field) is not None
+        )
+
     def __iter__(self) -> Iterator[tuple[str, int | str | None]]:
         """Enables iteration over non-None GUIDs.
 
         Returns:
             Iterator[tuple[str, int | str | None]]: Iterator of (service, id) pairs
         """
-        return iter(self.__dict__.items())
-
-    def __str__(self) -> str:
-        """Creates a debug-friendly string representation.
-
-        Returns:
-            str: Comma-separated list of non-None IDs
-            Example: "tvdb_id: 123456, imdb_id: tt1234567"
-        """
-        return ", ".join(f"{k}_id: {v}" for k, v in self if v is not None)
+        return iter(self.model_dump(exclude_none=True).items())
 
 
-@dataclass
-class SyncStats:
+class SyncStats(BaseModel, arbitrary_types_allowed=True):
     """Statistics tracker for synchronization operations.
 
     Keeps count of various sync outcomes for reporting and monitoring.
@@ -106,18 +104,34 @@ class SyncStats:
     synced: int = 0
     deleted: int = 0
     skipped: int = 0
+    not_found: int = 0
     failed: int = 0
+
+    possible: set[str] = set()
+    covered: set[str] = set()
+
+    @property
+    def coverage(self) -> float:
+        """Calculates the coverage percentage of successfully synced items.
+
+        Returns:
+            float: Coverage percentage of successfully synced items
+        """
+        return len(self.covered) / len(self.possible) if self.possible else 0.0
 
     def __add__(self, other: "SyncStats") -> "SyncStats":
         return SyncStats(
-            self.synced + other.synced,
-            self.deleted + other.deleted,
-            self.skipped + other.skipped,
-            self.failed + other.failed,
+            synced=self.synced + other.synced,
+            deleted=self.deleted + other.deleted,
+            skipped=self.skipped + other.skipped,
+            not_found=self.not_found + other.not_found,
+            failed=self.failed + other.failed,
+            possible=self.possible.union(other.possible),
+            covered=self.covered.union(other.covered),
         )
 
 
-class BaseSyncClient(ABC, Generic[T, S]):
+class BaseSyncClient(ABC, Generic[T, S, E]):
     """Abstract base class for media synchronization between Plex and AniList.
 
     Provides core synchronization logic while allowing specialized implementations
@@ -125,23 +139,8 @@ class BaseSyncClient(ABC, Generic[T, S]):
 
     Type Parameters:
         T: Main media type (Movie or Show)
-        S: Subitem type (Movie or Season)
-
-    Attributes:
-        anilist_client (AniListClient): Client for AniList API operations
-        animap_client (AniMapClient): Client for ID mapping lookups
-        plex_client (PlexClient): Client for Plex server operations
-        excluded_sync_fields (list[SyncField]): Fields to ignore during sync
-        destructive_sync (bool): Whether to allow deletions on AniList
-        fuzzy_search_threshold (int): Minimum similarity for title matching
-        sync_stats (SyncStats): Current synchronization statistics
-
-    Core Features:
-        - Media mapping and lookup
-        - Title-based fuzzy matching
-        - Status calculation and progress tracking
-        - Bidirectional sync with conflict resolution
-        - Detailed logging and statistics
+        S: Child item type (Movie or Season)
+        E: Grandchild item type (Movie or Episode)
     """
 
     def __init__(
@@ -150,18 +149,44 @@ class BaseSyncClient(ABC, Generic[T, S]):
         animap_client: AniMapClient,
         plex_client: PlexClient,
         excluded_sync_fields: list[SyncField],
+        full_scan: bool,
         destructive_sync: bool,
-        fuzzy_search_threshold: int,
+        search_fallback_threshold: int,
     ) -> None:
+        """Initializes a new synchronization client.
+
+        Args:
+            anilist_client (AniListClient): AniList API client
+            animap_client (AniMapClient): AniMap API client
+            plex_client (PlexClient): Plex API client
+            excluded_sync_fields (list[SyncField]): Fields to exclude from synchronization
+            destructive_sync (bool): Whether to delete AniList entries not found in Plex
+            search_fallback_threshold (int): Minimum match ratio for fuzzy title
+        """
         self.anilist_client = anilist_client
         self.animap_client = animap_client
         self.plex_client = plex_client
 
         self.excluded_sync_fields = excluded_sync_fields
+        self.full_scan = full_scan
         self.destructive_sync = destructive_sync
-        self.fuzzy_search_threshold = fuzzy_search_threshold
+        self.search_fallback_threshold = search_fallback_threshold
 
         self.sync_stats = SyncStats()
+
+        __extra_fields: dict[SyncField, Callable] = {
+            "progress": self._calculate_progress,
+            "repeat": self._calculate_repeats,
+            "score": self._calculate_score,
+            "notes": self._calculate_notes,
+            "started_at": self._calculate_started_at,
+            "completed_at": self._calculate_completed_at,
+        }
+        self.__extra_fields = {
+            k: v
+            for k, v in __extra_fields.items()
+            if k not in self.excluded_sync_fields
+        }
 
     def clear_cache(self) -> None:
         """Clears the cache for all decorated methods in the class."""
@@ -171,24 +196,14 @@ class BaseSyncClient(ABC, Generic[T, S]):
             ):
                 getattr(self, attr).cache_clear()
 
-    def process_media(self, item: T) -> SyncStats:
+    def process_media(self, item: T) -> None:
         """Processes a single media item for synchronization.
 
-        Main workflow:
-        1. Parse media identifiers
-        2. Map to AniList entries using IDs or title search
-        3. Calculate sync states
-        4. Update AniList as needed
-
         Args:
-            item (T): Plex media item to process
+            item (T): Grandparent Plex media item to sync
 
         Returns:
-            SyncStats: Updated synchronization statistics
-
-        Note:
-            Handles both direct matches and multi-episode seasons
-            through the map_media() abstraction
+            SyncStats: Updated synchronization statistics with counts of synced, deleted, skipped and failed items
         """
         guids = ParsedGuids.from_guids(item.guids)
 
@@ -202,71 +217,41 @@ class BaseSyncClient(ABC, Generic[T, S]):
             f"{debug_log_title} {debug_log_ids}"
         )
 
-        for subitem, animapping in self.map_media(item=item):
-            debug_log_title = self._debug_log_title(item=item, subitem=subitem)
+        for child_item, grandchild_items, animapping, anilist_media in self.map_media(
+            item
+        ):
+            debug_log_title = self._debug_log_title(item=item, animapping=animapping)
+            debug_log_ids = self._debug_log_ids(
+                key=child_item.ratingKey,
+                plex_id=child_item.guid,
+                guids=guids,
+                anilist_id=anilist_media.id,
+            )
+
+            log.debug(
+                f"{self.__class__.__name__}: Found AniList entry for {item.type} "
+                f"{debug_log_title} {debug_log_ids}"
+            )
 
             try:
-                anilist_media = None
-                if animapping and animapping.anilist_id:
-                    anilist_media = self.anilist_client.get_anime(animapping.anilist_id)
-                    match_method = "mapping lookup"
-                elif subitem.type != "season" or subitem.seasonNumber > 0:
-                    anilist_media = self.search_media(item=item, subitem=subitem)
-                    match_method = "title search"
-
-                debug_log_title = self._debug_log_title(
-                    item=item,
-                    subitem=subitem
-                    if animapping and animapping.tvdb_id not in (None, -1)
-                    else None,
-                    extra_title=f"(001 - {anilist_media.episodes if anilist_media else '???'})"
-                    if animapping and animapping.tvdb_season == -1
-                    else None,
-                )
-                debug_log_ids = self._debug_log_ids(
-                    key=item.ratingKey,
-                    plex_id=item.guid,
-                    guids=guids,
-                    anilist_id=anilist_media.id if anilist_media else None,
-                )
-
-                if not anilist_media:
-                    log.warning(
-                        f"{self.__class__.__name__}: No suitable AniList results found during mapping "
-                        f"lookup or title search for {item.type} {debug_log_title} {debug_log_ids}"
-                    )
-                    self.sync_stats.failed += 1
-                    continue
-
-                animapping = animapping or AniMap(
-                    anilist_id=anilist_media.id,
-                    tvdb_epoffset=0 if item.type == "show" else None,
-                    tvdb_season=subitem.seasonNumber if item.type == "show" else None,
-                )
-
-                log.debug(
-                    f"{self.__class__.__name__}: Found AniList entry using {match_method} for {item.type} "
-                    f"{debug_log_title} {debug_log_ids}"
-                )
-
                 self.sync_media(
                     item=item,
-                    subitem=subitem,
+                    child_item=child_item,
+                    grandchild_items=grandchild_items,
                     anilist_media=anilist_media,
                     animapping=animapping,
                 )
-            except Exception as e:
-                log.exception(
+                self.sync_stats.covered |= {str(e) for e in grandchild_items}
+            except Exception:
+                log.error(
                     f"{self.__class__.__name__}: Failed to process {item.type} "
-                    f"{debug_log_title} {debug_log_ids}",
-                    exc_info=e,
+                    f"{debug_log_title} {debug_log_ids}: ",
+                    exc_info=True,
                 )
                 self.sync_stats.failed += 1
 
-        return self.sync_stats
-
     @abstractmethod
-    def map_media(self, item: T) -> Iterator[tuple[S, AniMap | None]]:
+    def map_media(self, item: T) -> Iterator[tuple[S, list[E], AniMap, Media]]:
         """Maps a Plex item to potential AniList matches.
 
         Must be implemented by subclasses to handle different
@@ -276,20 +261,20 @@ class BaseSyncClient(ABC, Generic[T, S]):
             item (T): Plex media item to map
 
         Returns:
-            Iterator[tuple[S, AniMap | None]]: Potential matches
+            Iterator[tuple[S, list[E], AniMap, Media]]: Mapping matches (child, grandchild, animapping, anilist_media)
         """
         pass
 
     @abstractmethod
-    def search_media(self, item: T, subitem: S) -> Media | None:
+    def search_media(self, item: T, child_item: S) -> Media | None:
         """Searches for matching AniList entry by title.
 
         Must be implemented by subclasses to handle different
         search strategies for movies vs shows.
 
         Args:
-            item (T): Main Plex item
-            subitem (S): Specific item to match
+            item (T): Grandparent Plex media item
+            child_item (S): Target child item to sync
 
         Returns:
             Media | None: Matching AniList entry or None if not found
@@ -301,79 +286,55 @@ class BaseSyncClient(ABC, Generic[T, S]):
 
         Args:
             title (str): Title to match against
-            results (list[Media]): Potential matches from AniList
+            results (list[Media]): List of potential Media matches from AniList
 
         Returns:
-            Media | None: Best match above threshold, or None if no good match
-
-        Note:
-            Uses fuzz.ratio from thefuzz library for string similarity
-            Compares against all available title variants
+            Media | None: Best matching Media entry above threshold, or None if no match meets threshold
         """
-        best_result, best_ratio = max(
-            (
-                (r, max(fuzz.ratio(title, t) for t in r.title.titles() if t))
-                for r in results
-                if r.title
-            ),
-            default=(None, 0),
-            key=lambda x: x[1],
-        )
-
-        if best_ratio < self.fuzzy_search_threshold:
+        best_result, best_ratio = None, 0
+        for r in results:
+            if r.title:
+                for t in r.title.titles():
+                    current_ratio = fuzz.ratio(title, t)
+                    if current_ratio > best_ratio:
+                        best_ratio = current_ratio
+                        best_result = r
+        if best_ratio < self.search_fallback_threshold:
             return None
         return best_result
 
     def sync_media(
-        self, item: T, subitem: S, anilist_media: Media, animapping: AniMap
-    ) -> SyncStats:
+        self,
+        item: T,
+        child_item: S,
+        grandchild_items: list[E],
+        anilist_media: Media,
+        animapping: AniMap,
+    ) -> None:
         """Synchronizes a matched media item with AniList.
 
-        Workflow:
-        1. Get current states from both services
-        2. Apply excluded fields
-        3. Merge states using comparison rules
-        4. Update or delete on AniList as needed
-
         Args:
-            item (T): Main Plex media item
-            subitem (S): Specific item to sync (same as item for movies)
+            item (T): Grandparent Plex media item
+            child_item (S): Target child item to sync
+            grandchild_items (list[E]): Grandchild items to extract data from
             anilist_media (Media): Matched AniList entry
             animapping (AniMap): ID mapping information
-
-        Fields Synced (unless excluded):
-            - Watch status
-            - Score/rating
-            - Progress (episodes watched)
-            - Rewatch count
-            - User notes/review
-            - Start/completion dates
-
-        Note:
-            - Destructive sync allows deleting entries
-            - Skips update if no changes needed
-            - Uses _merge_media_lists for conflict resolution
         """
         guids = ParsedGuids.from_guids(item.guids)
 
-        debug_log_title = self._debug_log_title(
-            item=item,
-            subitem=subitem if animapping.tvdb_id not in (None, -1) else None,
-            extra_title=f"(001 - {anilist_media.episodes})"
-            if animapping.tvdb_season == -1
-            else None,
-        )
+        debug_log_title = self._debug_log_title(item=item, animapping=animapping)
         debug_log_ids = self._debug_log_ids(
-            key=subitem.ratingKey,
-            plex_id=subitem.guid,
+            key=child_item.ratingKey,
+            plex_id=child_item.guid,
             guids=guids,
             anilist_id=anilist_media.id,
         )
 
-        anilist_media_list = anilist_media.media_list_entry or None
+        anilist_media_list = anilist_media.media_list_entry
         plex_media_list = self._get_plex_media_list(
             item=item,
-            subitem=subitem,
+            child_item=child_item,
+            grandchild_items=grandchild_items,
             anilist_media=anilist_media,
             animapping=animapping,
         )
@@ -391,18 +352,22 @@ class BaseSyncClient(ABC, Generic[T, S]):
                 f"{self.__class__.__name__}: Skipping {item.type} because it is already up to date "
                 f"{debug_log_title} {debug_log_ids}"
             )
+
             self.sync_stats.skipped += 1
             return
 
         if self.destructive_sync and anilist_media_list and not plex_media_list.status:
-            log.info(
-                f"{self.__class__.__name__}: Deleting AniList entry with variables:"
+            log.success(
+                f"{self.__class__.__name__}: Deleting AniList entry for {item.type} "
+                f"{debug_log_title} {debug_log_ids}"
             )
-            log.info(f"\t\t{anilist_media_list}")
+            log.success(f"\t\tDELETE: {anilist_media_list}")
+
             self.anilist_client.delete_anime_entry(
                 anilist_media.media_list_entry.id,
                 anilist_media.media_list_entry.media_id,
             )
+            self.sync_stats.synced += 1
             self.sync_stats.deleted += 1
             return
 
@@ -418,104 +383,106 @@ class BaseSyncClient(ABC, Generic[T, S]):
             f"{self.__class__.__name__}: Syncing AniList entry for {item.type} "
             f"{debug_log_title} {debug_log_ids}"
         )
-        log.info(f"\t\tBEFORE => {anilist_media_list}")
-        log.info(f"\t\tAFTER  => {final_media_list}")
-        log.info(
-            f"\t\tDIFF   => {MediaList.diff(anilist_media_list, final_media_list)}"
+        log.success(
+            f"\t\tUPDATE: {MediaList.diff(anilist_media_list, final_media_list)}"
         )
 
         self.anilist_client.update_anime_entry(final_media_list)
 
-        log.info(
+        log.success(
             f"{self.__class__.__name__}: Synced {item.type} "
             f"{debug_log_title} {debug_log_ids}"
         )
         self.sync_stats.synced += 1
 
     def _get_plex_media_list(
-        self, item: T, subitem: S, anilist_media: Media, animapping: AniMap
+        self,
+        item: T,
+        child_item: S,
+        grandchild_items: list[E],
+        anilist_media: Media,
+        animapping: AniMap,
     ) -> MediaList:
         """Creates a MediaList object from Plex states and AniMap data.
 
         Args:
-            item (T): Main Plex media item
-            subitem (S): Specific item to sync
+            item (T): Grandparent Plex media item
+            child_item (S): Target child item to sync
+            grandchild_items (list[E]): Grandchild items to extract data from
             anilist_media (Media): Matched AniList entry
             animapping (AniMap): ID mapping information
 
         Returns:
-            MediaList: MediaList object with updated states
+            MediaList: New MediaList object populated with current Plex states
         """
+        kwargs = {
+            "item": item,
+            "child_item": child_item,
+            "grandchild_items": grandchild_items,
+            "anilist_media": anilist_media,
+            "animapping": animapping,
+        }
+
         media_list = MediaList(
             id=anilist_media.media_list_entry
             and anilist_media.media_list_entry.id
             or 0,
             user_id=self.anilist_client.user.id,
             media_id=anilist_media.id,
-            status=self._calculate_status(
-                item=item,
-                subitem=subitem,
-                anilist_media=anilist_media,
-                animapping=animapping,
-            ),
-            progress=self._calculate_progress(
-                item=item,
-                subitem=subitem,
-                anilist_media=anilist_media,
-                animapping=animapping,
-            ),
-            repeat=self._calculate_repeats(
-                item=item,
-                subitem=subitem,
-                anilist_media=anilist_media,
-                animapping=animapping,
-            ),
+            status=self._calculate_status(**kwargs),
         )
 
         if media_list.status is None:
             return media_list
 
-        notes = None
-        if "notes" not in self.excluded_sync_fields:
-            notes = self.plex_client.get_user_review(
-                subitem
-            ) or self.plex_client.get_user_review(item)
-
-        if media_list.status > MediaListStatus.PLANNING:
-            media_list.started_at = self._calculate_started_at(
-                item=item,
-                subitem=subitem,
-                anilist_media=anilist_media,
-                animapping=animapping,
-            )
-        if media_list.status >= MediaListStatus.COMPLETED:
-            media_list.completed_at = self._calculate_completed_at(
-                item=item,
-                subitem=subitem,
-                anilist_media=anilist_media,
-                animapping=animapping,
-            )
-            media_list.score = self._calculate_score(
-                item=item,
-                subitem=subitem,
-                anilist_media=anilist_media,
-                animapping=animapping,
-            )
-            media_list.notes = notes
+        for field in self.__extra_fields:
+            match field:
+                case "repeat":
+                    media_list.repeat = (
+                        self.__extra_fields[field](**kwargs)
+                        if media_list.status >= MediaListStatus.COMPLETED
+                        else None
+                    )
+                case "score":
+                    media_list.score = (
+                        self._calculate_score(**kwargs)
+                        if media_list.status >= MediaListStatus.COMPLETED
+                        else None
+                    )
+                case "started_at":
+                    media_list.started_at = (
+                        self.__extra_fields[field](**kwargs)
+                        if media_list.status > MediaListStatus.PLANNING
+                        else None
+                    )
+                case "completed_at":
+                    media_list.completed_at = (
+                        self.__extra_fields[field](**kwargs)
+                        if media_list.status >= MediaListStatus.COMPLETED
+                        else None
+                    )
+                case _:
+                    setattr(media_list, field, self.__extra_fields[field](**kwargs))
 
         return media_list
 
     @abstractmethod
     def _calculate_status(
-        self, item: T, subitem: S, anilist_media: Media, animapping: AniMap
+        self,
+        item: T,
+        child_item: S,
+        grandchild_items: list[E],
+        anilist_media: Media,
+        animapping: AniMap,
     ) -> MediaListStatus | None:
         """Calculates the watch status for a media item.
 
         Must be implemented by subclasses to handle different media types.
 
         Args:
-            item (T): Main Plex media item
-            subitem (S): Specific item to sync
+            item (T): Grandparent Plex media item
+            child_item (S): Target child item to sync
+            grandchild_items (list[E]): Grandchild items to extract data from
             anilist_media (Media): Matched AniList entry
             animapping (AniMap): ID mapping information
 
@@ -526,15 +493,21 @@ class BaseSyncClient(ABC, Generic[T, S]):
 
     @abstractmethod
     def _calculate_score(
-        self, item: T, subitem: S, anilist_media: Media, animapping: AniMap
+        self,
+        item: T,
+        child_item: S,
+        grandchild_items: list[E],
+        anilist_media: Media,
+        animapping: AniMap,
     ) -> int | None:
         """Calculates the user rating for a media item.
 
         Must be implemented by subclasses to handle different media types.
 
         Args:
-            item (T): Main Plex media item
-            subitem (S): Specific item to sync
+            item (T): Grandparent Plex media item
+            child_item (S): Target child item to sync
+            grandchild_items (list[E]): Grandchild items to extract data from
             anilist_media (Media): Matched AniList entry
             animapping (AniMap): ID mapping information
 
@@ -545,15 +518,21 @@ class BaseSyncClient(ABC, Generic[T, S]):
 
     @abstractmethod
     def _calculate_progress(
-        self, item: T, subitem: S, anilist_media: Media, animapping: AniMap
+        self,
+        item: T,
+        child_item: S,
+        grandchild_items: list[E],
+        anilist_media: Media,
+        animapping: AniMap,
     ) -> int | None:
         """Calculates the progress for a media item.
 
         Must be implemented by subclasses to handle different media types.
 
         Args:
-            item (T): Main Plex media item
-            subitem (S): Specific item to sync
+            item (T): Grandparent Plex media item
+            child_item (S): Target child item to sync
+            grandchild_items (list[E]): Grandchild items to extract data from
             anilist_media (Media): Matched AniList entry
             animapping (AniMap): ID mapping information
 
@@ -564,15 +543,21 @@ class BaseSyncClient(ABC, Generic[T, S]):
 
     @abstractmethod
     def _calculate_repeats(
-        self, item: T, subitem: S, anilist_media: Media, animapping: AniMap
+        self,
+        item: T,
+        child_item: S,
+        grandchild_items: list[E],
+        anilist_media: Media,
+        animapping: AniMap,
     ) -> int | None:
         """Calculates the number of repeats for a media item.
 
         Must be implemented by subclasses to handle different media types.
 
         Args:
-            item (T): Main Plex media item
-            subitem (S): Specific item to sync
+            item (T): Grandparent Plex media item
+            child_item (S): Target child item to sync
+            grandchild_items (list[E]): Grandchild items to extract data from
             anilist_media (Media): Matched AniList entry
             animapping (AniMap): ID mapping information
 
@@ -583,15 +568,21 @@ class BaseSyncClient(ABC, Generic[T, S]):
 
     @abstractmethod
     def _calculate_started_at(
-        self, item: T, subitem: S, anilist_media: Media, animapping: AniMap
+        self,
+        item: T,
+        child_item: S,
+        grandchild_items: list[E],
+        anilist_media: Media,
+        animapping: AniMap,
     ) -> FuzzyDate | None:
         """Calculates the start date for a media item.
 
         Must be implemented by subclasses to handle different media types.
 
         Args:
-            item (T): Main Plex media item
-            subitem (S): Specific item to sync
+            item (T): Grandparent Plex media item
+            child_item (S): Target child item to sync
+            grandchild_items (list[E]): Grandchild items to extract data from
             anilist_media (Media): Matched AniList entry
             animapping (AniMap): ID mapping information
 
@@ -602,15 +593,21 @@ class BaseSyncClient(ABC, Generic[T, S]):
 
     @abstractmethod
     def _calculate_completed_at(
-        self, item: T, subitem: S, anilist_media: Media, animapping: AniMap
+        self,
+        item: T,
+        child_item: S,
+        grandchild_items: list[E],
+        anilist_media: Media,
+        animapping: AniMap,
     ) -> FuzzyDate | None:
         """Calculates the completion date for a media item.
 
         Must be implemented by subclasses to handle different media types.
 
         Args:
-            item (T): Main Plex media item
-            subitem (S): Specific item to sync
+            item (T): Grandparent Plex media item
+            child_item (S): Target child item to sync
+            grandchild_items (list[E]): Grandchild items to extract data from
             anilist_media (Media): Matched AniList entry
             animapping (AniMap): ID mapping information
 
@@ -619,7 +616,70 @@ class BaseSyncClient(ABC, Generic[T, S]):
         """
         pass
 
-    def _normalize_score(self, score: int | None) -> int | float | None:
+    @abstractmethod
+    def _calculate_notes(
+        self,
+        item: T,
+        child_item: S,
+        grandchild_items: list[E],
+        anilist_media: Media,
+        animapping: AniMap,
+    ) -> str | None:
+        """Chooses the most relevant user notes for a media item.
+
+        Must be implemented by subclasses to handle different media types.
+
+        Args:
+            item (T): Grandparent Plex media item
+            child_item (S): Target child item to sync
+            grandchild_items (list[E]): Grandchild items to extract data from
+            anilist_media (Media): Matched AniList entry
+            animapping (AniMap): ID mapping information
+
+        Returns:
+            str | None: User notes for the media item
+        """
+        pass
+
+    @abstractmethod
+    def _debug_log_title(
+        self,
+        item: T,
+        animapping: AniMap | None = None,
+    ) -> str:
+        """Creates a debug-friendly string of media titles.
+
+        Must be implemented by subclasses to handle different media types.
+
+        Args:
+            item (T): Grandparent Plex media item
+            animapping (AniMap | None): AniMap entry for the media
+
+        Returns:
+            str: Debug-friendly string of media titles
+        """
+        pass
+
+    @abstractmethod
+    def _debug_log_ids(
+        self, key: int, plex_id: str, guids: ParsedGuids, anilist_id: int | None = None
+    ) -> str:
+        """Creates a debug-friendly string of media identifiers.
+
+        Must be implemented by subclasses to handle different media types.
+
+        Args:
+            key (int): Plex rating key
+            plex_id (str): Plex ID
+            guids (ParsedGuids): Plex GUIDs
+            anilist_id (int | None): AniList ID
+
+        Returns:
+            str: Debug-friendly string of media identifiers
+        """
+        pass
+
+    def _normalize_score(self, score: int | float | None) -> int | float | None:
         """Normalizes a 0-10 point rating to the user's preferred scale.
 
         Note:
@@ -628,10 +688,11 @@ class BaseSyncClient(ABC, Generic[T, S]):
         Args:
             score (int | float | None): User rating to normalize
         Returns:
-            int | None: Normalized rating or None if no rating
+            int | float | None: Normalized rating or None if no rating
         """
         if score is None:
             return None
+        score = round(score)
 
         scale = self.anilist_client.user.media_list_options.score_format
 
@@ -656,24 +717,12 @@ class BaseSyncClient(ABC, Generic[T, S]):
     ) -> MediaList:
         """Merges Plex and AniList states using defined comparison rules.
 
-        Rules by field:
-            score: Update if different
-            notes: Update if different
-            progress: Update if Plex value is higher (or destructive)
-            repeat: Update if Plex value is higher (or destructive)
-            status: Update if Plex status is higher (or destructive)
-            started_at: Update if Plex date is earlier (or destructive)
-            completed_at: Update if Plex date is earlier (or destructive)
-
         Args:
             anilist_media_list (MediaList | None): Current AniList state
             plex_media_list (MediaList): Current Plex state
 
         Returns:
-            MediaList: Merged state to apply to AniList
-
-        Note:
-            Destructive sync ignores the usual comparison rules and always uses the Plex value
+            MediaList: New MediaList containing merged state based on comparison rules
         """
         if not anilist_media_list:
             return plex_media_list.model_copy()
@@ -689,80 +738,38 @@ class BaseSyncClient(ABC, Generic[T, S]):
             "completed_at": "lt",
         }
 
-        def should_update(op: str, p_val, a_val) -> bool:
-            """Determines if a field should be updated based on the comparison rule.
-
-            Args:
-                op (str): Comparison rule
-                p_val: Plex value
-                a_val: AniList value
-
-            Returns:
-                    bool: True if the field should be updated, False otherwise
-            """
-            if p_val is None:
-                return False
-            if a_val is None:
-                return True
-            match op:
-                case "ne":
-                    return p_val != a_val
-                case "gt":
-                    return self.destructive_sync or p_val > a_val
-                case "gte":
-                    return self.destructive_sync or p_val >= a_val
-                case "lt":
-                    return self.destructive_sync or p_val < a_val
-                case "lte":
-                    return self.destructive_sync or p_val <= a_val
-            return False
-
         for key, rule in COMPARISON_RULES.items():
             plex_val = getattr(plex_media_list, key)
             anilist_val = getattr(anilist_media_list, key)
-            if should_update(rule, plex_val, anilist_val):
+            if self.__should_update_field(rule, plex_val, anilist_val):
                 setattr(res_media_list, key, plex_val)
 
         return res_media_list
 
-    def _debug_log_title(
-        self, item: T, subitem: S | None = None, extra_title: str | None = None
-    ) -> str:
-        """Creates a debug-friendly string of media titles.
-
-        The outputted string uses color formatting syntax with the `$$` delimiters.
-
-        Args
-            item (T): Plex media item
-            subitem (S | None): Specific item to sync. Defaults to None
-            extra_title (str | None): An additional string to append to the title. Defaults to None
-
-        Returns:
-            str: Debug-friendly string of media titles
-        """
-        extra_title = f" | {extra_title}" if extra_title else ""
-        if subitem and item != subitem:
-            return f"$$'{item.title} | {subitem.title}{extra_title}'$$"
-        return f"$$'{item.title}{extra_title}'$$"
-
-    def _debug_log_ids(
-        self,
-        key: int,
-        plex_id: str,
-        guids: ParsedGuids,
-        anilist_id: int | None = None,
-    ) -> str:
-        """Creates a debug-friendly string of media identifiers.
-
-        The outputted string uses color formatting syntax with the `$$` delimiters.
+    def __should_update_field(self, op: str, plex_val: Any, anilist_val: Any) -> bool:
+        """Determines if a field should be updated based on the comparison rule.
 
         Args:
-            key (int): Plex rating key
-            plex_id (str): Plex ID
-            guids (ParsedGuids): Plex GUIDs
-            anilist_id (int | None): AniList ID
+            op (str): Comparison rule
+            plex_val: Plex value
+            anilist_val: AniList value
 
         Returns:
-            str: Debug-friendly string of media identifiers
+                bool: True if the field should be updated, False otherwise
         """
-        return f"$${{key: {key}, plex_id: {plex_id}, {guids}{f', anilist_id: {anilist_id}' if anilist_id else ''}}}$$"
+        if plex_val is None:
+            return False
+        if anilist_val is None:
+            return True
+        match op:
+            case "ne":
+                return plex_val != anilist_val
+            case "gt":
+                return self.destructive_sync or plex_val > anilist_val
+            case "gte":
+                return self.destructive_sync or plex_val >= anilist_val
+            case "lt":
+                return self.destructive_sync or plex_val < anilist_val
+            case "lte":
+                return self.destructive_sync or plex_val <= anilist_val
+        return False

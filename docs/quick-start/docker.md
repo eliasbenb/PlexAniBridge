@@ -18,10 +18,6 @@ Below is a PlexAniBridge Docker compose file with example values. Optional envir
 
     Have a look at [the configuration page](../configuration.md) for a detailed list of configurable environment variables.
 
-!!! note
-
-    You can pin the image to a specific version or branch by changing `latest` to a specific tag, e.g. `main`, `develop`, `{{ git_tag }}`, etc.
-
 ```yaml title="compose.yaml"
 --8<-- "compose.yaml"
 ```
@@ -31,6 +27,18 @@ To start the container, run:
 ```shell
 docker compose -f compose.yaml up -d
 ```
+
+!!! tip
+
+    You can pin the image to a specific version or branch by changing `latest` to a specific tag. Some available tags are:
+    
+    - `latest`: The latest stable release
+    - `beta`: The latest beta release (may be unstable)
+    - `alpha`: The latest alpha release (may be unstable)
+    - `vX.Y.Z`: A specific version from the [releases page](https://github.com/eliasbenb/PlexAniBridge/releases) (e.g. `v0.4.0`)
+    - `main`: The latest commit on the `main` branch, which is usually tied to the latest release
+    - `develop`: The latest commit on the `develop` branch (may be unstable)
+
 
 ### Docker CLI
 

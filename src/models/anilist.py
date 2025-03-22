@@ -379,7 +379,7 @@ class MediaList(AniListBaseModel):
     updated_at: UTCDateTime | None = None
 
     @staticmethod
-    def diff(old: MediaList, new: MediaList) -> str:
+    def diff(old: MediaList | None, new: MediaList) -> str:
         """Generate a diff string between two MediaList objects
 
         Args:
@@ -389,6 +389,9 @@ class MediaList(AniListBaseModel):
         Returns:
             str: A diff string between the two objects
         """
+        if old is None:
+            old = MediaList(id=new.id, user_id=new.user_id, media_id=new.media_id)
+
         diff_str = "("
         for field, _ in old.model_fields.items():
             old_value = getattr(old, field)

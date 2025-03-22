@@ -7,6 +7,12 @@ on:
       - develop
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      tag_version:
+        description: 'Version tag (e.g., v1.0.0)'
+        required: true
+        type: string
 
 env:
   REGISTRY: ghcr.io
@@ -45,14 +51,16 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          flavor: |
+            latest=false
           tags: |
             type=semver,pattern=v{{version}}
             type=semver,pattern=v{{major}}.{{minor}}
             type=semver,pattern=v{{major}}
             type=ref,event=branch
-          labels: |
-            org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.created=${{ github.event.head_commit.timestamp }}
+            type=raw,value=alpha,enable=${{ github.ref_type == 'tag' && contains(github.ref, 'alpha') }}
+            type=raw,value=beta,enable=${{ github.ref_type == 'tag' && contains(github.ref, 'beta') }}
+            type=raw,value=latest,enable=${{ github.ref_type == 'tag' && !contains(github.ref, 'alpha') && !contains(github.ref, 'beta') }}
 
       - name: Build and push Docker image
         id: build-and-push

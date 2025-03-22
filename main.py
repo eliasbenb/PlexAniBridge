@@ -7,8 +7,10 @@ from src.core import BridgeClient, SchedulerClient
 
 
 @asynccontextmanager
-async def create_scheduler(bridge: BridgeClient, **scheduler_kwargs):
-    scheduler = SchedulerClient(bridge, **scheduler_kwargs)
+async def create_scheduler(
+    bridge: BridgeClient, stop_event: asyncio.Event, **scheduler_kwargs
+):
+    scheduler = SchedulerClient(bridge, stop_event=stop_event, **scheduler_kwargs)
     try:
         await scheduler.start()
         yield scheduler
@@ -24,7 +26,7 @@ async def main():
     stop_event = asyncio.Event()
 
     def shutdown():
-        log.info("Initiating graceful shutdown...")
+        log.info("PlexAniBridge: Shutting down...")
         stop_event.set()
 
     loop = asyncio.get_running_loop()
@@ -34,6 +36,7 @@ async def main():
     try:
         async with create_scheduler(
             bridge,
+            stop_event=stop_event,
             sync_interval=config.SYNC_INTERVAL,
             polling_scan=config.POLLING_SCAN,
             poll_interval=30,

@@ -4,19 +4,20 @@ from textwrap import dedent
 from time import sleep
 
 import requests
-from cachetools.func import lru_cache, ttl_cache
+from cachetools.func import ttl_cache
 
 from src import log
 from src.models.anilist import (
     Media,
     MediaFormat,
     MediaList,
+    MediaListCollection,
     MediaListCollectionWithMedia,
     MediaListWithMedia,
     MediaStatus,
     User,
 )
-from src.utils.rate_limitter import RateLimiter
+from src.utils.rate_limiter import RateLimiter
 
 
 class AniListClient:
@@ -41,6 +42,13 @@ class AniListClient:
     BACKUP_RETENTION_DAYS = 7
 
     def __init__(self, anilist_token: str, backup_dir: Path, dry_run: bool) -> None:
+        """Initialize the AniList client.
+
+        Args:
+            anilist_token (str): Authentication token for AniList API
+            backup_dir (Path): Directory path where backup files will be stored
+            dry_run (bool): If True, simulates API calls without making actual changes
+        """
         self.anilist_token = anilist_token
         self.backup_dir = backup_dir
         self.dry_run = dry_run
@@ -106,7 +114,7 @@ class AniListClient:
         values for status, score, progress, etc.
 
         Args:
-            media_list_entry (MediaList): Updated entry containing the following fields:
+            media_list_entry (MediaList): Updated AniList entry to save
 
         Raises:
             requests.HTTPError: If the API request fails
@@ -175,7 +183,6 @@ class AniListClient:
 
         return response["deleted"]
 
-    @ttl_cache(maxsize=None, ttl=86400)
     def search_anime(
         self,
         search_str: str,
@@ -202,7 +209,7 @@ class AniListClient:
         """
         log.debug(
             f"{self.__class__.__name__}: Searching for {'movie' if is_movie else 'show'} "
-            f"with title $$'{search_str}'$$ that has {episodes or 'unknown'} episodes"
+            f"with title $$'{search_str}'$$ that is releasing and has {episodes or 'unknown'} episodes"
         )
 
         res = self._search_anime(search_str, is_movie, limit)
@@ -214,7 +221,7 @@ class AniListClient:
             or not episodes
         ]
 
-    @lru_cache(maxsize=None)
+    @ttl_cache(maxsize=None, ttl=604800)
     def _search_anime(
         self,
         search_str: str,
@@ -375,7 +382,15 @@ class AniListClient:
         if not backup_file.parent.exists():
             backup_file.parent.mkdir(parents=True)
 
-        backup_file.write_text(data.model_dump_json(indent=2))
+        data_without_media = MediaListCollection(
+            **{
+                field: getattr(data, field)
+                for field in MediaListCollection.model_fields
+                if hasattr(data, field)
+            }
+        )
+
+        backup_file.write_text(data_without_media.model_dump_json(indent=2))
         log.info(f"{self.__class__.__name__}: Exported AniList data to '{backup_file}'")
 
         cutoff_date = datetime.now() - timedelta(days=self.BACKUP_RETENTION_DAYS)
@@ -461,8 +476,8 @@ class AniListClient:
             response.raise_for_status()
         except requests.HTTPError as e:
             log.error(
-                f"{self.__class__.__name__}: Failed to make request to AniList API:",
-                exc_info=e,
+                f"{self.__class__.__name__}: Failed to make request to AniList API: ",
+                exc_info=True,
             )
             log.error(f"\t\t{response.text}")
             raise e

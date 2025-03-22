@@ -1,12 +1,24 @@
 {
-  "$schema": "https://cdn.jsdelivr.net/gh/eliasbenb/PlexAniBridge-Mappings/mappings.schema.json",
-  "21234": {
-    "anidb_id": 11292,
-    "tvdb_id": 303071,
-    "tvdb_season": 1,
-    "tvdb_epoffset": 0,
-    "mal_id": 31043,
-    "imdb_id": "tt5249462",
-    "tmdb_show_id": 65249
+  "$schema": "https://raw.githubusercontent.com/eliasbenb/PlexAniBridge-Mappings/v2/mappings.schema.json",
+  "$includes": [
+    "/path/to/another/mappings.json",
+    "https://url.to/another/mappings.json"
+  ],
+  "99999": {
+    "anidb_id": 9999,
+    "imdb_id": "tt9999999",
+    "mal_id": 9999,
+    "tmdb_show_id": 9999,
+    "tvdb_id": 9999,
+    "tvdb_mappings": {
+      "s0": "e1",
+      "s1": "e1-e13"
+    }
+  },
+  "99998": {
+    "anidb_id": 9998,
+    "imdb_id": "tt9999998",
+    "mal_id": 9998,
+    "tmdb_movie_id": 9998
   }
 }

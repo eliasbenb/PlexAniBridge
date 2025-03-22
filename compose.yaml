@@ -2,20 +2,23 @@ services:
   plexanibridge:
     image: ghcr.io/eliasbenb/plexanibridge:latest
     environment:
+      TZ: America/New_York
       ANILIST_TOKEN: eyJ...
       PLEX_TOKEN: 2Sb...
       PLEX_USER: username
       PLEX_URL: http://plex:32400
       PLEX_SECTIONS: '["Anime", "Anime Movies"]'
+      # PLEX_GENRES: []
+      # PLEX_METADATA_SOURCE: local
       # SYNC_INTERVAL: 3600
       # POLLING_SCAN: False
       # FULL_SCAN: False
       # DESTRUCTIVE_SYNC: False
       # EXCLUDED_SYNC_FIELDS: '["notes", "score"]'
-      # DATA_PATH: ./data
       # DRY_RUN: False
       # LOG_LEVEL: INFO
-      # FUZZY_SEARCH_THRESHOLD: 90
+      # SEARCH_FALLBACK_THRESHOLD=-1
+      # DATA_PATH: ./data
     volumes:
       - ./data:/app/data
       # - ./logs:/app/logs
