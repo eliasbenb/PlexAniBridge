@@ -34,19 +34,30 @@ def get_git_hash() -> str:
             return "unknown"
 
         with open(git_dir_path / "HEAD") as f:
-            ref = f.read().strip().split(": ")[1]
+            head_content = f.read().strip()
 
-        if ref.startswith("refs/heads/"):
-            ref = ref[11:]
-        else:
-            return "unknown"
+        # HEAD is directly pointing to a commit
+        if not head_content.startswith("ref:"):
+            return head_content
 
-        ref_path = git_dir_path / "refs" / "heads" / ref
-        if not ref_path.exists() or not ref_path.is_file():
-            return "unknown"
+        ref_path = head_content.split("ref: ")[1]
 
-        with open(ref_path) as f:
-            return f.read().strip()
+        # HEAD is pointing to a branch
+        full_ref_path = git_dir_path / ref_path
+        if full_ref_path.exists() and full_ref_path.is_file():
+            with open(full_ref_path) as f:
+                return f.read().strip()
+
+        # HEAD is pointing to reference in packed-refs
+        packed_refs_path = git_dir_path / "packed-refs"
+        if packed_refs_path.exists() and packed_refs_path.is_file():
+            with open(packed_refs_path) as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith("#") and line.endswith(ref_path):
+                        return line.split()[0]
+
+        return "unknown"
     except Exception:
         return "unknown"
 
