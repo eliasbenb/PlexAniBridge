@@ -1,4 +1,4 @@
-FROM python:3.12-alpine
+FROM python:3.13-alpine
 
 LABEL maintainer="Elias Benbourenane <eliasbenbourenane@gmail.com>" \
     org.opencontainers.image.title="PlexAniBridge" \
