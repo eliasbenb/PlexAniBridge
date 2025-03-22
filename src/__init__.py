@@ -21,6 +21,7 @@ PLEXANIBDRIGE_HEADER = f"""
 ║  Author: {f"{__author__} @{__maintainer__}":<69}║
 ║  License: {__license__:<68}║
 ║  Repository: https://github.com/eliasbenb/PlexAniBridge                       ║
+║  Documentation: https://plexanibridge.elias.eu.org                            ║
 ║                                                                               ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝
 """.strip()
