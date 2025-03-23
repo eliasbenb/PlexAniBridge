@@ -120,6 +120,7 @@ class PlexCommunityClient:
         query: str,
         variables: dict | str = None,
         operation_name: str | None = None,
+        retry_count: int = 0,
     ) -> dict:
         """Makes a rate-limited request to the Plex Community API.
 
@@ -129,6 +130,8 @@ class PlexCommunityClient:
         Args:
             query (str): GraphQL query string
             variables (dict | str | None): Variables for the GraphQL query
+            operation_name (str | None): The operation name for the GraphQL query
+            retry_count (int): The number of times the request has been retried
 
         Returns:
             dict: JSON response from the API
@@ -136,6 +139,9 @@ class PlexCommunityClient:
         Raises:
             requests.HTTPError: If the request fails for any reason other than rate limiting
         """
+        if retry_count >= 3:
+            raise requests.HTTPError("Failed to make request after 3 tries")
+
         self.rate_limiter.wait_if_needed()  # Rate limit the requests
 
         response = self.session.post(
@@ -153,7 +159,22 @@ class PlexCommunityClient:
                 f"{self.__class__.__name__}: Rate limit exceeded, waiting {retry_after} seconds"
             )
             sleep(retry_after + 1)
-            return self._make_request(query, variables)
+            return self._make_request(
+                query,
+                variables=variables,
+                operation_name=operation_name,
+                retry_count=retry_count,
+            )
+        elif response.status_code == 502:  # Bad Gateway
+            log.warning(
+                f"{self.__class__.__name__}: Received 502 Bad Gateway, retrying"
+            )
+            return self._make_request(
+                query,
+                variables=variables,
+                operation_name=operation_name,
+                retry_count=retry_count + 1,
+            )
 
         try:
             response.raise_for_status()
