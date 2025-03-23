@@ -398,6 +398,11 @@ class MediaList(AniListBaseModel):
             new_value = getattr(new, field)
 
             if old_value != new_value:
+                if field == "notes":
+                    if old_value:
+                        old_value = old_value[:50].replace("\n", "  ") + "..."
+                    if new_value:
+                        new_value = new_value[:50].replace("\n", "  ") + "..."
                 diff_str += f"{field}: {old_value} -> {new_value}, "
 
         return diff_str.rstrip(", ") + ")"
