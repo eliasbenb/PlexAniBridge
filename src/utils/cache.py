@@ -4,6 +4,9 @@ from cachetools import LRUCache, TTLCache, cached
 
 
 def generic_lru_cache(maxsize=128):
+    if maxsize is None:
+        maxsize = 2**32
+
     def decorator(func):
         @wraps(func)
         @cached(LRUCache(maxsize), key=generic_hash)
