@@ -81,23 +81,21 @@ class AniListRestoreClient:
         }
         """).strip()
 
+        variables = entry.model_dump_json()
+
         if self.dry_run:
             print(
                 f"[DRY RUN] Would restore entry for media ID: {entry.mediaId} with data:"
             )
-            print(f"\t{entry.model_dump_json(exclude_none=True)}")
+            print(f"\t{variables}")
             return
 
-        variables = entry.model_dump_json(exclude_none=True)
-
-        try:
-            response = self._make_request(query, variables)
-            if "errors" in response:
-                print(f"Error restoring entry {entry.mediaId}: {response['errors']}")
-            else:
-                print(f"Restored entry for media ID: {entry.mediaId}")
-        except Exception as e:
-            print(f"Failed to restore entry {entry.mediaId}: {str(e)}")
+        res = self._make_request(query, variables)
+        print(
+            f"Succesfully restored entry for "
+            f"'{res['data']['SaveMediaListEntry']['media']['title']['userPreferred']}' "
+            f"(ID: {res['data']['SaveMediaListEntry']['id']})"
+        )
 
     def _make_request(
         self, query: str, variables: dict[str, Any] | None = None
