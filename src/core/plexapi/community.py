@@ -3,7 +3,7 @@ from time import sleep
 
 import requests
 
-from src import log
+from src import __version__, log
 from src.utils.rate_limiter import RateLimiter
 
 
@@ -12,6 +12,16 @@ class PlexCommunityClient:
 
     def __init__(self, plex_token: str):
         self.plex_token = plex_token
+
+        self.session = requests.Session()
+        self.session.headers.update(
+            {
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+                "User-Agent": f"PlexAniBridge/{__version__}",
+                "X-Plex-Token": self.plex_token,
+            }
+        )
 
         self.rate_limiter = RateLimiter(
             log_name=self.__class__.__name__, requests_per_minute=360
@@ -128,13 +138,8 @@ class PlexCommunityClient:
         """
         self.rate_limiter.wait_if_needed()  # Rate limit the requests
 
-        response = requests.post(
+        response = self.session.post(
             self.API_URL,
-            headers={
-                "Accept": "application/json",
-                "Content-Type": "application/json",
-                "X-Plex-Token": self.plex_token,
-            },
             json={
                 "query": query,
                 "variables": variables,
