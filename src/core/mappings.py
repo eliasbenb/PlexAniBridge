@@ -199,17 +199,20 @@ class MappingsClient:
             raw_res = self.session.get(url)
             raw_res.raise_for_status()
             mappings = raw_res.json()
-        except requests.RequestException as e:
+        except requests.RequestException:
             log.error(
-                f"{self.__class__.__name__}: Error reaching mappings URL {url}: {e}"
+                f"{self.__class__.__name__}: Error reaching mappings URL $$'{url}'$$",
+                exc_info=True,
             )
-        except json.JSONDecodeError as e:
+        except json.JSONDecodeError:
             log.error(
-                f"{self.__class__.__name__}: Error decoding mappings from URL {url}: {e}"
+                f"{self.__class__.__name__}: Error decoding mappings from URL $$'{url}'$$",
+                exc_info=True,
             )
-        except Exception as e:
+        except Exception:
             log.error(
-                f"{self.__class__.__name__}: Unexpected error fetching mappings from URL {url}: {e}"
+                f"{self.__class__.__name__}: Unexpected error fetching mappings from URL $$'{url}'$$",
+                exc_info=True,
             )
 
         self._loaded_sources.add(url)
