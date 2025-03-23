@@ -69,12 +69,16 @@ class AniListRestoreClient:
 
     def _restore_entry(self, entry: MediaList) -> None:
         query = dedent("""
-        mutation ($mediaId: Int, $status: MediaListStatus, $score: Float, $progress: Int, $repeat: Int, $notes: String, $startedAt: FuzzyDateInput, $completedAt: FuzzyDateInput) {{
-            SaveMediaListEntry(mediaId: $mediaId, status: $status, score: $score, progress: $progress, repeat: $repeat, notes: $notes, startedAt: $startedAt, completedAt: $completedAt) {{
+        mutation ($mediaId: Int, $status: MediaListStatus, $score: Float, $progress: Int, $repeat: Int, $notes: String, $startedAt: FuzzyDateInput, $completedAt: FuzzyDateInput) {
+            SaveMediaListEntry(mediaId: $mediaId, status: $status, score: $score, progress: $progress, repeat: $repeat, notes: $notes, startedAt: $startedAt, completedAt: $completedAt) {
                 id
-                mediaId
-            }}
-        }}
+                media {
+                    title {
+                        userPreferred
+                    }
+                }
+            }
+        }
         """).strip()
 
         if self.dry_run:
