@@ -11,8 +11,6 @@ from typing import Any
 import requests
 from pydantic import BaseModel
 
-from src import __version__
-
 
 class FuzzyDate(BaseModel):
     year: int | None = None
@@ -51,7 +49,7 @@ class AniListRestoreClient:
             {
                 "Accept": "application/json",
                 "Content-Type": "application/json",
-                "User-Agent": f"PlexAniBridge/{__version__}",
+                "User-Agent": "PlexAniBridge",
                 "Authorization": f"Bearer {self.token}",
             }
         )
