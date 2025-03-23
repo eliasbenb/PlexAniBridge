@@ -6,7 +6,7 @@ from time import sleep
 import requests
 from cachetools.func import ttl_cache
 
-from src import log
+from src import __version__, log
 from src.models.anilist import (
     Media,
     MediaFormat,
@@ -52,6 +52,16 @@ class AniListClient:
         self.anilist_token = anilist_token
         self.backup_dir = backup_dir
         self.dry_run = dry_run
+
+        self.session = requests.Session()
+        self.session.headers.update(
+            {
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+                "User-Agent": f"PlexAniBridge/{__version__}",
+                "Authorization": f"Bearer {self.anilist_token}",
+            }
+        )
 
         self.rate_limiter = RateLimiter(self.__class__.__name__, requests_per_minute=90)
         self.user = self.get_user()
@@ -454,13 +464,8 @@ class AniListClient:
         """
         self.rate_limiter.wait_if_needed()  # Rate limit the requests
 
-        response = requests.post(
+        response = self.session.post(
             self.API_URL,
-            headers={
-                "Authorization": f"Bearer {self.anilist_token}",
-                "Content-Type": "application/json",
-                "Accept": "application/json",
-            },
             json={"query": query, "variables": variables or {}},
         )
 

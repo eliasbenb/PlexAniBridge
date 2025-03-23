@@ -8,7 +8,7 @@ import tomlkit
 import yaml
 from tomlkit.exceptions import TOMLKitError
 
-from src import log
+from src import __version__, log
 
 AniMapDict: TypeAlias = dict[str, dict[str, Any]]
 
@@ -28,6 +28,15 @@ class MappingsClient:
     def __init__(self, data_path: Path) -> None:
         self.data_path = data_path
         self._loaded_sources: set[str] = set()
+
+        self.session = requests.Session()
+        self.session.headers.update(
+            {
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+                "User-Agent": f"PlexAniBridge/{__version__}",
+            }
+        )
 
     def _is_file(self, src: str) -> bool:
         """Check if the source is a file.
@@ -187,7 +196,7 @@ class MappingsClient:
         """
         mappings: AniMapDict = {}
         try:
-            raw_res = requests.get(url)
+            raw_res = self.session.get(url)
             raw_res.raise_for_status()
             mappings = raw_res.json()
         except requests.RequestException as e:
