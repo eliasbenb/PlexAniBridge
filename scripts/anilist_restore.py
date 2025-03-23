@@ -109,7 +109,12 @@ class AniListRestoreClient:
             sleep(retry_after + 1)
             return self._make_request(query, variables)
 
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except requests.HTTPError as e:
+            print(f"Error making request: {e}")
+            print(response.text)
+            raise e
         return response.json()
 
 
