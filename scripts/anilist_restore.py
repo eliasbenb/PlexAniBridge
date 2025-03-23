@@ -11,8 +11,6 @@ from typing import Any
 import requests
 from pydantic import BaseModel
 
-from src import __version__
-
 
 class FuzzyDate(BaseModel):
     year: int | None = None
@@ -29,10 +27,10 @@ class MediaList(BaseModel):
     progress: int | None = None
     repeat: int | None = None
     notes: str | None = None
-    started_at: FuzzyDate | None = None
-    completed_at: FuzzyDate | None = None
-    created_at: datetime | None = None
-    updated_at: datetime | None = None
+    startedAt: FuzzyDate | None = None
+    completedAt: FuzzyDate | None = None
+    createdAt: datetime | None = None
+    updatedAt: datetime | None = None
 
 
 class AniListRestoreClient:
@@ -51,7 +49,7 @@ class AniListRestoreClient:
             {
                 "Accept": "application/json",
                 "Content-Type": "application/json",
-                "User-Agent": f"PlexAniBridge/{__version__}",
+                "User-Agent": "PlexAniBridge",
                 "Authorization": f"Bearer {self.token}",
             }
         )
@@ -71,31 +69,33 @@ class AniListRestoreClient:
 
     def _restore_entry(self, entry: MediaList) -> None:
         query = dedent("""
-        mutation ($mediaId: Int, $status: MediaListStatus, $score: Float, $progress: Int, $repeat: Int, $notes: String, $startedAt: FuzzyDateInput, $completedAt: FuzzyDateInput) {{
-            SaveMediaListEntry(mediaId: $mediaId, status: $status, score: $score, progress: $progress, repeat: $repeat, notes: $notes, startedAt: $startedAt, completedAt: $completedAt) {{
+        mutation ($mediaId: Int, $status: MediaListStatus, $score: Float, $progress: Int, $repeat: Int, $notes: String, $startedAt: FuzzyDateInput, $completedAt: FuzzyDateInput) {
+            SaveMediaListEntry(mediaId: $mediaId, status: $status, score: $score, progress: $progress, repeat: $repeat, notes: $notes, startedAt: $startedAt, completedAt: $completedAt) {
                 id
-                mediaId
-            }}
-        }}
+                media {
+                    title {
+                        userPreferred
+                    }
+                }
+            }
+        }
         """).strip()
+
+        variables = entry.model_dump_json()
 
         if self.dry_run:
             print(
                 f"[DRY RUN] Would restore entry for media ID: {entry.mediaId} with data:"
             )
-            print(f"\t{entry.model_dump_json(exclude_none=True)}")
+            print(f"\t{variables}")
             return
 
-        variables = entry.model_dump_json(exclude_none=True)
-
-        try:
-            response = self._make_request(query, variables)
-            if "errors" in response:
-                print(f"Error restoring entry {entry.mediaId}: {response['errors']}")
-            else:
-                print(f"Restored entry for media ID: {entry.mediaId}")
-        except Exception as e:
-            print(f"Failed to restore entry {entry.mediaId}: {str(e)}")
+        res = self._make_request(query, variables)
+        print(
+            f"Succesfully restored entry for "
+            f"'{res['data']['SaveMediaListEntry']['media']['title']['userPreferred']}' "
+            f"(ID: {res['data']['SaveMediaListEntry']['id']})"
+        )
 
     def _make_request(
         self, query: str, variables: dict[str, Any] | None = None
@@ -111,7 +111,12 @@ class AniListRestoreClient:
             sleep(retry_after + 1)
             return self._make_request(query, variables)
 
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except requests.HTTPError as e:
+            print(f"Error making request: {e}")
+            print(response.text)
+            raise e
         return response.json()
 
 
