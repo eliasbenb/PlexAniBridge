@@ -217,6 +217,10 @@ class PlexAnibridgeConfig(BaseSettings):
             self.PLEX_USER = [self.PLEX_USER]
         if len(self.ANILIST_TOKEN) != len(self.PLEX_USER):
             raise ValueError("The number of Plex users and AniList tokens must match")
+        if any(not token for token in self.ANILIST_TOKEN):
+            raise ValueError("AniList tokens cannot be empty")
+        if any(not user for user in self.PLEX_USER):
+            raise ValueError("Plex users cannot be empty")
         return self
 
     def encode(self) -> str:
