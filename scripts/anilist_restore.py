@@ -27,10 +27,10 @@ class MediaList(BaseModel):
     progress: int | None = None
     repeat: int | None = None
     notes: str | None = None
-    started_at: FuzzyDate | None = None
-    completed_at: FuzzyDate | None = None
-    created_at: datetime | None = None
-    updated_at: datetime | None = None
+    startedAt: FuzzyDate | None = None
+    completedAt: FuzzyDate | None = None
+    createdAt: datetime | None = None
+    updatedAt: datetime | None = None
 
 
 class AniListRestoreClient:
