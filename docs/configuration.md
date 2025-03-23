@@ -116,7 +116,7 @@ This is useful for syncing only Anime content in a mixed library.
 
 ---
 
-## `PLEX_METADATA_SOURCE`
+### `PLEX_METADATA_SOURCE`
 
 `Enum("local", "online")` (Optional, default: `"local"`)
 
