@@ -1,3 +1,6 @@
+import os
+import uuid
+
 from .logging import Logger, get_logger
 from .settings import PlexAnibridgeConfig
 from .utils.terminal import supports_utf8
@@ -50,3 +53,10 @@ config = PlexAnibridgeConfig()
 log: Logger = get_logger(
     log_name="PlexAniBridge", log_level=config.LOG_LEVEL, log_dir="logs"
 )
+
+os.environ["PLEXAPI_HEADER_IDENTIFIER"] = uuid.uuid3(
+    uuid.NAMESPACE_DNS, "PlexAniBridge"
+).hex
+os.environ["PLEXAPI_HEADER_DEVICE_NAME"] = "PlexAniBridge"
+os.environ["PLEXAPI_HEADER_VERSION"] = __version__
+os.environ["PLEXAPI_HEADER_PROVIDES"] = ""
