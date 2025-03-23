@@ -7,6 +7,7 @@ import plexapi.utils
 import requests
 from cachetools.func import lru_cache
 from plexapi.library import MovieSection, ShowSection
+from plexapi.myplex import MyPlexUser
 from plexapi.server import PlexServer
 from plexapi.video import (
     Episode,
@@ -107,9 +108,9 @@ class PlexClient:
             Uses admin_client for admin users, creates new client for others
         """
         admin_account = self.admin_client.myPlexAccount()
-        self.is_admin_user = self.plex_user in (
-            admin_account.username,
-            admin_account.email,
+        self.is_admin_user = self.plex_user.lower() in (
+            (admin_account.username or "").lower(),
+            (admin_account.email or "").lower(),
         ) or (admin_account.title == self.plex_user and not admin_account.username)
         self.is_online_user = (
             self.plex_metadata_source == PlexMetadataSource.ONLINE
@@ -130,13 +131,16 @@ class PlexClient:
                     "will not be available for this user."
                 )
 
-            self.user_client = self.admin_client.switchUser(self.plex_user)
-            self.user_account_id = next(
-                u.id
-                for u in admin_account.users()
-                if self.plex_user in (u.username, u.email)  # Regular user
-                or (u.title == self.plex_user and not u.username)  # Home user
-            )
+            try:
+                self.user_client = self.admin_client.switchUser(self.plex_user)
+                self.user_account_id = self._match_plex_user(
+                    self.plex_user, admin_account.users()
+                ).id
+            except Exception as e:
+                raise ValueError(
+                    f"{self.__class__.__name__}: Failed to switch to user $$'{self.plex_user}'$$"
+                ) from e
+
         log.debug(
             f"{self.__class__.__name__}: Initialized Plex client for user "
             f"$$'{self.plex_user}'$$ $${{plex_account_id: {self.user_account_id}}}$$"
@@ -153,6 +157,36 @@ class PlexClient:
         Handles authentication and client setup for the Plex Community API.
         """
         self.community_client = PlexCommunityClient(self.plex_token)
+
+    def _match_plex_user(self, plex_user: str, users: list[MyPlexUser]) -> MyPlexUser:
+        """Matches the specified Plex user to a MyPlexUser object.
+
+        Args:
+            plex_user (str): Username, email, or title of the Plex user to match
+            users (list[MyPlexUser]): List of Plex users to search
+
+        Returns:
+            MyPlexUser: MyPlexUser object for the specified user
+        """
+        plex_user_lower = plex_user.lower()
+
+        def is_home_user(u: MyPlexUser) -> bool:
+            return u.title and not u.username and not u.email
+
+        for u in users:
+            if is_home_user(u):
+                if plex_user_lower == (u.title or "").lower():
+                    return u
+            elif plex_user_lower in (
+                (u.username or "").lower(),
+                (u.email or "").lower(),
+            ):
+                return u
+
+        raise ValueError(
+            f"{self.__class__.__name__}: User $$'{self.plex_user}'$$ not found "
+            f"in Plex users list"
+        )
 
     def _get_on_deck_window(self) -> timedelta:
         """Gets the configured cutoff time for Continue Watching items on Plex.
