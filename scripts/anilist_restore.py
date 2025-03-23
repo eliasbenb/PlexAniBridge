@@ -11,6 +11,8 @@ from typing import Any
 import requests
 from pydantic import BaseModel
 
+from src import __version__
+
 
 class FuzzyDate(BaseModel):
     year: int | None = None
@@ -43,6 +45,16 @@ class AniListRestoreClient:
         self.dry_run = dry_run
         self.request_count = 0
         self.last_request_time = 0
+
+        self.session = requests.Session()
+        self.session.headers.update(
+            {
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+                "User-Agent": f"PlexAniBridge/{__version__}",
+                "Authorization": f"Bearer {self.token}",
+            }
+        )
 
     def restore_from_file(self, backup_file: Path) -> None:
         print(f"Loading backup from {backup_file}")
@@ -88,13 +100,8 @@ class AniListRestoreClient:
     def _make_request(
         self, query: str, variables: dict[str, Any] | None = None
     ) -> dict[str, Any]:
-        response = requests.post(
+        response = self.session.post(
             self.API_URL,
-            headers={
-                "Authorization": f"Bearer {self.token}",
-                "Content-Type": "application/json",
-                "Accept": "application/json",
-            },
             json={"query": query, "variables": variables or {}},
         )
 
