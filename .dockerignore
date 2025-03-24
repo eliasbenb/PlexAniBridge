@@ -23,7 +23,7 @@ env.bak/
 venv.bak/
 
 # Logs
-/logs
+*.log
 
 # IDE
 /.devcontainer
