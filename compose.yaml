@@ -21,5 +21,4 @@ services:
       # DATA_PATH: ./data
     volumes:
       - ./data:/app/data
-      # - ./logs:/app/logs
     restart: unless-stopped

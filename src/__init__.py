@@ -51,7 +51,9 @@ else:
 config = PlexAnibridgeConfig()
 
 log: Logger = get_logger(
-    log_name="PlexAniBridge", log_level=config.LOG_LEVEL, log_dir="logs"
+    log_name="PlexAniBridge",
+    log_level=config.LOG_LEVEL,
+    log_dir=config.DATA_PATH / "logs",
 )
 
 os.environ["PLEXAPI_HEADER_IDENTIFIER"] = uuid.uuid3(

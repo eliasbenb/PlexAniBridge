@@ -1,6 +1,6 @@
 # Data
-/data
-logs/
+/data/**
+!/data/mappings.example.*
 
 # Database
 *.db
