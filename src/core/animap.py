@@ -136,10 +136,6 @@ class AniMapClient:
                     )
                     mappings.pop(key)
 
-            log.info(
-                f"{self.__class__.__name__}: Loading {validated_count} mapping entries"
-            )
-
             curr_mappings_hash = md5(
                 json.dumps(mappings, sort_keys=True).encode()
             ).hexdigest()
@@ -152,6 +148,9 @@ class AniMapClient:
 
             log.debug(
                 f"{self.__class__.__name__}: Anime mapping changes detected, syncing database"
+            )
+            log.info(
+                f"{self.__class__.__name__}: Loading {validated_count} mapping entries into the local database"
             )
 
             values = [
