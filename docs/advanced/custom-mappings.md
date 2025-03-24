@@ -14,8 +14,17 @@ PlexAniBridge allows you to define custom mappings for Plex content to AniList, 
 Below is an example mappings file. You can use [the JSON schema](https://github.com/eliasbenb/PlexAniBridge-Mappings/blob/HEAD/mappings.schema.json) or the [PlexAniBridge-Mappings database](https://github.com/eliasbenb/PlexAniBridge-Mappings) as reference.
 
 ```json title="mappings.custom.json"
---8<-- "mappings.example.json"
+--8<-- "data/mappings.example.json"
 ```
+
+??? tip "YAML Format for Mappings"
+
+    The mappings file can also be written in YAML format. Here is the same example in YAML:
+
+    ```yaml title="mappings.custom.yaml"
+    --8<-- "data/mappings.example.yaml"
+    ```
+
 
 !!! tip "Including External Mappings"
 

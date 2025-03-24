@@ -5,11 +5,11 @@ on:
     branches:
       - main
     paths:
+      - "data/mappings.example.*"
       - "docs/**"
       - "mkdocs.yml"
       - ".env.example"
       - "compose.yaml"
-      - "mappings.example.json"
   workflow_dispatch:
 
 jobs:
