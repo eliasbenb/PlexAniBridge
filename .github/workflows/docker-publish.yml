@@ -78,3 +78,4 @@ jobs:
           delete-orphaned-images: true
           validate: true
           package: plexanibridge
+          older-than: 1 day
