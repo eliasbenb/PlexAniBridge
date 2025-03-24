@@ -247,7 +247,7 @@ class PlexClient:
 
         if min_last_modified:
             if self.is_online_user:
-                min_last_modified = min_last_modified + timedelta(seconds=90)
+                min_last_modified = min_last_modified - timedelta(seconds=30)
 
             log.debug(
                 f"{self.__class__.__name__}: Filtering section $$'{section.title}'$$ by "
