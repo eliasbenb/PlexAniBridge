@@ -23,7 +23,7 @@ class MediaList(BaseModel):
     userId: int
     mediaId: int
     status: str | None = None
-    score: float | None = None
+    score: float = 0
     progress: int | None = None
     repeat: int | None = None
     notes: str | None = None

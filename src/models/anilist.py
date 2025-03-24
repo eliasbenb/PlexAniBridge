@@ -369,7 +369,7 @@ class MediaList(AniListBaseModel):
     user_id: int
     media_id: int
     status: MediaListStatus | None = None
-    score: float | None = None
+    score: float = 0
     progress: int | None = None
     repeat: int | None = None
     notes: str | None = None
