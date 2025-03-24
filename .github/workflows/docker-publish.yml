@@ -2,11 +2,8 @@ name: Docker Build and Publish
 
 on:
   push:
-    branches:
-      - main
-      - develop
-    tags:
-      - "v*"
+    branches: [ main, develop ]
+    tags: [ "v*" ]
 
 env:
   REGISTRY: ghcr.io
@@ -53,14 +50,13 @@ jobs:
             type=raw,value=beta,enable=${{ github.ref_type == 'tag' && contains(github.ref, 'beta') }}
             type=raw,value=latest,enable=${{ github.ref_type == 'tag' && !contains(github.ref, 'alpha') && !contains(github.ref, 'beta') }}
             type=ref,event=branch
-            type=sha
 
       - name: Build and Push Docker Image
         id: build-and-push
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64,linux/arm64/v8
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -68,9 +64,10 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Delete Untagged Packages
-        uses: actions/delete-package-versions@v5
+        uses: dataaxiom/ghcr-cleanup-action@v1
         with:
-          package-name: plexanibridge
-          package-type: container
-          min-versions-to-keep: 0
-          delete-only-untagged-versions: true
+          delete-untagged: true
+          delete-ghost-images: true
+          delete-orphaned-images: true
+          validate: true
+          package: plexanibridge
