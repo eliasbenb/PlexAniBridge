@@ -1,4 +1,5 @@
 name: MkDocs
+
 on:
   push:
     branches:
@@ -11,27 +12,40 @@ on:
       - "mappings.example.json"
   workflow_dispatch:
 
-permissions:
-  contents: write
 jobs:
-  deploy:
+  build-and-publish:
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
       - name: Configure Git Credentials
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-      - uses: actions/setup-python@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: 3.x
-      - run: echo "cache_id=$(date --utc '+%V')" >> $GITHUB_ENV
 
-      - uses: actions/cache@v4
+      - name: Determine Cache ID
+        run: echo "cache_id=$(date --utc '+%V')" >> $GITHUB_ENV
+
+      - name: Setup Cache
+        uses: actions/cache@v4
         with:
           key: mkdocs-material-${{ env.cache_id }}
           path: .cache
           restore-keys: |
             mkdocs-material-
-      - run: pip install -r docs/requirements.txt
-      - run: mkdocs gh-deploy --force
+
+      - name: Install Dependencies
+        run: pip install -r docs/requirements.txt
+
+      - name: Build and Deploy Docs
+        run: mkdocs gh-deploy --force
