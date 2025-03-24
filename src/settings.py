@@ -147,8 +147,11 @@ class PlexAnibridgeConfig(BaseSettings):
         """Catches extra environment variables not defined in the model and logs them."""
         from src.logging import Logger, get_logger
 
+        log_level = values.get("LOG_LEVEL", "INFO")
         log_dir = Path(values.get("DATA_PATH", "./data")) / "logs"
-        log: Logger = get_logger(log_name="PlexAniBridge", log_dir=log_dir.resolve())
+        log: Logger = get_logger(
+            log_name="PlexAniBridge", log_level=log_level, log_dir=log_dir.resolve()
+        )
 
         DEPRECATED: dict[str, str] = {}
         DEPRECATED_ALIAS: dict[str, str] = {
