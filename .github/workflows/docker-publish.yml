@@ -50,12 +50,12 @@ jobs:
           flavor: |
             latest=false
           tags: |
-            type=semver,pattern=v{{version}},enable=${{ startsWith(github.event.inputs.ref || github.ref_name, 'v') }}
-            type=semver,pattern=v{{major}}.{{minor}},enable=${{ startsWith(github.event.inputs.ref || github.ref_name, 'v') }}
-            type=semver,pattern=v{{major}},enable=${{ startsWith(github.event.inputs.ref || github.ref_name, 'v') }}
-            type=raw,value=alpha,enable=${{ contains(github.event.inputs.ref || github.ref, 'alpha') }}
-            type=raw,value=beta,enable=${{ contains(github.event.inputs.ref || github.ref, 'beta') }}
-            type=raw,value=latest,enable=${{ startsWith(github.event.inputs.ref || github.ref_name, 'v') && !contains(github.event.inputs.ref || github.ref, 'alpha') && !contains(github.event.inputs.ref || github.ref, 'beta') }}
+            type=semver,pattern=v{{version}}
+            type=semver,pattern=v{{major}}.{{minor}}
+            type=semver,pattern=v{{major}}
+            type=raw,value=alpha,enable=${{ github.ref_type == 'tag' && contains(github.ref, 'alpha') }}
+            type=raw,value=beta,enable=${{ github.ref_type == 'tag' && contains(github.ref, 'beta') }}
+            type=raw,value=latest,enable=${{ github.ref_type == 'tag' && !contains(github.ref, 'alpha') && !contains(github.ref, 'beta') }}
             type=ref,event=branch
 
       - name: Build and Push Docker Image
