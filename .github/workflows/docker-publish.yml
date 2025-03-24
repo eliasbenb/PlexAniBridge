@@ -57,10 +57,13 @@ jobs:
             type=semver,pattern=v{{version}}
             type=semver,pattern=v{{major}}.{{minor}}
             type=semver,pattern=v{{major}}
-            type=ref,event=branch
             type=raw,value=alpha,enable=${{ github.ref_type == 'tag' && contains(github.ref, 'alpha') }}
             type=raw,value=beta,enable=${{ github.ref_type == 'tag' && contains(github.ref, 'beta') }}
             type=raw,value=latest,enable=${{ github.ref_type == 'tag' && !contains(github.ref, 'alpha') && !contains(github.ref, 'beta') }}
+            type=ref,event=branch
+            type=sha
+            type=ref,event=branch
+            type=sha
 
       - name: Build and push Docker image
         id: build-and-push
