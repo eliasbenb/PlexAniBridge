@@ -410,6 +410,21 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         """
         return f"$${{key: {key}, plex_id: {plex_id}, {guids}{f', anilist_id: {anilist_id}' if anilist_id else ''}}}$$"
 
+    @generic_lru_cache(maxsize=4)
+    def _filter_history_by_episodes(
+        self, item: Show, grandchild_items: list[Episode]
+    ) -> list[EpisodeHistory]:
+        grandchild_rating_keys = {e.ratingKey for e in grandchild_items}
+
+        return sorted(
+            (
+                h
+                for h in self.plex_client.get_history(item)
+                if h.ratingKey in grandchild_rating_keys
+            ),
+            key=lambda x: x.viewedAt,
+        )
+
     def _get_last_watched_date(self, episode: Episode) -> FuzzyDate | None:
         """Gets the last watched date for an episode.
 
