@@ -364,11 +364,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             FuzzyDate | None: Completion date for the media item
         """
         history = self._filter_history_by_episodes(item, grandchild_items)
-        first_time_histories = []
-        for h in history:
-            if not first_time_histories:
-                first_time_histories.append(h)
-        last_history = next(iter(reversed(first_time_histories)), None)
+        last_history = next(reversed(history), None)
 
         last_viewed_dt = max(
             (e.lastViewedAt for e in grandchild_items if e.lastViewedAt),
