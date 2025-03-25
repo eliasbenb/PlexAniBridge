@@ -411,7 +411,11 @@ class PlexClient:
             Results are cached using functools.cache decorator
         """
         if not self.is_online_user:
-            args = {"metadataItemID": item.ratingKey, "accountID": self.user_account_id}
+            args = {
+                "metadataItemID": item.ratingKey,
+                "accountID": self.user_account_id,
+                "sort": "viewedAt:asc",
+            }
             return self.admin_client.fetchItems(
                 f"/status/sessions/history/all{plexapi.utils.joinArgs(args)}"
             )
@@ -420,7 +424,7 @@ class PlexClient:
             data = self.community_client.get_watch_activity(
                 self._guid_to_key(item.guid)
             )
-            history = []
+            history: list[EpisodeHistory] = []
             for entry in data:
                 metadata = entry["metadataItem"]
                 user = entry["userV2"]
@@ -453,7 +457,7 @@ class PlexClient:
                     if metadata["type"] == "MOVIE"
                     else PlexHistory(**history_kwargs)
                 )
-            return history
+            return sorted(history, key=lambda x: x.viewedAt)
         except requests.HTTPError:
             log.error(
                 f"Failed to get watch hsitory for {item.type} $$'{item.title}'$$ "

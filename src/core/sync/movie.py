@@ -156,9 +156,7 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
         Returns:
             FuzzyDate | None: Start date for the media item
         """
-        history: list[MovieHistory] = sorted(
-            self.plex_client.get_history(item), key=lambda x: x.viewedAt
-        )
+        history = self.plex_client.get_history(item)
         first_history = next(iter(history), None)
 
         last_viewed = (
