@@ -85,7 +85,10 @@ class PlexClient:
 
         Handles authentication and client setup for the admin account.
         """
-        self.admin_client = PlexServer(self.plex_url, self.plex_token)
+        session = requests.Session()
+        session.verify = False
+
+        self.admin_client = PlexServer(self.plex_url, self.plex_token, session)
         self.online_client = (
             PlexMetadataServer(self.plex_url, self.plex_token)
             if self.plex_metadata_source == PlexMetadataSource.ONLINE
