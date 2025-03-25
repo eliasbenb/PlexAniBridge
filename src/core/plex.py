@@ -469,34 +469,6 @@ class PlexClient:
         finally:
             return []
 
-    def get_first_history(self, item: Media) -> History | None:
-        """Retrieves the oldest watch history entry for a media item.
-
-        A convenience wrapper around get_history() that returns only the
-        first (oldest) history entry.
-
-        Args:
-            item (Media): Media item to get history for
-
-        Returns:
-            History | None: Oldest history entry if found, None if no history exists
-        """
-        return min(self.get_history(item), key=lambda h: h.viewedAt, default=None)
-
-    def get_last_history(self, item: Media) -> History | None:
-        """Retrieves the most recent watch history entry for a media item.
-
-        A convenience wrapper around get_history() that returns only the
-        most recent history entry.
-
-        Args:
-            item (Media): Media item to get history for
-
-        Returns:
-            History | None: Most recent history entry if found, None if no history exists
-        """
-        return max(self.get_history(item), key=lambda h: h.viewedAt, default=None)
-
     def is_on_watchlist(self, item: Movie | Show) -> bool:
         """Checks if a media item is on the user's watchlist.
 
