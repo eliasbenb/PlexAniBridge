@@ -352,17 +352,51 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         return last_viewed or history_viewed
 
     def _calculate_completed_at(
-        self, grandchild_items: list[Episode], **_
+        self, item: Show, grandchild_items: list[Episode], **_
     ) -> FuzzyDate | None:
         """Calculates the completion date for a media item.
 
         Args:
+            item (Show): Grandparent Plex media item
             grandchild_items (list[Episode]): List of relevant episodes
 
         Returns:
             FuzzyDate | None: Completion date for the media item
         """
-        return self._get_last_watched_date(grandchild_items[-1])
+        history = self._filter_history_by_episodes(item, grandchild_items)
+        first_time_histories = []
+        for h in history:
+            if not first_time_histories:
+                first_time_histories.append(h)
+        last_history = next(iter(reversed(first_time_histories)), None)
+
+        last_viewed_dt = max(
+            (e.lastViewedAt for e in grandchild_items if e.lastViewedAt),
+            default=None,
+        )
+        last_viewed = (
+            FuzzyDate.from_date(
+                last_viewed_dt.replace(tzinfo=timezone.utc).astimezone(
+                    self.anilist_client.user_tz
+                )
+            )
+            if last_viewed_dt
+            else None
+        )
+
+        history_viewed = (
+            FuzzyDate.from_date(
+                last_history.viewedAt.replace(tzinfo=timezone.utc).astimezone(
+                    self.anilist_client.user_tz
+                )
+            )
+            if last_history
+            else None
+        )
+
+        if last_viewed and history_viewed:
+            return max(last_viewed, history_viewed)
+        return last_viewed or history_viewed
 
     def _calculate_notes(
         self,
