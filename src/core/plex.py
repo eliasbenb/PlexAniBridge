@@ -67,6 +67,7 @@ class PlexClient:
         self.plex_metadata_source = plex_metadata_source
 
         self._init_admin_client()
+        self._init_online_client()
         self._init_user_client()
         self._init_community_client()
 
@@ -87,13 +88,17 @@ class PlexClient:
         """
         session = requests.Session()
         session.verify = False
-
         self.admin_client = PlexServer(self.plex_url, self.plex_token, session)
-        self.online_client = (
-            PlexMetadataServer(self.plex_url, self.plex_token)
-            if self.plex_metadata_source == PlexMetadataSource.ONLINE
-            else None
-        )
+
+    def _init_online_client(self) -> None:
+        """Initializes the Plex client for the online metadata source.
+
+        Handles authentication and client setup for the online metadata source.
+        """
+        if self.plex_metadata_source == PlexMetadataSource.ONLINE:
+            self.online_client = PlexMetadataServer(self.plex_url, self.plex_token)
+        else:
+            self.online_client = None
 
     def _init_user_client(self) -> PlexServer:
         """Initializes the Plex client for the specified user account.
