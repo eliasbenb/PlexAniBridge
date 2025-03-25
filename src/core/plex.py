@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from math import isnan
 from typing import TypeAlias
+from urllib.parse import urlparse
 from xml.etree import ElementTree
 
 import plexapi.utils
@@ -22,6 +23,7 @@ from tzlocal import get_localzone
 
 from src import log
 from src.settings import PlexMetadataSource
+from src.utils.requests import SelectiveVerifySession
 
 from .plexapi.community import PlexCommunityClient
 from .plexapi.metadata import PlexMetadataServer
@@ -67,6 +69,7 @@ class PlexClient:
         self.plex_metadata_source = plex_metadata_source
 
         self._init_admin_client()
+        self._init_online_client()
         self._init_user_client()
         self._init_community_client()
 
@@ -85,12 +88,22 @@ class PlexClient:
 
         Handles authentication and client setup for the admin account.
         """
-        self.admin_client = PlexServer(self.plex_url, self.plex_token)
-        self.online_client = (
-            PlexMetadataServer(self.plex_url, self.plex_token)
-            if self.plex_metadata_source == PlexMetadataSource.ONLINE
-            else None
-        )
+        parsed_url = urlparse(self.plex_url)
+        session = None
+        if parsed_url.scheme == "https":
+            session = SelectiveVerifySession(whitelist=[parsed_url.hostname])
+
+        self.admin_client = PlexServer(self.plex_url, self.plex_token, session)
+
+    def _init_online_client(self) -> None:
+        """Initializes the Plex client for the online metadata source.
+
+        Handles authentication and client setup for the online metadata source.
+        """
+        if self.plex_metadata_source == PlexMetadataSource.ONLINE:
+            self.online_client = PlexMetadataServer(self.plex_url, self.plex_token)
+        else:
+            self.online_client = None
 
     def _init_user_client(self) -> PlexServer:
         """Initializes the Plex client for the specified user account.
