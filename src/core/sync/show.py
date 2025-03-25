@@ -3,7 +3,7 @@ from collections import Counter
 from datetime import datetime, timezone
 from typing import Iterator
 
-from plexapi.video import Episode, Season, Show
+from plexapi.video import Episode, EpisodeHistory, Season, Show
 
 from src import log
 from src.models.anilist import FuzzyDate, Media, MediaListStatus
@@ -309,17 +309,47 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         return least_views - 1 if least_views else None
 
     def _calculate_started_at(
-        self, grandchild_items: list[Episode], **_
+        self, item: Show, grandchild_items: list[Episode], **_
     ) -> FuzzyDate | None:
         """Calculates the start date for a media item.
 
         Args:
+            item (Show): Grandparent Plex media item
             grandchild_items (list[Episode]): List of relevant episodes
 
         Returns:
             FuzzyDate | None: Start date for the media item
         """
-        return self._get_last_watched_date(grandchild_items[0])
+        history = self._filter_history_by_episodes(item, grandchild_items)
+        first_history = next(iter(history), None)
+
+        last_viewed_dt = min(
+            (e.lastViewedAt for e in grandchild_items if e.lastViewedAt),
+            default=None,
+        )
+        last_viewed = (
+            FuzzyDate.from_date(
+                last_viewed_dt.replace(tzinfo=timezone.utc).astimezone(
+                    self.anilist_client.user_tz
+                )
+            )
+            if last_viewed_dt
+            else None
+        )
+
+        history_viewed = (
+            FuzzyDate.from_date(
+                first_history.viewedAt.replace(tzinfo=timezone.utc).astimezone(
+                    self.anilist_client.user_tz
+                )
+            )
+            if first_history
+            else None
+        )
+
+        if last_viewed and history_viewed:
+            return min(last_viewed, history_viewed)
+        return last_viewed or history_viewed
 
     def _calculate_completed_at(
         self, grandchild_items: list[Episode], **_
