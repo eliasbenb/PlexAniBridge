@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from math import isnan
 from typing import TypeAlias
+from urllib.parse import urlparse
 from xml.etree import ElementTree
 
 import plexapi.utils
@@ -22,6 +23,7 @@ from tzlocal import get_localzone
 
 from src import log
 from src.settings import PlexMetadataSource
+from src.utils.requests import SelectiveVerifySession
 
 from .plexapi.community import PlexCommunityClient
 from .plexapi.metadata import PlexMetadataServer
@@ -86,8 +88,11 @@ class PlexClient:
 
         Handles authentication and client setup for the admin account.
         """
-        session = requests.Session()
-        session.verify = False
+        parsed_url = urlparse(self.plex_url)
+        session = None
+        if parsed_url.scheme == "https":
+            session = SelectiveVerifySession(whitelist=[parsed_url.hostname])
+
         self.admin_client = PlexServer(self.plex_url, self.plex_token, session)
 
     def _init_online_client(self) -> None:
