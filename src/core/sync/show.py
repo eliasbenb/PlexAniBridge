@@ -489,40 +489,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             key=lambda x: x.viewedAt,
         )
 
-    def _get_last_watched_date(self, episode: Episode) -> FuzzyDate | None:
-        """Gets the last watched date for an episode.
-
-        Args:
-            episode (Episode): Episode to check
-
-        Returns:
-            FuzzyDate | None: Last watched date for the episode
-        """
-        history = self.plex_client.get_first_history(episode)
-        last_viewed = (
-            FuzzyDate.from_date(
-                episode.lastViewedAt.replace(tzinfo=timezone.utc).astimezone(
-                    self.anilist_client.user_tz
-                )
-            )
-            if episode.lastViewedAt
-            else None
-        )
-        history_viewed = (
-            FuzzyDate.from_date(
-                history.viewedAt.replace(tzinfo=timezone.utc).astimezone(
-                    self.anilist_client.user_tz
-                )
-            )
-            if history and history.viewedAt
-            else None
-        )
-
-        if last_viewed and history_viewed:
-            return min(last_viewed, history_viewed)
-        return last_viewed or history_viewed
-
-    @generic_lru_cache(maxsize=32)
+    @generic_lru_cache(maxsize=8)
     def _filter_watched_episodes(self, episodes: list[Episode]) -> list[Episode]:
         """Filters watched episodes based on AniList entry.
 
