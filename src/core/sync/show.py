@@ -475,12 +475,20 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         self, item: Show, grandchild_items: list[Episode]
     ) -> list[EpisodeHistory]:
         grandchild_rating_keys = {e.ratingKey for e in grandchild_items}
+        history = self.plex_client.get_history(item)
 
-        return [
-            h
-            for h in self.plex_client.get_history(item)
-            if h.ratingKey in grandchild_rating_keys
-        ]
+        filtered_history = {h for h in history if h.ratingKey in grandchild_rating_keys}
+
+        for e in grandchild_items:
+            if e.ratingKey not in grandchild_rating_keys or not e.lastViewedAt:
+                continue
+            episode_history = EpisodeHistory(
+                self.plex_client.user_client._server, e._data
+            )
+            episode_history.viewedAt = e.lastViewedAt
+            filtered_history.add(episode_history)
+
+        return sorted(filtered_history, key=lambda h: h.viewedAt)
 
     @generic_lru_cache(maxsize=8)
     def _filter_watched_episodes(self, episodes: list[Episode]) -> list[Episode]:
