@@ -2,8 +2,7 @@ name: MkDocs
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
     paths:
       - "data/mappings.example.*"
       - "docs/**"
@@ -11,6 +10,10 @@ on:
       - ".env.example"
       - "compose.yaml"
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build-and-publish:
