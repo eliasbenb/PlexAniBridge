@@ -76,6 +76,7 @@ jobs:
 
       - name: Delete Untagged Packages
         uses: dataaxiom/ghcr-cleanup-action@v1
+        continue-on-error: true
         with:
           delete-untagged: true
           delete-ghost-images: true
