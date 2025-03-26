@@ -21,6 +21,38 @@ PlexAniBridge is a tool designed to keep your AniList profile automatically sync
 - **Plex Online Metadata**: Choose between using local metadata (default) or the online Plex API for enhanced tracking across multiple servers with persistent tracking data.
 - **Optimized Performance**: Intelligent caching of requests to minimize API rate limits.
 - **Easy Deployment**: Fully compatible with [Docker deployments](https://plexanibridge.elias.eu.org/quick-start/docker) 🐳.
+
+```mermaid
+flowchart LR
+    User([User])
+    Plex[(Plex Media Server)]
+    PAB[PlexAniBridge]
+    AL[(AniList)]
+    Mapping[(Mapping Database)]
+   
+    subgraph " "
+        User -->|Watches anime<br>Rates anime<br>Adds anime to library| Plex
+    end
+   
+    subgraph " "
+        Plex -->|Media info<br>Watch history<br>Ratings & reviews| PAB
+    end
+   
+       subgraph " "
+        PAB -->|Updates profile<br>Syncs progress<br>Syncs repeats<br>Syncs ratings & reviews<br>Syncs start & end dates| AL
+    end
+
+    subgraph " "
+        PAB -->|Looks up anime IDs| Mapping
+        Mapping -->|Provides AniList IDs| PAB
+    end
+   
+       
+    style PAB fill:#45a1d9,stroke:#333,stroke-width:2px,color:#fff
+    style Plex fill:#e5a00d,stroke:#333,stroke-width:2px,color:#fff
+    style AL fill:#152232,stroke:#333,stroke-width:2px,color:#fff
+```
+
 ## Acknowledgments
 
 - [Kometa Mappings](https://github.com/Kometa-Team/Anime-IDs): The inspiration behind the mappings database.
