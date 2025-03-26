@@ -1,7 +1,7 @@
 from datetime import timezone
 from typing import Iterator
 
-from plexapi.video import Movie, MovieHistory
+from plexapi.video import Movie
 
 from src import log
 from src.models.anilist import FuzzyDate, Media, MediaListStatus

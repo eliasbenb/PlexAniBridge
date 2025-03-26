@@ -143,7 +143,7 @@ class AniListClient:
             )
             return None
 
-        variables = media_list_entry.model_dump_json()
+        variables = media_list_entry.model_dump_json(exclude_none=True)
 
         response = self._make_request(query, variables)["data"]["SaveMediaListEntry"]
 
@@ -383,15 +383,15 @@ class AniListClient:
                         self._media_list_entry_to_media(entry)
                     )
 
-        n = 1
-        backup_file = self.backup_dir / f"plexanibridge-{self.user.name}.{n}.json"
-        while backup_file.exists():
-            n += 1
-            backup_file = self.backup_dir / f"plexanibridge-{self.user.name}.{n}.json"
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        backup_file = (
+            self.backup_dir / f"plexanibridge-{self.user.name}.{timestamp}.json"
+        )
 
         if not backup_file.parent.exists():
             backup_file.parent.mkdir(parents=True)
 
+        # To compress the backup file, remove the unecessary media field from each list entry
         data_without_media = MediaListCollection(
             **{
                 field: getattr(data, field)
@@ -400,7 +400,7 @@ class AniListClient:
             }
         )
 
-        backup_file.write_text(data_without_media.model_dump_json(indent=2))
+        backup_file.write_text(data_without_media.model_dump_json())
         log.info(f"{self.__class__.__name__}: Exported AniList data to '{backup_file}'")
 
         cutoff_date = datetime.now() - timedelta(days=self.BACKUP_RETENTION_DAYS)

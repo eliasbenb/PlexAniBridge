@@ -1,11 +1,25 @@
 from functools import wraps
+from typing import Any
 
 from cachetools import LRUCache, TTLCache, cached
 
 
-def generic_lru_cache(maxsize=128):
+def generic_lru_cache(maxsize: int | None = 128):
+    """Function decorator to cache function results using an LRU cache.
+
+    Unlike functools.lru_cache, this decorator can be used with any object,
+    even if it's unhashable. The cache key is computed by hashing the input
+    arguments using a recursive algorithm.
+
+    Args:
+        maxsize (int | None): Maximum number of items in the cache. Defaults to 128.
+
+    Returns:
+        Callable: Decorator function that caches the decorated function's results
+    """
+
     if maxsize is None:
-        maxsize = 2**32
+        maxsize = 2**32  # 'infinitely' large cache
 
     def decorator(func):
         @wraps(func)
@@ -18,8 +32,18 @@ def generic_lru_cache(maxsize=128):
     return decorator
 
 
-def generic_ttl_cache(maxsize=128, ttl=600):
-    if maxsize is None:
+def generic_ttl_cache(maxsize: int | None = 128, ttl: int | None = 600):
+    """Function decorator to cache function results using a TTL cache.
+
+    Unlike functools.lru_cache, this decorator can be used with any object,
+    even if it's unhashable. The cache key is computed by hashing the input
+    arguments using a recursive algorithm.
+
+    Args:
+        maxsize (int | None): Maximum number of items in the cache. Defaults to 128.
+        ttl (int | None): Time-to-live for cached items in seconds. Defaults to 600.
+    """
+    if maxsize is None:  # 'infinitely' large cache
         maxsize = 2**32
 
     def decorator(func):
@@ -55,7 +79,7 @@ def generic_hash(*args, **kwargs):
         return hash((args_hash, kwargs_hash))
 
 
-def _generic_hash(obj, _visited_ids):
+def _generic_hash(obj: Any, _visited_ids: set[int]) -> int:
     obj_id = id(obj)
     if obj_id in _visited_ids:
         return hash("<cycle>")

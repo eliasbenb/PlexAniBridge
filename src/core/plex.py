@@ -115,10 +115,6 @@ class PlexClient:
 
         Returns:
             PlexServer: Initialized Plex client for the user account
-
-        Note:
-            Sets instance attributes is_admin_user and user_account_id
-            Uses admin_client for admin users, creates new client for others
         """
         admin_account = self.admin_client.myPlexAccount()
         self.is_admin_user = self.plex_user.lower() in (

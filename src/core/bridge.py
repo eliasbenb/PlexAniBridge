@@ -14,26 +14,6 @@ from src.settings import PlexAnibridgeConfig
 class BridgeClient:
     """Main orchestrator for synchronizing Plex and AniList libraries.
 
-    This client serves as the central coordinator for the entire synchronization process,
-    managing the initialization and interaction between various components:
-    - AniList API client
-    - Plex Media Server client
-    - AniMap database client (for ID mappings)
-    - Sync clients for movies and TV shows
-
-    Attributes:
-        config (PlexAnibridgeConfig): Application configuration settings
-        token_user_pairs (list[tuple[str, str]]): Paired AniList tokens and Plex usernames
-        animap_client (AniMapClient): Client for anime ID mapping database
-        last_synced (datetime | None): UTC timestamp of the last successful sync
-        last_config_encoded (str | None): Encoded version of the last used configuration
-
-    Configuration Options:
-        - FULL_SCAN: Allow scanning items that don't have any activity
-        - DESTRUCTIVE_SYNC: Allow deletion of AniList entries
-        - EXCLUDED_SYNC_FIELDS: Fields to ignore during sync
-        - SEARCH_FALLBACK_THRESHOLD: Matching threshold for title comparison
-
     Args:
         config (PlexAnibridgeConfig): Application configuration settings
     """
@@ -174,16 +154,6 @@ class BridgeClient:
         2. Processes each Plex user + AniList token pair
         3. Updates sync metadata upon successful completion
 
-        The sync process is considered successful only if all user pairs
-        are processed without errors. A failure for any user will prevent
-        the last_synced timestamp from being updated.
-
-        Note:
-            - Polling scan requires valid last_synced and matching configuration
-            - Partial scan can process only items with some Plex activity
-            - Full scan can process all items in the library
-            - Destructive sync can remove entries from AniList
-
         Args:
             poll (bool): Flag to enable polling scan mode, default False
         """
@@ -277,6 +247,7 @@ class BridgeClient:
             f"$$'{anilist_client.user.name}'$$ completed"
         )
 
+        # The unsynced items will include anything that failed or was not found
         unsynced_items = list(sync_stats.possible - sync_stats.covered)
         if unsynced_items:
             unsynced_items_str = ", ".join(str(i) for i in sorted(unsynced_items))
@@ -306,14 +277,6 @@ class BridgeClient:
                 - Number of items deleted
                 - Number of items skipped
                 - Number of items that failed
-
-        Process:
-        1. Retrieves items from the section based on sync mode:
-           - Partial scan: Only items with activity
-           - Full scan: All items
-           - Non-destructive: Only watched items
-        2. Routes each item to appropriate sync client (movie/show)
-        3. Collects and returns sync statistics
         """
         log.info(f"{self.__class__.__name__}: Syncing section $$'{section.title}'$$")
 
