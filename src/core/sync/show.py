@@ -3,7 +3,7 @@ from collections import Counter
 from datetime import datetime, timezone
 from typing import Iterator
 
-from plexapi.video import Episode, Season, Show
+from plexapi.video import Episode, EpisodeHistory, Season, Show
 
 from src import log
 from src.models.anilist import FuzzyDate, Media, MediaListStatus
@@ -309,30 +309,90 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         return least_views - 1 if least_views else None
 
     def _calculate_started_at(
-        self, grandchild_items: list[Episode], **_
+        self, item: Show, grandchild_items: list[Episode], **_
     ) -> FuzzyDate | None:
         """Calculates the start date for a media item.
 
         Args:
+            item (Show): Grandparent Plex media item
             grandchild_items (list[Episode]): List of relevant episodes
 
         Returns:
             FuzzyDate | None: Start date for the media item
         """
-        return self._get_last_watched_date(grandchild_items[0])
+        history = self._filter_history_by_episodes(item, grandchild_items)
+        first_history = next(iter(history), None)
+
+        last_viewed_dt = min(
+            (e.lastViewedAt for e in grandchild_items if e.lastViewedAt),
+            default=None,
+        )
+        last_viewed = (
+            FuzzyDate.from_date(
+                last_viewed_dt.replace(tzinfo=timezone.utc).astimezone(
+                    self.anilist_client.user_tz
+                )
+            )
+            if last_viewed_dt
+            else None
+        )
+
+        history_viewed = (
+            FuzzyDate.from_date(
+                first_history.viewedAt.replace(tzinfo=timezone.utc).astimezone(
+                    self.anilist_client.user_tz
+                )
+            )
+            if first_history
+            else None
+        )
+
+        if last_viewed and history_viewed:
+            return min(last_viewed, history_viewed)
+        return last_viewed or history_viewed
 
     def _calculate_completed_at(
-        self, grandchild_items: list[Episode], **_
+        self, item: Show, grandchild_items: list[Episode], **_
     ) -> FuzzyDate | None:
         """Calculates the completion date for a media item.
 
         Args:
+            item (Show): Grandparent Plex media item
             grandchild_items (list[Episode]): List of relevant episodes
 
         Returns:
             FuzzyDate | None: Completion date for the media item
         """
-        return self._get_last_watched_date(grandchild_items[-1])
+        history = self._filter_history_by_episodes(item, grandchild_items)
+        last_history = next(reversed(history), None)
+
+        last_viewed_dt = max(
+            (e.lastViewedAt for e in grandchild_items if e.lastViewedAt),
+            default=None,
+        )
+        last_viewed = (
+            FuzzyDate.from_date(
+                last_viewed_dt.replace(tzinfo=timezone.utc).astimezone(
+                    self.anilist_client.user_tz
+                )
+            )
+            if last_viewed_dt
+            else None
+        )
+
+        history_viewed = (
+            FuzzyDate.from_date(
+                last_history.viewedAt.replace(tzinfo=timezone.utc).astimezone(
+                    self.anilist_client.user_tz
+                )
+            )
+            if last_history
+            else None
+        )
+
+        if last_viewed and history_viewed:
+            return max(last_viewed, history_viewed)
+        return last_viewed or history_viewed
 
     def _calculate_notes(
         self,
@@ -410,40 +470,42 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         """
         return f"$${{key: {key}, plex_id: {plex_id}, {guids}{f', anilist_id: {anilist_id}' if anilist_id else ''}}}$$"
 
-    def _get_last_watched_date(self, episode: Episode) -> FuzzyDate | None:
-        """Gets the last watched date for an episode.
+    @generic_lru_cache(maxsize=4)
+    def _filter_history_by_episodes(
+        self, item: Show, grandchild_items: list[Episode]
+    ) -> list[EpisodeHistory]:
+        """Filters out history entries that don't exist in the grandchild items.
+
+        This function does four major tasks:
+            1. Filters out history entries that don't exist in the grandchild items.
+            2. Create history entries for episodes that don't have a history entry.
+            3. Only includes the FIRST history entry for each episode, skipping the rest.
+            4. Sorts and returns the processed history entries by the view date
 
         Args:
-            episode (Episode): Episode to check
+            item (Show): Main Plex media item
+            grandchild_items (list[Episode]): List of relevant episodes
 
         Returns:
-            FuzzyDate | None: Last watched date for the episode
+            list[EpisodeHistory]: Filtered history entries
         """
-        history = self.plex_client.get_first_history(episode)
-        last_viewed = (
-            FuzzyDate.from_date(
-                episode.lastViewedAt.replace(tzinfo=timezone.utc).astimezone(
-                    self.anilist_client.user_tz
-                )
-            )
-            if episode.lastViewedAt
-            else None
-        )
-        history_viewed = (
-            FuzzyDate.from_date(
-                history.viewedAt.replace(tzinfo=timezone.utc).astimezone(
-                    self.anilist_client.user_tz
-                )
-            )
-            if history and history.viewedAt
-            else None
-        )
+        grandchild_rating_keys = {e.ratingKey for e in grandchild_items}
+        history = self.plex_client.get_history(item)  # Assumed to be sorted
 
-        if last_viewed and history_viewed:
-            return min(last_viewed, history_viewed)
-        return last_viewed or history_viewed
+        filtered_history = {h for h in history if h.ratingKey in grandchild_rating_keys}
 
-    @generic_lru_cache(maxsize=32)
+        for e in grandchild_items:
+            if e.ratingKey not in grandchild_rating_keys or not e.lastViewedAt:
+                continue
+            episode_history = EpisodeHistory(
+                self.plex_client.user_client._server, e._data
+            )
+            episode_history.viewedAt = e.lastViewedAt
+            filtered_history.add(episode_history)
+
+        return sorted(filtered_history, key=lambda h: h.viewedAt)
+
+    @generic_lru_cache(maxsize=8)
     def _filter_watched_episodes(self, episodes: list[Episode]) -> list[Episode]:
         """Filters watched episodes based on AniList entry.
 

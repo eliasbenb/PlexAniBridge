@@ -411,7 +411,11 @@ class PlexClient:
             Results are cached using functools.cache decorator
         """
         if not self.is_online_user:
-            args = {"metadataItemID": item.ratingKey, "accountID": self.user_account_id}
+            args = {
+                "metadataItemID": item.ratingKey,
+                "accountID": self.user_account_id,
+                "sort": "viewedAt:asc",
+            }
             return self.admin_client.fetchItems(
                 f"/status/sessions/history/all{plexapi.utils.joinArgs(args)}"
             )
@@ -420,7 +424,7 @@ class PlexClient:
             data = self.community_client.get_watch_activity(
                 self._guid_to_key(item.guid)
             )
-            history = []
+            history: list[EpisodeHistory] = []
             for entry in data:
                 metadata = entry["metadataItem"]
                 user = entry["userV2"]
@@ -453,7 +457,7 @@ class PlexClient:
                     if metadata["type"] == "MOVIE"
                     else PlexHistory(**history_kwargs)
                 )
-            return history
+            return sorted(history, key=lambda x: x.viewedAt)
         except requests.HTTPError:
             log.error(
                 f"Failed to get watch hsitory for {item.type} $$'{item.title}'$$ "
@@ -468,34 +472,6 @@ class PlexClient:
             )
         finally:
             return []
-
-    def get_first_history(self, item: Media) -> History | None:
-        """Retrieves the oldest watch history entry for a media item.
-
-        A convenience wrapper around get_history() that returns only the
-        first (oldest) history entry.
-
-        Args:
-            item (Media): Media item to get history for
-
-        Returns:
-            History | None: Oldest history entry if found, None if no history exists
-        """
-        return min(self.get_history(item), key=lambda h: h.viewedAt, default=None)
-
-    def get_last_history(self, item: Media) -> History | None:
-        """Retrieves the most recent watch history entry for a media item.
-
-        A convenience wrapper around get_history() that returns only the
-        most recent history entry.
-
-        Args:
-            item (Media): Media item to get history for
-
-        Returns:
-            History | None: Most recent history entry if found, None if no history exists
-        """
-        return max(self.get_history(item), key=lambda h: h.viewedAt, default=None)
 
     def is_on_watchlist(self, item: Movie | Show) -> bool:
         """Checks if a media item is on the user's watchlist.
