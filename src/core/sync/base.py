@@ -174,18 +174,17 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
 
         self.sync_stats = SyncStats()
 
-        __extra_fields: dict[SyncField, Callable] = {
-            "progress": self._calculate_progress,
-            "repeat": self._calculate_repeats,
-            "score": self._calculate_score,
-            "notes": self._calculate_notes,
-            "started_at": self._calculate_started_at,
-            "completed_at": self._calculate_completed_at,
+        extra_fields: dict[SyncField, Callable] = {
+            SyncField.STATUS: self._calculate_status,
+            SyncField.PROGRESS: self._calculate_progress,
+            SyncField.REPEAT: self._calculate_repeats,
+            SyncField.SCORE: self._calculate_score,
+            SyncField.NOTES: self._calculate_notes,
+            SyncField.STARTED_AT: self._calculate_started_at,
+            SyncField.COMPLETED_AT: self._calculate_completed_at,
         }
-        self.__extra_fields = {
-            k: v
-            for k, v in __extra_fields.items()
-            if k not in self.excluded_sync_fields
+        self._extra_fields = {
+            k: v for k, v in extra_fields.items() if k not in self.excluded_sync_fields
         }
 
     def clear_cache(self) -> None:
@@ -435,34 +434,21 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         if media_list.status is None:
             return media_list
 
-        for field in self.__extra_fields:
+        for field in self._extra_fields:
             match field:
-                case "repeat":
-                    media_list.repeat = (
-                        self.__extra_fields[field](**kwargs)
-                        if media_list.status >= MediaListStatus.COMPLETED
-                        else None
-                    )
-                case "score":
-                    media_list.score = (
-                        self._calculate_score(**kwargs)
-                        if media_list.status >= MediaListStatus.COMPLETED
-                        else None
-                    )
-                case "started_at":
+                case SyncField.STATUS:
+                    pass
+                case SyncField.REPEAT | SyncField.SCORE | SyncField.COMPLETED_AT:
+                    if media_list.status >= MediaListStatus.COMPLETED:
+                        setattr(media_list, field, self._extra_fields[field](**kwargs))
+                case SyncField.STARTED_AT:
                     media_list.started_at = (
-                        self.__extra_fields[field](**kwargs)
+                        self._extra_fields[field](**kwargs)
                         if media_list.status > MediaListStatus.PLANNING
                         else None
                     )
-                case "completed_at":
-                    media_list.completed_at = (
-                        self.__extra_fields[field](**kwargs)
-                        if media_list.status >= MediaListStatus.COMPLETED
-                        else None
-                    )
                 case _:
-                    setattr(media_list, field, self.__extra_fields[field](**kwargs))
+                    setattr(media_list, field, self._extra_fields[field](**kwargs))
 
         return media_list
 
