@@ -474,8 +474,23 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
     def _filter_history_by_episodes(
         self, item: Show, grandchild_items: list[Episode]
     ) -> list[EpisodeHistory]:
+        """Filters out history entries that don't exist in the grandchild items.
+
+        This function does four major tasks:
+            1. Filters out history entries that don't exist in the grandchild items.
+            2. Create history entries for episodes that don't have a history entry.
+            3. Only includes the FIRST history entry for each episode, skipping the rest.
+            4. Sorts and returns the processed history entries by the view date
+
+        Args:
+            item (Show): Main Plex media item
+            grandchild_items (list[Episode]): List of relevant episodes
+
+        Returns:
+            list[EpisodeHistory]: Filtered history entries
+        """
         grandchild_rating_keys = {e.ratingKey for e in grandchild_items}
-        history = self.plex_client.get_history(item)
+        history = self.plex_client.get_history(item)  # Assumed to be sorted
 
         filtered_history = {h for h in history if h.ratingKey in grandchild_rating_keys}
 
