@@ -143,7 +143,7 @@ class AniListClient:
             )
             return None
 
-        variables = media_list_entry.model_dump_json()
+        variables = media_list_entry.model_dump_json(exclude_none=True)
 
         response = self._make_request(query, variables)["data"]["SaveMediaListEntry"]
 
