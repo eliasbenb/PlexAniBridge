@@ -27,10 +27,6 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         """
         guids = ParsedGuids.from_guids(item.guids)
 
-        episodes_by_season: dict[int, list[Episode]] = {}
-        for e in item.episodes():
-            episodes_by_season.setdefault(e.parentIndex, []).append(e)
-
         seasons: dict[int, Season] = {
             s.index: s
             for s in item.seasons()
@@ -42,29 +38,37 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             )
         }
 
-        all_possible_episodes = []
-        for index, eps in episodes_by_season.items():
-            if index in seasons:
-                all_possible_episodes.extend(eps)
+        if not seasons:
+            return
+
+        episodes_by_season = {}
+        for season_index in seasons:
+            episodes_by_season[season_index] = []
+
+        for episode in item.episodes():
+            if episode.parentIndex in seasons:
+                episodes_by_season.setdefault(episode.parentIndex, []).append(episode)
+
+        all_possible_episodes = [e for eps in episodes_by_season.values() for e in eps]
         self.sync_stats.possible |= {str(e) for e in all_possible_episodes}
 
-        unyielded_seasons = set(seasons.keys())
+        processed_seasons = set()
 
-        for animapping in self.animap_client.get_mappings(
-            **dict(guids), is_movie=False
-        ):
+        animappings = list(
+            self.animap_client.get_mappings(**dict(guids), is_movie=False)
+        )
+
+        for animapping in animappings:
             if not animapping.anilist_id:
                 continue
 
-            filtered_seasons = {
-                index: seasons.get(index)
-                for index in {m.season for m in animapping.parsed_tvdb_mappings}
-                if index in seasons
+            mapped_season_indices = {m.season for m in animapping.parsed_tvdb_mappings}
+            relevant_seasons = {
+                idx: seasons[idx] for idx in mapped_season_indices if idx in seasons
             }
-            if not filtered_seasons:
-                continue
 
-            episodes: list[Episode] = []
+            if not relevant_seasons:
+                continue
 
             try:
                 anilist_media = self.anilist_client.get_anime(animapping.anilist_id)
@@ -75,49 +79,65 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
                     exc_info=True,
                 )
                 self.sync_stats.failed += 1
-                anilist_media = None
+                continue
 
             if not anilist_media:
                 continue
 
+            episodes = []
+            season_episode_counts = Counter()
+
             for tvdb_mapping in animapping.parsed_tvdb_mappings:
-                season = filtered_seasons.get(tvdb_mapping.season)
-                if not season:
+                season_idx = tvdb_mapping.season
+                if season_idx not in relevant_seasons:
                     continue
 
-                season_episodes = episodes_by_season.get(season.index, [])
+                season_episodes = episodes_by_season.get(season_idx, [])
+
+                filtered_episodes = []
                 if tvdb_mapping.end:
-                    episodes.extend(
+                    filtered_episodes = [
                         e
                         for e in season_episodes
                         if tvdb_mapping.start <= e.index <= tvdb_mapping.end
-                    )
+                    ]
                 else:
-                    episodes.extend(
+                    filtered_episodes = [
                         e for e in season_episodes if e.index >= tvdb_mapping.start
-                    )
+                    ]
 
                 if tvdb_mapping.ratio < 0:
-                    episodes = [e for e in episodes for _ in range(-tvdb_mapping.ratio)]
+                    filtered_episodes = [
+                        e for e in filtered_episodes for _ in range(-tvdb_mapping.ratio)
+                    ]
                 elif tvdb_mapping.ratio > 0:
                     tmp_episodes = {
-                        e for i, e in enumerate(episodes) if i % tvdb_mapping.ratio == 0
+                        e
+                        for i, e in enumerate(filtered_episodes)
+                        if i % tvdb_mapping.ratio == 0
                     }
                     self.sync_stats.covered |= {
-                        str(e) for e in set(episodes) - tmp_episodes
+                        str(e) for e in set(filtered_episodes) - tmp_episodes
                     }
-                    episodes = list(tmp_episodes)
+                    filtered_episodes = list(tmp_episodes)
 
-            season_counts = Counter(e.parentIndex for e in episodes)
-            unyielded_seasons -= set(season_counts.keys())
+                episodes.extend(filtered_episodes)
+                season_episode_counts.update({season_idx: len(filtered_episodes)})
 
             if not episodes:
                 continue
-            episodes = sorted(episodes, key=lambda e: (e.parentIndex, e.index))
-            primary_season = filtered_seasons[season_counts.most_common(1)[0][0]]
+
+            processed_seasons.update(season_episode_counts.keys())
+
+            primary_season_idx = season_episode_counts.most_common(1)[0][0]
+            primary_season = relevant_seasons[primary_season_idx]
+
+            episodes.sort(key=lambda e: (e.parentIndex, e.index))
+
             yield primary_season, episodes, animapping, anilist_media
 
-        for index in unyielded_seasons:
+        unprocessed_seasons = set(seasons.keys()) - processed_seasons
+        for index in sorted(unprocessed_seasons):
             if index < 1:
                 continue
             season = seasons[index]
@@ -125,12 +145,12 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             try:
                 anilist_media = self.search_media(item, season)
             except Exception:
-                anilist_media = None
                 self.sync_stats.failed += 1
                 log.error(
                     f"Failed to fetch AniList data for {self._debug_log_title(item)}: ",
                     exc_info=True,
                 )
+                continue
 
             if not anilist_media:
                 log.debug(
@@ -141,8 +161,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
                 self.sync_stats.not_found += 1
                 continue
 
-            season_episodes = episodes_by_season.get(season.index, [])
-            episodes = sorted(season_episodes, key=lambda e: e.index)
+            episodes = sorted(episodes_by_season.get(index, []), key=lambda e: e.index)
 
             animapping = AniMap(
                 anilist_id=anilist_media.id,
