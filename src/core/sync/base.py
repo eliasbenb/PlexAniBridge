@@ -741,7 +741,10 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         for key, rule in COMPARISON_RULES.items():
             plex_val = getattr(plex_media_list, key)
             anilist_val = getattr(anilist_media_list, key)
-            if self.__should_update_field(rule, plex_val, anilist_val):
+
+            if self.destructive_sync and plex_val is not None:
+                setattr(res_media_list, key, plex_val)
+            elif self.__should_update_field(rule, plex_val, anilist_val):
                 setattr(res_media_list, key, plex_val)
 
         return res_media_list
@@ -757,19 +760,22 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         Returns:
                 bool: True if the field should be updated, False otherwise
         """
-        if plex_val is None:
+        if anilist_val == plex_val:
             return False
         if anilist_val is None:
             return True
+        if plex_val is None:
+            return False
+
         match op:
             case "ne":
                 return plex_val != anilist_val
             case "gt":
-                return self.destructive_sync or plex_val > anilist_val
+                return plex_val > anilist_val
             case "gte":
-                return self.destructive_sync or plex_val >= anilist_val
+                return plex_val >= anilist_val
             case "lt":
-                return self.destructive_sync or plex_val < anilist_val
+                return plex_val < anilist_val
             case "lte":
-                return self.destructive_sync or plex_val <= anilist_val
+                return plex_val <= anilist_val
         return False
