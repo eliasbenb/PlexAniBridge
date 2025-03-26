@@ -9,15 +9,10 @@ from pydantic_settings import BaseSettings
 
 
 class PlexMetadataSource(StrEnum):
-    """Defines the source of metadata for Plex media items.
+    """Defines the source of metadata for Plex media items."""
 
-    Values:
-        LOCAL: Metadata is sourced from the local Plex server
-        ONLINE: Metadata is sourced from Plex's online services
-    """
-
-    LOCAL = "local"
-    ONLINE = "online"
+    LOCAL = "local"  # Metadata is sourced from the local Plex server
+    ONLINE = "online"  # Metadata is sourced from Plex's online services
 
     def __repr__(self) -> str:
         """Provides a string representation of the metadata source.
@@ -35,28 +30,15 @@ class SyncField(StrEnum):
     These fields represent the data that can be synchronized between Plex
     and AniList for each media entry. Each enum value corresponds to an
     AniList API field name in snake_case format.
-
-    Values:
-        STATUS: Watch status (watching, completed, etc.)
-        SCORE: User rating
-        PROGRESS: Number of episodes/movies watched
-        REPEAT: Number of times rewatched
-        NOTES: User's notes/comments
-        STARTED_AT: When the user started watching
-        COMPLETED_AT: When the user finished watching
-
-    Note:
-        Values are stored in snake_case but can be converted to camelCase
-        for AniList API compatibility using to_camel()
     """
 
-    STATUS = "status"
-    SCORE = "score"
-    PROGRESS = "progress"
-    REPEAT = "repeat"
-    NOTES = "notes"
-    STARTED_AT = "started_at"
-    COMPLETED_AT = "completed_at"
+    STATUS = "status"  # Watch status (watching, completed, etc.)
+    SCORE = "score"  # User rating
+    PROGRESS = "progress"  # Number of episodes/movies watched
+    REPEAT = "repeat"  # Number of times rewatched
+    NOTES = "notes"  # User's notes/comments
+    STARTED_AT = "started_at"  # When the user started watching
+    COMPLETED_AT = "completed_at"  # When the user finished watching
 
     def to_camel(self) -> str:
         """Converts the field name to camelCase for AniList API compatibility.
@@ -82,22 +64,14 @@ class LogLevel(StrEnum):
 
     Standard Python logging levels used to control log output verbosity.
     Ordered from most verbose (DEBUG) to least verbose (CRITICAL).
-
-    Values:
-        DEBUG: Detailed information for debugging
-        INFO: General information about program execution
-        SUCCESS: Positive confirmation of a successful operation
-        WARNING: Indicates a potential problem
-        ERROR: Error that prevented a specific operation
-        CRITICAL: Error that prevents further program execution
     """
 
-    DEBUG = "DEBUG"
-    INFO = "INFO"
-    SUCCESS = "SUCCESS"
-    WARNING = "WARNING"
-    ERROR = "ERROR"
-    CRITICAL = "CRITICAL"
+    DEBUG = "DEBUG"  # Detailed information for debugging
+    INFO = "INFO"  # General information about program execution
+    SUCCESS = "SUCCESS"  # Successful operations that caused a tangible change
+    WARNING = "WARNING"  # Potential problems or issues
+    ERROR = "ERROR"  # Error that prevented an operation
+    CRITICAL = "CRITICAL"  # Error that prevents further program execution
 
     def __repr__(self) -> str:
         """Provides a string representation of the log level.
@@ -206,14 +180,6 @@ class PlexAnibridgeConfig(BaseSettings):
 
         Raises:
             ValueError: If token and user counts don't match
-
-        Example:
-            Single user:
-                ANILIST_TOKEN="token1"
-                PLEX_USER="user1"
-            Multiple users:
-                ANILIST_TOKEN="token1,token2"
-                PLEX_USER="user1,user2"
         """
         if isinstance(self.ANILIST_TOKEN, str):
             self.ANILIST_TOKEN = [self.ANILIST_TOKEN]
@@ -235,10 +201,6 @@ class PlexAnibridgeConfig(BaseSettings):
 
         Returns:
             str: MD5 hash of the configuration
-
-        Note:
-            Used to detect configuration changes between runs for
-            determining polling scan eligibility
         """
 
         def sort_value(value):
@@ -261,9 +223,6 @@ class PlexAnibridgeConfig(BaseSettings):
         Returns:
             str: Comma-separated list of key-value pairs with sensitive
                  values masked (ANILIST_TOKEN, PLEX_TOKEN)
-
-        Example:
-            "PLEX_URL: http://localhost:32400, PLEX_TOKEN: **********, ..."
         """
         secrets = ["ANILIST_TOKEN", "PLEX_TOKEN"]
         return ", ".join(

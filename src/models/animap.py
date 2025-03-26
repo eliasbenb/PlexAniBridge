@@ -46,7 +46,16 @@ class AniMap(SQLModel, table=True):
     @field_validator(
         "imdb_id", "mal_id", "tmdb_movie_id", "tmdb_show_id", mode="before"
     )
-    def convert_to_list(cls, v):
+    def convert_to_list(cls, v) -> list:
+        """Convert single values to lists.
+
+        Args:
+            cls: Class instance
+            v: Value to convert
+
+        Returns:
+            list: List of values
+        """
         if v is None:
             return v
         if not isinstance(v, list):
