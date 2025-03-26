@@ -42,11 +42,11 @@ Below is an example mappings file. You can use [the JSON schema](https://github.
 
 !!! tip "Mapping File Formats"
 
-    Any of JSON, YAML, or TOML can be used as the format for the custom mappings file. The file extension determines the format of the file (`.json`, `.yaml`, `.yml`, or `.toml`).
+    JSON or YAML can be used as the format for the custom mappings file. The file extension determines the format of the file (`.json`, `.yaml`, or `.yml`).
 
 ## Local Custom Mappings
 
-PlexAniBridge will look for a custom mappings file with the name `mappings.custom.(json|yaml|yml|toml)` in the `DATA_PATH` directory. The file extension determines the format of the file (JSON, YAML, or TOML).
+PlexAniBridge will look for a custom mappings file with the name `mappings.custom.(json|yaml|yml)` in the `DATA_PATH` directory. The file extension determines the format of the file (JSON or YAMLL).
 
 ## Community Custom Mappings
 

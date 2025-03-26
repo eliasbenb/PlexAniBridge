@@ -46,7 +46,6 @@ class AniMapClient:
         "mappings.custom.json",
         "mappings.custom.yaml",
         "mappings.custom.yml",
-        "mappings.custom.toml",
     ]
 
     def __init__(self, data_path: Path) -> None:
@@ -69,28 +68,7 @@ class AniMapClient:
         self._sync_db()
 
     def _sync_db(self) -> None:
-        """Synchronizes the local database with the mapping source.
-
-        Performs the following steps:
-        1. Checks if the CDN data has changed by comparing MD5 hashes
-        2. If unchanged, skips the sync to avoid unnecessary updates
-        3. If changed:
-            - Downloads the latest mapping data
-            - Converts data to appropriate types (handling multi-value fields)
-            - Updates the local database using merge operations
-            - Removes entries that no longer exist in the CDN
-            - Updates the stored CDN hash
-
-        Raises:
-            requests.HTTPError: If the CDN request fails
-            SQLAlchemyError: If database operations fail
-
-        Note:
-            - Uses MD5 hashing to detect changes in CDN data
-            - Handles multi-value fields (mal_id, imdb_id) by splitting comma-separated strings
-            - Uses SQLModel merge operations to efficiently update existing records
-            - Maintains data consistency using database transactions
-        """
+        """Synchronizes the local database with the mapping source."""
 
         def single_val_to_list(value: Any) -> list[int | str]:
             """Converts a single value to a list if not already a list.
@@ -205,19 +183,7 @@ class AniMapClient:
             is_movie (bool): Whether the search is for a movie or TV show
 
         Returns:
-            list[AniMap]: Matching entries sorted by:
-                1. TVDB season (if applicable)
-                2. TVDB episode offset (if applicable)
-                3. AniList ID
-                4. AniDB ID
-
-        Note:
-            Search Behavior:
-            - Only returns entries that have an AniList ID
-            - IMDB matching is partial (can match within array of IDs)
-            - TMDB, TVDB, season, and epoffset require exact matches
-            - TV show searches can include season and episode offset criteria
-            - Results are deduplicated based on (anilist_id, tvdb_season, tvdb_epoffset)
+            list[AniMap]: Matching anime mapping entries
         """
         if not imdb and not tmdb and not tvdb:
             return []

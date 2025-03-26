@@ -22,7 +22,6 @@ class MappingsClient:
         "mappings.custom.json",
         "mappings.custom.yaml",
         "mappings.custom.yml",
-        "mappings.custom.toml",
     ]
 
     def __init__(self, data_path: Path) -> None:
@@ -157,15 +156,16 @@ class MappingsClient:
         file_path = Path(file)
 
         try:
-            if file_path.suffix == ".json":
-                with file_path.open() as f:
-                    mappings = json.load(f)
-            elif file_path.suffix in [".yaml", ".yml"]:
-                with file_path.open() as f:
-                    mappings = self._dict_str_keys(yaml.safe_load(f))
-            elif file_path.suffix == ".toml":
-                with file_path.open() as f:
-                    mappings = tomlkit.load(f)
+            match file_path.suffix:
+                case ".json":
+                    with file_path.open() as f:
+                        mappings = json.load(f)
+                case ".yaml" | ".yml":
+                    with file_path.open() as f:
+                        mappings = self._dict_str_keys(yaml.safe_load(f))
+                case ".toml":
+                    with file_path.open() as f:
+                        mappings = tomlkit.load(f)
         except (json.JSONDecodeError, yaml.YAMLError, TOMLKitError) as e:
             log.error(
                 f"{self.__class__.__name__}: Error decoding file "
