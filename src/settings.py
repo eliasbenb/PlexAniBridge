@@ -127,27 +127,32 @@ class PlexAnibridgeConfig(BaseSettings):
             log_name="PlexAniBridge", log_level=log_level, log_dir=log_dir.resolve()
         )
 
+        # `DEPRECATED` and `DEPRECATED_ALIAS` are used to warn users about
+        # upcoming changes to configuration settings.
         DEPRECATED: dict[str, str] = {}
+        # `DEPRECATED_ALIAS` allows for deprecated settings to be (temporarily)
+        # aliased to new settings to ease the transition.
         DEPRECATED_ALIAS: dict[str, str] = {
-            "fuzzy_search_threshold": "SEARCH_FALLBACK_THRESHOLD"
+            "FUZZY_SEARCH_THRESHOLD": "SEARCH_FALLBACK_THRESHOLD"
         }
 
         wanted: set[str] = set(cls.model_fields.keys())
         extra: set[str] = set(values.keys()) - wanted
 
         for key in extra:
+            key = key.upper()
             if key in DEPRECATED:
                 log.warning(
-                    f"$$'{key.upper()}'$$ is going to become deprecated soon, use $$'{DEPRECATED[key].upper()}'$$ instead"
+                    f"$$'{key}'$$ is going to become deprecated soon, use $$'{DEPRECATED[key]}'$$ instead"
                 )
             elif key in DEPRECATED_ALIAS:
                 log.warning(
-                    f"$$'{key.upper()}'$$ is going to become deprecated soon, use $$'{DEPRECATED_ALIAS[key].upper()}'$$ instead"
+                    f"$$'{key}'$$ is going to become deprecated soon, use $$'{DEPRECATED_ALIAS[key]}'$$ instead"
                 )
-                values[DEPRECATED_ALIAS[key]] = values[key]
+                values[DEPRECATED_ALIAS[key]] = values[key.lower()]
             else:
                 log.warning(f"Unrecognized configuration setting: $$'{key}'$$")
-            del values[key]
+            del values[key.lower()]
 
         return values
 
@@ -210,6 +215,8 @@ class PlexAnibridgeConfig(BaseSettings):
                 return {k: sort_value(v) for k, v in sorted(value.items())}
             return value
 
+        # We exclude certain 'inconsequential' fields from the hash to avoid
+        # unnecessary restarts of the application when they change.
         config_str = "".join(
             str(sort_value(getattr(self, key)))
             for key in sorted(self.model_fields.keys())

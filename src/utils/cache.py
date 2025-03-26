@@ -19,7 +19,7 @@ def generic_lru_cache(maxsize: int | None = 128):
     """
 
     if maxsize is None:
-        maxsize = 2**32
+        maxsize = 2**32  # 'infinitely' large cache
 
     def decorator(func):
         @wraps(func)
@@ -43,7 +43,7 @@ def generic_ttl_cache(maxsize: int | None = 128, ttl: int | None = 600):
         maxsize (int | None): Maximum number of items in the cache. Defaults to 128.
         ttl (int | None): Time-to-live for cached items in seconds. Defaults to 600.
     """
-    if maxsize is None:
+    if maxsize is None:  # 'infinitely' large cache
         maxsize = 2**32
 
     def decorator(func):

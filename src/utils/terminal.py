@@ -1,5 +1,8 @@
 import locale
+import os
 import sys
+
+import colorama
 
 
 def supports_utf8() -> bool:
@@ -10,3 +13,44 @@ def supports_utf8() -> bool:
     """
     encoding = sys.stdout.encoding or locale.getpreferredencoding(False)
     return encoding.lower().startswith("utf")
+
+
+def supports_color() -> bool:
+    """Check if the terminal supports ANSI color codes.
+
+    Detects if the terminal supports ANSI color codes by checking platform-specific
+    conditions and environment variables. On Windows, it also checks the Windows
+    registry for the VirtualTerminalLevel key.
+
+    Returns:
+        bool: True if the terminal supports color, False otherwise
+    """
+
+    def vt_codes_enabled_in_windows_registry():
+        try:
+            import winreg
+        except ImportError:
+            return False
+
+        try:
+            reg_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Console")
+            reg_key_value, _ = winreg.QueryValueEx(reg_key, "VirtualTerminalLevel")
+            return reg_key_value == 1
+        except FileNotFoundError:
+            return False
+
+    is_a_tty = hasattr(sys.stdout, "isatty") and sys.stdout.isatty()
+
+    if not is_a_tty:
+        return False
+
+    if sys.platform == "win32":
+        return (
+            getattr(colorama, "fixed_windows_console", False)
+            or "ANSICON" in os.environ
+            or "WT_SESSION" in os.environ  # Windows Terminal
+            or os.environ.get("TERM_PROGRAM") == "vscode"
+            or vt_codes_enabled_in_windows_registry()
+        )
+
+    return True

@@ -30,10 +30,10 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         seasons: dict[int, Season] = {
             s.index: s
             for s in item.seasons()
-            if s.leafCount
+            if s.leafCount  # Skip empty seasons
             and (
-                self.full_scan
-                or s.viewedLeafCount
+                self.full_scan  # We need to either be using `FULL_SCAN`
+                or s.viewedLeafCount  # OR the season has been viewed
                 or (item.viewedLeafCount and self.plex_client.is_online_user)
             )
         }
@@ -41,6 +41,8 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         if not seasons:
             return
 
+        # Pre-fetch all episodes of the show. Instead of fetching episodes for each season
+        # individually, we can fetch all episodes at once and filter them later.
         episodes_by_season = {}
         for season_index in seasons:
             episodes_by_season[season_index] = []
@@ -52,7 +54,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         all_possible_episodes = [e for eps in episodes_by_season.values() for e in eps]
         self.sync_stats.possible |= {str(e) for e in all_possible_episodes}
 
-        processed_seasons = set()
+        processed_seasons = set()  # To keep track of seasons that were processed
 
         animappings = list(
             self.animap_client.get_mappings(**dict(guids), is_movie=False)
@@ -62,6 +64,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             if not animapping.anilist_id:
                 continue
 
+            # Filter the seasons that are relevant to the current mapping
             mapped_season_indices = {m.season for m in animapping.parsed_tvdb_mappings}
             relevant_seasons = {
                 idx: seasons[idx] for idx in mapped_season_indices if idx in seasons
@@ -84,6 +87,8 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             if not anilist_media:
                 continue
 
+            # It might be that the mapping has multiple seasons.
+            # In that case, we need to find the 'primary' season to use for syncing.
             episodes = []
             season_episode_counts = Counter()
 
@@ -106,11 +111,15 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
                         e for e in season_episodes if e.index >= tvdb_mapping.start
                     ]
 
+                # A negative ratio means 1 AniList episode covers multiple Plex episodes
                 if tvdb_mapping.ratio < 0:
+                    # Duplicate every episode by the ratio
                     filtered_episodes = [
                         e for e in filtered_episodes for _ in range(-tvdb_mapping.ratio)
                     ]
+                # A positive ratio means 1 Plex episode covers multiple AniList episodes
                 elif tvdb_mapping.ratio > 0:
+                    # Skip every ratio-th episode
                     tmp_episodes = {
                         e
                         for i, e in enumerate(filtered_episodes)
@@ -136,10 +145,11 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
 
             yield primary_season, episodes, animapping, anilist_media
 
+        # We're done with the mapped seasons. Now we need to process the remaining seasons.
         unprocessed_seasons = set(seasons.keys()) - processed_seasons
         for index in sorted(unprocessed_seasons):
             if index < 1:
-                continue
+                continue  # Skip specials
             season = seasons[index]
 
             try:
@@ -513,6 +523,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
 
         filtered_history = {h for h in history if h.ratingKey in grandchild_rating_keys}
 
+        # If an episode doesn't have a history entry, create one with the last viewed date
         for e in grandchild_items:
             if e.ratingKey not in grandchild_rating_keys or not e.lastViewedAt:
                 continue

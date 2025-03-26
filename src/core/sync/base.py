@@ -85,7 +85,7 @@ class ParsedGuids(BaseModel):
         return iter(self.model_dump(exclude_none=True).items())
 
 
-class SyncStats(BaseModel, arbitrary_types_allowed=True):
+class SyncStats(BaseModel):
     """Statistics tracker for synchronization operations.
 
     Keeps count of various sync outcomes for reporting and monitoring.

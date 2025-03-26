@@ -92,6 +92,7 @@ class AniMapClient:
             mappings = self.mappings_client.load_mappings()
             tmp_mappings = mappings.copy()
 
+            # Make sure that each entry is in the correct format
             for key, entry in tmp_mappings.items():
                 try:
                     anilist_id = int(key)
@@ -143,13 +144,17 @@ class AniMapClient:
                 for key, entry in mappings.items()
             ]
 
+            # Delete any entries in the database that are not in the new mappings
             session.exec(
                 delete(AniMap).where(
                     AniMap.anilist_id.not_in([d["anilist_id"] for d in values])
                 )
             )
 
+            # Merge any changes or new entries into the database
             for value in values:
+                # Certain list fields can be either a single value or a list
+                # Convert single values to lists for consistency
                 for attr in ("mal_id", "imdb_id", "tmdb_movie_id", "tmdb_show_id"):
                     if attr in value:
                         value[attr] = single_val_to_list(value[attr])
@@ -221,6 +226,8 @@ class AniMapClient:
             return func.json_type(field, f"$.{key}").is_not(None)
 
         with Session(db.engine) as session:
+            # OR conditions involve ID matching
+            # AND conditions involve metadata matching
             or_conditions = []
             and_conditions = []
 

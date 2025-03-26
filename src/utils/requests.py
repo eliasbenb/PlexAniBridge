@@ -12,8 +12,10 @@ class SelectiveVerifySession(requests.Session):
 
     def request(self, method, url, **kwargs):
         domain = urlparse(url).hostname
+        # Disable SSL verification for whitelisted domains
         if domain in self.whitelist:
             kwargs["verify"] = False
+            # Suppress SSL warnings
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore", InsecureRequestWarning)
                 return super().request(method, url, **kwargs)
