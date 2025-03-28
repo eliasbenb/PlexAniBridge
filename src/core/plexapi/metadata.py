@@ -9,6 +9,7 @@ from typing import (
 )
 from xml.etree import ElementTree
 
+import requests
 from plexapi import log, utils
 from plexapi.base import PlexObject
 from plexapi.exceptions import BadRequest, NotFound, Unauthorized
@@ -305,12 +306,22 @@ class PlexMetadataServer(PlexServer, PlexMetadataObject):
 
     @generic_ttl_cache(maxsize=None, ttl=30)
     def query(
-        self, key, method=None, headers=None, params=None, timeout=None, **kwargs
+        self,
+        key,
+        method=None,
+        headers=None,
+        params=None,
+        timeout=None,
+        retry_count=0,
+        **kwargs,
     ):
         """Query the Plex server for data.
 
         Includes rate limiting and error handling for rate limit exceeded responses.
         """
+        if retry_count >= 3:
+            raise requests.HTTPError("Failed to make request after 3 tries")
+
         if self._baseurl in (
             self.myPlexAccount().DISCOVER,
             self.myPlexAccount().METADATA,
@@ -332,7 +343,17 @@ class PlexMetadataServer(PlexServer, PlexMetadataObject):
                 f"{self.__class__.__name__}: Rate limit exceeded, waiting {retry_after} seconds"
             )
             sleep(retry_after + 1)
-            return self.query(key, method, headers, params, timeout, **kwargs)
+            return self.query(
+                key, method, headers, params, timeout, retry_count, **kwargs
+            )
+        elif response.status_code == 500:  # Bad Gateway
+            log.warning(
+                f"{self.__class__.__name__}: Received 502 Bad Gateway, retrying"
+            )
+            sleep(1)
+            return self.query(
+                key, method, headers, params, timeout, retry_count + 1, **kwargs
+            )
 
         if response.status_code not in (200, 201, 204):
             codename = codes.get(response.status_code)[0]
