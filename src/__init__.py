@@ -56,6 +56,11 @@ log: Logger = get_logger(
     log_dir=config.DATA_PATH / "logs",
 )
 
+# The below environment variables are consumed by the python-plexapi library
+# and are used to identify the client making the requests to the Plex server.
+# Having a consistent identifier is important so that the server doesn't think
+# the client is a new one every time it starts (which causes "New Device"
+# notifications)
 os.environ["PLEXAPI_HEADER_IDENTIFIER"] = uuid.uuid3(
     uuid.NAMESPACE_DNS, "PlexAniBridge"
 ).hex
