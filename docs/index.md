@@ -22,36 +22,11 @@ PlexAniBridge is a tool designed to keep your AniList profile automatically sync
 - **Optimized Performance**: Intelligent caching of requests to minimize API rate limits.
 - **Easy Deployment**: Fully compatible with [Docker deployments](https://plexanibridge.elias.eu.org/quick-start/docker) 🐳.
 
-```mermaid
-flowchart LR
-    User([User])
-    Plex[(Plex Media Server)]
-    PAB[PlexAniBridge]
-    AL[(AniList)]
-    Mapping[(Mapping Database)]
-   
-    subgraph " "
-        User -->|Watches anime<br>Rates anime<br>Adds anime to library| Plex
-    end
-   
-    subgraph " "
-        Plex -->|Media info<br>Watch history<br>Ratings & reviews| PAB
-    end
-   
-       subgraph " "
-        PAB -->|Updates profile<br>Syncs progress<br>Syncs repeats<br>Syncs ratings & reviews<br>Syncs start & end dates| AL
-    end
+![Flowchart Diagram](https://mermaid.ink/img/pako:eNqdVGtr2zAU_StCgZKCE_xMbTEKyfJlkEBpKYMl_aBEsi3iWEaS81iT_z5JVkg29igTxuheXZ1z7z2S3uGaEwoRzCu-X5dYKDB7XtZAj1dJRX9h_m_3neepoodF3_zBnBKGwQsVOyru39zyeLIwi-OaTQQjBXX-8WzR174Zk-oSOsdNw-pi0XcTMMUKr7CkLqCLku2qELgpwRLqr_NdMgODwePpK1brkkqAa7aln1bi8RmrW3NMiLOA4qBiK4HF8WTr6NBoTT7AZys2fF3VrM65QbfsoNRlcXF07LoWCe6AoDtG9_JkevI7pr-RjSeW67UhtphG8JxVtpyXY722jkJQKa8eQRuK1a3j10SuS1IZje9MPsASnLQ-Nyn-oxMuuRnnGwnaxjX3y1TDOCmvwRdtzYYnwXeM6HLcQei2_Lk7Lg11rKgl1S2oUC9OcEAyTyrBNxT1oihy88GeEVWisDl4a15xgXp5nv-EYSTsQGiCfZ_8D8h45iCCJAyj8OMQ0INbKraYEX3T3g3kEqqSbukSIj0lWGxMl886DreKG6UgUqKlHhS8LUqIclxJbbX2UEwZ1upsLyENrr9xfmtC9A4PEAVxOgzSh3iUxWkYh0GaevAIURSGwzDK0lEajGJ_FCZnD363AP4wfUh8PaIgTbIs8fWGQpisXTJaJyo-87ZWEIWZB_V90Id_3j0h9iU5_wBX-1zo?type=png)
 
-    subgraph " "
-        PAB -->|Looks up anime IDs| Mapping
-        Mapping -->|Provides AniList IDs| PAB
-    end
-   
-       
-    style PAB fill:#45a1d9,stroke:#333,stroke-width:2px,color:#fff
-    style Plex fill:#e5a00d,stroke:#333,stroke-width:2px,color:#fff
-    style AL fill:#152232,stroke:#333,stroke-width:2px,color:#fff
-```
+<!---
+https://mermaid.live/edit#pako:eNqdVGtr2zAU_StCgZKCE_xMbTEKyfJlkEBpKYMl_aBEsi3iWEaS81iT_z5JVkg29igTxuheXZ1z7z2S3uGaEwoRzCu-X5dYKDB7XtZAj1dJRX9h_m_3neepoodF3_zBnBKGwQsVOyru39zyeLIwi-OaTQQjBXX-8WzR174Zk-oSOsdNw-pi0XcTMMUKr7CkLqCLku2qELgpwRLqr_NdMgODwePpK1brkkqAa7aln1bi8RmrW3NMiLOA4qBiK4HF8WTr6NBoTT7AZys2fF3VrM65QbfsoNRlcXF07LoWCe6AoDtG9_JkevI7pr-RjSeW67UhtphG8JxVtpyXY722jkJQKa8eQRuK1a3j10SuS1IZje9MPsASnLQ-Nyn-oxMuuRnnGwnaxjX3y1TDOCmvwRdtzYYnwXeM6HLcQei2_Lk7Lg11rKgl1S2oUC9OcEAyTyrBNxT1oihy88GeEVWisDl4a15xgXp5nv-EYSTsQGiCfZ_8D8h45iCCJAyj8OMQ0INbKraYEX3T3g3kEqqSbukSIj0lWGxMl886DreKG6UgUqKlHhS8LUqIclxJbbX2UEwZ1upsLyENrr9xfmtC9A4PEAVxOgzSh3iUxWkYh0GaevAIURSGwzDK0lEajGJ_FCZnD363AP4wfUh8PaIgTbIs8fWGQpisXTJaJyo-87ZWEIWZB_V90Id_3j0h9iU5_wBX-1zo
+--->
 
 ## Acknowledgments
 
