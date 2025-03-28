@@ -64,7 +64,7 @@ class MappingsClient:
         parsed = urlparse(src)
         return bool(parsed.scheme) and bool(parsed.netloc)
 
-    def _dict_str_keys(self, d: dict[str, Any]) -> dict[str, Any]:
+    def _json_str_keys(self, d: dict[str, Any]) -> dict[str, Any]:
         """Ensure all keys in a dictionary are strings.
 
         Args:
@@ -74,9 +74,9 @@ class MappingsClient:
             dict[str, Any]: Dictionary with all keys as strings
         """
         if isinstance(d, dict):
-            return {str(k): self._dict_str_keys(v) for k, v in d.items()}
+            return {str(k): self._json_str_keys(v) for k, v in d.items()}
         elif isinstance(d, list):
-            return [self._dict_str_keys(i) for i in d]
+            return [self._json_str_keys(i) for i in d]
         else:
             return d
 
@@ -162,7 +162,7 @@ class MappingsClient:
                         mappings = json.load(f)
                 case ".yaml" | ".yml":
                     with file_path.open() as f:
-                        mappings = self._dict_str_keys(yaml.safe_load(f))
+                        mappings = self._json_str_keys(yaml.safe_load(f))
                 case ".toml":
                     with file_path.open() as f:
                         mappings = tomlkit.load(f)
