@@ -52,6 +52,20 @@ class PlexCommunityClient:
                         metadataItem {
                             id
                             type
+                            title
+                            index
+                            parent {
+                                id
+                                type
+                                title
+                                index
+                            }
+                            grandparent {
+                                id
+                                type
+                                title
+                                index
+                            }
                         }
                         userV2 {
                             id
@@ -169,6 +183,7 @@ class PlexCommunityClient:
             log.warning(
                 f"{self.__class__.__name__}: Received 502 Bad Gateway, retrying"
             )
+            sleep(1)
             return self._make_request(
                 query,
                 variables=variables,

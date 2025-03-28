@@ -425,34 +425,39 @@ class PlexClient:
                 metadata = entry["metadataItem"]
                 user = entry["userV2"]
 
-                history_data = ElementTree.Element(
-                    "History",
-                    attrib={
-                        "accountID": str(user["id"]),
-                        "deviceID": "",
-                        "historyKey": f"/status/sessions/history/{entry['id']}",
-                        "viewedAt": entry["date"],
-                        "grandparentTitle": item.grandparentTitle
-                        if hasattr(item, "grandparentTitle")
-                        else "",
-                        "index": item.index if hasattr(item, "index") else "",
-                        "parentIndex": item.parentIndex
-                        if hasattr(item, "parentIndex")
-                        else "",
-                    },
-                )
+                attrib = {
+                    "accountID": str(user["id"]),
+                    "deviceID": "",
+                    "historyKey": f"/status/sessions/history/{entry['id']}",
+                    "ratingKey": metadata["id"],
+                    "guid": metadata["id"],
+                    "title": metadata["title"],
+                }
+                if metadata["type"] == "EPISODE":
+                    attrib["parentRatingKey"] = metadata["parent"]["id"]
+                    attrib["grandparentRatingKey"] = metadata["grandparent"]["id"]
+                    attrib["parentGuid"] = metadata["parent"]["id"]
+                    attrib["grandparentGuid"] = metadata["grandparent"]["id"]
+                    attrib["index"] = metadata["index"]
+                    attrib["parentIndex"] = metadata["parent"]["index"]
+                    attrib["parentTitle"] = metadata["parent"]["title"]
+                    attrib["grandparentTitle"] = metadata["grandparent"]["title"]
+
+                history_data = ElementTree.Element("History", attrib=attrib)
                 history_kwargs = {
                     "server": self.online_client._server,
                     "data": history_data,
                 }
-
-                history.append(
+                h = (
                     EpisodeHistory(**history_kwargs)
                     if metadata["type"] == "EPISODE"
                     else MovieHistory(**history_kwargs)
                     if metadata["type"] == "MOVIE"
                     else PlexHistory(**history_kwargs)
                 )
+                h.viewedAt = datetime.fromisoformat(entry["date"])
+                history.append(h)
+
             return sorted(history, key=lambda x: x.viewedAt)
         except requests.HTTPError:
             log.error(
