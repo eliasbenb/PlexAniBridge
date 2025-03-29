@@ -77,13 +77,17 @@ URL to your Plex server that the PlexAniBridge host can access.
 
 ### `PLEX_SECTIONS`
 
-`list[str]` (Required)
+`list[str]` (Optional, default: `[]`)
 
 List of Plex library sections to consider, specified in Python list syntax:
 
 ```python
 ["Anime", "Anime Movies"]
 ```
+
+!!! tip "Allowing All Sections"
+
+    To sync all sections, set this to an empty list: `[]` or don't set it at all. This is the default behavior.
 
 ??? note "Multi-User Considerations"
 
