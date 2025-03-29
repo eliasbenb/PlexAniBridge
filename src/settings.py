@@ -98,7 +98,7 @@ class PlexAnibridgeConfig(BaseSettings):
     PLEX_TOKEN: str
     PLEX_USER: str | list[str]
     PLEX_URL: str = "http://localhost:32400"
-    PLEX_SECTIONS: list[str]
+    PLEX_SECTIONS: list[str] = []
     PLEX_GENRES: list[str] = []
     PLEX_METADATA_SOURCE: PlexMetadataSource = PlexMetadataSource.LOCAL
 
