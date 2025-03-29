@@ -32,7 +32,6 @@ services:
       PLEX_TOKEN: 2Sb...
       PLEX_USER: username
       PLEX_URL: http://plex:32400
-      PLEX_SECTIONS: '["Anime", "Anime Movies"]'
     volumes:
       - ./data:/app/data
     restart: unless-stopped

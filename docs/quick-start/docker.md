@@ -51,7 +51,6 @@ docker run \
   -e PLEX_TOKEN \
   -e PLEX_USER \
   -e PLEX_URL \
-  -e PLEX_SECTIONS \
   -v ./data:/app/data \
   ghcr.io/eliasbenb/plexanibridge:latest
 ```

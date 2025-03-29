@@ -233,7 +233,11 @@ class PlexClient:
         sections = {
             section.title: section for section in self.user_client.library.sections()
         }
-        return [sections[title] for title in self.plex_sections if title in sections]
+        if self.plex_sections:
+            return [
+                sections[title] for title in self.plex_sections if title in sections
+            ]
+        return list(sections.values())
 
     def get_section_items(
         self,
