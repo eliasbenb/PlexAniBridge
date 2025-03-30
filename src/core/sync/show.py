@@ -57,7 +57,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         processed_seasons = set()  # To keep track of seasons that were processed
 
         animappings = list(
-            self.animap_client.get_mappings(**dict(guids), is_movie=False)
+            self.animap_client.get_mappings(tvdb=guids.tvdb, is_movie=False)
         )
 
         for animapping in animappings:
