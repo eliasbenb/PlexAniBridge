@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from math import isnan
 from typing import TypeAlias
 from urllib.parse import urlparse
@@ -287,11 +287,7 @@ class PlexClient:
                     "or": [
                         {"unwatched": False},
                         {"viewCount>>": 0},
-                        {
-                            "lastRatedAt>>=": datetime(
-                                1970, 1, 1, tzinfo=get_localzone()
-                            )
-                        },
+                        {"lastRatedAt>>=": datetime(1970, 1, 1, tzinfo=timezone.utc)},
                     ]
                 }
             )
