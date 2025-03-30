@@ -38,10 +38,6 @@ class AniMapClient:
         https://github.com/eliasbenb/PlexAniBridge-Mappings
     """
 
-    SCHEMA_VERSION = "v2"
-    CDN_URL = f"https://raw.githubusercontent.com/eliasbenb/PlexAniBridge-Mappings/{SCHEMA_VERSION}/mappings.json"
-    SCHEMA_URL = f"https://cdn.statically.io/gh/eliasbenb/PlexAniBridge-Mappings/{SCHEMA_VERSION}/mappings.schema.json"
-
     MAPPING_FILES = [
         "mappings.custom.json",
         "mappings.custom.yaml",
