@@ -1,9 +1,10 @@
 import sys
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Iterator
 
 from plexapi.video import Episode, EpisodeHistory, Season, Show
+from tzlocal import get_localzone
 
 from src import log
 from src.models.anilist import FuzzyDate, Media, MediaListStatus
@@ -246,9 +247,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             return MediaListStatus.CURRENT
 
         is_in_deck_window = any(
-            e.lastViewedAt.replace(tzinfo=timezone.utc)
-            + self.plex_client.on_deck_window
-            > datetime.now(timezone.utc)
+            e.lastViewedAt + self.plex_client.on_deck_window > datetime.now()
             for e in watched_episodes
         )
 
@@ -358,7 +357,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         )
         last_viewed = (
             FuzzyDate.from_date(
-                last_viewed_dt.replace(tzinfo=timezone.utc).astimezone(
+                last_viewed_dt.replace(tzinfo=get_localzone()).astimezone(
                     self.anilist_client.user_tz
                 )
             )
@@ -368,7 +367,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
 
         history_viewed = (
             FuzzyDate.from_date(
-                first_history.viewedAt.replace(tzinfo=timezone.utc).astimezone(
+                first_history.viewedAt.replace(tzinfo=get_localzone()).astimezone(
                     self.anilist_client.user_tz
                 )
             )
@@ -395,23 +394,23 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         history = self._filter_history_by_episodes(item, grandchild_items)
         last_history = next(reversed(history), None)
 
-        last_viewed_dt = max(
+        last_viewed_at = max(
             (e.lastViewedAt for e in grandchild_items if e.lastViewedAt),
             default=None,
         )
         last_viewed = (
             FuzzyDate.from_date(
-                last_viewed_dt.replace(tzinfo=timezone.utc).astimezone(
+                last_viewed_at.replace(tzinfo=get_localzone()).astimezone(
                     self.anilist_client.user_tz
                 )
             )
-            if last_viewed_dt
+            if last_viewed_at
             else None
         )
 
         history_viewed = (
             FuzzyDate.from_date(
-                last_history.viewedAt.replace(tzinfo=timezone.utc).astimezone(
+                last_history.viewedAt.replace(tzinfo=get_localzone()).astimezone(
                     self.anilist_client.user_tz
                 )
             )

@@ -1,7 +1,7 @@
-from datetime import timezone
 from typing import Iterator
 
 from plexapi.video import Movie
+from tzlocal import get_localzone
 
 from src import log
 from src.models.anilist import FuzzyDate, Media, MediaListStatus
@@ -161,7 +161,7 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
 
         last_viewed = (
             FuzzyDate.from_date(
-                item.lastViewedAt.replace(tzinfo=timezone.utc).astimezone(
+                item.lastViewedAt.replace(tzinfo=get_localzone()).astimezone(
                     self.anilist_client.user_tz
                 )
             )
@@ -170,7 +170,7 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
         )
         history_viewed = (
             FuzzyDate.from_date(
-                first_history.viewedAt.replace(tzinfo=timezone.utc).astimezone(
+                first_history.viewedAt.replace(tzinfo=get_localzone()).astimezone(
                     self.anilist_client.user_tz
                 )
             )

@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from math import isnan
 from typing import TypeAlias
 from urllib.parse import urlparse
@@ -15,7 +15,6 @@ from plexapi.video import (
     EpisodeHistory,
     Movie,
     MovieHistory,
-    PlexHistory,
     Season,
     Show,
 )
@@ -288,7 +287,11 @@ class PlexClient:
                     "or": [
                         {"unwatched": False},
                         {"viewCount>>": 0},
-                        {"lastRatedAt>>=": datetime(1970, 1, 1, tzinfo=timezone.utc)},
+                        {
+                            "lastRatedAt>>=": datetime(
+                                1970, 1, 1, tzinfo=get_localzone()
+                            )
+                        },
                     ]
                 }
             )
@@ -437,9 +440,8 @@ class PlexClient:
                     "guid": metadata["id"],
                     "title": metadata["title"],
                 }
+
                 if metadata["type"] == "EPISODE":
-                    attrib["parentRatingKey"] = metadata["parent"]["id"]
-                    attrib["grandparentRatingKey"] = metadata["grandparent"]["id"]
                     attrib["parentGuid"] = metadata["parent"]["id"]
                     attrib["grandparentGuid"] = metadata["grandparent"]["id"]
                     attrib["index"] = metadata["index"]
@@ -447,19 +449,24 @@ class PlexClient:
                     attrib["parentTitle"] = metadata["parent"]["title"]
                     attrib["grandparentTitle"] = metadata["grandparent"]["title"]
 
-                history_data = ElementTree.Element("History", attrib=attrib)
-                history_kwargs = {
-                    "server": self.online_client._server,
-                    "data": history_data,
-                }
-                h = (
-                    EpisodeHistory(**history_kwargs)
-                    if metadata["type"] == "EPISODE"
-                    else MovieHistory(**history_kwargs)
-                    if metadata["type"] == "MOVIE"
-                    else PlexHistory(**history_kwargs)
+                    history_data = ElementTree.Element("History", attrib=attrib)
+                    h = EpisodeHistory(
+                        server=self.online_client._server, data=history_data
+                    )
+                    h.parentRatingKey = metadata["parent"]["id"]
+                    h.grandparentRatingKey = metadata["grandparent"]["id"]
+                elif metadata["type"] == "MOVIE":
+                    history_data = ElementTree.Element("History", attrib=attrib)
+                    h = MovieHistory(
+                        server=self.online_client._server, data=history_data
+                    )
+
+                h.ratingKey = metadata["id"]
+                h.viewedAt = (
+                    datetime.fromisoformat(entry["date"])
+                    .astimezone(get_localzone())
+                    .replace(tzinfo=None)
                 )
-                h.viewedAt = datetime.fromisoformat(entry["date"])
                 history.append(h)
 
             return sorted(history, key=lambda x: x.viewedAt)
@@ -475,8 +482,7 @@ class PlexClient:
                 f"$${{key: {item.ratingKey}, plex_id: {item.guid}}}$$",
                 exc_info=True,
             )
-        finally:
-            return []
+        return []
 
     def is_on_watchlist(self, item: Movie | Show) -> bool:
         """Checks if a media item is on the user's watchlist.
