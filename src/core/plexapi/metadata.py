@@ -130,30 +130,22 @@ class PlexMetadataObject(PlexObject):
         return super()._reload(*args, **kwargs)
 
 
-class MetadataVideo(Video, PlexMetadataObject):
+class VideoMetadataMixin:
     def _loadData(self, data):
         super()._loadData(data)
         self.ratingKey = data.attrib.get("ratingKey")
 
 
-class MetadataMovie(Movie, MetadataVideo):
+class EpisodeMetadataMixin:
     def _loadData(self, data):
         super()._loadData(data)
-        self.ratingKey = data.attrib.get("ratingKey")
-
-
-class MetadataEpisode(Episode, MetadataVideo):
-    def _loadData(self, data):
-        super()._loadData(data)
-        self.ratingKey = data.attrib.get("ratingKey")
         self.parentRatingKey = data.attrib.get("parentRatingKey")
         self.grandparentRatingKey = data.attrib.get("grandparentRatingKey")
 
 
-class MetadataSeason(Season, MetadataVideo):
+class SeasonMetadataMixin:
     def _loadData(self, data):
         super()._loadData(data)
-        self.ratingKey = data.attrib.get("ratingKey")
         self.parentRatingKey = data.attrib.get("parentRatingKey")
 
     @metadata_server
@@ -162,16 +154,7 @@ class MetadataSeason(Season, MetadataVideo):
         return self.fetchItems(key, MetadataEpisode, **kwargs)
 
 
-class MetadataShow(Show, MetadataVideo):
-    def _loadData(self, data):
-        super()._loadData(data)
-        self.ratingKey = data.attrib.get("ratingKey")
-
-    def episodes(self, **kwargs):
-        return list(
-            chain.from_iterable(season.episodes(**kwargs) for season in self.seasons())
-        )
-
+class ShowMetadataMixin:
     @discover_server
     def __loadUserStates(self, seasons):
         if not seasons:
@@ -208,8 +191,13 @@ class MetadataShow(Show, MetadataVideo):
             )
         )
 
+    def episodes(self, **kwargs):
+        return list(
+            chain.from_iterable(season.episodes(**kwargs) for season in self.seasons())
+        )
 
-class MetadataLibrarySection(LibrarySection, PlexMetadataObject):
+
+class LibrarySectionMetadataMixin:
     @original_server
     def _search(self, *args, **kwargs):
         return super().search(*args, **kwargs)
@@ -254,17 +242,53 @@ class MetadataLibrarySection(LibrarySection, PlexMetadataObject):
         )
 
 
-class MetadataMovieSection(MovieSection, MetadataLibrarySection):
+class MetadataVideo(VideoMetadataMixin, PlexMetadataObject, Video):
+    pass
+
+
+class MetadataMovie(VideoMetadataMixin, PlexMetadataObject, Movie):
+    pass
+
+
+class MetadataEpisode(
+    EpisodeMetadataMixin, VideoMetadataMixin, PlexMetadataObject, Episode
+):
+    pass
+
+
+class MetadataSeason(
+    SeasonMetadataMixin, VideoMetadataMixin, PlexMetadataObject, Season
+):
+    pass
+
+
+class MetadataShow(ShowMetadataMixin, VideoMetadataMixin, PlexMetadataObject, Show):
+    pass
+
+
+class MetadataLibrarySection(
+    LibrarySectionMetadataMixin, PlexMetadataObject, LibrarySection
+):
+    pass
+
+
+class MetadataMovieSection(
+    LibrarySectionMetadataMixin, PlexMetadataObject, MovieSection
+):
     def search(self, *args, **kwargs):
-        return super().search(cls=MetadataMovie, *args, **kwargs)
+        return LibrarySectionMetadataMixin.search(
+            self, cls=MetadataMovie, *args, **kwargs
+        )
 
 
-class MetadataShowSection(ShowSection, MetadataLibrarySection):
+class MetadataShowSection(LibrarySectionMetadataMixin, PlexMetadataObject, ShowSection):
     def search(self, *args, **kwargs):
-        return super().search(cls=MetadataShow, *args, **kwargs)
+        return LibrarySectionMetadataMixin.search(
+            self, cls=MetadataShow, *args, **kwargs
+        )
 
 
-class MetadataLibrary(Library, PlexMetadataObject):
+class MetadataLibrary(PlexMetadataObject, Library):
     def _loadSections(self):
         key = "/library/sections"
         sectionsByID = {}
@@ -285,7 +309,7 @@ class MetadataLibrary(Library, PlexMetadataObject):
         self._sectionsByTitle = dict(sectionsByTitle)
 
 
-class PlexMetadataServer(PlexServer, PlexMetadataObject):
+class PlexMetadataServer(PlexServer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
