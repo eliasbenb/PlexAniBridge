@@ -5,6 +5,7 @@ from urllib.parse import urljoin, urlparse
 
 import requests
 import tomlkit
+import urllib3.exceptions
 import yaml
 from tomlkit.exceptions import TOMLKitError
 
@@ -184,12 +185,15 @@ class MappingsClient:
             mappings,
         )
 
-    def _load_mappings_url(self, url: str, loaded_chain: set[str]) -> AniMapDict:
+    def _load_mappings_url(
+        self, url: str, loaded_chain: set[str], retry_count: int = 0
+    ) -> AniMapDict:
         """Load mappings from a URL.
 
         Args:
             url (str): URL to load mappings from
             loaded_chain (set[str]): Set of already loaded includes to prevent circular includes
+            retry_count (int | None): Number of retries to attempt
 
         Returns:
             AniMapDict: Mappings loaded from the URL
@@ -199,15 +203,18 @@ class MappingsClient:
             raw_res = self.session.get(url)
             raw_res.raise_for_status()
             mappings = raw_res.json()
-        except requests.exceptions.RequestException:
+        except (requests.exceptions.RequestException, urllib3.exceptions.ProtocolError):
+            if retry_count > 1:
+                log.warning(
+                    f"{self.__class__.__name__}: Error reaching mappings URL $$'{url}'$$, retrying..."
+                )
+                return self._load_mappings_url(url, loaded_chain, retry_count - 1)
             log.error(
-                f"{self.__class__.__name__}: Error reaching mappings URL $$'{url}'$$",
-                exc_info=True,
+                f"{self.__class__.__name__}: Error reaching mappings URL $$'{url}'$$"
             )
         except json.JSONDecodeError:
             log.error(
-                f"{self.__class__.__name__}: Error decoding mappings from URL $$'{url}'$$",
-                exc_info=True,
+                f"{self.__class__.__name__}: Error decoding mappings from URL $$'{url}'$$"
             )
         except Exception:
             log.error(
@@ -249,7 +256,7 @@ class MappingsClient:
             return self._load_mappings_url(src, loaded_chain)
         else:
             log.warning(
-                f"{self.__class__.__name__}: Invalid mappings source: '{src}', skipping"
+                f"{self.__class__.__name__}: Invalid mappings source: $$'{src}'$$, skipping"
             )
             return {}
 
