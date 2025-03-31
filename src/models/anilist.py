@@ -263,6 +263,11 @@ class UserOptions(AniListBaseModel):
     timezone: str | None = None
 
 
+class MediaListOptions(AniListBaseModel):
+    score_format: ScoreFormat | None = None
+    row_order: str | None = None
+
+
 class User(AniListBaseModel):
     id: int
     name: str
@@ -431,11 +436,6 @@ class MediaListCollection(AniListBaseModel):
     user: User | None = None
     lists: list[MediaListGroup] = []
     has_next_chunk: bool | None = None
-
-
-class MediaListOptions(AniListBaseModel):
-    score_format: ScoreFormat | None = None
-    row_order: str | None = None
 
 
 class AiringSchedule(AniListBaseModel):
