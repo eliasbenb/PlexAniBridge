@@ -506,8 +506,7 @@ class AniListClient:
             response.raise_for_status()
         except requests.HTTPError as e:
             log.error(
-                f"{self.__class__.__name__}: Failed to make request to AniList API",
-                exc_info=True,
+                f"{self.__class__.__name__}: Failed to make request to AniList API"
             )
             log.error(f"\t\t{response.text}")
             raise e

@@ -244,7 +244,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             except Exception:
                 log.error(
                     f"{self.__class__.__name__}: Failed to process {item.type} "
-                    f"{debug_log_title} {debug_log_ids}: ",
+                    f"{debug_log_title} {debug_log_ids}",
                     exc_info=True,
                 )
                 self.sync_stats.failed += 1

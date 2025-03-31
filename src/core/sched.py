@@ -40,7 +40,7 @@ class SchedulerClient:
         try:
             await asyncio.to_thread(self.bridge.sync, poll=poll)
         except Exception:
-            log.error(f"{self.__class__.__name__}: Sync process error: ", exc_info=True)
+            log.error(f"{self.__class__.__name__}: Sync process error", exc_info=True)
 
     async def sync(self, poll: bool = False) -> None:
         """Execute a single synchronization cycle with error handling
@@ -63,7 +63,7 @@ class SchedulerClient:
                         pass
                 raise
             except Exception:
-                log.error(f"{self.__class__.__name__}: Sync error: ", exc_info=True)
+                log.error(f"{self.__class__.__name__}: Sync error", exc_info=True)
 
     async def _periodic_sync(self) -> None:
         """Handle periodic synchronization"""
@@ -100,9 +100,7 @@ class SchedulerClient:
                 log.info(f"{self.__class__.__name__}: Poll sync cancelled")
                 break
             except Exception:
-                log.error(
-                    f"{self.__class__.__name__}: Poll sync error: ", exc_info=True
-                )
+                log.error(f"{self.__class__.__name__}: Poll sync error", exc_info=True)
                 await asyncio.sleep(10)
 
     async def _reinit(self) -> None:
@@ -121,7 +119,7 @@ class SchedulerClient:
                 log.info(f"{self.__class__.__name__}: Reinit task cancelled")
                 break
             except Exception:
-                log.error(f"{self.__class__.__name__}: Reinit error: ", exc_info=True)
+                log.error(f"{self.__class__.__name__}: Reinit error", exc_info=True)
                 await asyncio.sleep(10)
 
     def _create_task(self, coro: CoroutineType) -> None:

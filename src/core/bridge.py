@@ -302,7 +302,7 @@ class BridgeClient:
                 sync_client.process_media(item)
             except Exception:
                 log.error(
-                    f"{self.__class__.__name__}: Failed to sync item $$'{item.title}'$$: ",
+                    f"{self.__class__.__name__}: Failed to sync item $$'{item.title}'$$",
                     exc_info=True,
                 )
 

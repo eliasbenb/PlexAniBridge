@@ -158,7 +158,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             except Exception:
                 self.sync_stats.failed += 1
                 log.error(
-                    f"Failed to fetch AniList data for {self._debug_log_title(item)}: ",
+                    f"Failed to fetch AniList data for {self._debug_log_title(item)}",
                     exc_info=True,
                 )
                 continue
