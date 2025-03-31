@@ -36,6 +36,9 @@ jobs:
         with:
           python-version: 3.x
 
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
+
       - name: Determine Cache ID
         run: echo "cache_id=$(date --utc '+%V')" >> $GITHUB_ENV
 
@@ -48,7 +51,7 @@ jobs:
             mkdocs-material-
 
       - name: Install Dependencies
-        run: pip install -r docs/requirements.txt
+        run: uv sync --package docs --frozen
 
       - name: Build and Deploy Docs
-        run: mkdocs gh-deploy --force
+        run: uv run mkdocs gh-deploy --force
