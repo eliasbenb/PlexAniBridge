@@ -52,10 +52,6 @@ PlexAniBridge will look for a custom mappings file with the name `mappings.custo
 
 There are community maintained mappings repositories that you can use to get pre-made mappings for your content. You can include these mappings in your custom mappings file using the `$includes` key as explained above.
 
-## Community Custom Mappings
-
-There are community maintained mappings repositories that you can use to get pre-made mappings for your content. You can include these mappings in your custom mappings file using the `$includes` key as explained above.
-
 - <a href="https://github.com/LuceoEtzio/PlexAniBridge-Custom-Mappings">
     <img src="https://avatars.githubusercontent.com/u/40282884?s=24&v=4" alt="LuceoEtzio" style="margin-right: 4px; border-radius: 50%; vertical-align: middle;">
     <span>LuceoEtzio/PlexAniBridge-Custom-Mappings</span>
