@@ -1,5 +1,7 @@
 FROM python:3.13-alpine
 
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
 LABEL maintainer="Elias Benbourenane <eliasbenbourenane@gmail.com>" \
     org.opencontainers.image.title="PlexAniBridge" \
     org.opencontainers.image.description="Synchronize your Plex watch history, ratings, and reviews with AniList" \
@@ -13,10 +15,10 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-COPY requirements.txt .
+COPY pyproject.toml uv.lock ./
 
-RUN pip install --no-cache-dir --no-compile -r requirements.txt
+RUN uv sync --frozen
 
 COPY . .
 
-CMD ["python", "main.py"]
+CMD ["uv", "run", "main.py"]
