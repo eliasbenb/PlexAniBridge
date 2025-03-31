@@ -441,7 +441,9 @@ class AniListClient:
             },
         )
 
-    def _make_request(self, query: str, variables: dict | str | None = None) -> dict:
+    def _make_request(
+        self, query: str, variables: dict | str | None = None, retry_count: int = 0
+    ) -> dict:
         """Makes a rate-limited request to the AniList GraphQL API.
 
         Handles rate limiting, authentication, and automatic retries for
@@ -450,6 +452,7 @@ class AniListClient:
         Args:
             query (str): GraphQL query string
             variables (dict | str | None): Variables for the GraphQL query
+            retry_count (int): Number of retries attempted (used for temporary errors)
 
         Returns:
             dict: JSON response from the API
@@ -462,12 +465,24 @@ class AniListClient:
             - Automatically retries after waiting if rate limit is exceeded
             - Includes Authorization header using the stored token
         """
+        if retry_count >= 3:
+            raise requests.HTTPError("Failed to make request after 3 tries")
+
         self.rate_limiter.wait_if_needed()  # Rate limit the requests
 
-        response = self.session.post(
-            self.API_URL,
-            json={"query": query, "variables": variables or {}},
-        )
+        try:
+            response = self.session.post(
+                self.API_URL,
+                json={"query": query, "variables": variables or {}},
+            )
+        except requests.exceptions.ConnectionError:
+            log.error(
+                f"{self.__class__.__name__}: Connection error while making request to AniList API"
+            )
+            sleep(1)
+            return self._make_request(
+                query=query, variables=variables, retry_count=retry_count + 1
+            )
 
         if response.status_code == 429:  # Handle rate limit retries
             retry_after = int(response.headers.get("Retry-After", 60))
@@ -475,13 +490,23 @@ class AniListClient:
                 f"{self.__class__.__name__}: Rate limit exceeded, waiting {retry_after} seconds"
             )
             sleep(retry_after + 1)
-            return self._make_request(query, variables)
+            return self._make_request(
+                query=query, variables=variables, retry_count=retry_count
+            )
+        elif response.status_code == 502:  # Bad Gateway
+            log.warning(
+                f"{self.__class__.__name__}: Received 502 Bad Gateway, retrying"
+            )
+            sleep(1)
+            return self._make_request(
+                query=query, variables=variables, retry_count=retry_count + 1
+            )
 
         try:
             response.raise_for_status()
         except requests.HTTPError as e:
             log.error(
-                f"{self.__class__.__name__}: Failed to make request to AniList API: ",
+                f"{self.__class__.__name__}: Failed to make request to AniList API",
                 exc_info=True,
             )
             log.error(f"\t\t{response.text}")
