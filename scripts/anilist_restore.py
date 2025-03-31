@@ -9,6 +9,7 @@ from time import sleep
 from typing import Any
 
 import requests
+import urllib3.exceptions
 from pydantic import BaseModel
 
 
@@ -98,25 +99,47 @@ class AniListRestoreClient:
         )
 
     def _make_request(
-        self, query: str, variables: dict[str, Any] | None = None
+        self, query: str, variables: dict[str, Any] | None = None, retry_count: int = 0
     ) -> dict[str, Any]:
-        response = self.session.post(
-            self.API_URL,
-            json={"query": query, "variables": variables or {}},
-        )
+        if retry_count >= 3:
+            raise requests.exceptions.HTTPError("Failed to make request after 3 tries")
 
-        if response.status_code == 429:
+        try:
+            response = self.session.post(
+                self.API_URL,
+                json={"query": query, "variables": variables or {}},
+            )
+        except (
+            requests.exceptions.RequestException,
+            urllib3.exceptions.ProtocolError,
+        ):
+            print("Connection error while making request to AniList API")
+            sleep(1)
+            return self._make_request(
+                query=query, variables=variables, retry_count=retry_count + 1
+            )
+
+        if response.status_code == 429:  # Handle rate limit retries
             retry_after = int(response.headers.get("Retry-After", 60))
             print(f"Rate limit exceeded, waiting {retry_after} seconds")
             sleep(retry_after + 1)
-            return self._make_request(query, variables)
+            return self._make_request(
+                query=query, variables=variables, retry_count=retry_count
+            )
+        elif response.status_code == 502:  # Bad Gateway
+            print("Received 502 Bad Gateway, retrying")
+            sleep(1)
+            return self._make_request(
+                query=query, variables=variables, retry_count=retry_count + 1
+            )
 
         try:
             response.raise_for_status()
         except requests.HTTPError as e:
-            print(f"Error making request: {e}")
-            print(response.text)
+            print("Failed to make request to AniList API")
+            print(f"\t\t{response.text}")
             raise e
+
         return response.json()
 
 
