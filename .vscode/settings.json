@@ -2,12 +2,10 @@
     "[python]": {
         "editor.defaultFormatter": "charliermarsh.ruff"
     },
+    "python.defaultInterpreterPath": ".venv/bin/python",
+    "python.envFile": "",
     "ruff.fixAll": true,
     "ruff.organizeImports": true,
-    "python.envFile": "",
-    "yaml.schemas": {
-        "https://squidfunk.github.io/mkdocs-material/schema.json": "mkdocs.yml"
-    },
     "yaml.customTags": [
         "!ENV scalar",
         "!ENV sequence",
@@ -16,5 +14,8 @@
         "tag:yaml.org,2002:python/name:material.extensions.emoji.twemoji",
         "tag:yaml.org,2002:python/name:pymdownx.superfences.fence_code_format",
         "tag:yaml.org,2002:python/object/apply:pymdownx.slugs.slugify mapping"
-    ]
+    ],
+    "yaml.schemas": {
+        "https://squidfunk.github.io/mkdocs-material/schema.json": "mkdocs.yml"
+    }
 }
