@@ -315,7 +315,7 @@ class PlexClient:
             str | None: Review message if found, None if not found
 
         Raises:
-            requests.HTTPError: If the API request fails
+            requests.exceptions.HTTPError: If the API request fails
             KeyError: If the response format is unexpected
             ValueError: If the response cannot be parsed
 
@@ -333,7 +333,7 @@ class PlexClient:
                 f"$$'{item.title}'$$ $${{ plex_id: {item.guid}}}$$"
             )
             return self.community_client.get_reviews(self._guid_to_key(item.guid))
-        except requests.HTTPError:
+        except requests.exceptions.HTTPError:
             log.error(
                 f"Failed to get review for {item.type} $$'{item.title}'$$ "
                 f"$${{key: {item.ratingKey}, plex_id: {item.guid}}}$$",
@@ -466,7 +466,7 @@ class PlexClient:
                 history.append(h)
 
             return sorted(history, key=lambda x: x.viewedAt)
-        except requests.HTTPError:
+        except requests.exceptions.HTTPError:
             log.error(
                 f"Failed to get watch hsitory for {item.type} $$'{item.title}'$$ "
                 f"$${{key: {item.ratingKey}, plex_id: {item.guid}}}$$",

@@ -199,7 +199,7 @@ class MappingsClient:
             raw_res = self.session.get(url)
             raw_res.raise_for_status()
             mappings = raw_res.json()
-        except requests.RequestException:
+        except requests.exceptions.RequestException:
             log.error(
                 f"{self.__class__.__name__}: Error reaching mappings URL $$'{url}'$$",
                 exc_info=True,

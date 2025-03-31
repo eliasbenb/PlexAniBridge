@@ -344,7 +344,7 @@ class PlexMetadataServer(PlexServer):
         Includes rate limiting and error handling for rate limit exceeded responses.
         """
         if retry_count >= 3:
-            raise requests.HTTPError("Failed to make request after 3 tries")
+            raise requests.exceptions.HTTPError("Failed to make request after 3 tries")
 
         if self._baseurl in (
             self.myPlexAccount().DISCOVER,

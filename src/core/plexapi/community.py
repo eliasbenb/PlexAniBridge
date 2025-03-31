@@ -2,6 +2,7 @@ from textwrap import dedent
 from time import sleep
 
 import requests
+import urllib3.exceptions
 
 from src import __version__, log
 from src.utils.rate_limiter import RateLimiter
@@ -151,21 +152,33 @@ class PlexCommunityClient:
             dict: JSON response from the API
 
         Raises:
-            requests.HTTPError: If the request fails for any reason other than rate limiting
+            requests.exceptions.HTTPError: If the request fails for any reason other than rate limiting
         """
         if retry_count >= 3:
-            raise requests.HTTPError("Failed to make request after 3 tries")
+            raise requests.exceptions.HTTPError("Failed to make request after 3 tries")
 
         self.rate_limiter.wait_if_needed()  # Rate limit the requests
 
-        response = self.session.post(
-            self.API_URL,
-            json={
-                "query": query,
-                "variables": variables,
-                "operationName": operation_name,
-            },
-        )
+        try:
+            response = self.session.post(
+                self.API_URL,
+                json={
+                    "query": query,
+                    "variables": variables,
+                    "operationName": operation_name,
+                },
+            )
+        except (
+            requests.exceptions.RequestException,
+            urllib3.exceptions.ProtocolError,
+        ):
+            log.error(
+                f"{self.__class__.__name__}: Connection error while making request to the Plex Community API"
+            )
+            sleep(1)
+            return self._make_request(
+                query=query, variables=variables, retry_count=retry_count + 1
+            )
 
         if response.status_code == 429:  # Handle rate limit retries
             retry_after = int(response.headers.get("Retry-After", 60))
@@ -193,7 +206,7 @@ class PlexCommunityClient:
 
         try:
             response.raise_for_status()
-        except requests.HTTPError as e:
+        except requests.exceptions.HTTPError as e:
             log.error(
                 f"{self.__class__.__name__}: Failed to make request to the Plex Community API"
             )

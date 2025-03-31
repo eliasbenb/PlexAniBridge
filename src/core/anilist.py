@@ -3,7 +3,8 @@ from pathlib import Path
 from textwrap import dedent
 from time import sleep
 
-import requests
+import requests.exceptions
+import urllib3.exceptions
 from cachetools.func import ttl_cache
 
 from src import __version__, log
@@ -92,7 +93,7 @@ class AniListClient:
             User: Object containing the authenticated user's information
 
         Raises:
-            requests.HTTPError: If the API request fails
+            requests.exceptions.HTTPError: If the API request fails
         """
         query = dedent(f"""
         query {{
@@ -127,7 +128,7 @@ class AniListClient:
             media_list_entry (MediaList): Updated AniList entry to save
 
         Raises:
-            requests.HTTPError: If the API request fails
+            requests.exceptions.HTTPError: If the API request fails
         """
         query = dedent(f"""
         mutation ($mediaId: Int, $status: MediaListStatus, $score: Float, $progress: Int, $repeat: Int, $notes: String, $startedAt: FuzzyDateInput, $completedAt: FuzzyDateInput) {{
@@ -164,7 +165,7 @@ class AniListClient:
             bool: True if the entry was successfully deleted and not in dry run mode, False otherwise
 
         Raises:
-            requests.HTTPError: If the API request fails
+            requests.exceptions.HTTPError: If the API request fails
         """
         query = dedent("""
         mutation ($id: Int) {
@@ -215,7 +216,7 @@ class AniListClient:
             list[Media]: Filtered list of matching anime entries, sorted by relevance
 
         Raises:
-            requests.HTTPError: If the API request fails
+            requests.exceptions.HTTPError: If the API request fails
         """
         log.debug(
             f"{self.__class__.__name__}: Searching for {'movie' if is_movie else 'show'} "
@@ -252,7 +253,7 @@ class AniListClient:
             list[Media]: List of matching anime entries, unfiltered
 
         Raises:
-            requests.HTTPError: If the API request fails
+            requests.exceptions.HTTPError: If the API request fails
 
         Note:
             This method is cached using functools.cache to optimize repeated searches
@@ -303,7 +304,7 @@ class AniListClient:
             Media: Detailed information about the requested anime
 
         Raises:
-            requests.HTTPError: If the API request fails
+            requests.exceptions.HTTPError: If the API request fails
 
         Note:
             Results are cached in self.offline_anilist_entries for future use
@@ -345,7 +346,7 @@ class AniListClient:
             - Detailed information about each anime entry
 
         Raises:
-            requests.HTTPError: If the API request fails
+            requests.exceptions.HTTPError: If the API request fails
             OSError: If unable to create backup directory or write backup file
 
         Note:
@@ -458,7 +459,7 @@ class AniListClient:
             dict: JSON response from the API
 
         Raises:
-            requests.HTTPError: If the request fails for any reason other than rate limiting
+            requests.exceptions.HTTPError: If the request fails for any reason other than rate limiting
 
         Note:
             - Implements rate limiting of 90 requests per minute
@@ -466,7 +467,7 @@ class AniListClient:
             - Includes Authorization header using the stored token
         """
         if retry_count >= 3:
-            raise requests.HTTPError("Failed to make request after 3 tries")
+            raise requests.exceptions.HTTPError("Failed to make request after 3 tries")
 
         self.rate_limiter.wait_if_needed()  # Rate limit the requests
 
@@ -475,7 +476,10 @@ class AniListClient:
                 self.API_URL,
                 json={"query": query, "variables": variables or {}},
             )
-        except requests.exceptions.ConnectionError:
+        except (
+            requests.exceptions.RequestException,
+            urllib3.exceptions.ProtocolError,
+        ):
             log.error(
                 f"{self.__class__.__name__}: Connection error while making request to AniList API"
             )
@@ -504,7 +508,7 @@ class AniListClient:
 
         try:
             response.raise_for_status()
-        except requests.HTTPError as e:
+        except requests.exceptions.HTTPError as e:
             log.error(
                 f"{self.__class__.__name__}: Failed to make request to AniList API"
             )
