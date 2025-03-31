@@ -1,6 +1,23 @@
+FROM ghcr.io/astral-sh/uv:python3.13-alpine AS builder
+
+ENV PYTHONUNBUFFERED=1 \
+    UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_PYTHON_DOWNLOADS=0
+
+WORKDIR /app
+
+COPY uv.lock pyproject.toml /app/
+
+RUN uv sync --frozen --no-install-project --no-dev
+
+COPY . /app
+
+RUN uv sync --frozen --no-dev
+
 FROM python:3.13-alpine
 
-COPY --from=ghcr.io/astral-sh/uv:0.6 /uv /bin/
+COPY --from=builder --chown=app:app /app /app
 
 LABEL maintainer="Elias Benbourenane <eliasbenbourenane@gmail.com>" \
     org.opencontainers.image.title="PlexAniBridge" \
@@ -11,17 +28,8 @@ LABEL maintainer="Elias Benbourenane <eliasbenbourenane@gmail.com>" \
     org.opencontainers.image.source="https://github.com/eliasbenb/PlexAniBridge" \
     org.opencontainers.image.licenses="MIT"
 
-ENV PYTHONUNBUFFERED=1 \
-    UV_NO_CACHE=1 \
-    UV_PYTHON_DOWNLOADS=never \
-    UV_SYSTEM_PYTHON=1
+ENV PATH="/app/.venv/bin:$PATH"
 
 WORKDIR /app
 
-COPY pyproject.toml uv.lock ./
-
-RUN uv sync --frozen --compile-bytecode
-
-COPY . .
-
-CMD ["uv", "run", "main.py", "--no-sync"]
+CMD ["python", "/app/main.py"]
