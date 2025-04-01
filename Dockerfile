@@ -1,19 +1,15 @@
 FROM ghcr.io/astral-sh/uv:python3.13-alpine AS builder
 
-ENV PYTHONUNBUFFERED=1 \
-    UV_COMPILE_BYTECODE=1 \
-    UV_LINK_MODE=copy \
+ENV UV_LINK_MODE=copy \
     UV_PYTHON_DOWNLOADS=0
 
 WORKDIR /app
 
 COPY uv.lock pyproject.toml /app/
 
-RUN uv sync --frozen --no-install-project --no-dev
+RUN uv sync --frozen --no-install-project --no-editable
 
-COPY . /app
-
-RUN uv sync --frozen --no-dev
+ADD . /app
 
 FROM python:3.13-alpine
 
@@ -32,4 +28,4 @@ ENV PATH="/app/.venv/bin:$PATH"
 
 WORKDIR /app
 
-CMD ["python", "/app/main.py"]
+ENTRYPOINT ["python", "/app/main.py"]
