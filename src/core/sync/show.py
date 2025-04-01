@@ -520,17 +520,19 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         grandchild_rating_keys = {e.ratingKey for e in grandchild_items}
         history = self.plex_client.get_history(item)  # Assumed to be sorted
 
-        filtered_history = {h for h in history if h.ratingKey in grandchild_rating_keys}
+        filtered_history = [h for h in history if h.ratingKey in grandchild_rating_keys]
 
-        # If an episode doesn't have a history entry, create one with the last viewed date
         for e in grandchild_items:
             if e.ratingKey not in grandchild_rating_keys or not e.lastViewedAt:
                 continue
+
             episode_history = EpisodeHistory(
-                self.plex_client.user_client._server, e._data
+                server=self.plex_client.user_client._server,
+                data=e._data,
+                initpath="/status/sessions/history/all",
             )
             episode_history.viewedAt = e.lastViewedAt
-            filtered_history.add(episode_history)
+            filtered_history.append(episode_history)
 
         return sorted(filtered_history, key=lambda h: h.viewedAt)
 
