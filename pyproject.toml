@@ -42,7 +42,8 @@ Source = "https://github.com/eliasbenb/PlexAniBridge"
 Issues = "https://github.com/eliasbenb/PlexAniBridge/issues"
 
 [tool.pyright]
-include = ["./main.py", "./src"]
+include = ["."]
+extraPaths = ["./src/stubs"]
 
 [tool.uv.workspace]
 members = ["docs"]
