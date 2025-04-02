@@ -526,23 +526,32 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             list[EpisodeHistory]: Filtered history entries
         """
         grandchild_rating_keys = {e.ratingKey for e in grandchild_items}
+        episode_map = {e.ratingKey: e for e in grandchild_items}
         history = self.plex_client.get_history(item)
 
-        filtered_history = [h for h in history if h.ratingKey in grandchild_rating_keys]
+        filtered_history = {}
+        for h in history:
+            if h.ratingKey in grandchild_rating_keys:
+                if (
+                    h.ratingKey not in filtered_history
+                    or h.viewedAt < filtered_history[h.ratingKey].viewedAt
+                ):
+                    filtered_history[h.ratingKey] = h
 
-        for e in grandchild_items:
-            if e.ratingKey not in grandchild_rating_keys or not e.lastViewedAt:
-                continue
+        for rating_key, episode in episode_map.items():
+            if episode.lastViewedAt and (
+                rating_key not in filtered_history
+                or filtered_history[rating_key].viewedAt > episode.lastViewedAt
+            ):
+                episode_history = EpisodeHistory(
+                    server=self.plex_client.user_client._server,  # type: ignore
+                    data=episode._data,
+                    initpath="/status/sessions/history/all",
+                )
+                episode_history.viewedAt = episode.lastViewedAt
+                filtered_history[rating_key] = episode_history
 
-            episode_history = EpisodeHistory(
-                server=self.plex_client.user_client._server,  # type: ignore
-                data=e._data,
-                initpath="/status/sessions/history/all",
-            )
-            episode_history.viewedAt = e.lastViewedAt
-            filtered_history.append(episode_history)
-
-        return filtered_history  # type: ignore
+        return list(filtered_history.values())
 
     @generic_lru_cache(maxsize=8)
     def _filter_watched_episodes(self, episodes: list[Episode]) -> list[Episode]:
