@@ -9,17 +9,18 @@ from .mapping import TVDBMapping
 class AniMap(SQLModel, table=True):
     """Model for the animap table."""
 
-    __tablename__ = "animap"
+    __tablename__: str = "animap"  #  type: ignore
 
     anilist_id: int = Field(primary_key=True)
     anidb_id: int | None = Field(index=False)
-    imdb_id: list[str] | None = Field(sa_type=JSON(none_as_null=True), index=True)
-    mal_id: list[int] | None = Field(sa_type=JSON(none_as_null=True), index=False)
-    tmdb_movie_id: list[int] | None = Field(sa_type=JSON(none_as_null=True), index=True)
-    tmdb_show_id: list[int] | None = Field(sa_type=JSON(none_as_null=True), index=True)
+    imdb_id: list[str] | None = Field(sa_type=JSON(none_as_null=True), index=True)  # type: ignore
+    mal_id: list[int] | None = Field(sa_type=JSON(none_as_null=True), index=False)  # type: ignore
+    tmdb_movie_id: list[int] | None = Field(sa_type=JSON(none_as_null=True), index=True)  # type: ignore
+    tmdb_show_id: list[int] | None = Field(sa_type=JSON(none_as_null=True), index=True)  # type: ignore
     tvdb_id: int | None = Field(index=True)
     tvdb_mappings: dict[str, str] | None = Field(
-        sa_type=JSON(none_as_null=True), index=False
+        sa_type=JSON(none_as_null=True),  # type: ignore
+        index=False,
     )
 
     @cached_property

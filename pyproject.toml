@@ -41,5 +41,8 @@ Documentation = "https://plexanibridge.elias.eu.org"
 Source = "https://github.com/eliasbenb/PlexAniBridge"
 Issues = "https://github.com/eliasbenb/PlexAniBridge/issues"
 
+[tool.pyright]
+include = ["./main.py", "./src"]
+
 [tool.uv.workspace]
 members = ["docs"]

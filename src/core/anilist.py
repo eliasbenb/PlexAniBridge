@@ -113,7 +113,10 @@ class AniListClient:
             timezone: The timezone of the authenticated user
         """
         try:
-            hours, minutes = map(int, self.user.options.timezone.split(":"))
+            if self.user.options and self.user.options.timezone:
+                hours, minutes = map(int, self.user.options.timezone.split(":"))
+            else:
+                return timezone.utc
             return timezone(timedelta(hours=hours, minutes=minutes))
         except (AttributeError, ValueError):
             return timezone.utc

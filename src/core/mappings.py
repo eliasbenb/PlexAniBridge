@@ -81,12 +81,12 @@ class MappingsClient:
         else:
             return d
 
-    def _resolve_path(self, include_path: str, parent_path: Path | str) -> str:
+    def _resolve_path(self, include_path: str, parent_path: str) -> str:
         """Resolve a path relative to the parent path.
 
         Args:
             include_path (str): Path to resolve
-            parent_path (Path | str): Parent path to resolve against
+            parent_path (str): Parent path to resolve against
 
         Returns:
             str: Resolved path
@@ -97,7 +97,7 @@ class MappingsClient:
         is_parent_file = self._is_file(parent_path)
 
         # Absolute URL or absolute path
-        if is_url or (is_file and parent_path.is_absolute()):
+        if is_url or (is_file and Path(parent_path).is_absolute()):
             return include_path
         # Relative URL
         if is_parent_url:
@@ -111,14 +111,14 @@ class MappingsClient:
         return include_path
 
     def _load_includes(
-        self, includes: list[str], loaded_chain: set[str], parent: Path | str
+        self, includes: list[str], loaded_chain: set[str], parent: str
     ) -> AniMapDict:
         """Load mappings from included files or URLs.
 
         Args:
             includes (list[str]): List of file paths or URLs to include
             loaded_chain (set[str]): Set of already loaded includes to prevent circular includes
-            parent (Path | str): Parent path or URL to resolve relative paths against
+            parent (str): Parent path or URL to resolve relative paths against
 
         Returns:
             AniMapDict: Merged mappings from all included files
@@ -180,8 +180,17 @@ class MappingsClient:
 
         self._loaded_sources.add(file)
 
+        includes = mappings.get("$includes", [])
+        if not isinstance(includes, list):
+            log.warning(
+                f"{self.__class__.__name__}: $includes in {file_path.absolute().as_posix()} is not a list, ignoring"
+            )
+            includes = []
+        else:
+            includes = [str(item) for item in includes]
+
         return self._deep_merge(
-            self._load_includes(mappings.get("$includes", []), loaded_chain, file_path),
+            self._load_includes(includes, loaded_chain, str(file_path)),
             mappings,
         )
 
@@ -224,24 +233,30 @@ class MappingsClient:
 
         self._loaded_sources.add(url)
 
+        includes = mappings.get("$includes", [])
+        if not isinstance(includes, list):
+            log.warning(
+                f"{self.__class__.__name__}: $includes in {url} is not a list, ignoring"
+            )
+            includes = []
+        else:
+            includes = [str(item) for item in includes]
+
         return self._deep_merge(
-            self._load_includes(mappings.get("$includes", []), loaded_chain, url),
+            self._load_includes(includes, loaded_chain, url),
             mappings,
         )
 
-    def _load_mappings(self, src: str, loaded_chain: set[str] = None) -> AniMapDict:
+    def _load_mappings(self, src: str, loaded_chain: set[str] = set()) -> AniMapDict:
         """Load mappings from a file or URL.
 
         Args:
             src (str): Path to the file or URL to load mappings from
-            loaded_chain (set[str], optional): Set of already loaded includes to prevent circular includes. Defaults to None.
+            loaded_chain (set[str]): Set of already loaded includes to prevent circular includes
 
         Returns:
             AniMapDict: Mappings loaded from the file or URL
         """
-        if loaded_chain is None:
-            loaded_chain = set()
-
         loaded_chain = loaded_chain | {src}
 
         if self._is_file(src):

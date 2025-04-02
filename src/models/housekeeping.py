@@ -7,7 +7,7 @@ class Housekeeping(SQLModel, table=True):
     This table is used to store miscellaneous data such as timestamps and hashes.
     """
 
-    __tablename__ = "house_keeping"
+    __tablename__: str = "house_keeping"  # type: ignore
 
     key: str = Field(primary_key=True)
     value: str | None

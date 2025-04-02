@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta, timezone
 from enum import StrEnum
 from functools import total_ordering
-from typing import Annotated, Any, ClassVar, Self, get_args, get_origin
+from typing import Annotated, Any, ClassVar, Generic, TypeVar, get_args, get_origin
 
 from pydantic import AfterValidator, AliasGenerator, BaseModel, ConfigDict
 from pydantic.alias_generators import to_camel
@@ -90,6 +90,7 @@ class MediaSort(AniListBaseEnum):
     FAVOURITES_DESC = "FAVOURITES_DESC"
 
 
+@total_ordering
 class MediaListStatus(AniListBaseEnum):
     _ignore_ = ["__priority"]
 
@@ -109,41 +110,18 @@ class MediaListStatus(AniListBaseEnum):
         "REPEATING": 3,
     }
 
-    def __eq__(self, other: MediaListStatus) -> bool:
-        if self.__class__ is not other.__class__:
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, MediaListStatus):
             return NotImplemented
         return self.value == other.value
 
-    def __ne__(self, other: MediaListStatus) -> bool:
-        if self.__class__ is not other.__class__:
-            return NotImplemented
-        return self.value != other.value
-
-    def __lt__(self, other: MediaListStatus) -> bool:
-        if self.__class__ is not other.__class__:
+    def __lt__(self, other: object) -> bool:
+        if not isinstance(other, MediaListStatus):
             return NotImplemented
         return (
             self.value != other.value
-            and self.__priority[self.value] <= self.__priority[other.value]
+            and self.__priority[self.value] < self.__priority[other.value]
         )
-
-    def __le__(self, other: MediaListStatus) -> bool:
-        if self.__class__ is not other.__class__:
-            return NotImplemented
-        return self.__priority[self.value] <= self.__priority[other.value]
-
-    def __gt__(self, other: MediaListStatus) -> bool:
-        if self.__class__ is not other.__class__:
-            return NotImplemented
-        return (
-            self.value != other.value
-            and self.__priority[self.value] >= self.__priority[other.value]
-        )
-
-    def __ge__(self, other: MediaListStatus) -> bool:
-        if self.__class__ is not other.__class__:
-            return NotImplemented
-        return self.__priority[self.value] >= self.__priority[other.value]
 
 
 class ScoreFormat(AniListBaseEnum):
@@ -187,16 +165,6 @@ class AniListBaseModel(BaseModel):
             str: JSON serialized string of the model
         """
         return super().model_dump_json(by_alias=True, **kwargs)
-
-    def clear(self) -> None:
-        """Clear all the fields of the model"""
-        for field, field_info in self.model_fields.items():
-            if field_info.default_factory:
-                default_value = field_info.default_factory()
-            else:
-                default_value = field_info.default
-            setattr(self, field, default_value)
-        self.model_fields_set.clear()
 
     def unset_fields(self, fields: list[str]) -> None:
         for field, field_info in self.model_fields.items():
@@ -313,18 +281,20 @@ class FuzzyDate(AniListBaseModel):
     day: int | None = None
 
     @staticmethod
-    def from_date(d: date | datetime) -> Self:
+    def from_date(d: date | datetime | None) -> FuzzyDate | None:
         """Create a FuzzyDate from a date or datetime object
 
         Args:
-            d (date | datetime): A date or datetime object
+            d (date | datetime | None): A date or datetime object
 
         Returns:
             FuzzyDate: An equivalent FuzzyDate object
         """
+        if d is None:
+            return None
         return FuzzyDate(year=d.year, month=d.month, day=d.day)
 
-    def to_datetime(self, *args, **kwargs) -> datetime | None:
+    def to_datetime(self) -> datetime | None:
         """Convert the FuzzyDate to a datetime object
 
         Returns:
@@ -332,13 +302,7 @@ class FuzzyDate(AniListBaseModel):
         """
         if not self.year:
             return None
-        return datetime(
-            year=self.year,
-            month=self.month or 1,
-            day=self.day or 1,
-            *args,
-            **kwargs,
-        )
+        return datetime(year=self.year, month=self.month or 1, day=self.day or 1)
 
     def __eq__(self, other: Any) -> bool:
         if not isinstance(other, FuzzyDate):
@@ -424,17 +388,21 @@ class MediaList(AniListBaseModel):
         )
 
 
-class MediaListGroup(AniListBaseModel):
-    entries: list[MediaList] = []
+EntryType = TypeVar("EntryType", bound=MediaList)
+GroupType = TypeVar("GroupType", bound="MediaListGroup")
+
+
+class MediaListGroup(AniListBaseModel, Generic[EntryType]):
+    entries: list[EntryType] = []
     name: str | None = None
     is_custom_list: bool | None = None
     is_split_completed_list: bool | None = None
     status: MediaListStatus | None = None
 
 
-class MediaListCollection(AniListBaseModel):
+class MediaListCollection(AniListBaseModel, Generic[GroupType]):
     user: User | None = None
-    lists: list[MediaListGroup] = []
+    lists: list[GroupType] = []
     has_next_chunk: bool | None = None
 
 
@@ -472,12 +440,12 @@ class MediaListWithMedia(MediaList):
     media: MediaWithoutList | None = None
 
 
-class MediaListGroupWithMedia(MediaListGroup):
-    entries: list[MediaListWithMedia] = []
+class MediaListGroupWithMedia(MediaListGroup[MediaListWithMedia]):
+    pass
 
 
-class MediaListCollectionWithMedia(MediaListCollection):
-    lists: list[MediaListGroupWithMedia] = []
+class MediaListCollectionWithMedia(MediaListCollection[MediaListGroupWithMedia]):
+    pass
 
 
 class MediaConnection(AniListBaseModel):

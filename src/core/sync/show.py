@@ -30,8 +30,9 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
 
         seasons: dict[int, Season] = {
             s.index: s
-            for s in item.seasons()
-            if s.leafCount  # Skip empty seasons
+            for s in item.seasons() or []
+            if s is not None
+            and s.leafCount  # Skip empty seasons
             and (
                 self.full_scan  # We need to either be using `FULL_SCAN`
                 or s.viewedLeafCount  # OR the season has been viewed
@@ -44,13 +45,13 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
 
         # Pre-fetch all episodes of the show. Instead of fetching episodes for each season
         # individually, we can fetch all episodes at once and filter them later.
-        episodes_by_season = {}
+        episodes_by_season: dict[int, list[Episode]] = {}
         for season_index in seasons:
             episodes_by_season[season_index] = []
 
         for episode in item.episodes():
-            if episode.parentIndex in seasons:
-                episodes_by_season.setdefault(episode.parentIndex, []).append(episode)
+            if episode.parentIndex in seasons:  # type: ignore
+                episodes_by_season.setdefault(episode.parentIndex, []).append(episode)  # type: ignore
 
         all_possible_episodes = [e for eps in episodes_by_season.values() for e in eps]
         self.sync_stats.possible |= {str(e) for e in all_possible_episodes}
@@ -79,7 +80,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             except Exception:
                 log.error(
                     f"Failed to fetch AniList data for {self._debug_log_title(item, animapping)} "
-                    f"{self._debug_log_ids(item.ratingKey, item.guid, guids, animapping.anilist_id)}",
+                    f"{self._debug_log_ids(item.ratingKey, item.guid, guids, animapping.anilist_id)}",  # type: ignore
                     exc_info=True,
                 )
                 self.sync_stats.failed += 1
@@ -90,7 +91,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
 
             # It might be that the mapping has multiple seasons.
             # In that case, we need to find the 'primary' season to use for syncing.
-            episodes = []
+            episodes: list[Episode] = []
             season_episode_counts = Counter()
 
             for tvdb_mapping in animapping.parsed_tvdb_mappings:
@@ -166,8 +167,8 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             if not anilist_media:
                 log.debug(
                     f"No AniList entry could be found for "
-                    f"{self._debug_log_title(item, AniMap(anilist_id=None, tvdb_mappings={f's{index}': ''}))}"
-                    f"{self._debug_log_ids(item.ratingKey, season.guid, guids)}"
+                    f"{self._debug_log_title(item, AniMap(anilist_id=0, anidb_id=None, imdb_id=None, mal_id=None, tmdb_movie_id=None, tmdb_show_id=None, tvdb_id=None, tvdb_mappings={f's{index}': ''}))}"
+                    f"{self._debug_log_ids(item.ratingKey, season.guid, guids)}"  # type: ignore
                 )
                 self.sync_stats.not_found += 1
                 continue
@@ -175,9 +176,12 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             episodes = sorted(episodes_by_season.get(index, []), key=lambda e: e.index)
 
             animapping = AniMap(
+                anidb_id=None,
                 anilist_id=anilist_media.id,
-                imdb_id=guids.imdb,
-                tmdb_show_id=guids.tmdb,
+                imdb_id=[guids.imdb] if guids.imdb else None,
+                mal_id=None,
+                tmdb_movie_id=None,
+                tmdb_show_id=[guids.tmdb] if guids.tmdb else None,
                 tvdb_id=guids.tvdb,
                 tvdb_mappings={f"s{index}": ""},
             )
@@ -204,12 +208,19 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
 
         episodes = child_item.leafCount
         results = self.anilist_client.search_anime(
-            item.title, is_movie=False, episodes=episodes
+            item.title,
+            is_movie=False,
+            episodes=episodes,  # type: ignore
         )
         return self._best_search_result(item.title, results)
 
     def _calculate_status(
-        self, item: Show, grandchild_items: list[Episode], anilist_media: Media, **_
+        self,
+        item: Show,
+        grandchild_items: list[Episode],
+        anilist_media: Media,
+        *_,
+        **__,
     ) -> MediaListStatus | None:
         """Calculates the watch status for a media item.
 
@@ -249,6 +260,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         is_in_deck_window = any(
             e.lastViewedAt + self.plex_client.on_deck_window > datetime.now()
             for e in watched_episodes
+            if e.lastViewedAt
         )
 
         # We've watched some episodes recently but the last watched episode is from a different season
@@ -280,8 +292,9 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         child_item: Season,
         grandchild_items: list[Episode],
         animapping: AniMap,
-        **_,
-    ) -> int | None:
+        *_,
+        **__,
+    ) -> int | float | None:
         """Calculates the user rating for a media item.
 
         Args:
@@ -291,7 +304,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             animapping (AniMap): Matched AniMap entry
 
         Returns:
-            int | None: User rating for the media item
+            int | float | None: User rating for the media item
         """
         if all(e.userRating for e in grandchild_items):
             score = sum(e.userRating for e in grandchild_items) / len(grandchild_items)
@@ -307,7 +320,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         return self._normalize_score(score)
 
     def _calculate_progress(
-        self, grandchild_items: list[Episode], anilist_media: Media, **_
+        self, grandchild_items: list[Episode], anilist_media: Media, *_, **__
     ) -> int | None:
         """Calculates the progress for a media item.
 
@@ -321,7 +334,9 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         watched_episodes = len(self._filter_watched_episodes(grandchild_items))
         return min(watched_episodes, anilist_media.episodes or watched_episodes)
 
-    def _calculate_repeats(self, grandchild_items: list[Episode], **_) -> int | None:
+    def _calculate_repeats(
+        self, grandchild_items: list[Episode], *_, **__
+    ) -> int | None:
         """Calculates the number of repeats for a media item.
 
         Args:
@@ -334,10 +349,10 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             (e.viewCount for e in self._filter_watched_episodes(grandchild_items)),
             default=0,
         )
-        return least_views - 1 if least_views else None
+        return int(least_views - 1) if least_views else None
 
     def _calculate_started_at(
-        self, item: Show, grandchild_items: list[Episode], **_
+        self, item: Show, grandchild_items: list[Episode], *_, **__
     ) -> FuzzyDate | None:
         """Calculates the start date for a media item.
 
@@ -355,23 +370,19 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             (e.lastViewedAt for e in grandchild_items if e.lastViewedAt),
             default=None,
         )
-        last_viewed = (
-            FuzzyDate.from_date(
-                last_viewed_dt.replace(tzinfo=get_localzone()).astimezone(
-                    self.anilist_client.user_tz
-                )
+        last_viewed = FuzzyDate.from_date(
+            last_viewed_dt.replace(tzinfo=get_localzone()).astimezone(
+                self.anilist_client.user_tz
             )
             if last_viewed_dt
             else None
         )
 
-        history_viewed = (
-            FuzzyDate.from_date(
-                first_history.viewedAt.replace(tzinfo=get_localzone()).astimezone(
-                    self.anilist_client.user_tz
-                )
+        history_viewed = FuzzyDate.from_date(
+            first_history.viewedAt.replace(tzinfo=get_localzone()).astimezone(
+                self.anilist_client.user_tz
             )
-            if first_history
+            if first_history and first_history.viewedAt
             else None
         )
 
@@ -380,7 +391,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         return last_viewed or history_viewed
 
     def _calculate_completed_at(
-        self, item: Show, grandchild_items: list[Episode], **_
+        self, item: Show, grandchild_items: list[Episode], *_, **__
     ) -> FuzzyDate | None:
         """Calculates the completion date for a media item.
 
@@ -408,13 +419,11 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             else None
         )
 
-        history_viewed = (
-            FuzzyDate.from_date(
-                last_history.viewedAt.replace(tzinfo=get_localzone()).astimezone(
-                    self.anilist_client.user_tz
-                )
+        history_viewed = FuzzyDate.from_date(
+            last_history.viewedAt.replace(tzinfo=get_localzone()).astimezone(
+                self.anilist_client.user_tz
             )
-            if last_history
+            if last_history and last_history.viewedAt
             else None
         )
 
@@ -428,7 +437,8 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         child_item: Season,
         grandchild_items: list[Episode],
         anilist_media: Media,
-        **_,
+        *_,
+        **__,
     ) -> str | None:
         """Chooses the most relevant user notes for a media item.
 
@@ -527,14 +537,14 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
                 continue
 
             episode_history = EpisodeHistory(
-                server=self.plex_client.user_client._server,
+                server=self.plex_client.user_client._server,  # type: ignore
                 data=e._data,
                 initpath="/status/sessions/history/all",
             )
             episode_history.viewedAt = e.lastViewedAt
             filtered_history.append(episode_history)
 
-        return sorted(filtered_history, key=lambda h: h.viewedAt)
+        return list(sorted(filtered_history, key=lambda h: h.viewedAt or datetime.min))  # type: ignore
 
     @generic_lru_cache(maxsize=8)
     def _filter_watched_episodes(self, episodes: list[Episode]) -> list[Episode]:

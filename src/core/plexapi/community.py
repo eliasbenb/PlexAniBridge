@@ -133,7 +133,7 @@ class PlexCommunityClient:
     def _make_request(
         self,
         query: str,
-        variables: dict | str = None,
+        variables: dict | str | None = None,
         operation_name: str | None = None,
         retry_count: int = 0,
     ) -> dict:

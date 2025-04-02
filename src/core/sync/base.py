@@ -14,7 +14,7 @@ from src.settings import SyncField
 
 T = TypeVar("T", bound=Movie | Show)  # Section item
 S = TypeVar("S", bound=Movie | Season)  # Item child (season)
-E = TypeVar("E", bound=Movie | Episode)  # Item grandchild (episode)
+E = TypeVar("E", bound=list[Movie] | list[Episode])  # Item grandchild (episode)
 
 
 class ParsedGuids(BaseModel):
@@ -75,14 +75,6 @@ class ParsedGuids(BaseModel):
             for field in self.model_fields
             if getattr(self, field) is not None
         )
-
-    def __iter__(self) -> Iterator[tuple[str, int | str | None]]:
-        """Enables iteration over non-None GUIDs.
-
-        Returns:
-            Iterator[tuple[str, int | str | None]]: Iterator of (service, id) pairs
-        """
-        return iter(self.model_dump(exclude_none=True).items())
 
 
 class SyncStats(BaseModel):
@@ -167,7 +159,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         self.animap_client = animap_client
         self.plex_client = plex_client
 
-        self.excluded_sync_fields = excluded_sync_fields
+        self.excluded_sync_fields = [field.value for field in excluded_sync_fields]
         self.full_scan = full_scan
         self.destructive_sync = destructive_sync
         self.search_fallback_threshold = search_fallback_threshold
@@ -208,7 +200,9 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
 
         debug_log_title = self._debug_log_title(item=item)
         debug_log_ids = self._debug_log_ids(
-            key=item.ratingKey, plex_id=item.guid, guids=guids
+            key=item.ratingKey,  # type: ignore
+            plex_id=item.guid,
+            guids=guids,
         )
 
         log.debug(
@@ -221,7 +215,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         ):
             debug_log_title = self._debug_log_title(item=item, animapping=animapping)
             debug_log_ids = self._debug_log_ids(
-                key=child_item.ratingKey,
+                key=child_item.ratingKey,  # type: ignore
                 plex_id=child_item.guid,
                 guids=guids,
                 anilist_id=anilist_media.id,
@@ -250,7 +244,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
                 self.sync_stats.failed += 1
 
     @abstractmethod
-    def map_media(self, item: T) -> Iterator[tuple[S, list[E], AniMap, Media]]:
+    def map_media(self, item: T) -> Iterator[tuple[S, E, AniMap, Media]]:
         """Maps a Plex item to potential AniList matches.
 
         Must be implemented by subclasses to handle different
@@ -260,7 +254,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             item (T): Plex media item to map
 
         Returns:
-            Iterator[tuple[S, list[E], AniMap, Media]]: Mapping matches (child, grandchild, animapping, anilist_media)
+            Iterator[tuple[S, E, AniMap, Media]]: Mapping matches (child, grandchild, animapping, anilist_media)
         """
         pass
 
@@ -306,7 +300,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         self,
         item: T,
         child_item: S,
-        grandchild_items: list[E],
+        grandchild_items: E,
         anilist_media: Media,
         animapping: AniMap,
     ) -> None:
@@ -315,7 +309,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         Args:
             item (T): Grandparent Plex media item
             child_item (S): Target child item to sync
-            grandchild_items (list[E]): Grandchild items to extract data from
+            grandchild_items (E): Grandchild items to extract data from
             anilist_media (Media): Matched AniList entry
             animapping (AniMap): ID mapping information
         """
@@ -323,7 +317,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
 
         debug_log_title = self._debug_log_title(item=item, animapping=animapping)
         debug_log_ids = self._debug_log_ids(
-            key=child_item.ratingKey,
+            key=child_item.ratingKey,  # type: ignore
             plex_id=child_item.guid,
             guids=guids,
             anilist_id=anilist_media.id,
@@ -362,12 +356,13 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             )
             log.success(f"\t\tDELETE: {anilist_media_list}")
 
-            self.anilist_client.delete_anime_entry(
-                anilist_media.media_list_entry.id,
-                anilist_media.media_list_entry.media_id,
-            )
-            self.sync_stats.synced += 1
-            self.sync_stats.deleted += 1
+            if anilist_media.media_list_entry:
+                self.anilist_client.delete_anime_entry(
+                    anilist_media.media_list_entry.id,
+                    anilist_media.media_list_entry.media_id,
+                )
+                self.sync_stats.synced += 1
+                self.sync_stats.deleted += 1
             return
 
         if not final_media_list.status:
@@ -398,7 +393,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         self,
         item: T,
         child_item: S,
-        grandchild_items: list[E],
+        grandchild_items: E,
         anilist_media: Media,
         animapping: AniMap,
     ) -> MediaList:
@@ -407,7 +402,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         Args:
             item (T): Grandparent Plex media item
             child_item (S): Target child item to sync
-            grandchild_items (list[E]): Grandchild items to extract data from
+            grandchild_items (E): Grandchild items to extract data from
             anilist_media (Media): Matched AniList entry
             animapping (AniMap): ID mapping information
 
@@ -457,7 +452,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         self,
         item: T,
         child_item: S,
-        grandchild_items: list[E],
+        grandchild_items: E,
         anilist_media: Media,
         animapping: AniMap,
     ) -> MediaListStatus | None:
@@ -468,7 +463,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         Args:
             item (T): Grandparent Plex media item
             child_item (S): Target child item to sync
-            grandchild_items (list[E]): Grandchild items to extract data from
+            grandchild_items (E): Grandchild items to extract data from
             anilist_media (Media): Matched AniList entry
             animapping (AniMap): ID mapping information
 
@@ -482,10 +477,10 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         self,
         item: T,
         child_item: S,
-        grandchild_items: list[E],
+        grandchild_items: E,
         anilist_media: Media,
         animapping: AniMap,
-    ) -> int | None:
+    ) -> int | float | None:
         """Calculates the user rating for a media item.
 
         Must be implemented by subclasses to handle different media types.
@@ -493,12 +488,12 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         Args:
             item (T): Grandparent Plex media item
             child_item (S): Target child item to sync
-            grandchild_items (list[E]): Grandchild items to extract data from
+            grandchild_items (E): Grandchild items to extract data from
             anilist_media (Media): Matched AniList entry
             animapping (AniMap): ID mapping information
 
         Returns:
-            int | None: User rating for the media item
+            int | float | None: User rating for the media item
         """
         pass
 
@@ -507,7 +502,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         self,
         item: T,
         child_item: S,
-        grandchild_items: list[E],
+        grandchild_items: E,
         anilist_media: Media,
         animapping: AniMap,
     ) -> int | None:
@@ -518,7 +513,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         Args:
             item (T): Grandparent Plex media item
             child_item (S): Target child item to sync
-            grandchild_items (list[E]): Grandchild items to extract data from
+            grandchild_items (E): Grandchild items to extract data from
             anilist_media (Media): Matched AniList entry
             animapping (AniMap): ID mapping information
 
@@ -532,7 +527,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         self,
         item: T,
         child_item: S,
-        grandchild_items: list[E],
+        grandchild_items: E,
         anilist_media: Media,
         animapping: AniMap,
     ) -> int | None:
@@ -543,7 +538,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         Args:
             item (T): Grandparent Plex media item
             child_item (S): Target child item to sync
-            grandchild_items (list[E]): Grandchild items to extract data from
+            grandchild_items (E): Grandchild items to extract data from
             anilist_media (Media): Matched AniList entry
             animapping (AniMap): ID mapping information
 
@@ -557,7 +552,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         self,
         item: T,
         child_item: S,
-        grandchild_items: list[E],
+        grandchild_items: E,
         anilist_media: Media,
         animapping: AniMap,
     ) -> FuzzyDate | None:
@@ -568,7 +563,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         Args:
             item (T): Grandparent Plex media item
             child_item (S): Target child item to sync
-            grandchild_items (list[E]): Grandchild items to extract data from
+            grandchild_items (E): Grandchild items to extract data from
             anilist_media (Media): Matched AniList entry
             animapping (AniMap): ID mapping information
 
@@ -582,7 +577,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         self,
         item: T,
         child_item: S,
-        grandchild_items: list[E],
+        grandchild_items: E,
         anilist_media: Media,
         animapping: AniMap,
     ) -> FuzzyDate | None:
@@ -593,7 +588,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         Args:
             item (T): Grandparent Plex media item
             child_item (S): Target child item to sync
-            grandchild_items (list[E]): Grandchild items to extract data from
+            grandchild_items (E): Grandchild items to extract data from
             anilist_media (Media): Matched AniList entry
             animapping (AniMap): ID mapping information
 
@@ -607,7 +602,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         self,
         item: T,
         child_item: S,
-        grandchild_items: list[E],
+        grandchild_items: E,
         anilist_media: Media,
         animapping: AniMap,
     ) -> str | None:
@@ -618,7 +613,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         Args:
             item (T): Grandparent Plex media item
             child_item (S): Target child item to sync
-            grandchild_items (list[E]): Grandchild items to extract data from
+            grandchild_items (E): Grandchild items to extract data from
             anilist_media (Media): Matched AniList entry
             animapping (AniMap): ID mapping information
 
@@ -680,7 +675,11 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             return None
         score = round(score)
 
-        scale = self.anilist_client.user.media_list_options.score_format
+        scale = (
+            self.anilist_client.user.media_list_options.score_format
+            if self.anilist_client.user.media_list_options
+            else None
+        )
 
         match scale:
             case ScoreFormat.POINT_100:
