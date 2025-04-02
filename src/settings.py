@@ -5,6 +5,7 @@ from typing import Self
 
 from pydantic import Field, model_validator
 from pydantic.alias_generators import to_camel
+from pydantic.fields import _Unset
 from pydantic_settings import BaseSettings
 
 
@@ -92,29 +93,29 @@ class PlexAnibridgeConfig(BaseSettings):
     """
 
     # AniList
-    ANILIST_TOKEN: str | list[str]
+    ANILIST_TOKEN: str | list[str] = _Unset
 
     # Plex
-    PLEX_TOKEN: str
-    PLEX_USER: str | list[str]
+    PLEX_TOKEN: str = _Unset
+    PLEX_USER: str | list[str] = _Unset
     PLEX_URL: str = "http://localhost:32400"
     PLEX_SECTIONS: list[str] = []
     PLEX_GENRES: list[str] = []
     PLEX_METADATA_SOURCE: PlexMetadataSource = PlexMetadataSource.LOCAL
 
     # General
-    SYNC_INTERVAL: int = Field(3600, ge=-1)
+    SYNC_INTERVAL: int = Field(default=3600, ge=-1)
     POLLING_SCAN: bool = False
     FULL_SCAN: bool = False
     DESTRUCTIVE_SYNC: bool = False
 
-    EXCLUDED_SYNC_FIELDS: list[SyncField] = ["notes", "score"]
+    EXCLUDED_SYNC_FIELDS: list[SyncField] = [SyncField.NOTES, SyncField.SCORE]
 
     # Advanced
-    DATA_PATH: Path = "./data"
+    DATA_PATH: Path = Path("./data")
     DRY_RUN: bool = False
     LOG_LEVEL: LogLevel = LogLevel.INFO
-    SEARCH_FALLBACK_THRESHOLD: int = Field(-1, ge=-1, le=100)
+    SEARCH_FALLBACK_THRESHOLD: int = Field(default=-1, ge=-1, le=100)
 
     @model_validator(mode="before")
     def catch_extra_env_vars(cls, values) -> dict[str, str]:
@@ -124,7 +125,9 @@ class PlexAnibridgeConfig(BaseSettings):
         log_level = values.get("LOG_LEVEL", "INFO")
         log_dir = Path(values.get("DATA_PATH", "./data")) / "logs"
         log: Logger = get_logger(
-            log_name="PlexAniBridge", log_level=log_level, log_dir=log_dir.resolve()
+            log_name="PlexAniBridge",
+            log_level=log_level,
+            log_dir=str(log_dir.resolve()),
         )
 
         # `DEPRECATED` and `DEPRECATED_ALIAS` are used to warn users about

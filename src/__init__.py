@@ -53,7 +53,7 @@ config = PlexAnibridgeConfig()
 log: Logger = get_logger(
     log_name="PlexAniBridge",
     log_level=config.LOG_LEVEL,
-    log_dir=config.DATA_PATH / "logs",
+    log_dir=str(config.DATA_PATH / "logs"),
 )
 
 # The below environment variables are consumed by the python-plexapi library
