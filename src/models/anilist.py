@@ -167,7 +167,7 @@ class AniListBaseModel(BaseModel):
         return super().model_dump_json(by_alias=True, **kwargs)
 
     def unset_fields(self, fields: list[str]) -> None:
-        for field, field_info in self.model_fields.items():
+        for field, field_info in self.__class__.model_fields.items():
             if field in fields:
                 setattr(self, field, field_info.default)
 
@@ -263,7 +263,7 @@ class MediaTitle(AniListBaseModel):
         Returns:
             list[str]: All the available titles
         """
-        return [getattr(self, t) for t in self.model_fields if t]
+        return [getattr(self, t) for t in self.__class__.model_fields if t]
 
     def __str__(self) -> str:
         """Return the first available title or an empty string

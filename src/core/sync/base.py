@@ -72,7 +72,7 @@ class ParsedGuids(BaseModel):
         """
         return ", ".join(
             f"{field}: {getattr(self, field)}"
-            for field in self.model_fields
+            for field in self.__class__.model_fields
             if getattr(self, field) is not None
         )
 

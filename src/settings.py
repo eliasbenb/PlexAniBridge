@@ -222,7 +222,7 @@ class PlexAnibridgeConfig(BaseSettings):
         # unnecessary restarts of the application when they change.
         config_str = "".join(
             str(sort_value(getattr(self, key)))
-            for key in sorted(self.model_fields.keys())
+            for key in sorted(self.__class__.model_fields.keys())
             if key not in ("LOG_LEVEL", "DRY_RUN", "SYNC_INTERVAL")
         )
         return md5(config_str.encode()).hexdigest()
@@ -240,7 +240,7 @@ class PlexAnibridgeConfig(BaseSettings):
                 f"{key}: {getattr(self, key)}"
                 if key not in secrets
                 else f"{key}: **********"
-                for key in self.model_fields
+                for key in self.__class__.model_fields
             ]
         )
 
