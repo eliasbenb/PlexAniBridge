@@ -1,9 +1,14 @@
 from functools import cached_property
+from typing import Any
 
 from pydantic import field_validator
 from sqlmodel import JSON, Field, SQLModel
 
 from .mapping import TVDBMapping
+
+
+def TypedJson(*args, **kwargs) -> Any:
+    return JSON(*args, **kwargs)
 
 
 class AniMap(SQLModel, table=True):
@@ -13,13 +18,17 @@ class AniMap(SQLModel, table=True):
 
     anilist_id: int = Field(primary_key=True)
     anidb_id: int | None = Field(index=False)
-    imdb_id: list[str] | None = Field(sa_type=JSON(none_as_null=True), index=True)  # type: ignore
-    mal_id: list[int] | None = Field(sa_type=JSON(none_as_null=True), index=False)  # type: ignore
-    tmdb_movie_id: list[int] | None = Field(sa_type=JSON(none_as_null=True), index=True)  # type: ignore
-    tmdb_show_id: list[int] | None = Field(sa_type=JSON(none_as_null=True), index=True)  # type: ignore
+    imdb_id: list[str] | None = Field(sa_type=TypedJson(none_as_null=True), index=True)
+    mal_id: list[int] | None = Field(sa_type=TypedJson(none_as_null=True), index=False)
+    tmdb_movie_id: list[int] | None = Field(
+        sa_type=TypedJson(none_as_null=True), index=True
+    )
+    tmdb_show_id: list[int] | None = Field(
+        sa_type=TypedJson(none_as_null=True), index=True
+    )
     tvdb_id: int | None = Field(index=True)
     tvdb_mappings: dict[str, str] | None = Field(
-        sa_type=JSON(none_as_null=True),  # type: ignore
+        sa_type=TypedJson(none_as_null=True),
         index=False,
     )
 

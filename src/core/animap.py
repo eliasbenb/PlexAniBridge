@@ -4,19 +4,20 @@ from pathlib import Path
 from typing import Any
 
 from pydantic import ValidationError
-from sqlalchemy.orm.attributes import InstrumentedAttribute
-from sqlalchemy.sql.elements import BinaryExpression, UnaryExpression
-from sqlmodel import (
-    Session,
+from sqlalchemy import (
     and_,
     column,
     delete,
     exists,
     func,
+    not_,
     or_,
     select,
     true,
 )
+from sqlalchemy.orm.base import Mapped
+from sqlalchemy.sql.elements import BinaryExpression, UnaryExpression
+from sqlmodel import Session, col
 
 from src import log
 from src.core.mappings import MappingsClient
@@ -142,9 +143,9 @@ class AniMapClient:
             ]
 
             # Delete any entries in the database that are not in the new mappings
-            session.exec(
+            session.execute(
                 delete(AniMap).where(
-                    AniMap.anilist_id.not_in([d["anilist_id"] for d in values])  # type: ignore
+                    not_(col(AniMap.anilist_id).in_([d["anilist_id"] for d in values]))
                 )
             )
 
@@ -190,9 +191,7 @@ class AniMapClient:
         if not imdb and not tmdb and not tvdb:
             return []
 
-        def json_array_contains(
-            field: InstrumentedAttribute, value: Any
-        ) -> UnaryExpression:
+        def json_array_contains(field: Mapped, value: Any) -> UnaryExpression:
             """Generates a JSON_CONTAINS function for the given field.
 
             Args:
@@ -208,9 +207,7 @@ class AniMapClient:
                 .where(column("value") == value)
             )
 
-        def json_dict_contains(
-            field: InstrumentedAttribute, key: str
-        ) -> BinaryExpression:
+        def json_dict_contains(field: Mapped, key: str) -> BinaryExpression:
             """Generate a SQL expression for checking if a JSON field contains a key.
 
             Args:
@@ -218,7 +215,7 @@ class AniMapClient:
                 key (str): Value to search for
 
             Returns:
-                UnaryExpression: JSON_CONTAINS function
+                BinaryExpression: JSON_CONTAINS function
             """
             return func.json_type(field, f"$.{key}").is_not(None)
 
@@ -230,23 +227,23 @@ class AniMapClient:
 
             if is_movie:
                 if imdb:
-                    or_conditions.append(json_array_contains(AniMap.imdb_id, imdb))  # type: ignore
+                    or_conditions.append(json_array_contains(col(AniMap.imdb_id), imdb))
                 if tmdb:
                     or_conditions.append(
-                        json_array_contains(AniMap.tmdb_movie_id, tmdb)  # type: ignore
+                        json_array_contains(col(AniMap.tmdb_movie_id), tmdb)
                     )
             else:
                 if imdb:
-                    or_conditions.append(json_array_contains(AniMap.imdb_id, imdb))  # type: ignore
+                    or_conditions.append(json_array_contains(col(AniMap.imdb_id), imdb))
                 if tmdb:
                     or_conditions.append(
-                        json_array_contains(AniMap.tmdb_show_id, tmdb)  # type: ignore
+                        json_array_contains(col(AniMap.tmdb_show_id), tmdb)
                     )
                 if tvdb:
                     or_conditions.append(AniMap.tvdb_id == tvdb)
                 if season:
                     and_conditions.append(
-                        json_dict_contains(AniMap.tvdb_mappings, f"s{season}")  # type: ignore
+                        json_dict_contains(col(AniMap.tvdb_mappings), f"s{season}")
                     )
 
             final_conditions = true()
@@ -256,4 +253,4 @@ class AniMapClient:
                 final_conditions = and_(final_conditions, *and_conditions)
 
             query = select(AniMap).where(final_conditions)
-            return list(session.exec(query).all())
+            return list(session.execute(query).scalars().all())
