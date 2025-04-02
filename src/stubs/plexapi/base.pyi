@@ -5,12 +5,7 @@ from xml.etree.ElementTree import Element
 
 from _typeshed import Incomplete
 
-from plexapi import utils as utils
-from plexapi.exceptions import BadRequest as BadRequest
-from plexapi.exceptions import NotFound as NotFound
-from plexapi.exceptions import UnknownType as UnknownType
-from plexapi.exceptions import Unsupported as Unsupported
-from plexapi.server import PlexServer as PlexServer
+from plexapi.server import PlexServer
 
 PlexObjectT = TypeVar("PlexObjectT", bound="PlexObject")
 MediaContainerT = TypeVar("MediaContainerT", bound="MediaContainer")
@@ -126,5 +121,5 @@ class MediaContainer(list[PlexObjectT], PlexObject, Generic[PlexObjectT]):
     size: Incomplete
     offset: Incomplete
     def extend(
-        self, /, __iterable: Iterable[PlexObjectT] | MediaContainerT
+        self, /, __iterable: Iterable[PlexObjectT] | MediaContainer[PlexObjectT]
     ) -> None: ...

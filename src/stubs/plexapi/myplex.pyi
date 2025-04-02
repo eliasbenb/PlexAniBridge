@@ -1,17 +1,6 @@
 from _typeshed import Incomplete
 
-from plexapi import utils as utils
-from plexapi.base import PlexObject as PlexObject
-from plexapi.client import PlexClient as PlexClient
-from plexapi.exceptions import BadRequest as BadRequest
-from plexapi.exceptions import NotFound as NotFound
-from plexapi.exceptions import TwoFactorRequired as TwoFactorRequired
-from plexapi.exceptions import Unauthorized as Unauthorized
-from plexapi.library import LibrarySection as LibrarySection
-from plexapi.server import PlexServer as PlexServer
-from plexapi.sonos import PlexSonosClient as PlexSonosClient
-from plexapi.sync import SyncItem as SyncItem
-from plexapi.sync import SyncList as SyncList
+from plexapi.base import PlexObject
 
 class MyPlexAccount(PlexObject):
     FRIENDINVITE: str

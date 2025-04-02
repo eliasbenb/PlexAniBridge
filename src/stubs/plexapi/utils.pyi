@@ -2,9 +2,6 @@ import logging
 from collections.abc import Generator
 
 from _typeshed import Incomplete
-from plexapi.exceptions import BadRequest as BadRequest
-from plexapi.exceptions import NotFound as NotFound
-from plexapi.exceptions import Unauthorized as Unauthorized
 
 log: Incomplete
 SEARCHTYPES: Incomplete

@@ -1,9 +1,6 @@
 from _typeshed import Incomplete
 
-from plexapi import utils as utils
-from plexapi.base import PlexObject as PlexObject
-from plexapi.exceptions import BadRequest as BadRequest
-from plexapi.exceptions import NotFound as NotFound
+from plexapi.base import PlexObject
 
 class Settings(PlexObject):
     key: str

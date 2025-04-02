@@ -2,31 +2,28 @@ from functools import cached_property as cached_property
 
 from _typeshed import Incomplete
 
-from plexapi import utils as utils
-from plexapi.base import Playable as Playable
-from plexapi.base import PlexHistory as PlexHistory
-from plexapi.base import PlexPartialObject as PlexPartialObject
-from plexapi.base import PlexSession as PlexSession
-from plexapi.exceptions import BadRequest as BadRequest
-from plexapi.mixins import AdvancedSettingsMixin as AdvancedSettingsMixin
-from plexapi.mixins import ArtMixin as ArtMixin
-from plexapi.mixins import ArtUrlMixin as ArtUrlMixin
-from plexapi.mixins import EpisodeEditMixins as EpisodeEditMixins
-from plexapi.mixins import ExtrasMixin as ExtrasMixin
-from plexapi.mixins import HubsMixin as HubsMixin
-from plexapi.mixins import LogoMixin as LogoMixin
-from plexapi.mixins import MovieEditMixins as MovieEditMixins
-from plexapi.mixins import PlayedUnplayedMixin as PlayedUnplayedMixin
-from plexapi.mixins import PosterMixin as PosterMixin
-from plexapi.mixins import PosterUrlMixin as PosterUrlMixin
-from plexapi.mixins import RatingMixin as RatingMixin
-from plexapi.mixins import SeasonEditMixins as SeasonEditMixins
-from plexapi.mixins import ShowEditMixins as ShowEditMixins
-from plexapi.mixins import SplitMergeMixin as SplitMergeMixin
-from plexapi.mixins import ThemeMixin as ThemeMixin
-from plexapi.mixins import ThemeUrlMixin as ThemeUrlMixin
-from plexapi.mixins import UnmatchMatchMixin as UnmatchMatchMixin
-from plexapi.mixins import WatchlistMixin as WatchlistMixin
+from plexapi.base import Playable, PlexHistory, PlexPartialObject, PlexSession
+from plexapi.mixins import (
+    AdvancedSettingsMixin,
+    ArtMixin,
+    ArtUrlMixin,
+    EpisodeEditMixins,
+    ExtrasMixin,
+    HubsMixin,
+    LogoMixin,
+    MovieEditMixins,
+    PlayedUnplayedMixin,
+    PosterMixin,
+    PosterUrlMixin,
+    RatingMixin,
+    SeasonEditMixins,
+    ShowEditMixins,
+    SplitMergeMixin,
+    ThemeMixin,
+    ThemeUrlMixin,
+    UnmatchMatchMixin,
+    WatchlistMixin,
+)
 
 class Video(PlexPartialObject, PlayedUnplayedMixin):
     ratingKey: int
