@@ -104,7 +104,7 @@ class PlexClient:
         else:
             self.online_client = None
 
-    def _init_user_client(self) -> PlexServer:
+    def _init_user_client(self) -> None:
         """Initializes the Plex client for the specified user account.
 
         Handles authentication and client setup for different user types:
@@ -206,14 +206,14 @@ class PlexClient:
         """
         return timedelta(weeks=self.admin_client.settings.get("onDeckWindow").value)
 
-    def _guid_to_key(self, guid: str) -> int:
+    def _guid_to_key(self, guid: str) -> str:
         """Converts a Plex GUID to a Plex rating key.
 
         Args:
             guid (str): Plex GUID to convert
 
         Returns:
-            int: Plex rating key
+            str: GUID rating key
         """
         return guid.rsplit("/", 1)[-1]
 
@@ -228,6 +228,11 @@ class PlexClient:
                 Returns empty list if no sections match the configuration.
         """
         log.debug(f"{self.__class__.__name__}: Getting all sections")
+
+        if not self.user_client:
+            raise ValueError(
+                f"{self.__class__.__name__}: User client is not initialized."
+            )
 
         sections = {
             section.title: section for section in self.user_client.library.sections()
@@ -351,18 +356,18 @@ class PlexClient:
     @lru_cache(maxsize=32)
     def get_continue_watching_hub(
         self, section: MovieSection | ShowSection
-    ) -> list[Movie | Episode]:
+    ) -> list[Episode] | list[Movie]:
         """Retrieves all items in the Continue Watching hub.
 
         Args:
             section (MovieSection | ShowSection): The library section to query
 
         Returns:
-            list[Movie | Episode]
+            list[Episode] | list[Movie]: The continue watching items
         """
-        return section.continueWatching()
+        return section.continueWatching()  # type: ignore
 
-    def get_continue_watching(self, item: Movie | Show) -> Movie | Episode:
+    def get_continue_watching(self, item: Movie | Show) -> Movie | Episode | None:
         """Retrieves all items in the Continue Watching hub.
 
         Args:
@@ -415,15 +420,17 @@ class PlexClient:
                 "accountID": self.user_account_id,
                 "sort": "viewedAt:asc",
             }
-            return self.admin_client.fetchItems(
-                f"/status/sessions/history/all{plexapi.utils.joinArgs(args)}"
+            return list(
+                self.admin_client.fetchItems(
+                    f"/status/sessions/history/all{plexapi.utils.joinArgs(args)}"  # type: ignore
+                )
             )
 
         try:
             data = self.community_client.get_watch_activity(
                 self._guid_to_key(item.guid)
             )
-            history: list[EpisodeHistory] = []
+            history: list[EpisodeHistory | MovieHistory] = []
             for entry in data:
                 metadata = entry["metadataItem"]
                 user = entry["userV2"]
@@ -447,15 +454,19 @@ class PlexClient:
 
                     history_data = ElementTree.Element("History", attrib=attrib)
                     h = EpisodeHistory(
-                        server=self.online_client._server, data=history_data
+                        server=self.online_client._server,  # type: ignore
+                        data=history_data,
                     )
                     h.parentRatingKey = metadata["parent"]["id"]
                     h.grandparentRatingKey = metadata["grandparent"]["id"]
                 elif metadata["type"] == "MOVIE":
                     history_data = ElementTree.Element("History", attrib=attrib)
                     h = MovieHistory(
-                        server=self.online_client._server, data=history_data
+                        server=self.online_client._server,  # type: ignore
+                        data=history_data,
                     )
+                else:
+                    continue
 
                 h.ratingKey = metadata["id"]
                 h.viewedAt = (
@@ -465,7 +476,7 @@ class PlexClient:
                 )
                 history.append(h)
 
-            return sorted(history, key=lambda x: x.viewedAt)
+            return sorted(history, key=lambda x: x.viewedAt or datetime.min)
         except requests.exceptions.HTTPError:
             log.error(
                 f"Failed to get watch hsitory for {item.type} $$'{item.title}'$$ "
@@ -491,11 +502,11 @@ class PlexClient:
         """
         return bool(item.onWatchlist()) if self.is_admin_user else False
 
-    def is_on_continue_watching(self, item: Media) -> bool:
+    def is_on_continue_watching(self, item: Movie | Show) -> bool:
         """Checks if a media item appears in the Continue Watching hub.
 
         Args:
-            item (Movie | Show | Season): Media item to check
+            item (Movie | Show): Media item to check
             **kwargs: Additional arguments to pass to get_continue_watching()
 
         Returns:
