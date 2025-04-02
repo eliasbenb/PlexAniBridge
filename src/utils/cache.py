@@ -32,7 +32,7 @@ def generic_lru_cache(maxsize: int | None = 128):
     return decorator
 
 
-def generic_ttl_cache(maxsize: int | None = 128, ttl: int | None = 600):
+def generic_ttl_cache(maxsize: int | None = 128, ttl: int = 600):
     """Function decorator to cache function results using a TTL cache.
 
     Unlike functools.lru_cache, this decorator can be used with any object,
