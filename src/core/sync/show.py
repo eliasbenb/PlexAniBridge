@@ -143,8 +143,6 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             primary_season_idx = season_episode_counts.most_common(1)[0][0]
             primary_season = relevant_seasons[primary_season_idx]
 
-            episodes.sort(key=lambda e: (e.parentIndex, e.index))
-
             yield primary_season, episodes, animapping, anilist_media
 
         # We're done with the mapped seasons. Now we need to process the remaining seasons.
@@ -173,7 +171,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
                 self.sync_stats.not_found += 1
                 continue
 
-            episodes = sorted(episodes_by_season.get(index, []), key=lambda e: e.index)
+            episodes = episodes_by_season.get(index, [])
 
             animapping = AniMap(
                 anidb_id=None,
@@ -364,7 +362,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             FuzzyDate | None: Start date for the media item
         """
         history = self._filter_history_by_episodes(item, grandchild_items)
-        first_history = next(iter(history), None)
+        first_history = min(history, key=lambda h: h.viewedAt) if history else None  # type: ignore
 
         last_viewed_dt = min(
             (e.lastViewedAt for e in grandchild_items if e.lastViewedAt),
@@ -403,7 +401,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             FuzzyDate | None: Completion date for the media item
         """
         history = self._filter_history_by_episodes(item, grandchild_items)
-        last_history = next(reversed(history), None)
+        last_history = max(history, key=lambda h: h.viewedAt) if history else None  # type: ignore
 
         last_viewed_at = max(
             (e.lastViewedAt for e in grandchild_items if e.lastViewedAt),
@@ -528,7 +526,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             list[EpisodeHistory]: Filtered history entries
         """
         grandchild_rating_keys = {e.ratingKey for e in grandchild_items}
-        history = self.plex_client.get_history(item)  # Assumed to be sorted
+        history = self.plex_client.get_history(item)
 
         filtered_history = [h for h in history if h.ratingKey in grandchild_rating_keys]
 
@@ -544,7 +542,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             episode_history.viewedAt = e.lastViewedAt
             filtered_history.append(episode_history)
 
-        return list(sorted(filtered_history, key=lambda h: h.viewedAt or datetime.min))  # type: ignore
+        return filtered_history  # type: ignore
 
     @generic_lru_cache(maxsize=8)
     def _filter_watched_episodes(self, episodes: list[Episode]) -> list[Episode]:

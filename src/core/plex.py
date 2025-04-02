@@ -410,16 +410,9 @@ class PlexClient:
 
         Returns:
             list[History]: Watch history entries for the item
-
-        Note:
-            Results are cached using functools.cache decorator
         """
         if not self.is_online_user:
-            args = {
-                "metadataItemID": item.ratingKey,
-                "accountID": self.user_account_id,
-                "sort": "viewedAt:asc",
-            }
+            args = {"metadataItemID": item.ratingKey, "accountID": self.user_account_id}
             return list(
                 self.admin_client.fetchItems(
                     f"/status/sessions/history/all{plexapi.utils.joinArgs(args)}"  # type: ignore
@@ -476,7 +469,7 @@ class PlexClient:
                 )
                 history.append(h)
 
-            return sorted(history, key=lambda x: x.viewedAt or datetime.min)
+            return history
         except requests.exceptions.HTTPError:
             log.error(
                 f"Failed to get watch hsitory for {item.type} $$'{item.title}'$$ "
