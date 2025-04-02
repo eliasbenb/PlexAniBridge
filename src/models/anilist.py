@@ -90,6 +90,7 @@ class MediaSort(AniListBaseEnum):
     FAVOURITES_DESC = "FAVOURITES_DESC"
 
 
+@total_ordering
 class MediaListStatus(AniListBaseEnum):
     _ignore_ = ["__priority"]
 
@@ -109,41 +110,18 @@ class MediaListStatus(AniListBaseEnum):
         "REPEATING": 3,
     }
 
-    def __eq__(self, other: MediaListStatus) -> bool:
-        if self.__class__ is not other.__class__:
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, MediaListStatus):
             return NotImplemented
         return self.value == other.value
 
-    def __ne__(self, other: MediaListStatus) -> bool:
-        if self.__class__ is not other.__class__:
-            return NotImplemented
-        return self.value != other.value
-
-    def __lt__(self, other: MediaListStatus) -> bool:
-        if self.__class__ is not other.__class__:
+    def __lt__(self, other: object) -> bool:
+        if not isinstance(other, MediaListStatus):
             return NotImplemented
         return (
             self.value != other.value
-            and self.__priority[self.value] <= self.__priority[other.value]
+            and self.__priority[self.value] < self.__priority[other.value]
         )
-
-    def __le__(self, other: MediaListStatus) -> bool:
-        if self.__class__ is not other.__class__:
-            return NotImplemented
-        return self.__priority[self.value] <= self.__priority[other.value]
-
-    def __gt__(self, other: MediaListStatus) -> bool:
-        if self.__class__ is not other.__class__:
-            return NotImplemented
-        return (
-            self.value != other.value
-            and self.__priority[self.value] >= self.__priority[other.value]
-        )
-
-    def __ge__(self, other: MediaListStatus) -> bool:
-        if self.__class__ is not other.__class__:
-            return NotImplemented
-        return self.__priority[self.value] >= self.__priority[other.value]
 
 
 class ScoreFormat(AniListBaseEnum):
