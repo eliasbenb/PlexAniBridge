@@ -379,21 +379,21 @@ class PlexClient:
         if self.is_online_user:
             return None
 
-        if item.type == "movie":
-            return next(
-                (
-                    e
-                    for e in self.get_continue_watching_hub(item.section())
-                    if item.ratingKey == e.ratingKey
-                ),
-                None,
-            )
-        elif item.type == "show":
+        if item.type == "show":
             return next(
                 (
                     e
                     for e in self.get_continue_watching_hub(item.section())
                     if item.ratingKey == e.grandparentRatingKey
+                ),
+                None,
+            )
+        else:
+            return next(
+                (
+                    e
+                    for e in self.get_continue_watching_hub(item.section())
+                    if item.ratingKey == e.ratingKey
                 ),
                 None,
             )
