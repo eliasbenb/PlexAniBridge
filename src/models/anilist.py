@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta, timezone
 from enum import StrEnum
 from functools import total_ordering
-from typing import Annotated, Any, ClassVar, Self, get_args, get_origin
+from typing import Annotated, Any, ClassVar, Generic, TypeVar, get_args, get_origin
 
 from pydantic import AfterValidator, AliasGenerator, BaseModel, ConfigDict
 from pydantic.alias_generators import to_camel
@@ -281,18 +281,20 @@ class FuzzyDate(AniListBaseModel):
     day: int | None = None
 
     @staticmethod
-    def from_date(d: date | datetime) -> Self:
+    def from_date(d: date | datetime | None) -> FuzzyDate | None:
         """Create a FuzzyDate from a date or datetime object
 
         Args:
-            d (date | datetime): A date or datetime object
+            d (date | datetime | None): A date or datetime object
 
         Returns:
             FuzzyDate: An equivalent FuzzyDate object
         """
+        if d is None:
+            return None
         return FuzzyDate(year=d.year, month=d.month, day=d.day)
 
-    def to_datetime(self, *args, **kwargs) -> datetime | None:
+    def to_datetime(self) -> datetime | None:
         """Convert the FuzzyDate to a datetime object
 
         Returns:
@@ -300,13 +302,7 @@ class FuzzyDate(AniListBaseModel):
         """
         if not self.year:
             return None
-        return datetime(
-            year=self.year,
-            month=self.month or 1,
-            day=self.day or 1,
-            *args,
-            **kwargs,
-        )
+        return datetime(year=self.year, month=self.month or 1, day=self.day or 1)
 
     def __eq__(self, other: Any) -> bool:
         if not isinstance(other, FuzzyDate):
@@ -392,17 +388,21 @@ class MediaList(AniListBaseModel):
         )
 
 
-class MediaListGroup(AniListBaseModel):
-    entries: list[MediaList] = []
+EntryType = TypeVar("EntryType", bound=MediaList)
+GroupType = TypeVar("GroupType", bound="MediaListGroup")
+
+
+class MediaListGroup(AniListBaseModel, Generic[EntryType]):
+    entries: list[EntryType] = []
     name: str | None = None
     is_custom_list: bool | None = None
     is_split_completed_list: bool | None = None
     status: MediaListStatus | None = None
 
 
-class MediaListCollection(AniListBaseModel):
+class MediaListCollection(AniListBaseModel, Generic[GroupType]):
     user: User | None = None
-    lists: list[MediaListGroup] = []
+    lists: list[GroupType] = []
     has_next_chunk: bool | None = None
 
 
@@ -440,12 +440,12 @@ class MediaListWithMedia(MediaList):
     media: MediaWithoutList | None = None
 
 
-class MediaListGroupWithMedia(MediaListGroup):
-    entries: list[MediaListWithMedia] = []
+class MediaListGroupWithMedia(MediaListGroup[MediaListWithMedia]):
+    pass
 
 
-class MediaListCollectionWithMedia(MediaListCollection):
-    lists: list[MediaListGroupWithMedia] = []
+class MediaListCollectionWithMedia(MediaListCollection[MediaListGroupWithMedia]):
+    pass
 
 
 class MediaConnection(AniListBaseModel):
