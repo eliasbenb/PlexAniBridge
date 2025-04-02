@@ -506,7 +506,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         """
         return f"$${{key: {key}, plex_id: {plex_id}, {guids}{f', anilist_id: {anilist_id}' if anilist_id else ''}}}$$"
 
-    @generic_lru_cache(maxsize=4)
+    @generic_lru_cache(maxsize=1)
     def _filter_history_by_episodes(
         self, item: Show, grandchild_items: list[Episode]
     ) -> list[EpisodeHistory]:
@@ -553,7 +553,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
 
         return list(filtered_history.values())
 
-    @generic_lru_cache(maxsize=8)
+    @generic_lru_cache(maxsize=1)
     def _filter_watched_episodes(self, episodes: list[Episode]) -> list[Episode]:
         """Filters watched episodes based on AniList entry.
 
