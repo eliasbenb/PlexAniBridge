@@ -46,3 +46,8 @@ include = ["./main.py", "./src"]
 
 [tool.uv.workspace]
 members = ["docs"]
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.398",
+]
