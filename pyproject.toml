@@ -53,7 +53,7 @@ members = ["docs"]
 
 [dependency-groups]
 dev = [
-    "mypy>=1.15.0",
+    "mypy[mypyc]>=1.15.0",
     "pyright>=1.1.398",
     "types-requests>=2.32.0.20250328",
 ]
