@@ -45,10 +45,15 @@ Issues = "https://github.com/eliasbenb/PlexAniBridge/issues"
 include = ["."]
 extraPaths = ["./src/stubs"]
 
+[tool.mypy]
+mypy_path = ["./src/stubs"]
+
 [tool.uv.workspace]
 members = ["docs"]
 
 [dependency-groups]
 dev = [
+    "mypy>=1.15.0",
     "pyright>=1.1.398",
+    "types-requests>=2.32.0.20250328",
 ]
