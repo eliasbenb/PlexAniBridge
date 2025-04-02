@@ -50,8 +50,8 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             episodes_by_season[season_index] = []
 
         for episode in item.episodes():
-            if episode.parentIndex in seasons:  # type: ignore
-                episodes_by_season.setdefault(episode.parentIndex, []).append(episode)  # type: ignore
+            if episode.parentIndex in seasons:
+                episodes_by_season.setdefault(episode.parentIndex, []).append(episode)
 
         all_possible_episodes = [e for eps in episodes_by_season.values() for e in eps]
         self.sync_stats.possible |= {str(e) for e in all_possible_episodes}
@@ -80,7 +80,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             except Exception:
                 log.error(
                     f"Failed to fetch AniList data for {self._debug_log_title(item, animapping)} "
-                    f"{self._debug_log_ids(item.ratingKey, item.guid, guids, animapping.anilist_id)}",  # type: ignore
+                    f"{self._debug_log_ids(item.ratingKey, item.guid, guids, animapping.anilist_id)}",
                     exc_info=True,
                 )
                 self.sync_stats.failed += 1
@@ -143,8 +143,6 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             primary_season_idx = season_episode_counts.most_common(1)[0][0]
             primary_season = relevant_seasons[primary_season_idx]
 
-            episodes.sort(key=lambda e: (e.parentIndex, e.index))
-
             yield primary_season, episodes, animapping, anilist_media
 
         # We're done with the mapped seasons. Now we need to process the remaining seasons.
@@ -168,12 +166,12 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
                 log.debug(
                     f"No AniList entry could be found for "
                     f"{self._debug_log_title(item, AniMap(anilist_id=0, anidb_id=None, imdb_id=None, mal_id=None, tmdb_movie_id=None, tmdb_show_id=None, tvdb_id=None, tvdb_mappings={f's{index}': ''}))}"
-                    f"{self._debug_log_ids(item.ratingKey, season.guid, guids)}"  # type: ignore
+                    f"{self._debug_log_ids(item.ratingKey, season.guid, guids)}"
                 )
                 self.sync_stats.not_found += 1
                 continue
 
-            episodes = sorted(episodes_by_season.get(index, []), key=lambda e: e.index)
+            episodes = episodes_by_season.get(index, [])
 
             animapping = AniMap(
                 anidb_id=None,
@@ -210,7 +208,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         results = self.anilist_client.search_anime(
             item.title,
             is_movie=False,
-            episodes=episodes,  # type: ignore
+            episodes=episodes,
         )
         return self._best_search_result(item.title, results)
 
@@ -364,7 +362,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             FuzzyDate | None: Start date for the media item
         """
         history = self._filter_history_by_episodes(item, grandchild_items)
-        first_history = next(iter(history), None)
+        first_history = min(history, key=lambda h: h.viewedAt) if history else None
 
         last_viewed_dt = min(
             (e.lastViewedAt for e in grandchild_items if e.lastViewedAt),
@@ -403,7 +401,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             FuzzyDate | None: Completion date for the media item
         """
         history = self._filter_history_by_episodes(item, grandchild_items)
-        last_history = next(reversed(history), None)
+        last_history = max(history, key=lambda h: h.viewedAt) if history else None
 
         last_viewed_at = max(
             (e.lastViewedAt for e in grandchild_items if e.lastViewedAt),
@@ -488,8 +486,8 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
 
     def _debug_log_ids(
         self,
-        key: int,
-        plex_id: str,
+        key: int | str,
+        plex_id: str | None,
         guids: ParsedGuids,
         anilist_id: int | None = None,
     ) -> str:
@@ -508,7 +506,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         """
         return f"$${{key: {key}, plex_id: {plex_id}, {guids}{f', anilist_id: {anilist_id}' if anilist_id else ''}}}$$"
 
-    @generic_lru_cache(maxsize=4)
+    @generic_lru_cache(maxsize=1)
     def _filter_history_by_episodes(
         self, item: Show, grandchild_items: list[Episode]
     ) -> list[EpisodeHistory]:
@@ -528,25 +526,34 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             list[EpisodeHistory]: Filtered history entries
         """
         grandchild_rating_keys = {e.ratingKey for e in grandchild_items}
-        history = self.plex_client.get_history(item)  # Assumed to be sorted
+        episode_map = {e.ratingKey: e for e in grandchild_items}
+        history = self.plex_client.get_history(item)
 
-        filtered_history = [h for h in history if h.ratingKey in grandchild_rating_keys]
+        filtered_history = {}
+        for h in history:
+            if h.ratingKey in grandchild_rating_keys:
+                if (
+                    h.ratingKey not in filtered_history
+                    or h.viewedAt < filtered_history[h.ratingKey].viewedAt
+                ):
+                    filtered_history[h.ratingKey] = h
 
-        for e in grandchild_items:
-            if e.ratingKey not in grandchild_rating_keys or not e.lastViewedAt:
-                continue
+        for rating_key, episode in episode_map.items():
+            if episode.lastViewedAt and (
+                rating_key not in filtered_history
+                or filtered_history[rating_key].viewedAt > episode.lastViewedAt
+            ):
+                episode_history = EpisodeHistory(
+                    server=self.plex_client.user_client._server,
+                    data=episode._data,
+                    initpath="/status/sessions/history/all",
+                )
+                episode_history.viewedAt = episode.lastViewedAt
+                filtered_history[rating_key] = episode_history
 
-            episode_history = EpisodeHistory(
-                server=self.plex_client.user_client._server,  # type: ignore
-                data=e._data,
-                initpath="/status/sessions/history/all",
-            )
-            episode_history.viewedAt = e.lastViewedAt
-            filtered_history.append(episode_history)
+        return list(filtered_history.values())
 
-        return list(sorted(filtered_history, key=lambda h: h.viewedAt or datetime.min))  # type: ignore
-
-    @generic_lru_cache(maxsize=8)
+    @generic_lru_cache(maxsize=1)
     def _filter_watched_episodes(self, episodes: list[Episode]) -> list[Episode]:
         """Filters watched episodes based on AniList entry.
 

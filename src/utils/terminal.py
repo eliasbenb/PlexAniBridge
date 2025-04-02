@@ -27,6 +27,9 @@ def supports_color() -> bool:
     """
 
     def vt_codes_enabled_in_windows_registry():
+        if sys.platform != "win32":
+            return False
+
         try:
             import winreg
         except ImportError:

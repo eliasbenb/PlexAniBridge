@@ -239,8 +239,12 @@ class BridgeClient:
         plex_sections = plex_client.get_sections()
 
         sync_stats = SyncStats()
+
+        start_time = datetime.now(timezone.utc)
         for section in plex_sections:
             sync_stats += self._sync_section(plex_client, section, poll)
+        end_time = datetime.now(timezone.utc)
+        duration = end_time - start_time
 
         log.info(
             f"{self.__class__.__name__}: Syncing Plex user $$'{plex_user}'$$ to AniList user "
@@ -258,7 +262,8 @@ class BridgeClient:
         log.info(
             f"{self.__class__.__name__}: {sync_stats.synced} items synced, {sync_stats.deleted} items deleted, "
             f"{sync_stats.skipped} items skipped, {sync_stats.not_found} items not found, "
-            f"and {sync_stats.failed} items failed with a coverage of {sync_stats.coverage:.2%}"
+            f"and {sync_stats.failed} items failed with a coverage of {sync_stats.coverage:.2%} in "
+            f"{duration.total_seconds():.2f} seconds"
         )
 
     def _sync_section(

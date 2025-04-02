@@ -99,7 +99,10 @@ class AniListRestoreClient:
         )
 
     def _make_request(
-        self, query: str, variables: dict[str, Any] | None = None, retry_count: int = 0
+        self,
+        query: str,
+        variables: dict[str, Any] | str | None = None,
+        retry_count: int = 0,
     ) -> dict[str, Any]:
         if retry_count >= 3:
             raise requests.exceptions.HTTPError("Failed to make request after 3 tries")

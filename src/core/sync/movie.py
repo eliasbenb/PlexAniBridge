@@ -52,7 +52,7 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
         except Exception:
             log.error(
                 f"Failed to fetch AniList data for {self._debug_log_title(item)}: "
-                f"{self._debug_log_ids(item.ratingKey, item.guid, guids, animapping.anilist_id)}",  # type: ignore
+                f"{self._debug_log_ids(item.ratingKey, item.guid, guids, animapping.anilist_id)}",
                 exc_info=True,
             )
             self.sync_stats.failed += 1
@@ -61,7 +61,7 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
         if not anilist_media:
             log.debug(
                 f"No AniList entry could be found for {self._debug_log_title(item)} "
-                f"{self._debug_log_ids(item.ratingKey, item.guid, guids)}"  # type: ignore
+                f"{self._debug_log_ids(item.ratingKey, item.guid, guids)}"
             )
             self.sync_stats.not_found += 1
             return
@@ -156,7 +156,7 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
         Returns:
             int | None: Number of repeats for the media item
         """
-        return item.viewCount - 1 if item.viewCount else None  # type: ignore
+        return item.viewCount - 1 if item.viewCount else None
 
     def _calculate_started_at(self, item: Movie, *_, **__) -> FuzzyDate | None:
         """Calculates the start date for a media item.
@@ -168,7 +168,7 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
             FuzzyDate | None: Start date for the media item
         """
         history = self.plex_client.get_history(item)
-        first_history = next(iter(history), None)
+        first_history = min(history, key=lambda h: h.viewedAt) if history else None
 
         last_viewed = FuzzyDate.from_date(
             item.lastViewedAt.replace(tzinfo=get_localzone()).astimezone(
@@ -226,8 +226,8 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
 
     def _debug_log_ids(
         self,
-        key: int,
-        plex_id: str,
+        key: int | str,
+        plex_id: str | None,
         guids: ParsedGuids,
         anilist_id: int | None = None,
     ) -> str:

@@ -65,19 +65,19 @@ class MappingsClient:
         parsed = urlparse(src)
         return bool(parsed.scheme) and bool(parsed.netloc)
 
-    def _json_str_keys(self, d: dict[str, Any]) -> dict[str, Any]:
+    def _dict_str_keys(self, d: dict | list) -> Any:
         """Ensure all keys in a dictionary are strings.
 
         Args:
-            d (dict[str, Any]): Dictionary to convert
+            d (dict | list): Dictionary or list to convert
 
         Returns:
-            dict[str, Any]: Dictionary with all keys as strings
+            dict | list: Dictionary with all keys as strings or a list
         """
         if isinstance(d, dict):
-            return {str(k): self._json_str_keys(v) for k, v in d.items()}
+            return {str(k): self._dict_str_keys(v) for k, v in d.items()}
         elif isinstance(d, list):
-            return [self._json_str_keys(i) for i in d]
+            return [self._dict_str_keys(i) for i in d]
         else:
             return d
 
@@ -163,7 +163,7 @@ class MappingsClient:
                         mappings = json.load(f)
                 case ".yaml" | ".yml":
                     with file_path.open() as f:
-                        mappings = self._json_str_keys(yaml.safe_load(f))
+                        mappings = self._dict_str_keys(yaml.safe_load(f))
                 case ".toml":
                     with file_path.open() as f:
                         mappings = tomlkit.load(f)
