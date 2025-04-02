@@ -166,16 +166,6 @@ class AniListBaseModel(BaseModel):
         """
         return super().model_dump_json(by_alias=True, **kwargs)
 
-    def clear(self) -> None:
-        """Clear all the fields of the model"""
-        for field, field_info in self.model_fields.items():
-            if field_info.default_factory:
-                default_value = field_info.default_factory()
-            else:
-                default_value = field_info.default
-            setattr(self, field, default_value)
-        self.model_fields_set.clear()
-
     def unset_fields(self, fields: list[str]) -> None:
         for field, field_info in self.model_fields.items():
             if field in fields:
