@@ -50,8 +50,8 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             episodes_by_season[season_index] = []
 
         for episode in item.episodes():
-            if episode.parentIndex in seasons:  # type: ignore
-                episodes_by_season.setdefault(episode.parentIndex, []).append(episode)  # type: ignore
+            if episode.parentIndex in seasons:
+                episodes_by_season.setdefault(episode.parentIndex, []).append(episode)
 
         all_possible_episodes = [e for eps in episodes_by_season.values() for e in eps]
         self.sync_stats.possible |= {str(e) for e in all_possible_episodes}
@@ -80,7 +80,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             except Exception:
                 log.error(
                     f"Failed to fetch AniList data for {self._debug_log_title(item, animapping)} "
-                    f"{self._debug_log_ids(item.ratingKey, item.guid, guids, animapping.anilist_id)}",  # type: ignore
+                    f"{self._debug_log_ids(item.ratingKey, item.guid, guids, animapping.anilist_id)}",
                     exc_info=True,
                 )
                 self.sync_stats.failed += 1
@@ -166,7 +166,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
                 log.debug(
                     f"No AniList entry could be found for "
                     f"{self._debug_log_title(item, AniMap(anilist_id=0, anidb_id=None, imdb_id=None, mal_id=None, tmdb_movie_id=None, tmdb_show_id=None, tvdb_id=None, tvdb_mappings={f's{index}': ''}))}"
-                    f"{self._debug_log_ids(item.ratingKey, season.guid, guids)}"  # type: ignore
+                    f"{self._debug_log_ids(item.ratingKey, season.guid, guids)}"
                 )
                 self.sync_stats.not_found += 1
                 continue
@@ -208,7 +208,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         results = self.anilist_client.search_anime(
             item.title,
             is_movie=False,
-            episodes=episodes,  # type: ignore
+            episodes=episodes,
         )
         return self._best_search_result(item.title, results)
 
@@ -362,7 +362,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             FuzzyDate | None: Start date for the media item
         """
         history = self._filter_history_by_episodes(item, grandchild_items)
-        first_history = min(history, key=lambda h: h.viewedAt) if history else None  # type: ignore
+        first_history = min(history, key=lambda h: h.viewedAt) if history else None
 
         last_viewed_dt = min(
             (e.lastViewedAt for e in grandchild_items if e.lastViewedAt),
@@ -401,7 +401,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             FuzzyDate | None: Completion date for the media item
         """
         history = self._filter_history_by_episodes(item, grandchild_items)
-        last_history = max(history, key=lambda h: h.viewedAt) if history else None  # type: ignore
+        last_history = max(history, key=lambda h: h.viewedAt) if history else None
 
         last_viewed_at = max(
             (e.lastViewedAt for e in grandchild_items if e.lastViewedAt),
@@ -486,8 +486,8 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
 
     def _debug_log_ids(
         self,
-        key: int,
-        plex_id: str,
+        key: int | str,
+        plex_id: str | None,
         guids: ParsedGuids,
         anilist_id: int | None = None,
     ) -> str:
@@ -544,7 +544,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
                 or filtered_history[rating_key].viewedAt > episode.lastViewedAt
             ):
                 episode_history = EpisodeHistory(
-                    server=self.plex_client.user_client._server,  # type: ignore
+                    server=self.plex_client.user_client._server,
                     data=episode._data,
                     initpath="/status/sessions/history/all",
                 )

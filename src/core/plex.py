@@ -67,6 +67,11 @@ class PlexClient:
         self.plex_genres = plex_genres
         self.plex_metadata_source = plex_metadata_source
 
+        self.admin_client: PlexServer
+        self.user_client: PlexServer
+        self.online_client: PlexMetadataServer | None
+        self.community_client: PlexCommunityClient
+
         self._init_admin_client()
         self._init_online_client()
         self._init_user_client()
@@ -125,7 +130,7 @@ class PlexClient:
             and self.is_admin_user
         )
 
-        if self.is_online_user:
+        if self.is_online_user and self.online_client:
             self.user_client = self.online_client
             self.user_account_id = 1
         elif self.is_admin_user:
@@ -179,7 +184,7 @@ class PlexClient:
         plex_user_lower = plex_user.lower()
 
         def is_home_user(u: MyPlexUser) -> bool:
-            return u.title and not u.username and not u.email
+            return bool(u.title) and not u.username and not u.email
 
         for u in users:
             if is_home_user(u):
@@ -206,7 +211,7 @@ class PlexClient:
         """
         return timedelta(weeks=self.admin_client.settings.get("onDeckWindow").value)
 
-    def _guid_to_key(self, guid: str) -> str:
+    def _guid_to_key(self, guid: str | None) -> str:
         """Converts a Plex GUID to a Plex rating key.
 
         Args:
@@ -215,6 +220,8 @@ class PlexClient:
         Returns:
             str: GUID rating key
         """
+        if not guid:
+            raise ValueError(f"{self.__class__.__name__}: GUID cannot be None or empty")
         return guid.rsplit("/", 1)[-1]
 
     def get_sections(self) -> list[Section]:
@@ -365,7 +372,7 @@ class PlexClient:
         Returns:
             list[Episode] | list[Movie]: The continue watching items
         """
-        return section.continueWatching()  # type: ignore
+        return section.continueWatching()
 
     def get_continue_watching(self, item: Movie | Show) -> Movie | Episode | None:
         """Retrieves all items in the Continue Watching hub.
@@ -411,11 +418,11 @@ class PlexClient:
         Returns:
             list[History]: Watch history entries for the item
         """
-        if not self.is_online_user:
+        if not self.is_online_user or not self.online_client:
             args = {"metadataItemID": item.ratingKey, "accountID": self.user_account_id}
             return list(
                 self.admin_client.fetchItems(
-                    f"/status/sessions/history/all{plexapi.utils.joinArgs(args)}"  # type: ignore
+                    f"/status/sessions/history/all{plexapi.utils.joinArgs(args)}"
                 )
             )
 
@@ -447,7 +454,7 @@ class PlexClient:
 
                     history_data = ElementTree.Element("History", attrib=attrib)
                     h = EpisodeHistory(
-                        server=self.online_client._server,  # type: ignore
+                        server=self.online_client._server,
                         data=history_data,
                     )
                     h.parentRatingKey = metadata["parent"]["id"]
@@ -455,7 +462,7 @@ class PlexClient:
                 elif metadata["type"] == "MOVIE":
                     history_data = ElementTree.Element("History", attrib=attrib)
                     h = MovieHistory(
-                        server=self.online_client._server,  # type: ignore
+                        server=self.online_client._server,
                         data=history_data,
                     )
                 else:

@@ -200,7 +200,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
 
         debug_log_title = self._debug_log_title(item=item)
         debug_log_ids = self._debug_log_ids(
-            key=item.ratingKey,  # type: ignore
+            key=item.ratingKey,
             plex_id=item.guid,
             guids=guids,
         )
@@ -215,7 +215,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         ):
             debug_log_title = self._debug_log_title(item=item, animapping=animapping)
             debug_log_ids = self._debug_log_ids(
-                key=child_item.ratingKey,  # type: ignore
+                key=child_item.ratingKey,
                 plex_id=child_item.guid,
                 guids=guids,
                 anilist_id=anilist_media.id,
@@ -317,7 +317,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
 
         debug_log_title = self._debug_log_title(item=item, animapping=animapping)
         debug_log_ids = self._debug_log_ids(
-            key=child_item.ratingKey,  # type: ignore
+            key=child_item.ratingKey,
             plex_id=child_item.guid,
             guids=guids,
             anilist_id=anilist_media.id,
@@ -643,7 +643,11 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
 
     @abstractmethod
     def _debug_log_ids(
-        self, key: int, plex_id: str, guids: ParsedGuids, anilist_id: int | None = None
+        self,
+        key: int | str,
+        plex_id: str | None,
+        guids: ParsedGuids,
+        anilist_id: int | None = None,
     ) -> str:
         """Creates a debug-friendly string of media identifiers.
 
