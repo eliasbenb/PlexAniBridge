@@ -1,6 +1,7 @@
 import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from time import sleep
 
 import requests.exceptions
 import urllib3.exceptions
@@ -158,6 +159,7 @@ class AniListClient:
         """Updates multiple anime entries on the authenticated user's list.
 
         Sends a batch mutation to modify multiple existing anime entries in the user's list.
+        Processes entries in batches of 10 to avoid overwhelming the API.
 
         Args:
             media_list_entries (list[MediaList]): List of updated AniList entries to save
@@ -165,68 +167,80 @@ class AniListClient:
         Raises:
             requests.exceptions.HTTPError: If the API request fails
         """
+        BATCH_SIZE = 10
+
         if not media_list_entries:
             return None
 
-        variable_declarations = []
-        mutation_fields = []
-        variables = {}
-
-        for i, media_list_entry in enumerate(media_list_entries):
-            variable_declarations.extend(
-                [
-                    f"$mediaId{i}: Int",
-                    f"$status{i}: MediaListStatus",
-                    f"$score{i}: Float",
-                    f"$progress{i}: Int",
-                    f"$repeat{i}: Int",
-                    f"$notes{i}: String",
-                    f"$startedAt{i}: FuzzyDateInput",
-                    f"$completedAt{i}: FuzzyDateInput",
-                ]
+        for i in range(0, len(media_list_entries), BATCH_SIZE):
+            batch = media_list_entries[i : i + BATCH_SIZE]
+            log.debug(
+                f"{self.__class__.__name__}: Updating batch of anime entries "
+                f"$${{anilist_id: {[m.media_id for m in batch]}}}$$"
             )
-            mutation_field = dedent(f"""
-                m{i}: SaveMediaListEntry(
-                    mediaId: $mediaId{i},
-                    status: $status{i},
-                    score: $score{i},
-                    progress: $progress{i},
-                    repeat: $repeat{i},
-                    notes: $notes{i},  
-                    startedAt: $startedAt{i},
-                    completedAt: $completedAt{i}
-                ) {{
-                    {MediaListWithMedia.model_dump_graphql(indent_level=3)}
+
+            variable_declarations = []
+            mutation_fields = []
+            variables = {}
+
+            for j, media_list_entry in enumerate(batch):
+                variable_declarations.extend(
+                    [
+                        f"$mediaId{j}: Int",
+                        f"$status{j}: MediaListStatus",
+                        f"$score{j}: Float",
+                        f"$progress{j}: Int",
+                        f"$repeat{j}: Int",
+                        f"$notes{j}: String",
+                        f"$startedAt{j}: FuzzyDateInput",
+                        f"$completedAt{j}: FuzzyDateInput",
+                    ]
+                )
+                mutation_field = f"""
+                    m{j}: SaveMediaListEntry(
+                        mediaId: $mediaId{j},
+                        status: $status{j},
+                        score: $score{j},
+                        progress: $progress{j},
+                        repeat: $repeat{j},
+                        notes: $notes{j},  
+                        startedAt: $startedAt{j},
+                        completedAt: $completedAt{j}
+                    ) {{
+                        {MediaListWithMedia.model_dump_graphql(indent_level=3)}
+                    }}
+                """
+                mutation_fields.append(mutation_field)
+
+                entry_vars: dict = json.loads(
+                    media_list_entry.model_dump_json(exclude_none=True)
+                )
+                for k, v in entry_vars.items():
+                    variables[f"{k}{j}"] = v
+
+            query = f"""
+                mutation BatchUpdateEntries({", ".join(variable_declarations)}) {{
+                    {"\n".join(mutation_fields)}
                 }}
-            """).strip()
-            mutation_fields.append(mutation_field)
+            """
 
-            entry_vars = json.loads(media_list_entry.model_dump_json(exclude_none=True))
-            for k, v in entry_vars.items():
-                variables[f"{k}{i}"] = v
-
-        query = dedent(f"""
-            mutation BatchUpdateEntries({", ".join(variable_declarations)}) {{
-                {"\n".join(mutation_fields)}
-            }}
-        """).strip()
-
-        if self.dry_run:
-            log.info(
-                f"{self.__class__.__name__}: Dry run enabled, skipping anime entry update $${{anilist_id: {[m.media_id for m in media_list_entries]}}}$$"
-            )
-            return None
-
-        response: dict[str, dict[str, dict]] = self._make_request(
-            query, json.dumps(variables)
-        )
-
-        for mutation_data in response["data"].values():
-            if "mediaId" not in mutation_data:
+            if self.dry_run:
+                log.info(
+                    f"{self.__class__.__name__}: Dry run enabled, skipping anime entry update "
+                    f"$${{anilist_id: {[m.media_id for m in batch]}}}$$"
+                )
                 continue
-            self.offline_anilist_entries[mutation_data["mediaId"]] = (
-                self._media_list_entry_to_media(MediaListWithMedia(**mutation_data))
+
+            response: dict[str, dict[str, dict]] = self._make_request(
+                query, json.dumps(variables)
             )
+
+            for mutation_data in response["data"].values():
+                if "mediaId" not in mutation_data:
+                    continue
+                self.offline_anilist_entries[mutation_data["mediaId"]] = (
+                    self._media_list_entry_to_media(MediaListWithMedia(**mutation_data))
+                )
 
     def delete_anime_entry(self, entry_id: int, media_id: int) -> bool:
         """Deletes an anime entry from the authenticated user's list.

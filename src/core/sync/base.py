@@ -418,7 +418,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             self.sync_stats.synced += len(self.queued_batch_requests)
             log.success(
                 f"{self.__class__.__name__}: Synced {len(self.queued_batch_requests)} items to AniList"
-                f" $${{anilist_id: {[m.media_id for m in self.queued_batch_requests]}}}$$"
+                f"with batch mode $${{anilist_id: {[m.media_id for m in self.queued_batch_requests]}}}$$"
             )
         finally:
             self.queued_batch_requests.clear()
