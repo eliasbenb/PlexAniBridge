@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from textwrap import dedent
@@ -154,6 +155,58 @@ class AniListClient:
         self.offline_anilist_entries[media_list_entry.media_id] = (
             self._media_list_entry_to_media(MediaListWithMedia(**response))
         )
+
+    def batch_update_anime_entries(self, media_list_entries: list[MediaList]) -> None:
+        """Updates multiple anime entries on the authenticated user's list.
+
+        Sends a batch mutation to modify multiple existing anime entries in the user's list.
+
+        Args:
+            media_list_entries (list[MediaList]): List of updated AniList entries to save
+
+        Raises:
+            requests.exceptions.HTTPError: If the API request fails
+        """
+        queries: list[str] = []
+        variables: dict = {}
+
+        for i, media_list_entry in enumerate(media_list_entries):
+            query = dedent(f"""
+            mutation m{i} ($mediaId{i}: Int, $status{i}: MediaListStatus, $score{i}: Float, $progress{i}: Int, $repeat{i}: Int, $notes{i}: String, $startedAt{i}: FuzzyDateInput, $completedAt{i}: FuzzyDateInput) {{
+                SaveMediaListEntry(
+                    mediaId: $mediaId{i},
+                    status: $status{i},
+                    score: $score{i},
+                    progress: $progress{i},
+                    repeat: $repeat{i},
+                    notes: $notes{i},  
+                    startedAt: $startedAt{i},
+                    completedAt: $completedAt{i}
+                ) {{
+                    {MediaListWithMedia.model_dump_graphql(indent_level=3)}
+                }}
+            }}
+            """).strip()
+            queries.append(query)
+
+            variables.update(
+                {
+                    f"{k}{i}": v
+                    for k, v in json.loads(
+                        media_list_entry.model_dump_json(exclude_none=True)
+                    ).items()
+                }
+            )
+
+        if self.dry_run:
+            log.info(
+                f"{self.__class__.__name__}: Dry run enabled, skipping anime entry update $${{anilist_id: {[m.media_id for m in media_list_entries]}}}$$"
+            )
+            return None
+
+        print("\n".join(queries))
+        res = self._make_request("\n".join(queries), variables)
+        print(res)
 
     def delete_anime_entry(self, entry_id: int, media_id: int) -> bool:
         """Deletes an anime entry from the authenticated user's list.
@@ -446,7 +499,7 @@ class AniListClient:
         )
 
     def _make_request(
-        self, query: str, variables: dict | str | None = None, retry_count: int = 0
+        self, query: str, variables: dict | str = {}, retry_count: int = 0
     ) -> dict:
         """Makes a rate-limited request to the AniList GraphQL API.
 
