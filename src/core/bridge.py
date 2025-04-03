@@ -312,4 +312,7 @@ class BridgeClient:
                     exc_info=True,
                 )
 
+        if self.config.BATCH_REQUESTS:
+            sync_client.batch_sync()
+
         return sync_client.sync_stats

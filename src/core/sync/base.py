@@ -397,6 +397,23 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         )
         self.sync_stats.synced += 1
 
+    def batch_sync(self) -> None:
+        """Executes batch synchronization of queued media lists.
+
+        Sends all queued media lists to AniList in a single batch request.
+        This is more efficient than sending individual requests for each media list.
+        """
+        if not self.queued_batch_requests:
+            return
+
+        log.info(
+            f"{self.__class__.__name__}: Syncing {len(self.queued_batch_requests)} "
+            f"items to AniList in batch mode"
+        )
+        self.anilist_client.batch_update_anime_entries(self.queued_batch_requests)
+        self.sync_stats.synced += len(self.queued_batch_requests)
+        self.queued_batch_requests.clear()
+
     def _get_plex_media_list(
         self,
         item: T,
