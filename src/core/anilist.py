@@ -418,6 +418,75 @@ class AniListClient:
 
         return result
 
+    def batch_get_anime(self, anilist_ids: list[int]) -> list[Media]:
+        """Retrieves detailed information about a list of anime.
+
+        Attempts to fetch anime data from local cache first, falling back to
+        batch API requests for entries not found in cache. Processes requests
+        in batches of 10 to avoid overwhelming the API.
+
+        Args:
+            anilist_ids (list[int]): The AniList IDs of the anime to retrieve
+
+        Returns:
+            list[Media]: Detailed information about the requested anime
+
+        Raises:
+            requests.exceptions.HTTPError: If the API request fails
+        """
+        BATCH_SIZE = 10
+
+        if not anilist_ids:
+            return []
+
+        result = []
+        missing_ids = []
+
+        for anilist_id in anilist_ids:
+            if anilist_id in self.offline_anilist_entries:
+                log.debug(
+                    f"{self.__class__.__name__}: Pulling AniList data from local cache {{anilist_id: {anilist_id}}}"
+                )
+                result.append(self.offline_anilist_entries[anilist_id])
+            else:
+                missing_ids.append(anilist_id)
+
+        if not missing_ids:
+            return result
+
+        for i in range(0, len(missing_ids), BATCH_SIZE):
+            batch_ids = missing_ids[i : i + BATCH_SIZE]
+            log.debug(
+                f"{self.__class__.__name__}: Pulling AniList data from API for batch {{anilist_ids: {batch_ids}}}"
+            )
+
+            query_parts = []
+            variables = {}
+
+            for j, anilist_id in enumerate(batch_ids):
+                query_parts.append(f"""
+                m{j}: Media(id: $id{j}, type: ANIME) {{
+                    {Media.model_dump_graphql()}
+                }}
+            """)
+                variables[f"id{j}"] = anilist_id
+
+            query = f"""
+            query BatchGetAnime({", ".join([f"$id{j}: Int" for j in range(len(batch_ids))])}) {{
+                {" ".join(query_parts)}
+            }}
+            """
+
+            response = self._make_request(query, variables)
+
+            for j, anilist_id in enumerate(batch_ids):
+                media_data = response["data"][f"m{j}"]
+                media = Media(**media_data)
+                self.offline_anilist_entries[anilist_id] = media
+                result.append(media)
+
+        return result
+
     def backup_anilist(self) -> None:
         """Creates a JSON backup of the user's AniList data.
 
