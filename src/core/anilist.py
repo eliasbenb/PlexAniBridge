@@ -167,13 +167,28 @@ class AniListClient:
         Raises:
             requests.exceptions.HTTPError: If the API request fails
         """
-        queries: list[str] = []
-        variables: dict = {}
+        if not media_list_entries:
+            return None
+
+        variable_declarations = []
+        mutation_fields = []
+        variables = {}
 
         for i, media_list_entry in enumerate(media_list_entries):
-            query = dedent(f"""
-            mutation m{i} ($mediaId{i}: Int, $status{i}: MediaListStatus, $score{i}: Float, $progress{i}: Int, $repeat{i}: Int, $notes{i}: String, $startedAt{i}: FuzzyDateInput, $completedAt{i}: FuzzyDateInput) {{
-                SaveMediaListEntry(
+            variable_declarations.extend(
+                [
+                    f"$mediaId{i}: Int",
+                    f"$status{i}: MediaListStatus",
+                    f"$score{i}: Float",
+                    f"$progress{i}: Int",
+                    f"$repeat{i}: Int",
+                    f"$notes{i}: String",
+                    f"$startedAt{i}: FuzzyDateInput",
+                    f"$completedAt{i}: FuzzyDateInput",
+                ]
+            )
+            mutation_field = dedent(f"""
+                m{i}: SaveMediaListEntry(
                     mediaId: $mediaId{i},
                     status: $status{i},
                     score: $score{i},
@@ -185,18 +200,18 @@ class AniListClient:
                 ) {{
                     {MediaListWithMedia.model_dump_graphql(indent_level=3)}
                 }}
-            }}
             """).strip()
-            queries.append(query)
+            mutation_fields.append(mutation_field)
 
-            variables.update(
-                {
-                    f"{k}{i}": v
-                    for k, v in json.loads(
-                        media_list_entry.model_dump_json(exclude_none=True)
-                    ).items()
-                }
-            )
+            entry_vars = json.loads(media_list_entry.model_dump_json(exclude_none=True))
+            for k, v in entry_vars.items():
+                variables[f"{k}{i}"] = v
+
+        query = dedent(f"""
+            mutation BatchUpdateEntries({", ".join(variable_declarations)}) {{
+                {"\n".join(mutation_fields)}
+            }}
+        """).strip()
 
         if self.dry_run:
             log.info(
