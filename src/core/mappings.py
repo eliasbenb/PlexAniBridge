@@ -167,15 +167,17 @@ class MappingsClient:
                 case ".toml":
                     with file_path.open() as f:
                         mappings = tomlkit.load(f)
-        except (json.JSONDecodeError, yaml.YAMLError, TOMLKitError) as e:
+        except (json.JSONDecodeError, yaml.YAMLError, TOMLKitError):
             log.error(
                 f"{self.__class__.__name__}: Error decoding file "
-                f"{file_path.absolute().as_posix()}: {e}"
+                f"$$'{str(file_path.resolve())}'$$",
+                exc_info=True,
             )
-        except Exception as e:
+        except Exception:
             log.error(
                 f"{self.__class__.__name__}: Unexpected error reading file "
-                f"{file_path.absolute().as_posix()}: {e}"
+                f"$$'{str(file_path.resolve())}'$$",
+                exc_info=True,
             )
 
         self._loaded_sources.add(file)
@@ -183,7 +185,8 @@ class MappingsClient:
         includes = mappings.get("$includes", [])
         if not isinstance(includes, list):
             log.warning(
-                f"{self.__class__.__name__}: $includes in {file_path.absolute().as_posix()} is not a list, ignoring"
+                f"{self.__class__.__name__}: The $includes key in $$'{str(file_path.resolve())}'$$ "
+                "is not a list, ignoring all entries"
             )
             includes = []
         else:
@@ -312,10 +315,8 @@ class MappingsClient:
         ]
 
         if existing_custom_mapping_files:
-            custom_mappings_path = (
-                (self.data_path / existing_custom_mapping_files[0])
-                .absolute()
-                .as_posix()
+            custom_mappings_path = str(
+                (self.data_path / existing_custom_mapping_files[0]).resolve()
             )
             custom_mappings = self._load_mappings(custom_mappings_path)
         else:
