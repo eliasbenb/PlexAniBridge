@@ -267,15 +267,17 @@ When enabled:
 
 `bool` (Optional, default: `False`)
 
-When enabled, AniList update requests are sent in batches instead of individually.
+When enabled, AniList update and get requests are sent in batches instead of individually. At the start of each sync job, a batch of requests is created and sent to AniList to retrieve all the entries that will be worked on. Then, near the end of the sync job, all entries that need updating are batched to reduce the number of requests.
 
 This can be used to significantly reduce rate limiting at the cost of worse error handling.
 
-For example, if a sync job finds 100 items to update with `BATCH_REQUESTS` enabled, all 100 requests will be sent at once. If any of the requests fail, all 100 requests will fail.
+For example, if a sync job finds 10 items to update with `BATCH_REQUESTS` enabled, all 10 requests will be sent at once. If any of the requests fail, all 10 requests will fail.
 
-!!! note
+!!! tip "First Run"
 
-    While this option should be stable, it is still recommended to keep it disabled unless you encounter rate limiting issues constantly.
+    The main use case for this option is when going through the first sync of a large library. It can significantly reduce the rate limiting of the AniList API.
+
+    For subsequent syncs, it is recommended to disable this option unless you encounter rate limiting issues constantly.
 
 ---
 
