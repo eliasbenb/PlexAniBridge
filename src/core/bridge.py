@@ -231,6 +231,7 @@ class BridgeClient:
             "full_scan": self.config.FULL_SCAN,
             "destructive_sync": self.config.DESTRUCTIVE_SYNC,
             "search_fallback_threshold": self.config.SEARCH_FALLBACK_THRESHOLD,
+            "batch_requests": self.config.BATCH_REQUESTS,
         }
 
         self.movie_sync = MovieSyncClient(**sync_client_args)

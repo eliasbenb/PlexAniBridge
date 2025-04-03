@@ -144,6 +144,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         full_scan: bool,
         destructive_sync: bool,
         search_fallback_threshold: int,
+        batch_requests: bool,
     ) -> None:
         """Initializes a new synchronization client.
 
@@ -154,6 +155,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             excluded_sync_fields (list[SyncField]): Fields to exclude from synchronization
             destructive_sync (bool): Whether to delete AniList entries not found in Plex
             search_fallback_threshold (int): Minimum match ratio for fuzzy title
+            batch_requests (bool): Whether to use batch requests to reduce API requests
         """
         self.anilist_client = anilist_client
         self.animap_client = animap_client
@@ -163,6 +165,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         self.full_scan = full_scan
         self.destructive_sync = destructive_sync
         self.search_fallback_threshold = search_fallback_threshold
+        self.batch_requests = batch_requests
 
         self.sync_stats = SyncStats()
 
@@ -178,6 +181,8 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         self._extra_fields = {
             k: v for k, v in extra_fields.items() if k not in self.excluded_sync_fields
         }
+
+        self.queued_batch_requests = []
 
     def clear_cache(self) -> None:
         """Clears the cache for all decorated methods in the class."""
@@ -381,7 +386,10 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             f"\t\tUPDATE: {MediaList.diff(anilist_media_list, final_media_list)}"
         )
 
-        self.anilist_client.update_anime_entry(final_media_list)
+        if self.batch_requests:
+            self.queued_batch_requests.append(final_media_list)
+        else:
+            self.anilist_client.update_anime_entry(final_media_list)
 
         log.success(
             f"{self.__class__.__name__}: Synced {item.type} "

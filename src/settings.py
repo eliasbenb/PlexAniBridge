@@ -115,6 +115,7 @@ class PlexAnibridgeConfig(BaseSettings):
     DRY_RUN: bool = False
     LOG_LEVEL: LogLevel = LogLevel.INFO
     SEARCH_FALLBACK_THRESHOLD: int = Field(default=-1, ge=-1, le=100)
+    BATCH_REQUESTS: bool = False
 
     @model_validator(mode="before")
     def catch_extra_env_vars(cls, values) -> dict[str, str]:
