@@ -1,5 +1,4 @@
 import logging
-import sys
 from collections import defaultdict
 from functools import cached_property, wraps
 from itertools import chain
@@ -11,6 +10,7 @@ from typing import (
 from xml.etree import ElementTree
 
 import requests
+from limiter import Limiter
 from plexapi.base import PlexObject
 from plexapi.exceptions import BadRequest, NotFound, Unauthorized
 from plexapi.library import (
@@ -25,9 +25,10 @@ from plexapi.video import Episode, Movie, Season, Show, Video
 from requests.status_codes import _codes as codes  # type: ignore[import]
 
 from src.utils.cache import generic_ttl_cache
-from src.utils.rate_limiter import RateLimiter
 
 log = logging.getLogger("plexapi")
+
+plex_metadata_limiter = Limiter(rate=300 / 60, capacity=30, jitter=True)
 
 
 def original_server(func: Callable[..., Any]) -> Callable[..., Any]:
@@ -321,10 +322,6 @@ class PlexMetadataServer(PlexServer):
         self._original_baseurl = self._baseurl
         self._original_token = self._token
 
-        self.rate_limiter = RateLimiter(
-            self.__class__.__name__, requests_per_minute=sys.maxsize
-        )
-
     @cached_property
     def library(self):
         try:
@@ -333,6 +330,7 @@ class PlexMetadataServer(PlexServer):
             data = self.query("/library/sections/")
         return MetadataLibrary(self, data)
 
+    @plex_metadata_limiter()
     @generic_ttl_cache(maxsize=None, ttl=30)
     def query(
         self,
@@ -350,12 +348,6 @@ class PlexMetadataServer(PlexServer):
         """
         if retry_count >= 3:
             raise requests.exceptions.HTTPError("Failed to make request after 3 tries")
-
-        if self._baseurl in (
-            self.myPlexAccount().DISCOVER,
-            self.myPlexAccount().METADATA,
-        ):
-            self.rate_limiter.wait_if_needed()
 
         url = self.url(key)
         method = method or self._session.get

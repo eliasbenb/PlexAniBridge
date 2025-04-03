@@ -2,9 +2,11 @@ from time import sleep
 
 import requests
 import urllib3.exceptions
+from limiter import Limiter
 
 from src import __version__, log
-from src.utils.rate_limiter import RateLimiter
+
+plex_community_limiter = Limiter(rate=300 / 60, capacity=30, jitter=True)
 
 
 class PlexCommunityClient:
@@ -21,10 +23,6 @@ class PlexCommunityClient:
                 "User-Agent": f"PlexAniBridge/{__version__}",
                 "X-Plex-Token": self.plex_token,
             }
-        )
-
-        self.rate_limiter = RateLimiter(
-            log_name=self.__class__.__name__, requests_per_minute=360
         )
 
     def get_watch_activity(self, metadata_id: str) -> list:
@@ -155,8 +153,6 @@ class PlexCommunityClient:
         """
         if retry_count >= 3:
             raise requests.exceptions.HTTPError("Failed to make request after 3 tries")
-
-        self.rate_limiter.wait_if_needed()  # Rate limit the requests
 
         try:
             response = self.session.post(

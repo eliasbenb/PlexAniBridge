@@ -24,6 +24,7 @@ dependencies = [
     "alembic>=1.15.2",
     "cachetools>=5.5.2",
     "colorama>=0.4.6",
+    "limiter>=0.5.0",
     "plexapi>=4.16.1",
     "pydantic>=2.11.1",
     "pydantic-settings>=2.8.1",

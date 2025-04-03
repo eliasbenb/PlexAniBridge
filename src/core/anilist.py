@@ -6,6 +6,7 @@ from time import sleep
 import requests.exceptions
 import urllib3.exceptions
 from cachetools.func import ttl_cache
+from limiter import Limiter
 
 from src import __version__, log
 from src.models.anilist import (
@@ -18,7 +19,8 @@ from src.models.anilist import (
     MediaStatus,
     User,
 )
-from src.utils.rate_limiter import RateLimiter
+
+anilist_limiter = Limiter(rate=(30 / 60) * 0.9, capacity=5, jitter=True)
 
 
 class AniListClient:
@@ -27,16 +29,6 @@ class AniListClient:
     This client provides methods to interact with the AniList GraphQL API, including searching for anime,
     updating user lists, and managing anime entries. It implements rate limiting and local caching
     to optimize API usage.
-
-    Attributes:
-        API_URL (str): The AniList GraphQL API endpoint
-        BACKUP_RETENTION_DAYS (int): Number of days to retain backup files
-        anilist_token (str): Authentication token for AniList API
-        backup_dir (Path): Directory where backup files are stored
-        dry_run (bool): If True, skips making actual API modifications
-        rate_limiter (RateLimiter): Handles API request rate limiting
-        user (User): Authenticated user's information
-        offline_anilist_entries (dict[int, Media]): Cache of anime entries
     """
 
     API_URL = "https://graphql.anilist.co"
@@ -64,7 +56,6 @@ class AniListClient:
             }
         )
 
-        self.rate_limiter = RateLimiter(self.__class__.__name__, requests_per_minute=30)
         self.user = self.get_user()
         self.user_tz = self.get_user_tz()
 
@@ -590,6 +581,7 @@ class AniListClient:
             },
         )
 
+    @anilist_limiter()
     def _make_request(
         self, query: str, variables: dict | str = {}, retry_count: int = 0
     ) -> dict:
@@ -616,8 +608,6 @@ class AniListClient:
         """
         if retry_count >= 3:
             raise requests.exceptions.HTTPError("Failed to make request after 3 tries")
-
-        self.rate_limiter.wait_if_needed()  # Rate limit the requests
 
         try:
             response = self.session.post(
