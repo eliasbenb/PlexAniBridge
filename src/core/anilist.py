@@ -433,22 +433,25 @@ class AniListClient:
         result = []
         missing_ids = []
 
-        for anilist_id in anilist_ids:
-            if anilist_id in self.offline_anilist_entries:
-                log.debug(
-                    f"{self.__class__.__name__}: Pulling AniList data from local cache {{anilist_id: {anilist_id}}}"
-                )
-                result.append(self.offline_anilist_entries[anilist_id])
-            else:
-                missing_ids.append(anilist_id)
+        cached_ids = [id for id in anilist_ids if id in self.offline_anilist_entries]
+        if cached_ids:
+            log.debug(
+                f"{self.__class__.__name__}: Pulling AniList data from local cache in batched mode "
+                f"$${{anilist_ids: {cached_ids}}}$$"
+            )
+            result.extend(self.offline_anilist_entries[id] for id in cached_ids)
 
+        missing_ids = [
+            id for id in anilist_ids if id not in self.offline_anilist_entries
+        ]
         if not missing_ids:
             return result
 
         for i in range(0, len(missing_ids), BATCH_SIZE):
             batch_ids = missing_ids[i : i + BATCH_SIZE]
             log.debug(
-                f"{self.__class__.__name__}: Pulling AniList data from API for batch {{anilist_ids: {batch_ids}}}"
+                f"{self.__class__.__name__}: Pulling AniList data from API in batched mode "
+                f"$${{anilist_ids: {batch_ids}}}$$"
             )
 
             query_parts = []
