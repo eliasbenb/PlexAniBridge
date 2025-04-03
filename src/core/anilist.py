@@ -219,9 +219,16 @@ class AniListClient:
             )
             return None
 
-        print("\n".join(queries))
-        res = self._make_request("\n".join(queries), variables)
-        print(res)
+        response: dict[str, dict[str, dict]] = self._make_request(
+            query, json.dumps(variables)
+        )
+
+        for mutation_data in response["data"].values():
+            if "mediaId" not in mutation_data:
+                continue
+            self.offline_anilist_entries[mutation_data["mediaId"]] = (
+                self._media_list_entry_to_media(MediaListWithMedia(**mutation_data))
+            )
 
     def delete_anime_entry(self, entry_id: int, media_id: int) -> bool:
         """Deletes an anime entry from the authenticated user's list.
