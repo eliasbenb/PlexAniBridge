@@ -1,4 +1,3 @@
-from textwrap import dedent
 from time import sleep
 
 import requests
@@ -37,7 +36,7 @@ class PlexCommunityClient:
         Returns:
             list: A list of PlexAPI EpisodeHistory or MovieHistory objects.
         """
-        query = dedent("""
+        query = """
         query GetWatchActivity($first: PaginationInt!, $after: String, $metadataID: ID) {
             activityFeed(
                 first: $first
@@ -79,7 +78,7 @@ class PlexCommunityClient:
                 }
             }
         }
-        """).strip()
+        """
 
         res = []
         current_after = None
@@ -110,7 +109,7 @@ class PlexCommunityClient:
         Returns:
             str: The review message, or None if no review is found
         """
-        query = dedent("""
+        query = """
         query GetReview($metadataID: ID!) {
             metadataReviewV2(metadata: {id: $metadataID}) {
                 ... on ActivityReview {
@@ -121,7 +120,7 @@ class PlexCommunityClient:
                 }
             }
         }
-        """).strip()
+        """
 
         response = self._make_request(query, {"metadataID": metadata_id}, "GetReview")
         data = response["data"]["metadataReviewV2"]

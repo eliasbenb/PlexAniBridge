@@ -1,8 +1,6 @@
 import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from textwrap import dedent
-from time import sleep
 
 import requests.exceptions
 import urllib3.exceptions
@@ -96,13 +94,13 @@ class AniListClient:
         Raises:
             requests.exceptions.HTTPError: If the API request fails
         """
-        query = dedent(f"""
+        query = f"""
         query {{
             Viewer {{
                 {User.model_dump_graphql()}
             }}
         }}
-        """).strip()
+        """
 
         response = self._make_request(query)["data"]["Viewer"]
         return User(**response)
@@ -134,13 +132,13 @@ class AniListClient:
         Raises:
             requests.exceptions.HTTPError: If the API request fails
         """
-        query = dedent(f"""
+        query = f"""
         mutation ($mediaId: Int, $status: MediaListStatus, $score: Float, $progress: Int, $repeat: Int, $notes: String, $startedAt: FuzzyDateInput, $completedAt: FuzzyDateInput) {{
             SaveMediaListEntry(mediaId: $mediaId, status: $status, score: $score, progress: $progress, repeat: $repeat, notes: $notes, startedAt: $startedAt, completedAt: $completedAt) {{
                 {MediaListWithMedia.model_dump_graphql()}
             }}
         }}
-        """).strip()
+        """
 
         if self.dry_run:  # Skip the request, only log the variables
             log.info(
@@ -245,13 +243,13 @@ class AniListClient:
         Raises:
             requests.exceptions.HTTPError: If the API request fails
         """
-        query = dedent("""
+        query = """
         mutation ($id: Int) {
             DeleteMediaListEntry(id: $id) {
                 deleted
             }
         }
-        """).strip()
+        """
 
         if self.dry_run:
             log.info(
@@ -333,7 +331,7 @@ class AniListClient:
         Raises:
             requests.exceptions.HTTPError: If the API request fails
         """
-        query = dedent(f"""
+        query = f"""
             query ($search: String, $formats: [MediaFormat], $limit: Int) {{
                 Page(perPage: $limit) {{
                     media(search: $search, type: ANIME, format_in: $formats) {{
@@ -341,7 +339,7 @@ class AniListClient:
                     }}
                 }}
             }}
-        """).strip()
+        """
 
         formats = (
             [MediaFormat.MOVIE, MediaFormat.SPECIAL]
@@ -387,13 +385,13 @@ class AniListClient:
             )
             return self.offline_anilist_entries[anilist_id]
 
-        query = dedent(f"""
+        query = f"""
         query ($id: Int) {{
             Media(id: $id, type: ANIME) {{
                 {Media.model_dump_graphql()}
             }}
         }}
-        """).strip()
+        """
 
         log.debug(
             f"{self.__class__.__name__}: Pulling AniList data from API $${{anilist_id: {anilist_id}}}$$"
@@ -421,13 +419,13 @@ class AniListClient:
             requests.exceptions.HTTPError: If the API request fails
             OSError: If unable to create backup directory or write backup file
         """
-        query = dedent(f"""
+        query = f"""
         query MediaListCollection($userId: Int, $type: MediaType, $chunk: Int) {{
             MediaListCollection(userId: $userId, type: $type, chunk: $chunk) {{
                 {MediaListCollectionWithMedia.model_dump_graphql()}
             }}
         }}
-        """).strip()
+        """
 
         data = MediaListCollectionWithMedia(user=self.user, has_next_chunk=True)
         variables = {"userId": self.user.id, "type": "ANIME", "chunk": 0}
