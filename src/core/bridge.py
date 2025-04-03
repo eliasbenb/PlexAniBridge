@@ -311,10 +311,6 @@ class BridgeClient:
         )
 
         if self.config.BATCH_REQUESTS:
-            log.info(
-                f"{self.__class__.__name__}: Prefetching all AniList entries in batch requests"
-            )
-
             parsed_guids = [ParsedGuids.from_guids(item.guids) for item in items]
             imdb_ids = [guid.imdb for guid in parsed_guids if guid.imdb is not None]
             tmdb_ids = [guid.tmdb for guid in parsed_guids if guid.tmdb is not None]
@@ -326,6 +322,11 @@ class BridgeClient:
             anilist_ids = [
                 a.anilist_id for a in animappings if a.anilist_id is not None
             ]
+
+            log.info(
+                f"{self.__class__.__name__}: Prefetching {len(anilist_ids)} entries "
+                f"from the AniList API in batch requests (this may take a while)"
+            )
 
             anilist_client.batch_get_anime(anilist_ids)
 
