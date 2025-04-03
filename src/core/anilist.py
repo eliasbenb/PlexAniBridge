@@ -64,7 +64,7 @@ class AniListClient:
             }
         )
 
-        self.rate_limiter = RateLimiter(self.__class__.__name__, requests_per_minute=90)
+        self.rate_limiter = RateLimiter(self.__class__.__name__, requests_per_minute=30)
         self.user = self.get_user()
         self.user_tz = self.get_user_tz()
 
@@ -207,7 +207,7 @@ class AniListClient:
                         startedAt: $startedAt{j},
                         completedAt: $completedAt{j}
                     ) {{
-                        {MediaListWithMedia.model_dump_graphql(indent_level=3)}
+                        {MediaListWithMedia.model_dump_graphql()}
                     }}
                 """
                 mutation_fields.append(mutation_field)
