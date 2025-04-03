@@ -182,7 +182,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             k: v for k, v in extra_fields.items() if k not in self.excluded_sync_fields
         }
 
-        self.queued_batch_requests = []
+        self.queued_batch_requests: list[MediaList] = []
 
     def clear_cache(self) -> None:
         """Clears the cache for all decorated methods in the class."""
@@ -378,17 +378,20 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             self.sync_stats.skipped += 1
             return
 
-        log.info(
-            f"{self.__class__.__name__}: Syncing AniList entry for {item.type} "
-            f"{debug_log_title} {debug_log_ids}"
-        )
-        log.success(
-            f"\t\tUPDATE: {MediaList.diff(anilist_media_list, final_media_list)}"
-        )
-
         if self.batch_requests:
+            log.info(
+                f"{self.__class__.__name__}: Queuing {item.type} for batch sync "
+                f"{debug_log_title} {debug_log_ids}"
+            )
             self.queued_batch_requests.append(final_media_list)
         else:
+            log.info(
+                f"{self.__class__.__name__}: Syncing AniList entry for {item.type} "
+                f"{debug_log_title} {debug_log_ids}"
+            )
+            log.success(
+                f"\t\tUPDATE: {MediaList.diff(anilist_media_list, final_media_list)}"
+            )
             self.anilist_client.update_anime_entry(final_media_list)
 
         log.success(
@@ -407,12 +410,14 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             return
 
         log.info(
-            f"{self.__class__.__name__}: Syncing {len(self.queued_batch_requests)} "
-            f"items to AniList in batch mode"
+            f"{self.__class__.__name__}: Syncing {len(self.queued_batch_requests)} items to AniList "
+            f"in batch mode $${{anilist_id: {[m.media_id for m in self.queued_batch_requests]}}}$$"
         )
-        self.anilist_client.batch_update_anime_entries(self.queued_batch_requests)
-        self.sync_stats.synced += len(self.queued_batch_requests)
-        self.queued_batch_requests.clear()
+        try:
+            self.anilist_client.batch_update_anime_entries(self.queued_batch_requests)
+            self.sync_stats.synced += len(self.queued_batch_requests)
+        finally:
+            self.queued_batch_requests.clear()
 
     def _get_plex_media_list(
         self,
