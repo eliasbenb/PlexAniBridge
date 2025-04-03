@@ -1,19 +1,22 @@
 FROM ghcr.io/astral-sh/uv:python3.13-alpine AS builder
 
 ENV UV_LINK_MODE=copy \
-    UV_PYTHON_DOWNLOADS=0
+    UV_PROJECT_ENVIRONMENT=/opt/venv \
+    UV_PYTHON_DOWNLOADS=never
+
+RUN --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    uv sync --frozen --no-dev --no-install-project
+
+COPY . /app
 
 WORKDIR /app
 
-COPY uv.lock pyproject.toml /app/
-
-RUN uv sync --frozen --no-install-project --no-editable --no-dev
-
-ADD . /app
+RUN uv sync --frozen --no-dev --no-editable
 
 FROM python:3.13-alpine
 
-COPY --from=builder --chown=app:app /app /app
+COPY --from=builder --chown=app:app /opt/venv /opt/venv
 
 LABEL maintainer="Elias Benbourenane <eliasbenbourenane@gmail.com>" \
     org.opencontainers.image.title="PlexAniBridge" \
@@ -24,8 +27,11 @@ LABEL maintainer="Elias Benbourenane <eliasbenbourenane@gmail.com>" \
     org.opencontainers.image.source="https://github.com/eliasbenb/PlexAniBridge" \
     org.opencontainers.image.licenses="MIT"
 
-ENV PATH="/app/.venv/bin:$PATH"
+ENV PYTHONPATH=/opt/venv/lib/python3.13/site-packages \
+    PYTHONUNBUFFERED=1
 
 WORKDIR /app
+
+COPY --chown=app:app . /app
 
 ENTRYPOINT ["python", "/app/main.py"]
