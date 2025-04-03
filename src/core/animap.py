@@ -9,6 +9,7 @@ from sqlalchemy import (
     column,
     delete,
     exists,
+    false,
     func,
     not_,
     or_,
@@ -16,7 +17,7 @@ from sqlalchemy import (
     true,
 )
 from sqlalchemy.orm.base import Mapped
-from sqlalchemy.sql.elements import BinaryExpression, UnaryExpression
+from sqlalchemy.sql.elements import BinaryExpression
 from sqlmodel import Session, col
 
 from src import log
@@ -167,9 +168,9 @@ class AniMapClient:
 
     def get_mappings(
         self,
-        imdb: str | None = None,
-        tmdb: int | None = None,
-        tvdb: int | None = None,
+        imdb: str | list[str] | None = None,
+        tmdb: int | list[int] | None = None,
+        tvdb: int | list[int] | None = None,
         season: int | None = None,
         is_movie: bool = True,
     ) -> list[AniMap]:
@@ -179,9 +180,9 @@ class AniMapClient:
         and metadata. The search logic differs between movies and TV shows.
 
         Args:
-            imdb (str | None): IMDB ID to match (can be partial match within array)
-            tmdb (int | None): TMDB ID to match (movies and TV shows)
-            tvdb (int | None): TVDB ID to match (TV shows only)
+            imdb (str | list[str] | None): IMDB ID(s) to match (can be partial match within array)
+            tmdb (int | list[int] | None): TMDB ID(s) to match (movies and TV shows)
+            tvdb (int | list[int] | None): TVDB ID(s) to match (TV shows only)
             season (int | None): TVDB season number for exact matching (TV shows only)
             is_movie (bool): Whether the search is for a movie or TV show
 
@@ -191,21 +192,40 @@ class AniMapClient:
         if not imdb and not tmdb and not tvdb:
             return []
 
-        def json_array_contains(field: Mapped, value: Any) -> UnaryExpression:
+        imdb_list = (
+            [imdb] if isinstance(imdb, str) else imdb if isinstance(imdb, list) else []
+        )
+        tmdb_list = (
+            [tmdb] if isinstance(tmdb, int) else tmdb if isinstance(tmdb, list) else []
+        )
+        tvdb_list = (
+            [tvdb] if isinstance(tvdb, int) else tvdb if isinstance(tvdb, list) else []
+        )
+
+        def json_array_contains(field: Mapped, values: list[Any]) -> Any:
             """Generates a JSON_CONTAINS function for the given field.
 
             Args:
                 field (InstrumentedAttribute): Field to search in
-                value (Any): Value to search for
+                values (list[Any]): Values to search for
 
             Returns:
-                UnaryExpression: JSON_CONTAINS function
+                Any: JSON_CONTAINS function
             """
-            return exists(
-                select(1)
-                .select_from(func.json_each(field))
-                .where(column("value") == value)
-            )
+
+            if not values:
+                return false()
+
+            conditions = []
+            for value in values:
+                conditions.append(
+                    exists(
+                        select(1)
+                        .select_from(func.json_each(field))
+                        .where(column("value") == value)
+                    )
+                )
+            return or_(*conditions)
 
         def json_dict_contains(field: Mapped, key: str) -> BinaryExpression:
             """Generate a SQL expression for checking if a JSON field contains a key.
@@ -220,27 +240,33 @@ class AniMapClient:
             return func.json_type(field, f"$.{key}").is_not(None)
 
         with Session(db.engine) as session:
-            # OR conditions involve ID matching
-            # AND conditions involve metadata matching
             or_conditions = []
             and_conditions = []
 
             if is_movie:
-                if imdb:
-                    or_conditions.append(json_array_contains(col(AniMap.imdb_id), imdb))
-                if tmdb:
+                if imdb_list:
                     or_conditions.append(
-                        json_array_contains(col(AniMap.tmdb_movie_id), tmdb)
+                        json_array_contains(col(AniMap.imdb_id), imdb_list)
+                    )
+                if tmdb_list:
+                    or_conditions.append(
+                        json_array_contains(col(AniMap.tmdb_movie_id), tmdb_list)
                     )
             else:
-                if imdb:
-                    or_conditions.append(json_array_contains(col(AniMap.imdb_id), imdb))
-                if tmdb:
+                if imdb_list:
                     or_conditions.append(
-                        json_array_contains(col(AniMap.tmdb_show_id), tmdb)
+                        json_array_contains(col(AniMap.imdb_id), imdb_list)
                     )
-                if tvdb:
-                    or_conditions.append(AniMap.tvdb_id == tvdb)
+                if tmdb_list:
+                    or_conditions.append(
+                        json_array_contains(col(AniMap.tmdb_show_id), tmdb_list)
+                    )
+
+                if tvdb_list:
+                    if len(tvdb_list) == 1:
+                        or_conditions.append(AniMap.tvdb_id == tvdb_list[0])
+                    else:
+                        or_conditions.append(col(AniMap.tvdb_id).in_(tvdb_list))
                 if season:
                     and_conditions.append(
                         json_dict_contains(col(AniMap.tvdb_mappings), f"s{season}")
