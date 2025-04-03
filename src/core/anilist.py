@@ -99,7 +99,7 @@ class AniListClient:
         query = dedent(f"""
         query {{
             Viewer {{
-{User.model_dump_graphql(indent_level=3)}
+                {User.model_dump_graphql()}
             }}
         }}
         """).strip()
@@ -137,7 +137,7 @@ class AniListClient:
         query = dedent(f"""
         mutation ($mediaId: Int, $status: MediaListStatus, $score: Float, $progress: Int, $repeat: Int, $notes: String, $startedAt: FuzzyDateInput, $completedAt: FuzzyDateInput) {{
             SaveMediaListEntry(mediaId: $mediaId, status: $status, score: $score, progress: $progress, repeat: $repeat, notes: $notes, startedAt: $startedAt, completedAt: $completedAt) {{
-{MediaListWithMedia.model_dump_graphql(indent_level=3)}
+                {MediaListWithMedia.model_dump_graphql()}
             }}
         }}
         """).strip()
@@ -310,15 +310,12 @@ class AniListClient:
 
         Raises:
             requests.exceptions.HTTPError: If the API request fails
-
-        Note:
-            This method is cached using functools.cache to optimize repeated searches
         """
         query = dedent(f"""
             query ($search: String, $formats: [MediaFormat], $limit: Int) {{
                 Page(perPage: $limit) {{
                     media(search: $search, type: ANIME, format_in: $formats) {{
-{Media.model_dump_graphql(indent_level=4)}
+                        {Media.model_dump_graphql()}
                     }}
                 }}
             }}
@@ -361,9 +358,6 @@ class AniListClient:
 
         Raises:
             requests.exceptions.HTTPError: If the API request fails
-
-        Note:
-            Results are cached in self.offline_anilist_entries for future use
         """
         if anilist_id in self.offline_anilist_entries:
             log.debug(
@@ -374,7 +368,7 @@ class AniListClient:
         query = dedent(f"""
         query ($id: Int) {{
             Media(id: $id, type: ANIME) {{
-{Media.model_dump_graphql(indent_level=3)}
+                {Media.model_dump_graphql()}
             }}
         }}
         """).strip()
@@ -404,16 +398,11 @@ class AniListClient:
         Raises:
             requests.exceptions.HTTPError: If the API request fails
             OSError: If unable to create backup directory or write backup file
-
-        Note:
-            - Backup files are named: plexanibridge-{username}.{number}.json
-            - Old backups exceeding BACKUP_RETENTION_DAYS are automatically deleted
-            - Skips custom lists to focus on standard watching status lists
         """
         query = dedent(f"""
         query MediaListCollection($userId: Int, $type: MediaType, $chunk: Int) {{
             MediaListCollection(userId: $userId, type: $type, chunk: $chunk) {{
-{MediaListCollectionWithMedia.model_dump_graphql(indent_level=3)}
+                {MediaListCollectionWithMedia.model_dump_graphql()}
             }}
         }}
         """).strip()
