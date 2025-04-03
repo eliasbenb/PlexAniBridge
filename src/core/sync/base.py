@@ -394,11 +394,11 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             )
             self.anilist_client.update_anime_entry(final_media_list)
 
-        log.success(
-            f"{self.__class__.__name__}: Synced {item.type} "
-            f"{debug_log_title} {debug_log_ids}"
-        )
-        self.sync_stats.synced += 1
+            log.success(
+                f"{self.__class__.__name__}: Synced {item.type} "
+                f"{debug_log_title} {debug_log_ids}"
+            )
+            self.sync_stats.synced += 1
 
     def batch_sync(self) -> None:
         """Executes batch synchronization of queued media lists.
