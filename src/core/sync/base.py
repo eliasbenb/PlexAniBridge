@@ -411,13 +411,13 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
 
         log.info(
             f"{self.__class__.__name__}: Syncing {len(self.queued_batch_requests)} items to AniList "
-            f"in batch mode $${{anilist_id: {[m.media_id for m in self.queued_batch_requests]}}}$$"
+            f"with batch mode $${{anilist_id: {[m.media_id for m in self.queued_batch_requests]}}}$$"
         )
         try:
             self.anilist_client.batch_update_anime_entries(self.queued_batch_requests)
             self.sync_stats.synced += len(self.queued_batch_requests)
             log.success(
-                f"{self.__class__.__name__}: Synced {len(self.queued_batch_requests)} items to AniList"
+                f"{self.__class__.__name__}: Synced {len(self.queued_batch_requests)} items to AniList "
                 f"with batch mode $${{anilist_id: {[m.media_id for m in self.queued_batch_requests]}}}$$"
             )
         finally:
