@@ -263,6 +263,22 @@ When enabled:
 
 ---
 
+### `BATCH_REQUESTS`
+
+`bool` (Optional, default: `False`)
+
+When enabled, AniList update requests are sent in batches instead of individually.
+
+This can be used to significantly reduce rate limiting at the cost of worse error handling.
+
+For example, if a sync job finds 100 items to update with `BATCH_REQUESTS` enabled, all 100 requests will be sent at once. If any of the requests fail, all 100 requests will fail.
+
+!!! note
+
+    While this option should be stable, it is still recommended to keep it disabled unless you encounter rate limiting issues constantly.
+
+---
+
 ### `SEARCH_FALLBACK_THRESHOLD`
 
 `int` (Optional, default: `-1`)

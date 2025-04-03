@@ -114,6 +114,7 @@ class PlexAnibridgeConfig(BaseSettings):
     DATA_PATH: Path = Path("./data")
     DRY_RUN: bool = False
     LOG_LEVEL: LogLevel = LogLevel.INFO
+    BATCH_REQUESTS: bool = False
     SEARCH_FALLBACK_THRESHOLD: int = Field(default=-1, ge=-1, le=100)
 
     @model_validator(mode="before")

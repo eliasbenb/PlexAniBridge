@@ -231,6 +231,7 @@ class BridgeClient:
             "full_scan": self.config.FULL_SCAN,
             "destructive_sync": self.config.DESTRUCTIVE_SYNC,
             "search_fallback_threshold": self.config.SEARCH_FALLBACK_THRESHOLD,
+            "batch_requests": self.config.BATCH_REQUESTS,
         }
 
         self.movie_sync = MovieSyncClient(**sync_client_args)
@@ -310,5 +311,8 @@ class BridgeClient:
                     f"{self.__class__.__name__}: Failed to sync item $$'{item.title}'$$",
                     exc_info=True,
                 )
+
+        if self.config.BATCH_REQUESTS:
+            sync_client.batch_sync()
 
         return sync_client.sync_stats

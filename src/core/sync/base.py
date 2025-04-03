@@ -144,6 +144,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         full_scan: bool,
         destructive_sync: bool,
         search_fallback_threshold: int,
+        batch_requests: bool,
     ) -> None:
         """Initializes a new synchronization client.
 
@@ -154,6 +155,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             excluded_sync_fields (list[SyncField]): Fields to exclude from synchronization
             destructive_sync (bool): Whether to delete AniList entries not found in Plex
             search_fallback_threshold (int): Minimum match ratio for fuzzy title
+            batch_requests (bool): Whether to use batch requests to reduce API requests
         """
         self.anilist_client = anilist_client
         self.animap_client = animap_client
@@ -163,6 +165,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         self.full_scan = full_scan
         self.destructive_sync = destructive_sync
         self.search_fallback_threshold = search_fallback_threshold
+        self.batch_requests = batch_requests
 
         self.sync_stats = SyncStats()
 
@@ -178,6 +181,8 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         self._extra_fields = {
             k: v for k, v in extra_fields.items() if k not in self.excluded_sync_fields
         }
+
+        self.queued_batch_requests: list[MediaList] = []
 
     def clear_cache(self) -> None:
         """Clears the cache for all decorated methods in the class."""
@@ -373,21 +378,50 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             self.sync_stats.skipped += 1
             return
 
+        if self.batch_requests:
+            log.info(
+                f"{self.__class__.__name__}: Queuing {item.type} for batch sync "
+                f"{debug_log_title} {debug_log_ids}"
+            )
+            self.queued_batch_requests.append(final_media_list)
+        else:
+            log.info(
+                f"{self.__class__.__name__}: Syncing AniList entry for {item.type} "
+                f"{debug_log_title} {debug_log_ids}"
+            )
+            log.success(
+                f"\t\tUPDATE: {MediaList.diff(anilist_media_list, final_media_list)}"
+            )
+            self.anilist_client.update_anime_entry(final_media_list)
+
+            log.success(
+                f"{self.__class__.__name__}: Synced {item.type} "
+                f"{debug_log_title} {debug_log_ids}"
+            )
+            self.sync_stats.synced += 1
+
+    def batch_sync(self) -> None:
+        """Executes batch synchronization of queued media lists.
+
+        Sends all queued media lists to AniList in a single batch request.
+        This is more efficient than sending individual requests for each media list.
+        """
+        if not self.queued_batch_requests:
+            return
+
         log.info(
-            f"{self.__class__.__name__}: Syncing AniList entry for {item.type} "
-            f"{debug_log_title} {debug_log_ids}"
+            f"{self.__class__.__name__}: Syncing {len(self.queued_batch_requests)} items to AniList "
+            f"in batch mode $${{anilist_id: {[m.media_id for m in self.queued_batch_requests]}}}$$"
         )
-        log.success(
-            f"\t\tUPDATE: {MediaList.diff(anilist_media_list, final_media_list)}"
-        )
-
-        self.anilist_client.update_anime_entry(final_media_list)
-
-        log.success(
-            f"{self.__class__.__name__}: Synced {item.type} "
-            f"{debug_log_title} {debug_log_ids}"
-        )
-        self.sync_stats.synced += 1
+        try:
+            self.anilist_client.batch_update_anime_entries(self.queued_batch_requests)
+            self.sync_stats.synced += len(self.queued_batch_requests)
+            log.success(
+                f"{self.__class__.__name__}: Synced {len(self.queued_batch_requests)} items to AniList"
+                f"with batch mode $${{anilist_id: {[m.media_id for m in self.queued_batch_requests]}}}$$"
+            )
+        finally:
+            self.queued_batch_requests.clear()
 
     def _get_plex_media_list(
         self,

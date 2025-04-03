@@ -17,6 +17,7 @@ services:
       # EXCLUDED_SYNC_FIELDS: '["notes", "score"]'
       # DRY_RUN: False
       # LOG_LEVEL: INFO
+      # BATCH_REQUESTS: False
       # SEARCH_FALLBACK_THRESHOLD=-1
       # DATA_PATH: ./data
     volumes:
