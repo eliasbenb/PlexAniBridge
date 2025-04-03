@@ -5,7 +5,13 @@ from sqlmodel import Session
 
 from src import log
 from src.core import AniListClient, AniMapClient, PlexClient
-from src.core.sync import BaseSyncClient, MovieSyncClient, ShowSyncClient, SyncStats
+from src.core.sync import (
+    BaseSyncClient,
+    MovieSyncClient,
+    ParsedGuids,
+    ShowSyncClient,
+    SyncStats,
+)
 from src.database import db
 from src.models.housekeeping import Housekeeping
 from src.settings import PlexAnibridgeConfig
@@ -243,7 +249,7 @@ class BridgeClient:
 
         start_time = datetime.now(timezone.utc)
         for section in plex_sections:
-            sync_stats += self._sync_section(plex_client, section, poll)
+            sync_stats += self._sync_section(plex_client, anilist_client, section, poll)
         end_time = datetime.now(timezone.utc)
         duration = end_time - start_time
 
@@ -268,12 +274,17 @@ class BridgeClient:
         )
 
     def _sync_section(
-        self, plex_client: PlexClient, section: MovieSection | ShowSection, poll: bool
+        self,
+        plex_client: PlexClient,
+        anilist_client: AniListClient,
+        section: MovieSection | ShowSection,
+        poll: bool,
     ) -> SyncStats:
         """Synchronizes a single Plex library section.
 
         Args:
             plex_client (PlexClient): Client for the Plex user
+            anilist_client (AniListClient): Client for the AniList user
             section (MovieSection | ShowSection): Plex library section to process
             poll (bool): Flag to enable polling scan mode
 
@@ -298,6 +309,25 @@ class BridgeClient:
             min_last_modified=last_sync if poll else None,
             require_watched=not self.config.FULL_SCAN,
         )
+
+        if self.config.BATCH_REQUESTS:
+            log.info(
+                f"{self.__class__.__name__}: Prefetching all AniList entries in batch requests"
+            )
+
+            parsed_guids = [ParsedGuids.from_guids(item.guids) for item in items]
+            imdb_ids = [guid.imdb for guid in parsed_guids if guid.imdb is not None]
+            tmdb_ids = [guid.tmdb for guid in parsed_guids if guid.tmdb is not None]
+            tvdb_ids = [guid.tvdb for guid in parsed_guids if guid.tvdb is not None]
+
+            animappings = self.animap_client.get_mappings(
+                imdb_ids, tmdb_ids, tvdb_ids, is_movie=section.type != "show"
+            )
+            anilist_ids = [
+                a.anilist_id for a in animappings if a.anilist_id is not None
+            ]
+
+            anilist_client.batch_get_anime(anilist_ids)
 
         sync_client: BaseSyncClient = {
             "movie": self.movie_sync,
