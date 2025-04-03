@@ -383,6 +383,9 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
                 f"{self.__class__.__name__}: Queuing {item.type} for batch sync "
                 f"{debug_log_title} {debug_log_ids}"
             )
+            log.success(
+                f"\t\tQUEUED UDPATE: {MediaList.diff(anilist_media_list, final_media_list)}"
+            )
             self.queued_batch_requests.append(final_media_list)
         else:
             log.info(
