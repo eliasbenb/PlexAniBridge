@@ -75,6 +75,21 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             if not relevant_seasons:
                 continue
 
+            any_relevant_episodes = self.destructive_sync
+            if not any_relevant_episodes:
+                for mapping in animapping.parsed_tvdb_mappings:
+                    mapping_episodes = episodes_by_season.get(mapping.season, [])
+                    if any(
+                        (e.viewCount or e.lastViewedAt or e.lastRatedAt)
+                        and e.index >= mapping.start
+                        and (not mapping.end or e.index <= mapping.end)
+                        for e in mapping_episodes
+                    ):
+                        any_relevant_episodes = True
+                        break
+            if not any_relevant_episodes:
+                continue
+
             try:
                 anilist_media = self.anilist_client.get_anime(animapping.anilist_id)
             except Exception:
