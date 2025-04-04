@@ -52,6 +52,9 @@ mypy_path = ["./src/stubs"]
 [tool.uv.workspace]
 members = ["docs"]
 
+[tool.uv.sources]
+plexapi = { git = "https://github.com/eliasbenb/python-plexapi", rev = "feat/lazy-loading-and-caching" }
+
 [dependency-groups]
 dev = [
     "mypy[mypyc]>=1.15.0",
