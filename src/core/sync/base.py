@@ -52,16 +52,22 @@ class ParsedGuids(BaseModel):
         """
         parsed_guids = ParsedGuids()
         for guid in guids:
+            if not guid.id:
+                continue
+
             split_guid = guid.id.split("://")
-            if len(split_guid) != 2 or not hasattr(parsed_guids, split_guid[0]):
+            if len(split_guid) != 2:
+                continue
+
+            attr = split_guid[0]
+            if not hasattr(parsed_guids, attr):
                 continue
 
             try:
-                split_guid[1] = int(split_guid[1])
+                setattr(parsed_guids, attr, int(split_guid[1]))
             except ValueError:
-                split_guid[1] = str(split_guid[1])
+                setattr(parsed_guids, attr, str(split_guid[1]))
 
-            setattr(parsed_guids, split_guid[0], split_guid[1])
         return parsed_guids
 
     def __str__(self) -> str:

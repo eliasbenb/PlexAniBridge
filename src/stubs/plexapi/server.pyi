@@ -1,72 +1,92 @@
 from collections.abc import Generator
+from datetime import datetime
 from functools import cached_property
+from typing import Callable
+from xml.etree.ElementTree import Element
 
 import requests
 from _typeshed import Incomplete
 
-from plexapi.base import PlexObject
+from plexapi.alert import AlertListener
+from plexapi.audio import Audio
+from plexapi.base import PlexHistory, PlexObject
+from plexapi.library import File, Library, LibrarySection, Path
+from plexapi.media import Agent, Session, TranscodeSession
+from plexapi.myplex import MyPlexAccount, MyPlexUser
+from plexapi.photo import Photo
+from plexapi.playlist import Playlist
+from plexapi.settings import Settings
+from plexapi.video import Video
 
 class PlexServer(PlexObject):
-    key: str
     _baseurl: str
     _session: requests.Session
     _timeout: float
     _token: str
     def __init__(
         self,
-        baseurl: Incomplete | None = None,
-        token: Incomplete | None = None,
-        session: Incomplete | None = None,
-        timeout: Incomplete | None = None,
+        baseurl: str | None = None,
+        token: str | None = None,
+        session: requests.Session | None = None,
+        timeout: int | None = None,
     ) -> None: ...
     @cached_property
-    def library(self): ...
+    def library(self) -> Library: ...
     @cached_property
-    def settings(self): ...
-    def identity(self): ...
-    def account(self): ...
-    def claim(self, account): ...
-    def unclaim(self): ...
+    def settings(self) -> Settings: ...
+    def identity(self) -> Identity: ...
+    def account(self) -> Account: ...
+    def claim(self, account: MyPlexAccount) -> Account: ...
+    def unclaim(self) -> Account: ...
     @property
-    def activities(self): ...
-    def agents(self, mediaType: Incomplete | None = None): ...
-    def createToken(self, type: str = "delegation", scope: str = "all"): ...
+    def activities(self) -> list[Activity]: ...
+    def agents(self, mediaType: str | None = None) -> list[Agent]: ...
+    def createToken(
+        self, type: str = "delegation", scope: str = "all"
+    ) -> str | None: ...
     def switchUser(
-        self, user, session: Incomplete | None = None, timeout: Incomplete | None = None
+        self,
+        user: MyPlexUser | str,
+        session: requests.Session | None = None,
+        timeout: int | None = None,
     ) -> PlexServer: ...
-    def systemAccounts(self): ...
-    def systemAccount(self, accountID): ...
-    def systemDevices(self): ...
-    def systemDevice(self, deviceID): ...
-    def myPlexAccount(self): ...
-    def browse(self, path: Incomplete | None = None, includeFiles: bool = True): ...
-    def walk(self, path: Incomplete | None = None) -> Generator[Incomplete]: ...
-    def isBrowsable(self, path): ...
+    def systemAccounts(self) -> list[SystemAccount]: ...
+    def systemAccount(self, accountID: int) -> SystemAccount: ...
+    def systemDevices(self) -> list[SystemDevice]: ...
+    def systemDevice(self, deviceID: int) -> SystemDevice: ...
+    def myPlexAccount(self) -> MyPlexAccount: ...
+    def browse(
+        self, path: Path | str | None = None, includeFiles: bool = True
+    ) -> list[Path] | list[File]: ...
+    def walk(
+        self, path: Path | str | None = None
+    ) -> Generator[tuple[str, list[Path], list[File]], None, None]: ...
+    def isBrowsable(self, path: Path | str) -> bool: ...
     def clients(self): ...
     def client(self, name): ...
     def createCollection(
         self,
-        title,
-        section,
-        items: Incomplete | None = None,
+        title: str,
+        section: LibrarySection | str,
+        items: list[Audio] | list[Photo.__class__] | list[Video] | None = None,
         smart: bool = False,
-        limit: Incomplete | None = None,
-        libtype: Incomplete | None = None,
-        sort: Incomplete | None = None,
-        filters: Incomplete | None = None,
+        limit: int | None = None,
+        libtype: str | None = None,
+        sort: str | list[str] | None = None,
+        filters: dict | None = None,
         **kwargs,
     ): ...
     def createPlaylist(
         self,
-        title,
-        section: Incomplete | None = None,
-        items: Incomplete | None = None,
+        title: str,
+        section: LibrarySection | str,
+        items: list[Audio] | list[Photo.__class__] | list[Video] | None = None,
         smart: bool = False,
-        limit: Incomplete | None = None,
-        libtype: Incomplete | None = None,
-        sort: Incomplete | None = None,
-        filters: Incomplete | None = None,
-        m3ufilepath: Incomplete | None = None,
+        limit: int | None = None,
+        libtype: str | None = None,
+        sort: str | list[str] | None = None,
+        filters: dict | None = None,
+        m3ufilepath: str | None = None,
         **kwargs,
     ): ...
     def createPlayQueue(self, item, **kwargs): ...
@@ -91,99 +111,100 @@ class PlexServer(PlexObject):
     def installUpdate(self): ...
     def history(
         self,
-        maxresults: Incomplete | None = None,
-        mindate: Incomplete | None = None,
-        ratingKey: Incomplete | None = None,
-        accountID: Incomplete | None = None,
-        librarySectionID: Incomplete | None = None,
-    ): ...
+        maxresults: int | None = None,
+        mindate: datetime | None = None,
+        ratingKey: int | str | None = None,
+        accountID: int | str | None = None,
+        librarySectionID: int | str | None = None,
+    ) -> PlexHistory: ...
     def playlists(
         self,
-        playlistType: Incomplete | None = None,
-        sectionId: Incomplete | None = None,
-        title: Incomplete | None = None,
-        sort: Incomplete | None = None,
+        playlistType: str | None = None,
+        sectionId: int | None = None,
+        title: str | None = None,
+        sort: str | None = None,
         **kwargs,
-    ): ...
-    def playlist(self, title): ...
+    ) -> list[Playlist.__class__]: ...
+    def playlist(self, title: str) -> Playlist.__class__: ...
     def optimizedItems(self, removeAll: Incomplete | None = None): ...
     def optimizedItem(self, optimizedID): ...
     def conversions(self, pause: Incomplete | None = None): ...
     def currentBackgroundProcess(self): ...
     def query(
         self,
-        key,
-        method: Incomplete | None = None,
-        headers: Incomplete | None = None,
-        params: Incomplete | None = None,
-        timeout: Incomplete | None = None,
+        key: str | None,
+        method: Callable | None = None,
+        headers: dict | None = None,
+        params: requests.sessions._Params | None = None,
+        timeout: int | None = None,
         **kwargs,
-    ): ...
+    ) -> str | dict | Element[str] | None: ...
     def search(
         self,
-        query,
-        mediatype: Incomplete | None = None,
-        limit: Incomplete | None = None,
-        sectionId: Incomplete | None = None,
+        query: str,
+        mediatype: str | None = None,
+        limit: int | None = None,
+        sectionId: int | None = None,
     ): ...
     def continueWatching(self): ...
-    def sessions(self): ...
-    def transcodeSessions(self): ...
+    def sessions(self) -> list[Session]: ...
+    def transcodeSessions(self) -> list[TranscodeSession]: ...
     def startAlertListener(
         self,
-        callback: Incomplete | None = None,
-        callbackError: Incomplete | None = None,
-    ): ...
+        callback: Callable | None = None,
+        callbackError: Callable | None = None,
+    ) -> AlertListener: ...
     def transcodeImage(
         self,
-        imageUrl,
-        height,
-        width,
-        opacity: Incomplete | None = None,
-        saturation: Incomplete | None = None,
-        blur: Incomplete | None = None,
-        background: Incomplete | None = None,
-        blendColor: Incomplete | None = None,
+        imageUrl: str,
+        height: int,
+        width: int,
+        opacity: int | None = None,
+        saturation: int | None = None,
+        blur: int | None = None,
+        background: str | None = None,
+        blendColor: str | None = None,
         minSize: bool = True,
         upscale: bool = True,
-        imageFormat: Incomplete | None = None,
-    ): ...
-    def url(self, key, includeToken: Incomplete | None = None): ...
-    def refreshSynclist(self): ...
-    def refreshContent(self): ...
+        imageFormat: str | None = None,
+    ) -> str: ...
+    def url(self, key: str | None, includeToken: bool | None = None) -> str: ...
+    def refreshSynclist(self) -> Element[str] | None: ...
+    def refreshContent(self) -> Element[str] | None: ...
     def refreshSync(self) -> None: ...
-    def bandwidth(self, timespan: Incomplete | None = None, **kwargs): ...
-    def resources(self): ...
+    def bandwidth(
+        self, timespan: str | None = None, **kwargs
+    ) -> list[StatisticsBandwidth]: ...
+    def resources(self) -> list[StatisticsResources]: ...
     def getWebURL(
-        self, base: Incomplete | None = None, playlistTab: Incomplete | None = None
-    ): ...
+        self, base: str | None = None, playlistTab: str | None = None
+    ) -> str: ...
     def _headers(self, **kwargs) -> dict[str, str]: ...
 
 class Account(PlexObject):
-    key: str
+    pass
 
 class Activity(PlexObject):
-    key: str
+    pass
 
 class Release(PlexObject):
-    TAG: str
-    key: str
+    pass
 
 class SystemAccount(PlexObject):
-    TAG: str
+    pass
 
 class SystemDevice(PlexObject):
-    TAG: str
+    pass
 
 class StatisticsBandwidth(PlexObject):
-    TAG: str
-    def account(self): ...
-    def device(self): ...
+    def account(self) -> SystemAccount: ...
+    def device(self) -> SystemDevice: ...
 
 class StatisticsResources(PlexObject):
-    TAG: str
+    pass
 
 class ButlerTask(PlexObject):
-    TAG: str
+    pass
 
-class Identity(PlexObject): ...
+class Identity(PlexObject):
+    pass

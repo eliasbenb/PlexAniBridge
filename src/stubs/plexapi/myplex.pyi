@@ -1,6 +1,17 @@
-from _typeshed import Incomplete
+from datetime import datetime
+from typing import Any, Callable
+from xml.etree.ElementTree import Element
 
-from plexapi.base import PlexObject
+import requests
+from _typeshed import Incomplete
+from typing_extensions import Self
+
+from plexapi.base import PlexHistory, PlexObject
+from plexapi.client import PlexClient
+from plexapi.library import LibrarySection
+from plexapi.server import PlexServer
+from plexapi.sync import SyncItem, SyncList
+from plexapi.video import Episode, Movie, Season, Show
 
 class MyPlexAccount(PlexObject):
     FRIENDINVITE: str
@@ -23,15 +34,64 @@ class MyPlexAccount(PlexObject):
     MUSIC: str
     DISCOVER: str
     METADATA: str
-    key: str
+
+    _token: str
+    _webhooks: list
+    adsConsent: str | None
+    adsConsentReminderAt: str | None
+    adsConsentSetAt: str | None
+    anonymous: str | None
+    authToken: str
+    backupCodesCreated: bool
+    confirmed: bool
+    country: str | None
+    email: str | None
+    emailOnlyAuth: bool
+    experimentalFeatures: bool
+    friendlyName: str | None
+    guest: bool
+    hasPassword: bool
+    home: bool
+    homeAdmin: bool
+    homeSize: int
+    id: int
+    joinedAt: datetime
+    locale: str | None
+    mailingListActive: bool
+    mailingListStatus: str | None
+    maxHomeSize: int
+    pin: str | None
+    protected: bool
+    rememberExpiresAt: datetime | None
+    restricted: bool
+    scrobbleTypes: list[int]
+    thumb: str | None
+    title: str | None
+    twoFactorEnabled: bool
+    username: str
+    uuid: str | None
+    subscriptionActive: bool
+    subscriptionDescription: str | None
+    subscriptionPaymentService: str | None
+    subscriptionPlan: str | None
+    subscriptionStatus: str | None
+    subscriptionSubscribedAt: datetime | None
+    profileAutoSelectAudio: bool
+    profileDefaultAudioLanguage: str | None
+    profileDefaultSubtitleLanguage: str | None
+    profileAutoSelectSubtitle: int
+    profileDefaultSubtitleAccessibility: int
+    profileDefaultSubtitleForces: int
+    services: Any | None
+
     def __init__(
         self,
-        username: Incomplete | None = None,
-        password: Incomplete | None = None,
-        token: Incomplete | None = None,
-        session: Incomplete | None = None,
-        timeout: Incomplete | None = None,
-        code: Incomplete | None = None,
+        username: str | None = None,
+        password: str | None = None,
+        token: str | None = None,
+        session: requests.Session | None = None,
+        timeout: int | None = None,
+        code: str | None = None,
         remember: bool = True,
     ) -> None: ...
     def signout(self): ...
@@ -39,144 +99,142 @@ class MyPlexAccount(PlexObject):
     def authenticationToken(self): ...
     def query(
         self,
-        url,
-        method: Incomplete | None = None,
-        headers: Incomplete | None = None,
-        timeout: Incomplete | None = None,
+        url: str,
+        method: Callable | None = None,
+        headers: dict | None = None,
+        timeout: int | None = None,
         **kwargs,
-    ): ...
-    def ping(self): ...
-    def device(
-        self, name: Incomplete | None = None, clientId: Incomplete | None = None
-    ): ...
-    def devices(self): ...
-    def resource(self, name): ...
-    def resources(self): ...
+    ) -> str | dict | Element[str] | None: ...
+    def ping(self) -> bool: ...
+    def device(self, name: str | None = None, clientId: str | None = None): ...
+    def devices(self) -> list[MyPlexDevice]: ...
+    def resource(self, name: str) -> MyPlexResource: ...
+    def resources(self) -> list[MyPlexResource]: ...
     def sonos_speakers(self): ...
     def sonos_speaker(self, name): ...
     def sonos_speaker_by_id(self, identifier): ...
     def inviteFriend(
         self,
-        user,
-        server,
-        sections: Incomplete | None = None,
+        user: MyPlexUser | str,
+        server: PlexServer,
+        sections: list[LibrarySection] | None = None,
         allowSync: bool = False,
         allowCameraUpload: bool = False,
         allowChannels: bool = False,
-        filterMovies: Incomplete | None = None,
-        filterTelevision: Incomplete | None = None,
-        filterMusic: Incomplete | None = None,
+        filterMovies: dict | None = None,
+        filterTelevision: dict | None = None,
+        filterMusic: dict | None = None,
     ): ...
     def createHomeUser(
         self,
-        user,
-        server,
-        sections: Incomplete | None = None,
+        user: MyPlexUser | str,
+        server: PlexServer,
+        sections: list[LibrarySection] | None = None,
         allowSync: bool = False,
         allowCameraUpload: bool = False,
         allowChannels: bool = False,
-        filterMovies: Incomplete | None = None,
-        filterTelevision: Incomplete | None = None,
-        filterMusic: Incomplete | None = None,
+        filterMovies: dict | None = None,
+        filterTelevision: dict | None = None,
+        filterMusic: dict | None = None,
     ): ...
     def createExistingUser(
         self,
-        user,
-        server,
-        sections: Incomplete | None = None,
+        user: MyPlexUser | str,
+        server: PlexServer,
+        sections: list[LibrarySection] | None = None,
         allowSync: bool = False,
         allowCameraUpload: bool = False,
         allowChannels: bool = False,
-        filterMovies: Incomplete | None = None,
-        filterTelevision: Incomplete | None = None,
-        filterMusic: Incomplete | None = None,
+        filterMovies: dict | None = None,
+        filterTelevision: dict | None = None,
+        filterMusic: dict | None = None,
     ): ...
-    def removeFriend(self, user): ...
-    def removeHomeUser(self, user): ...
-    def switchHomeUser(self, user, pin: Incomplete | None = None): ...
-    def setPin(self, newPin, currentPin: Incomplete | None = None): ...
-    def removePin(self, currentPin): ...
-    def setManagedUserPin(self, user, newPin): ...
-    def removeManagedUserPin(self, user): ...
-    def acceptInvite(self, user): ...
-    def cancelInvite(self, user): ...
+    def removeFriend(self, user: MyPlexUser | str): ...
+    def removeHomeUser(self, user: MyPlexUser | str) -> MyPlexAccount: ...
+    def switchHomeUser(
+        self, user: MyPlexUser | str, pin: str | None = None
+    ) -> MyPlexAccount: ...
+    def setPin(self, newPin: str, currentPin: str | None = None): ...
+    def removePin(self, currentPin: str): ...
+    def setManagedUserPin(self, user: MyPlexUser | str, newPin: str): ...
+    def removeManagedUserPin(self, user: MyPlexUser | str): ...
+    def acceptInvite(self, user: MyPlexUser | str): ...
+    def cancelInvite(self, user: MyPlexUser | str): ...
     def updateFriend(
         self,
-        user,
-        server,
-        sections: Incomplete | None = None,
+        user: MyPlexUser | str,
+        server: PlexServer,
+        sections: list[LibrarySection] | None = None,
         removeSections: bool = False,
-        allowSync: Incomplete | None = None,
-        allowCameraUpload: Incomplete | None = None,
-        allowChannels: Incomplete | None = None,
-        filterMovies: Incomplete | None = None,
-        filterTelevision: Incomplete | None = None,
-        filterMusic: Incomplete | None = None,
+        allowSync: bool | None = None,
+        allowCameraUpload: bool | None = None,
+        allowChannels: bool | None = None,
+        filterMovies: dict | None = None,
+        filterTelevision: dict | None = None,
+        filterMusic: dict | None = None,
     ): ...
-    def user(self, username): ...
-    def users(self): ...
+    def user(self, username: str) -> MyPlexUser: ...
+    def users(self) -> list[MyPlexUser]: ...
     def pendingInvite(
-        self, username, includeSent: bool = True, includeReceived: bool = True
-    ): ...
+        self, username: str, includeSent: bool = True, includeReceived: bool = True
+    ) -> MyPlexInvite: ...
     def pendingInvites(
         self, includeSent: bool = True, includeReceived: bool = True
-    ): ...
-    def addWebhook(self, url): ...
-    def deleteWebhook(self, url): ...
-    def setWebhooks(self, urls): ...
+    ) -> list[MyPlexInvite]: ...
+    def addWebhook(self, url: str): ...
+    def deleteWebhook(self, url: str): ...
+    def setWebhooks(self, urls: list[str]): ...
     def webhooks(self): ...
     def optOut(
         self, playback: Incomplete | None = None, library: Incomplete | None = None
     ): ...
     def syncItems(
-        self, client: Incomplete | None = None, clientId: Incomplete | None = None
-    ): ...
+        self, client: MyPlexDevice | None = None, clientId: str | None = None
+    ) -> SyncList: ...
     def sync(
         self,
-        sync_item,
-        client: Incomplete | None = None,
-        clientId: Incomplete | None = None,
-    ): ...
-    def claimToken(self): ...
+        sync_item: SyncItem,
+        client: MyPlexDevice | None = None,
+        clientId: str | None = None,
+    ) -> SyncItem: ...
+    def claimToken(self) -> str: ...
     def history(
-        self, maxresults: Incomplete | None = None, mindate: Incomplete | None = None
-    ): ...
+        self, maxresults: int | None = None, mindate: datetime | None = None
+    ) -> list[PlexHistory]: ...
     def onlineMediaSources(self): ...
     def videoOnDemand(self): ...
     def tidal(self): ...
     def watchlist(
         self,
-        filter: Incomplete | None = None,
-        sort: Incomplete | None = None,
-        libtype: Incomplete | None = None,
-        maxresults: Incomplete | None = None,
+        filter: str | None = None,
+        sort: str | None = None,
+        libtype: str | None = None,
+        maxresults: int | None = None,
         **kwargs,
-    ): ...
-    def onWatchlist(self, item): ...
-    def addToWatchlist(self, items): ...
-    def removeFromWatchlist(self, items): ...
-    def userState(self, item): ...
-    def isPlayed(self, item): ...
-    def markPlayed(self, item): ...
-    def markUnplayed(self, item): ...
+    ) -> list[Movie | Show]: ...
+    def onWatchlist(self, item: Movie | Show) -> bool: ...
+    def addToWatchlist(self, items: list[Movie | Show]) -> Self: ...
+    def removeFromWatchlist(self, items: list[Movie | Show]) -> Self: ...
+    def userState(self, item: Movie | Show): ...
+    def isPlayed(self, item: Movie | Show | Season | Episode) -> bool: ...
+    def markPlayed(self, item: Movie | Show | Season | Episode) -> Self: ...
+    def markUnplayed(self, item: Movie | Show | Season | Episode) -> Self: ...
     def searchDiscover(
         self,
-        query,
+        query: str,
         limit: int = 30,
-        libtype: Incomplete | None = None,
+        libtype: str | None = None,
         providers: str = "discover",
-    ): ...
+    ) -> list[Movie | Show]: ...
     @property
-    def viewStateSync(self): ...
+    def viewStateSync(self) -> bool: ...
     def enableViewStateSync(self) -> None: ...
     def disableViewStateSync(self) -> None: ...
-    def link(self, pin) -> None: ...
+    def link(self, pin: str) -> None: ...
     def publicIP(self): ...
-    def geoip(self, ip_address): ...
+    def geoip(self, ip_address: str) -> GeoLocation: ...
 
 class MyPlexUser(PlexObject):
-    TAG: str
-    key: str
     friend: bool
     allowCameraUpload: bool
     allowChannels: bool
@@ -199,31 +257,28 @@ class MyPlexUser(PlexObject):
     def get_token(self, machineIdentifier): ...
     def server(self, name): ...
     def history(
-        self, maxresults: Incomplete | None = None, mindate: Incomplete | None = None
-    ): ...
+        self, maxresults: int | None = None, mindate: datetime | None = None
+    ) -> list[PlexHistory]: ...
 
 class MyPlexInvite(PlexObject):
-    TAG: str
     REQUESTS: str
     REQUESTED: str
 
 class Section(PlexObject):
-    TAG: str
     def history(
-        self, maxresults: Incomplete | None = None, mindate: Incomplete | None = None
-    ): ...
+        self, maxresults: int | None = None, mindate: datetime | None = None
+    ) -> list[PlexHistory]: ...
 
 class MyPlexServerShare(PlexObject):
-    TAG: str
     def section(self, name): ...
     def sections(self): ...
-    def history(self, maxresults: int = 9999999, mindate: Incomplete | None = None): ...
+    def history(
+        self, maxresults: int = 9999999, mindate: datetime | None = None
+    ) -> list[PlexHistory]: ...
 
 class MyPlexResource(PlexObject):
-    TAG: str
-    key: str
-    DEFAULT_LOCATION_ORDER: Incomplete
-    DEFAULT_SCHEME_ORDER: Incomplete
+    DEFAULT_LOCATION_ORDER: list[str]
+    DEFAULT_SCHEME_ORDER: list[str]
     def preferred_connections(
         self,
         ssl: Incomplete | None = None,
@@ -232,56 +287,57 @@ class MyPlexResource(PlexObject):
     ): ...
     def connect(
         self,
-        ssl: Incomplete | None = None,
-        timeout: Incomplete | None = None,
+        ssl: bool | None = None,
+        timeout: int | None = None,
         locations: Incomplete | None = None,
         schemes: Incomplete | None = None,
-    ): ...
+    ) -> PlexServer | PlexClient.__class__: ...
 
 class ResourceConnection(PlexObject):
-    TAG: str
+    pass
 
 class MyPlexDevice(PlexObject):
-    TAG: str
-    key: str
-    def connect(self, timeout: Incomplete | None = None): ...
+    def connect(
+        self, timeout: int | None = None
+    ) -> PlexServer | PlexClient.__class__: ...
     def delete(self) -> None: ...
-    def syncItems(self): ...
+    def syncItems(self) -> SyncList: ...
 
 class MyPlexPinLogin:
     PINS: str
     CHECKPINS: str
     POLLINTERVAL: int
-    headers: Incomplete
+    headers: dict
     finished: bool
     expired: bool
-    token: Incomplete
+    token: str
     def __init__(
         self,
-        session: Incomplete | None = None,
-        requestTimeout: Incomplete | None = None,
-        headers: Incomplete | None = None,
+        session: requests.Session | None = None,
+        requestTimeout: int | None = None,
+        headers: dict | None = None,
         oauth: bool = False,
     ) -> None: ...
     @property
-    def pin(self): ...
-    def oauthUrl(self, forwardUrl: Incomplete | None = None): ...
+    def pin(self) -> str: ...
+    def oauthUrl(self, forwardUrl: str | None = None) -> str: ...
     def run(
-        self, callback: Incomplete | None = None, timeout: Incomplete | None = None
+        self,
+        callback: Callable[[str], Any] | None = None,
+        timeout: int | None = None,
     ) -> None: ...
-    def waitForLogin(self): ...
+    def waitForLogin(self) -> bool: ...
     def stop(self) -> None: ...
-    def checkLogin(self): ...
+    def checkLogin(self) -> bool: ...
 
 class AccountOptOut(PlexObject):
-    TAG: str
     CHOICES: Incomplete
     def optIn(self) -> None: ...
     def optOut(self) -> None: ...
     def optOutManaged(self) -> None: ...
 
 class UserState(PlexObject):
-    TAG: str
+    pass
 
 class GeoLocation(PlexObject):
-    TAG: str
+    pass

@@ -2,7 +2,7 @@ from time import sleep
 
 import requests
 import urllib3.exceptions
-from limiter import Limiter
+from limiter import Limiter  # type: ignore
 
 from src import __version__, log
 

@@ -58,6 +58,6 @@ plexapi = { git = "https://github.com/eliasbenb/python-plexapi", rev = "feat/laz
 [dependency-groups]
 dev = [
     "mypy[mypyc]>=1.15.0",
-    "pyright>=1.1.398",
     "types-requests>=2.32.0.20250328",
+    "types-setuptools>=78.1.0.20250329",
 ]

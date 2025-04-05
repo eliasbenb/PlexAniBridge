@@ -7,7 +7,7 @@ from xml.etree import ElementTree
 import plexapi.utils
 import requests
 from cachetools.func import lru_cache
-from plexapi.library import MovieSection, ShowSection
+from plexapi.library import LibrarySection, MovieSection, ShowSection
 from plexapi.myplex import MyPlexUser
 from plexapi.server import PlexServer
 from plexapi.video import (
@@ -242,7 +242,9 @@ class PlexClient:
             )
 
         sections = {
-            section.title: section for section in self.user_client.library.sections()
+            section.title: section
+            for section in self.user_client.library.sections()
+            if isinstance(section, Section)
         }
         if self.plex_sections:
             return [
@@ -362,7 +364,7 @@ class PlexClient:
 
     @lru_cache(maxsize=32)
     def get_continue_watching_hub(
-        self, section: MovieSection | ShowSection
+        self, section: LibrarySection
     ) -> list[Episode] | list[Movie]:
         """Retrieves all items in the Continue Watching hub.
 

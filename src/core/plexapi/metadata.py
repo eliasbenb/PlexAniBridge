@@ -46,8 +46,8 @@ def original_server(func: Callable[..., Any]) -> Callable[..., Any]:
         original_url = self._server._baseurl
         original_token = self._server._token
         try:
-            self._server._baseurl = self._server._original_baseurl  # type: ignore
-            self._server._token = self._server._original_token  # type: ignore
+            self._server._baseurl = self._server.__dict__.get("_original_baseurl", "")
+            self._server._token = self._server.__dict__.get("_original_token", "")
             return func(self, *args, **kwargs)
         finally:
             self._server._baseurl = original_url
@@ -126,7 +126,7 @@ class PlexMetadataObject(PlexObject):
         return super()._reload(*args, **kwargs)
 
     def _reload(self, *args, **kwargs):
-        if self._source == self._server._original_baseurl:  # type: ignore
+        if self._source == self._server.__dict__.get("_original_baseurl"):
             return self._reloadOriginalServer(*args, **kwargs)
         elif self._source == self._server.myPlexAccount().METADATA:
             return self._reloadMetadataServer(*args, **kwargs)
@@ -304,8 +304,8 @@ class MetadataLibrary(PlexMetadataObject, Library):
             "show": MetadataShowSection,
         }
 
-        for elem in self._server.query(key):
-            section = libcls.get(elem.attrib.get("type"), MetadataLibrarySection)(
+        for elem in self._server.query(key):  # type: ignore
+            section = libcls.get(elem.attrib.get("type"), MetadataLibrarySection)(  # type: ignore
                 self._server, elem, initpath=key
             )
             sectionsByID[section.key] = section
