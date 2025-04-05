@@ -53,8 +53,10 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             if episode.parentIndex in seasons:
                 episodes_by_season.setdefault(episode.parentIndex, []).append(episode)
 
-        all_possible_episodes = [e for eps in episodes_by_season.values() for e in eps]
-        self.sync_stats.possible |= {str(e) for e in all_possible_episodes}
+        all_possible_episodes = {
+            str(e) for eps in episodes_by_season.values() for e in eps
+        }
+        self.sync_stats.possible |= all_possible_episodes
 
         processed_seasons = set()  # To keep track of seasons that were processed
 
@@ -73,10 +75,10 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             }
 
             if not relevant_seasons:
+                self.sync_stats.covered |= all_possible_episodes
                 continue
-
-            any_relevant_episodes = self.destructive_sync
-            if not any_relevant_episodes:
+            elif not self.destructive_sync:
+                any_relevant_episodes = False
                 for mapping in animapping.parsed_tvdb_mappings:
                     mapping_episodes = episodes_by_season.get(mapping.season, [])
                     if any(
@@ -87,8 +89,9 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
                     ):
                         any_relevant_episodes = True
                         break
-            if not any_relevant_episodes:
-                continue
+                if not any_relevant_episodes:
+                    self.sync_stats.covered |= all_possible_episodes
+                    continue
 
             try:
                 anilist_media = self.anilist_client.get_anime(animapping.anilist_id)
