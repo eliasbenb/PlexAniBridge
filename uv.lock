@@ -597,7 +597,7 @@ requires-dist = [
     { name = "cachetools", specifier = ">=5.5.2" },
     { name = "colorama", specifier = ">=0.4.6" },
     { name = "limiter", specifier = ">=0.5.0" },
-    { name = "plexapi", git = "https://github.com/eliasbenb/python-plexapi?rev=feat%2Flazy-loading-and-caching" },
+    { name = "plexapi", git = "https://github.com/pushingkarmaorg/python-plexapi" },
     { name = "pydantic", specifier = ">=2.11.1" },
     { name = "pydantic-settings", specifier = ">=2.8.1" },
     { name = "pyyaml", specifier = ">=6.0.2" },
@@ -618,14 +618,14 @@ dev = [
 [[package]]
 name = "plexapi"
 version = "4.16.1"
-source = { git = "https://github.com/eliasbenb/python-plexapi?rev=feat%2Flazy-loading-and-caching#aea4282b9ed9e701c1d5159f113af4f14b7a9f80" }
+source = { git = "https://github.com/pushingkarmaorg/python-plexapi#0d4124ff785d4797af1cc31647896402ee6780fc" }
 dependencies = [
     { name = "requests" },
 ]
 
 [[package]]
 name = "pydantic"
-version = "2.11.2"
+version = "2.11.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "annotated-types" },
@@ -633,9 +633,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "typing-inspection" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b0/41/832125a41fe098b58d1fdd04ae819b4dc6b34d6b09ed78304fd93d4bc051/pydantic-2.11.2.tar.gz", hash = "sha256:2138628e050bd7a1e70b91d4bf4a91167f4ad76fdb83209b107c8d84b854917e", size = 784742 }
+sdist = { url = "https://files.pythonhosted.org/packages/10/2e/ca897f093ee6c5f3b0bee123ee4465c50e75431c3d5b6a3b44a47134e891/pydantic-2.11.3.tar.gz", hash = "sha256:7471657138c16adad9322fe3070c0116dd6c3ad8d649300e3cbdfe91f4db4ec3", size = 785513 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/bf/c2/0f3baea344d0b15e35cb3e04ad5b953fa05106b76efbf4c782a3f47f22f5/pydantic-2.11.2-py3-none-any.whl", hash = "sha256:7f17d25846bcdf89b670a86cdfe7b29a9f1c9ca23dee154221c9aa81845cfca7", size = 443295 },
+    { url = "https://files.pythonhosted.org/packages/b0/1d/407b29780a289868ed696d1616f4aad49d6388e5a77f567dcd2629dcd7b8/pydantic-2.11.3-py3-none-any.whl", hash = "sha256:a082753436a07f9ba1289c6ffa01cd93db3548776088aa917cc43b63f68fa60f", size = 443591 },
 ]
 
 [[package]]

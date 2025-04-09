@@ -53,7 +53,7 @@ mypy_path = ["./src/stubs"]
 members = ["docs"]
 
 [tool.uv.sources]
-plexapi = { git = "https://github.com/eliasbenb/python-plexapi", rev = "feat/lazy-loading-and-caching" }
+plexapi = { git = "https://github.com/pushingkarmaorg/python-plexapi" }
 
 [dependency-groups]
 dev = [
