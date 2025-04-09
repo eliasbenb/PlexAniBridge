@@ -1,4 +1,3 @@
-import logging
 from collections import defaultdict
 from functools import cached_property, wraps
 from itertools import chain
@@ -24,9 +23,8 @@ from plexapi.utils import cleanXMLString
 from plexapi.video import Episode, Movie, Season, Show, Video
 from requests.status_codes import _codes as codes  # type: ignore[import]
 
+from src import log
 from src.utils.cache import generic_ttl_cache
-
-log = logging.getLogger("plexapi")
 
 plex_metadata_limiter = Limiter(rate=300 / 60, capacity=30, jitter=True)
 

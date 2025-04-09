@@ -7,6 +7,10 @@ from pydantic.alias_generators import to_camel
 from pydantic.fields import _Unset
 from pydantic_settings import BaseSettings
 
+from src.logging import get_logger
+
+_log = get_logger(log_name="PlexAniBridge", log_level="INFO")
+
 
 class PlexMetadataSource(StrEnum):
     """Defines the source of metadata for Plex media items."""
@@ -120,16 +124,6 @@ class PlexAnibridgeConfig(BaseSettings):
     @model_validator(mode="before")
     def catch_extra_env_vars(cls, values) -> dict[str, str]:
         """Catches extra environment variables not defined in the model and logs them."""
-        from src.logging import Logger, get_logger
-
-        log_level = values.get("LOG_LEVEL", "INFO")
-        log_dir = Path(values.get("DATA_PATH", "./data")) / "logs"
-        log: Logger = get_logger(
-            log_name="PlexAniBridge",
-            log_level=log_level,
-            log_dir=str(log_dir.resolve()),
-        )
-
         # `DEPRECATED` and `DEPRECATED_ALIAS` are used to warn users about
         # upcoming changes to configuration settings.
         DEPRECATED: dict[str, str] = {}
@@ -145,16 +139,16 @@ class PlexAnibridgeConfig(BaseSettings):
         for key in extra:
             key = key.upper()
             if key in DEPRECATED:
-                log.warning(
+                _log.warning(
                     f"$$'{key}'$$ is going to become deprecated soon, use $$'{DEPRECATED[key]}'$$ instead"
                 )
             elif key in DEPRECATED_ALIAS:
-                log.warning(
+                _log.warning(
                     f"$$'{key}'$$ is going to become deprecated soon, use $$'{DEPRECATED_ALIAS[key]}'$$ instead"
                 )
                 values[DEPRECATED_ALIAS[key]] = values[key.lower()]
             else:
-                log.warning(f"Unrecognized configuration setting: $$'{key}'$$")
+                _log.warning(f"Unrecognized configuration setting: $$'{key}'$$")
             del values[key.lower()]
 
         return values
@@ -247,3 +241,6 @@ class PlexAnibridgeConfig(BaseSettings):
     class Config:
         env_file = ".env"
         extra = "allow"
+
+
+config = PlexAnibridgeConfig()
