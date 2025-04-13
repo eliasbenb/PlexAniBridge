@@ -123,7 +123,7 @@ class MappingsClient:
         Returns:
             AniMapDict: Merged mappings from all included files
         """
-        mappings = {}
+        mappings: dict[str, dict[str, Any]] = {}
         for include in includes:
             resolved_include = self._resolve_path(include, parent)
 
@@ -182,15 +182,15 @@ class MappingsClient:
 
         self._loaded_sources.add(file)
 
-        includes = mappings.get("$includes", [])
-        if not isinstance(includes, list):
+        includes: list[str] = []
+        includes_value: dict | list = mappings.get("$includes", [])
+        if isinstance(includes_value, list):
+            includes = [str(item) for item in includes_value]
+        else:
             log.warning(
-                f"{self.__class__.__name__}: The $includes key in $$'{str(file_path.resolve())}'$$ "
+                f"{self.__class__.__name__}: The $includes key in $'{str(file_path.resolve())}'$ "
                 "is not a list, ignoring all entries"
             )
-            includes = []
-        else:
-            includes = [str(item) for item in includes]
 
         return self._deep_merge(
             self._load_includes(includes, loaded_chain, str(file_path)),
@@ -236,14 +236,14 @@ class MappingsClient:
 
         self._loaded_sources.add(url)
 
-        includes = mappings.get("$includes", [])
-        if not isinstance(includes, list):
+        includes: list[str] = []
+        includes_value: dict | list = mappings.get("$includes", [])
+        if isinstance(includes_value, list):
+            includes = [str(item) for item in includes_value]
+        else:
             log.warning(
                 f"{self.__class__.__name__}: $includes in {url} is not a list, ignoring"
             )
-            includes = []
-        else:
-            includes = [str(item) for item in includes]
 
         return self._deep_merge(
             self._load_includes(includes, loaded_chain, url),

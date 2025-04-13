@@ -30,7 +30,6 @@ from .plexapi.metadata import PlexMetadataServer
 Media: TypeAlias = Movie | Show | Season | Episode
 MediaHistory: TypeAlias = MovieHistory | EpisodeHistory
 Section: TypeAlias = MovieSection | ShowSection
-History: TypeAlias = MovieHistory | EpisodeHistory
 
 
 class PlexClient:
@@ -269,7 +268,7 @@ class PlexClient:
         Returns:
             list[Media]: List of media items matching the criteria
         """
-        filters = {"and": []}
+        filters: dict = {"and": []}
 
         if min_last_modified:
             if self.is_online_user:
@@ -411,14 +410,14 @@ class PlexClient:
     def get_history(
         self,
         item: Media,
-    ) -> list[History]:
+    ) -> list[EpisodeHistory | MovieHistory]:
         """Retrieves watch history for a media item.
 
         Args:
             item (Media): Media item(s) to get history for
 
         Returns:
-            list[History]: Watch history entries for the item
+            list[EpisodeHistory | MovieHistory]: Watch history entries for the item
         """
         if not self.is_online_user or not self.online_client:
             args = {"metadataItemID": item.ratingKey, "accountID": self.user_account_id}

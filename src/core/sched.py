@@ -2,7 +2,7 @@ import asyncio
 import signal
 from datetime import datetime, timedelta, timezone
 from functools import partial
-from types import CoroutineType
+from typing import Any, Coroutine
 
 from tzlocal import get_localzone
 
@@ -28,7 +28,7 @@ class SchedulerClient:
         self._running = False
         self._tasks: set[asyncio.Task] = set()
         self._sync_lock = asyncio.Lock()
-        self._current_task = None
+        self._current_task: asyncio.Task | None = None
         self.stop_event = stop_event or asyncio.Event()
 
     async def run_sync(self, poll: bool) -> None:
@@ -122,7 +122,7 @@ class SchedulerClient:
                 log.error(f"{self.__class__.__name__}: Reinit error", exc_info=True)
                 await asyncio.sleep(10)
 
-    def _create_task(self, coro: CoroutineType) -> None:
+    def _create_task(self, coro: Coroutine[Any, Any, None]) -> None:
         """Create and track an asyncio task"""
         task = asyncio.create_task(coro)
         self._tasks.add(task)

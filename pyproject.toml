@@ -58,6 +58,8 @@ plexapi = { git = "https://github.com/pushingkarmaorg/python-plexapi" }
 [dependency-groups]
 dev = [
     "mypy[mypyc]>=1.15.0",
+    "types-cachetools>=5.5.0.20240820",
+    "types-pyyaml>=6.0.12.20250402",
     "types-requests>=2.32.0.20250328",
     "types-setuptools>=78.1.0.20250329",
 ]

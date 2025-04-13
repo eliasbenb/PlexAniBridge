@@ -229,19 +229,26 @@ class BridgeClient:
             f"with AniList user $$'{anilist_client.user.name}'$$"
         )
 
-        sync_client_args = {
-            "anilist_client": anilist_client,
-            "animap_client": self.animap_client,
-            "plex_client": plex_client,
-            "excluded_sync_fields": self.config.EXCLUDED_SYNC_FIELDS,
-            "full_scan": self.config.FULL_SCAN,
-            "destructive_sync": self.config.DESTRUCTIVE_SYNC,
-            "search_fallback_threshold": self.config.SEARCH_FALLBACK_THRESHOLD,
-            "batch_requests": self.config.BATCH_REQUESTS,
-        }
-
-        self.movie_sync = MovieSyncClient(**sync_client_args)
-        self.show_sync = ShowSyncClient(**sync_client_args)
+        self.movie_sync = MovieSyncClient(
+            anilist_client=anilist_client,
+            animap_client=self.animap_client,
+            plex_client=plex_client,
+            excluded_sync_fields=self.config.EXCLUDED_SYNC_FIELDS,
+            full_scan=self.config.FULL_SCAN,
+            destructive_sync=self.config.DESTRUCTIVE_SYNC,
+            search_fallback_threshold=self.config.SEARCH_FALLBACK_THRESHOLD,
+            batch_requests=self.config.BATCH_REQUESTS,
+        )
+        self.show_sync = ShowSyncClient(
+            anilist_client=anilist_client,
+            animap_client=self.animap_client,
+            plex_client=plex_client,
+            excluded_sync_fields=self.config.EXCLUDED_SYNC_FIELDS,
+            full_scan=self.config.FULL_SCAN,
+            destructive_sync=self.config.DESTRUCTIVE_SYNC,
+            search_fallback_threshold=self.config.SEARCH_FALLBACK_THRESHOLD,
+            batch_requests=self.config.BATCH_REQUESTS,
+        )
 
         plex_sections = plex_client.get_sections()
 

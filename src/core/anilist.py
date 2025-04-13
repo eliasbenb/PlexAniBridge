@@ -2,6 +2,7 @@ import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from time import sleep
+from typing import Any
 
 import requests.exceptions
 import urllib3.exceptions
@@ -430,7 +431,7 @@ class AniListClient:
         if not anilist_ids:
             return []
 
-        result = []
+        result: list[Media] = []
         missing_ids = []
 
         cached_ids = [id for id in anilist_ids if id in self.offline_anilist_entries]
@@ -505,7 +506,11 @@ class AniListClient:
         """
 
         data = MediaListCollectionWithMedia(user=self.user, has_next_chunk=True)
-        variables = {"userId": self.user.id, "type": "ANIME", "chunk": 0}
+        variables: dict[str, Any] = {
+            "userId": self.user.id,
+            "type": "ANIME",
+            "chunk": 0,
+        }
 
         while data.has_next_chunk:
             response = self._make_request(query, variables)["data"][

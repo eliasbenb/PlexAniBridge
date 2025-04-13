@@ -21,7 +21,6 @@ from plexapi.library import (
 from plexapi.server import PlexServer
 from plexapi.utils import cleanXMLString
 from plexapi.video import Episode, Movie, Season, Show, Video
-from requests.status_codes import _codes as codes  # type: ignore[import]
 
 from src import log
 from src.utils.cache import generic_ttl_cache
@@ -375,9 +374,8 @@ class PlexMetadataServer(PlexServer):
             )
 
         if response.status_code not in (200, 201, 204):
-            codename = codes.get(response.status_code)[0]
             errtext = response.text.replace("\n", " ")
-            message = f"({response.status_code}) {codename}; {response.url} {errtext}"
+            message = f"({response.status_code}) {response.status_code}; {response.url} {errtext}"
             if response.status_code == 401:
                 raise Unauthorized(message)
             elif response.status_code == 404:

@@ -197,10 +197,16 @@ class MovieSection(LibrarySection, MovieEditMixins):
     def recentlyAddedMovies(self, maxresults: int = 50) -> list[Movie]: ...
     def sync(
         self,
-        videoQuality: int,
+        policy: Policy,
+        mediaSettings: MediaSettings,
+        client: MyPlexDevice | None = None,
+        clientId: Incomplete | str = None,
+        title: Incomplete | str = None,
+        sort: Incomplete | str = None,
+        libtype: Incomplete | str = None,
+        videoQuality: int = 0,
         limit: int | None = None,
         unwatched: bool = False,
-        *args,
         **kwargs,
     ) -> SyncItem: ...
 
@@ -215,10 +221,16 @@ class ShowSection(LibrarySection, ShowEditMixins, SeasonEditMixins, EpisodeEditM
     def recentlyAddedEpisodes(self, maxresults: int = 50) -> list[Episode]: ...
     def sync(
         self,
-        videoQuality: int,
+        policy: Policy,
+        mediaSettings: MediaSettings,
+        client: MyPlexDevice | None = None,
+        clientId: Incomplete | str = None,
+        title: Incomplete | str = None,
+        sort: Incomplete | str = None,
+        libtype: Incomplete | str = None,
+        videoQuality: int = 0,
         limit: int | None = None,
         unwatched: bool = False,
-        *args,
         **kwargs,
     ) -> SyncItem: ...
 
@@ -234,7 +246,18 @@ class MusicSection(LibrarySection, ArtistEditMixins, AlbumEditMixins, TrackEditM
     def recentlyAddedAlbums(self, maxresults: int = 50): ...
     def recentlyAddedTracks(self, maxresults: int = 50): ...
     def sync(
-        self, bitrate: int, limit: int | None = None, *args, **kwargs
+        self,
+        policy: Policy,
+        mediaSettings: MediaSettings,
+        client: MyPlexDevice | None = None,
+        clientId: Incomplete | str = None,
+        title: Incomplete | str = None,
+        sort: Incomplete | str = None,
+        libtype: Incomplete | str = None,
+        bitrate: int = 0,
+        limit: int | None = None,
+        *args: Any,
+        **kwargs: Any,
     ) -> SyncItem: ...
     def sonicAdventure(
         self, start: Track.__class__ | int, end: Track.__class__ | int, **kwargs: Any
@@ -249,7 +272,18 @@ class PhotoSection(LibrarySection, PhotoalbumEditMixins, PhotoEditMixins):
     def searchPhotos(self, **kwargs): ...
     def recentlyAddedAlbums(self, maxresults: int = 50): ...
     def sync(
-        self, resolution: str, limit: int | None = None, *args, **kwargs
+        self,
+        policy: Policy,
+        mediaSettings: MediaSettings,
+        client: MyPlexDevice | None = None,
+        clientId: Incomplete | str = None,
+        title: Incomplete | str = None,
+        sort: Incomplete | str = None,
+        libtype: Incomplete | str = None,
+        resolution: str = "",
+        limit: int | None = None,
+        *args: Any,
+        **kwargs: Any,
     ) -> SyncItem: ...
 
 class LibraryTimeline(PlexObject):

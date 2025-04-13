@@ -4,20 +4,9 @@ from pathlib import Path
 from typing import Any
 
 from pydantic import ValidationError
-from sqlalchemy import (
-    and_,
-    column,
-    delete,
-    exists,
-    false,
-    func,
-    not_,
-    or_,
-    select,
-    true,
-)
+from sqlalchemy import and_, column, delete, exists, false, func, not_, or_, select
 from sqlalchemy.orm.base import Mapped
-from sqlalchemy.sql.elements import BinaryExpression
+from sqlalchemy.sql.elements import BinaryExpression, ColumnElement
 from sqlmodel import Session, col
 
 from src import log
@@ -272,11 +261,12 @@ class AniMapClient:
                         json_dict_contains(col(AniMap.tvdb_mappings), f"s{season}")
                     )
 
-            final_conditions = true()
+            merged_conditions: list[ColumnElement[bool]] = []
             if or_conditions:
-                final_conditions = and_(final_conditions, or_(*or_conditions))
+                merged_conditions.append(or_(*or_conditions))
             if and_conditions:
-                final_conditions = and_(final_conditions, *and_conditions)
+                merged_conditions.append(and_(*and_conditions))
+            where_clause = and_(*merged_conditions)
 
-            query = select(AniMap).where(final_conditions)
+            query = select(AniMap).where(where_clause)
             return list(session.execute(query).scalars().all())
