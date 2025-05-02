@@ -25,9 +25,9 @@ dependencies = [
     "cachetools>=5.5.2",
     "colorama>=0.4.6",
     "limiter>=0.5.0",
-    "plexapi>=4.16.1",
+    "plexapi>=4.17.0",
     "pydantic>=2.11.1",
-    "pydantic-settings>=2.8.1",
+    "pydantic-settings>=2.9.1",
     "pyyaml>=6.0.2",
     "requests>=2.32.3",
     "sqlmodel>=0.0.24",
@@ -48,7 +48,3 @@ extraPaths = ["./src/stubs"]
 
 [tool.uv.workspace]
 members = ["docs"]
-
-[tool.uv.sources]
-plexapi = { git = "https://github.com/pushingkarmaorg/python-plexapi" }
-
