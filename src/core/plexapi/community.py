@@ -1,11 +1,12 @@
-from textwrap import dedent
 from time import sleep
 
 import requests
 import urllib3.exceptions
+from limiter import Limiter  # type: ignore
 
 from src import __version__, log
-from src.utils.rate_limiter import RateLimiter
+
+plex_community_limiter = Limiter(rate=300 / 60, capacity=30, jitter=True)
 
 
 class PlexCommunityClient:
@@ -24,10 +25,6 @@ class PlexCommunityClient:
             }
         )
 
-        self.rate_limiter = RateLimiter(
-            log_name=self.__class__.__name__, requests_per_minute=360
-        )
-
     def get_watch_activity(self, metadata_id: str) -> list:
         """Fetches only watch activity for a given metadata ID and returns a list of PlexAPI EpisodeHistory or MovieHistory objects.
 
@@ -37,7 +34,7 @@ class PlexCommunityClient:
         Returns:
             list: A list of PlexAPI EpisodeHistory or MovieHistory objects.
         """
-        query = dedent("""
+        query = """
         query GetWatchActivity($first: PaginationInt!, $after: String, $metadataID: ID) {
             activityFeed(
                 first: $first
@@ -79,7 +76,7 @@ class PlexCommunityClient:
                 }
             }
         }
-        """).strip()
+        """
 
         res = []
         current_after = None
@@ -110,7 +107,7 @@ class PlexCommunityClient:
         Returns:
             str: The review message, or None if no review is found
         """
-        query = dedent("""
+        query = """
         query GetReview($metadataID: ID!) {
             metadataReviewV2(metadata: {id: $metadataID}) {
                 ... on ActivityReview {
@@ -121,7 +118,7 @@ class PlexCommunityClient:
                 }
             }
         }
-        """).strip()
+        """
 
         response = self._make_request(query, {"metadataID": metadata_id}, "GetReview")
         data = response["data"]["metadataReviewV2"]
@@ -133,7 +130,7 @@ class PlexCommunityClient:
     def _make_request(
         self,
         query: str,
-        variables: dict | str = None,
+        variables: dict | str | None = None,
         operation_name: str | None = None,
         retry_count: int = 0,
     ) -> dict:
@@ -156,8 +153,6 @@ class PlexCommunityClient:
         """
         if retry_count >= 3:
             raise requests.exceptions.HTTPError("Failed to make request after 3 tries")
-
-        self.rate_limiter.wait_if_needed()  # Rate limit the requests
 
         try:
             response = self.session.post(

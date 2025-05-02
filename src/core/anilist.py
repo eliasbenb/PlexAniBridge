@@ -1,11 +1,13 @@
+import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from textwrap import dedent
 from time import sleep
+from typing import Any
 
 import requests.exceptions
 import urllib3.exceptions
 from cachetools.func import ttl_cache
+from limiter import Limiter
 
 from src import __version__, log
 from src.models.anilist import (
@@ -18,7 +20,8 @@ from src.models.anilist import (
     MediaStatus,
     User,
 )
-from src.utils.rate_limiter import RateLimiter
+
+anilist_limiter = Limiter(rate=(30 / 60) * 0.9, capacity=3, jitter=False)
 
 
 class AniListClient:
@@ -27,16 +30,6 @@ class AniListClient:
     This client provides methods to interact with the AniList GraphQL API, including searching for anime,
     updating user lists, and managing anime entries. It implements rate limiting and local caching
     to optimize API usage.
-
-    Attributes:
-        API_URL (str): The AniList GraphQL API endpoint
-        BACKUP_RETENTION_DAYS (int): Number of days to retain backup files
-        anilist_token (str): Authentication token for AniList API
-        backup_dir (Path): Directory where backup files are stored
-        dry_run (bool): If True, skips making actual API modifications
-        rate_limiter (RateLimiter): Handles API request rate limiting
-        user (User): Authenticated user's information
-        offline_anilist_entries (dict[int, Media]): Cache of anime entries
     """
 
     API_URL = "https://graphql.anilist.co"
@@ -64,7 +57,6 @@ class AniListClient:
             }
         )
 
-        self.rate_limiter = RateLimiter(self.__class__.__name__, requests_per_minute=90)
         self.user = self.get_user()
         self.user_tz = self.get_user_tz()
 
@@ -95,13 +87,13 @@ class AniListClient:
         Raises:
             requests.exceptions.HTTPError: If the API request fails
         """
-        query = dedent(f"""
+        query = f"""
         query {{
             Viewer {{
-{User.model_dump_graphql(indent_level=3)}
+                {User.model_dump_graphql()}
             }}
         }}
-        """).strip()
+        """
 
         response = self._make_request(query)["data"]["Viewer"]
         return User(**response)
@@ -113,7 +105,10 @@ class AniListClient:
             timezone: The timezone of the authenticated user
         """
         try:
-            hours, minutes = map(int, self.user.options.timezone.split(":"))
+            if self.user.options and self.user.options.timezone:
+                hours, minutes = map(int, self.user.options.timezone.split(":"))
+            else:
+                return timezone.utc
             return timezone(timedelta(hours=hours, minutes=minutes))
         except (AttributeError, ValueError):
             return timezone.utc
@@ -130,13 +125,13 @@ class AniListClient:
         Raises:
             requests.exceptions.HTTPError: If the API request fails
         """
-        query = dedent(f"""
+        query = f"""
         mutation ($mediaId: Int, $status: MediaListStatus, $score: Float, $progress: Int, $repeat: Int, $notes: String, $startedAt: FuzzyDateInput, $completedAt: FuzzyDateInput) {{
             SaveMediaListEntry(mediaId: $mediaId, status: $status, score: $score, progress: $progress, repeat: $repeat, notes: $notes, startedAt: $startedAt, completedAt: $completedAt) {{
-{MediaListWithMedia.model_dump_graphql(indent_level=3)}
+                {MediaListWithMedia.model_dump_graphql()}
             }}
         }}
-        """).strip()
+        """
 
         if self.dry_run:  # Skip the request, only log the variables
             log.info(
@@ -151,6 +146,93 @@ class AniListClient:
         self.offline_anilist_entries[media_list_entry.media_id] = (
             self._media_list_entry_to_media(MediaListWithMedia(**response))
         )
+
+    def batch_update_anime_entries(self, media_list_entries: list[MediaList]) -> None:
+        """Updates multiple anime entries on the authenticated user's list.
+
+        Sends a batch mutation to modify multiple existing anime entries in the user's list.
+        Processes entries in batches of 10 to avoid overwhelming the API.
+
+        Args:
+            media_list_entries (list[MediaList]): List of updated AniList entries to save
+
+        Raises:
+            requests.exceptions.HTTPError: If the API request fails
+        """
+        BATCH_SIZE = 10
+
+        if not media_list_entries:
+            return None
+
+        for i in range(0, len(media_list_entries), BATCH_SIZE):
+            batch = media_list_entries[i : i + BATCH_SIZE]
+            log.debug(
+                f"{self.__class__.__name__}: Updating batch of anime entries "
+                f"$${{anilist_id: {[m.media_id for m in batch]}}}$$"
+            )
+
+            variable_declarations = []
+            mutation_fields = []
+            variables = {}
+
+            for j, media_list_entry in enumerate(batch):
+                variable_declarations.extend(
+                    [
+                        f"$mediaId{j}: Int",
+                        f"$status{j}: MediaListStatus",
+                        f"$score{j}: Float",
+                        f"$progress{j}: Int",
+                        f"$repeat{j}: Int",
+                        f"$notes{j}: String",
+                        f"$startedAt{j}: FuzzyDateInput",
+                        f"$completedAt{j}: FuzzyDateInput",
+                    ]
+                )
+                mutation_field = f"""
+                    m{j}: SaveMediaListEntry(
+                        mediaId: $mediaId{j},
+                        status: $status{j},
+                        score: $score{j},
+                        progress: $progress{j},
+                        repeat: $repeat{j},
+                        notes: $notes{j},  
+                        startedAt: $startedAt{j},
+                        completedAt: $completedAt{j}
+                    ) {{
+                        {MediaListWithMedia.model_dump_graphql()}
+                    }}
+                """
+                mutation_fields.append(mutation_field)
+
+                entry_vars: dict = json.loads(
+                    media_list_entry.model_dump_json(exclude_none=True)
+                )
+                for k, v in entry_vars.items():
+                    variables[f"{k}{j}"] = v
+
+            query = f"""
+                mutation BatchUpdateEntries({", ".join(variable_declarations)}) {{
+                    {"\n".join(mutation_fields)}
+                }}
+            """
+
+            if self.dry_run:
+                log.info(
+                    f"{self.__class__.__name__}: Dry run enabled, skipping anime entry update "
+                    f"$${{anilist_id: {[m.media_id for m in batch]}}}$$"
+                )
+                continue
+
+            response: dict[str, dict[str, dict]] = self._make_request(
+                query, json.dumps(variables)
+            )
+
+            for mutation_data in response["data"].values():
+                if "mediaId" not in mutation_data:
+                    continue
+                self.offline_anilist_entries[mutation_data["mediaId"]] = (
+                    self._media_list_entry_to_media(MediaListWithMedia(**mutation_data))
+                )
 
     def delete_anime_entry(self, entry_id: int, media_id: int) -> bool:
         """Deletes an anime entry from the authenticated user's list.
@@ -167,13 +249,13 @@ class AniListClient:
         Raises:
             requests.exceptions.HTTPError: If the API request fails
         """
-        query = dedent("""
+        query = """
         mutation ($id: Int) {
             DeleteMediaListEntry(id: $id) {
                 deleted
             }
         }
-        """).strip()
+        """
 
         if self.dry_run:
             log.info(
@@ -254,19 +336,16 @@ class AniListClient:
 
         Raises:
             requests.exceptions.HTTPError: If the API request fails
-
-        Note:
-            This method is cached using functools.cache to optimize repeated searches
         """
-        query = dedent(f"""
+        query = f"""
             query ($search: String, $formats: [MediaFormat], $limit: Int) {{
                 Page(perPage: $limit) {{
                     media(search: $search, type: ANIME, format_in: $formats) {{
-{Media.model_dump_graphql(indent_level=4)}
+                        {Media.model_dump_graphql()}
                     }}
                 }}
             }}
-        """).strip()
+        """
 
         formats = (
             [MediaFormat.MOVIE, MediaFormat.SPECIAL]
@@ -305,9 +384,6 @@ class AniListClient:
 
         Raises:
             requests.exceptions.HTTPError: If the API request fails
-
-        Note:
-            Results are cached in self.offline_anilist_entries for future use
         """
         if anilist_id in self.offline_anilist_entries:
             log.debug(
@@ -315,13 +391,13 @@ class AniListClient:
             )
             return self.offline_anilist_entries[anilist_id]
 
-        query = dedent(f"""
+        query = f"""
         query ($id: Int) {{
             Media(id: $id, type: ANIME) {{
-{Media.model_dump_graphql(indent_level=3)}
+                {Media.model_dump_graphql()}
             }}
         }}
-        """).strip()
+        """
 
         log.debug(
             f"{self.__class__.__name__}: Pulling AniList data from API $${{anilist_id: {anilist_id}}}$$"
@@ -331,6 +407,78 @@ class AniListClient:
         result = Media(**response["data"]["Media"])
 
         self.offline_anilist_entries[anilist_id] = result
+
+        return result
+
+    def batch_get_anime(self, anilist_ids: list[int]) -> list[Media]:
+        """Retrieves detailed information about a list of anime.
+
+        Attempts to fetch anime data from local cache first, falling back to
+        batch API requests for entries not found in cache. Processes requests
+        in batches of 10 to avoid overwhelming the API.
+
+        Args:
+            anilist_ids (list[int]): The AniList IDs of the anime to retrieve
+
+        Returns:
+            list[Media]: Detailed information about the requested anime
+
+        Raises:
+            requests.exceptions.HTTPError: If the API request fails
+        """
+        BATCH_SIZE = 10
+
+        if not anilist_ids:
+            return []
+
+        result: list[Media] = []
+        missing_ids = []
+
+        cached_ids = [id for id in anilist_ids if id in self.offline_anilist_entries]
+        if cached_ids:
+            log.debug(
+                f"{self.__class__.__name__}: Pulling AniList data from local cache in batched mode "
+                f"$${{anilist_ids: {cached_ids}}}$$"
+            )
+            result.extend(self.offline_anilist_entries[id] for id in cached_ids)
+
+        missing_ids = [
+            id for id in anilist_ids if id not in self.offline_anilist_entries
+        ]
+        if not missing_ids:
+            return result
+
+        for i in range(0, len(missing_ids), BATCH_SIZE):
+            batch_ids = missing_ids[i : i + BATCH_SIZE]
+            log.debug(
+                f"{self.__class__.__name__}: Pulling AniList data from API in batched mode "
+                f"$${{anilist_ids: {batch_ids}}}$$"
+            )
+
+            query_parts = []
+            variables = {}
+
+            for j, anilist_id in enumerate(batch_ids):
+                query_parts.append(f"""
+                m{j}: Media(id: $id{j}, type: ANIME) {{
+                    {Media.model_dump_graphql()}
+                }}
+            """)
+                variables[f"id{j}"] = anilist_id
+
+            query = f"""
+            query BatchGetAnime({", ".join([f"$id{j}: Int" for j in range(len(batch_ids))])}) {{
+                {" ".join(query_parts)}
+            }}
+            """
+
+            response = self._make_request(query, variables)
+
+            for j, anilist_id in enumerate(batch_ids):
+                media_data = response["data"][f"m{j}"]
+                media = Media(**media_data)
+                self.offline_anilist_entries[anilist_id] = media
+                result.append(media)
 
         return result
 
@@ -348,22 +496,21 @@ class AniListClient:
         Raises:
             requests.exceptions.HTTPError: If the API request fails
             OSError: If unable to create backup directory or write backup file
-
-        Note:
-            - Backup files are named: plexanibridge-{username}.{number}.json
-            - Old backups exceeding BACKUP_RETENTION_DAYS are automatically deleted
-            - Skips custom lists to focus on standard watching status lists
         """
-        query = dedent(f"""
+        query = f"""
         query MediaListCollection($userId: Int, $type: MediaType, $chunk: Int) {{
             MediaListCollection(userId: $userId, type: $type, chunk: $chunk) {{
-{MediaListCollectionWithMedia.model_dump_graphql(indent_level=3)}
+                {MediaListCollectionWithMedia.model_dump_graphql()}
             }}
         }}
-        """).strip()
+        """
 
         data = MediaListCollectionWithMedia(user=self.user, has_next_chunk=True)
-        variables = {"userId": self.user.id, "type": "ANIME", "chunk": 0}
+        variables: dict[str, Any] = {
+            "userId": self.user.id,
+            "type": "ANIME",
+            "chunk": 0,
+        }
 
         while data.has_next_chunk:
             response = self._make_request(query, variables)["data"][
@@ -442,8 +589,9 @@ class AniListClient:
             },
         )
 
+    @anilist_limiter()
     def _make_request(
-        self, query: str, variables: dict | str | None = None, retry_count: int = 0
+        self, query: str, variables: dict | str = {}, retry_count: int = 0
     ) -> dict:
         """Makes a rate-limited request to the AniList GraphQL API.
 
@@ -468,8 +616,6 @@ class AniListClient:
         """
         if retry_count >= 3:
             raise requests.exceptions.HTTPError("Failed to make request after 3 tries")
-
-        self.rate_limiter.wait_if_needed()  # Rate limit the requests
 
         try:
             response = self.session.post(

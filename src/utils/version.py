@@ -16,9 +16,9 @@ def get_pyproject_version() -> str:
         return "unknown"
 
     toml_data = tomlkit.load(toml_file.open())
-    if "project" in toml_data and "version" in toml_data["project"]:
-        return toml_data["project"]["version"]
-
+    project_data = toml_data.get("project", {})
+    if isinstance(project_data, dict) and "version" in project_data:
+        return project_data["version"]
     return "unknown"
 
 

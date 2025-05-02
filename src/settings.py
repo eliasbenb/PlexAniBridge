@@ -1,11 +1,15 @@
 from enum import StrEnum
 from hashlib import md5
 from pathlib import Path
-from typing import Self
 
 from pydantic import Field, model_validator
 from pydantic.alias_generators import to_camel
+from pydantic.fields import _Unset
 from pydantic_settings import BaseSettings
+
+from src.logging import get_logger
+
+_log = get_logger(log_name="PlexAniBridge", log_level="INFO")
 
 
 class PlexMetadataSource(StrEnum):
@@ -92,41 +96,34 @@ class PlexAnibridgeConfig(BaseSettings):
     """
 
     # AniList
-    ANILIST_TOKEN: str | list[str]
+    ANILIST_TOKEN: str | list[str] = _Unset
 
     # Plex
-    PLEX_TOKEN: str
-    PLEX_USER: str | list[str]
+    PLEX_TOKEN: str = _Unset
+    PLEX_USER: str | list[str] = _Unset
     PLEX_URL: str = "http://localhost:32400"
     PLEX_SECTIONS: list[str] = []
     PLEX_GENRES: list[str] = []
     PLEX_METADATA_SOURCE: PlexMetadataSource = PlexMetadataSource.LOCAL
 
     # General
-    SYNC_INTERVAL: int = Field(3600, ge=-1)
+    SYNC_INTERVAL: int = Field(default=3600, ge=-1)
     POLLING_SCAN: bool = False
     FULL_SCAN: bool = False
     DESTRUCTIVE_SYNC: bool = False
 
-    EXCLUDED_SYNC_FIELDS: list[SyncField] = ["notes", "score"]
+    EXCLUDED_SYNC_FIELDS: list[SyncField] = [SyncField.NOTES, SyncField.SCORE]
 
     # Advanced
-    DATA_PATH: Path = "./data"
+    DATA_PATH: Path = Path("./data")
     DRY_RUN: bool = False
     LOG_LEVEL: LogLevel = LogLevel.INFO
-    SEARCH_FALLBACK_THRESHOLD: int = Field(-1, ge=-1, le=100)
+    BATCH_REQUESTS: bool = False
+    SEARCH_FALLBACK_THRESHOLD: int = Field(default=-1, ge=-1, le=100)
 
     @model_validator(mode="before")
     def catch_extra_env_vars(cls, values) -> dict[str, str]:
         """Catches extra environment variables not defined in the model and logs them."""
-        from src.logging import Logger, get_logger
-
-        log_level = values.get("LOG_LEVEL", "INFO")
-        log_dir = Path(values.get("DATA_PATH", "./data")) / "logs"
-        log: Logger = get_logger(
-            log_name="PlexAniBridge", log_level=log_level, log_dir=log_dir.resolve()
-        )
-
         # `DEPRECATED` and `DEPRECATED_ALIAS` are used to warn users about
         # upcoming changes to configuration settings.
         DEPRECATED: dict[str, str] = {}
@@ -142,22 +139,22 @@ class PlexAnibridgeConfig(BaseSettings):
         for key in extra:
             key = key.upper()
             if key in DEPRECATED:
-                log.warning(
+                _log.warning(
                     f"$$'{key}'$$ is going to become deprecated soon, use $$'{DEPRECATED[key]}'$$ instead"
                 )
             elif key in DEPRECATED_ALIAS:
-                log.warning(
+                _log.warning(
                     f"$$'{key}'$$ is going to become deprecated soon, use $$'{DEPRECATED_ALIAS[key]}'$$ instead"
                 )
                 values[DEPRECATED_ALIAS[key]] = values[key.lower()]
             else:
-                log.warning(f"Unrecognized configuration setting: $$'{key}'$$")
+                _log.warning(f"Unrecognized configuration setting: $$'{key}'$$")
             del values[key.lower()]
 
         return values
 
     @model_validator(mode="after")
-    def absolute_data_path(self) -> Self:
+    def absolute_data_path(self) -> "PlexAnibridgeConfig":
         """Ensures DATA_PATH is an absolute path.
 
         Converts relative paths to absolute using the current working directory
@@ -173,7 +170,7 @@ class PlexAnibridgeConfig(BaseSettings):
         return self
 
     @model_validator(mode="after")
-    def token_validation(self) -> Self:
+    def token_validation(self) -> "PlexAnibridgeConfig":
         """Validates AniList tokens and Plex users.
 
         Performs the following validations:
@@ -219,7 +216,7 @@ class PlexAnibridgeConfig(BaseSettings):
         # unnecessary restarts of the application when they change.
         config_str = "".join(
             str(sort_value(getattr(self, key)))
-            for key in sorted(self.model_fields.keys())
+            for key in sorted(self.__class__.model_fields.keys())
             if key not in ("LOG_LEVEL", "DRY_RUN", "SYNC_INTERVAL")
         )
         return md5(config_str.encode()).hexdigest()
@@ -237,10 +234,13 @@ class PlexAnibridgeConfig(BaseSettings):
                 f"{key}: {getattr(self, key)}"
                 if key not in secrets
                 else f"{key}: **********"
-                for key in self.model_fields
+                for key in self.__class__.model_fields
             ]
         )
 
     class Config:
         env_file = ".env"
         extra = "allow"
+
+
+config = PlexAnibridgeConfig()

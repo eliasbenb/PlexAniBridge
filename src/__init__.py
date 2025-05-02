@@ -2,7 +2,7 @@ import os
 import uuid
 
 from .logging import Logger, get_logger
-from .settings import PlexAnibridgeConfig
+from .settings import config
 from .utils.terminal import supports_utf8
 from .utils.version import get_docker_status, get_git_hash, get_pyproject_version
 
@@ -48,12 +48,10 @@ else:
 +-------------------------------------------------------------------------------+
     """.strip()
 
-config = PlexAnibridgeConfig()
-
 log: Logger = get_logger(
     log_name="PlexAniBridge",
     log_level=config.LOG_LEVEL,
-    log_dir=config.DATA_PATH / "logs",
+    log_dir=str(config.DATA_PATH / "logs"),
 )
 
 # The below environment variables are consumed by the python-plexapi library

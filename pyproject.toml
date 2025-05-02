@@ -1,6 +1,6 @@
 [project]
 name = "PlexAniBridge"
-version = "0.5.4"
+version = "0.6.0"
 description = "Synchronize your Plex watch history, ratings, and reviews with AniList"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -24,9 +24,10 @@ dependencies = [
     "alembic>=1.15.2",
     "cachetools>=5.5.2",
     "colorama>=0.4.6",
-    "plexapi>=4.16.1",
+    "limiter>=0.5.0",
+    "plexapi>=4.17.0",
     "pydantic>=2.11.1",
-    "pydantic-settings>=2.8.1",
+    "pydantic-settings>=2.9.1",
     "pyyaml>=6.0.2",
     "requests>=2.32.3",
     "sqlmodel>=0.0.24",
@@ -40,6 +41,10 @@ Homepage = "https://plexanibridge.elias.eu.org"
 Documentation = "https://plexanibridge.elias.eu.org"
 Source = "https://github.com/eliasbenb/PlexAniBridge"
 Issues = "https://github.com/eliasbenb/PlexAniBridge/issues"
+
+[tool.pyright]
+include = ["main.py", "src"]
+extraPaths = ["./src/stubs"]
 
 [tool.uv.workspace]
 members = ["docs"]

@@ -1,5 +1,4 @@
 import re
-from typing import Self
 
 from pydantic import BaseModel, Field
 
@@ -25,7 +24,7 @@ class TVDBMapping(BaseModel):
         return self.end - self.start + 1 if self.end else -1
 
     @classmethod
-    def from_string(cls, season: int, s: str) -> list[Self]:
+    def from_string(cls, season: int, s: str) -> list["TVDBMapping"]:
         """Parse a string pattern into a TVDBMapping instance.
         Args:
             season (int): Season number
@@ -36,7 +35,7 @@ class TVDBMapping(BaseModel):
                     - 'e1-e5,e8-e10'
                     - '' (empty string for full season)
         Returns:
-            Self | None: New TVDBMapping instance if pattern is valid, None otherwise
+            TVDBMapping | None: New TVDBMapping instance if pattern is valid, None otherwise
         """
         PATTERN = re.compile(
             r"""

@@ -65,28 +65,28 @@ class MappingsClient:
         parsed = urlparse(src)
         return bool(parsed.scheme) and bool(parsed.netloc)
 
-    def _json_str_keys(self, d: dict[str, Any]) -> dict[str, Any]:
+    def _dict_str_keys(self, d: dict | list) -> Any:
         """Ensure all keys in a dictionary are strings.
 
         Args:
-            d (dict[str, Any]): Dictionary to convert
+            d (dict | list): Dictionary or list to convert
 
         Returns:
-            dict[str, Any]: Dictionary with all keys as strings
+            dict | list: Dictionary with all keys as strings or a list
         """
         if isinstance(d, dict):
-            return {str(k): self._json_str_keys(v) for k, v in d.items()}
+            return {str(k): self._dict_str_keys(v) for k, v in d.items()}
         elif isinstance(d, list):
-            return [self._json_str_keys(i) for i in d]
+            return [self._dict_str_keys(i) for i in d]
         else:
             return d
 
-    def _resolve_path(self, include_path: str, parent_path: Path | str) -> str:
+    def _resolve_path(self, include_path: str, parent_path: str) -> str:
         """Resolve a path relative to the parent path.
 
         Args:
             include_path (str): Path to resolve
-            parent_path (Path | str): Parent path to resolve against
+            parent_path (str): Parent path to resolve against
 
         Returns:
             str: Resolved path
@@ -97,7 +97,7 @@ class MappingsClient:
         is_parent_file = self._is_file(parent_path)
 
         # Absolute URL or absolute path
-        if is_url or (is_file and parent_path.is_absolute()):
+        if is_url or (is_file and Path(parent_path).is_absolute()):
             return include_path
         # Relative URL
         if is_parent_url:
@@ -111,19 +111,19 @@ class MappingsClient:
         return include_path
 
     def _load_includes(
-        self, includes: list[str], loaded_chain: set[str], parent: Path | str
+        self, includes: list[str], loaded_chain: set[str], parent: str
     ) -> AniMapDict:
         """Load mappings from included files or URLs.
 
         Args:
             includes (list[str]): List of file paths or URLs to include
             loaded_chain (set[str]): Set of already loaded includes to prevent circular includes
-            parent (Path | str): Parent path or URL to resolve relative paths against
+            parent (str): Parent path or URL to resolve relative paths against
 
         Returns:
             AniMapDict: Merged mappings from all included files
         """
-        mappings = {}
+        mappings: dict[str, dict[str, Any]] = {}
         for include in includes:
             resolved_include = self._resolve_path(include, parent)
 
@@ -163,25 +163,37 @@ class MappingsClient:
                         mappings = json.load(f)
                 case ".yaml" | ".yml":
                     with file_path.open() as f:
-                        mappings = self._json_str_keys(yaml.safe_load(f))
+                        mappings = self._dict_str_keys(yaml.safe_load(f))
                 case ".toml":
                     with file_path.open() as f:
                         mappings = tomlkit.load(f)
-        except (json.JSONDecodeError, yaml.YAMLError, TOMLKitError) as e:
+        except (json.JSONDecodeError, yaml.YAMLError, TOMLKitError):
             log.error(
                 f"{self.__class__.__name__}: Error decoding file "
-                f"{file_path.absolute().as_posix()}: {e}"
+                f"$$'{str(file_path.resolve())}'$$",
+                exc_info=True,
             )
-        except Exception as e:
+        except Exception:
             log.error(
                 f"{self.__class__.__name__}: Unexpected error reading file "
-                f"{file_path.absolute().as_posix()}: {e}"
+                f"$$'{str(file_path.resolve())}'$$",
+                exc_info=True,
             )
 
         self._loaded_sources.add(file)
 
+        includes: list[str] = []
+        includes_value: dict | list = mappings.get("$includes", [])
+        if isinstance(includes_value, list):
+            includes = [str(item) for item in includes_value]
+        else:
+            log.warning(
+                f"{self.__class__.__name__}: The $includes key in $'{str(file_path.resolve())}'$ "
+                "is not a list, ignoring all entries"
+            )
+
         return self._deep_merge(
-            self._load_includes(mappings.get("$includes", []), loaded_chain, file_path),
+            self._load_includes(includes, loaded_chain, str(file_path)),
             mappings,
         )
 
@@ -224,24 +236,30 @@ class MappingsClient:
 
         self._loaded_sources.add(url)
 
+        includes: list[str] = []
+        includes_value: dict | list = mappings.get("$includes", [])
+        if isinstance(includes_value, list):
+            includes = [str(item) for item in includes_value]
+        else:
+            log.warning(
+                f"{self.__class__.__name__}: $includes in {url} is not a list, ignoring"
+            )
+
         return self._deep_merge(
-            self._load_includes(mappings.get("$includes", []), loaded_chain, url),
+            self._load_includes(includes, loaded_chain, url),
             mappings,
         )
 
-    def _load_mappings(self, src: str, loaded_chain: set[str] = None) -> AniMapDict:
+    def _load_mappings(self, src: str, loaded_chain: set[str] = set()) -> AniMapDict:
         """Load mappings from a file or URL.
 
         Args:
             src (str): Path to the file or URL to load mappings from
-            loaded_chain (set[str], optional): Set of already loaded includes to prevent circular includes. Defaults to None.
+            loaded_chain (set[str]): Set of already loaded includes to prevent circular includes
 
         Returns:
             AniMapDict: Mappings loaded from the file or URL
         """
-        if loaded_chain is None:
-            loaded_chain = set()
-
         loaded_chain = loaded_chain | {src}
 
         if self._is_file(src):
@@ -297,10 +315,8 @@ class MappingsClient:
         ]
 
         if existing_custom_mapping_files:
-            custom_mappings_path = (
-                (self.data_path / existing_custom_mapping_files[0])
-                .absolute()
-                .as_posix()
+            custom_mappings_path = str(
+                (self.data_path / existing_custom_mapping_files[0]).resolve()
             )
             custom_mappings = self._load_mappings(custom_mappings_path)
         else:

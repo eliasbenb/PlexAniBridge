@@ -1,4 +1,5 @@
 from functools import cached_property
+from typing import Any
 
 from pydantic import field_validator
 from sqlmodel import JSON, Field, SQLModel
@@ -6,20 +7,29 @@ from sqlmodel import JSON, Field, SQLModel
 from .mapping import TVDBMapping
 
 
+def TypedJson(*args, **kwargs) -> Any:
+    return JSON(*args, **kwargs)
+
+
 class AniMap(SQLModel, table=True):
     """Model for the animap table."""
 
-    __tablename__ = "animap"
+    __tablename__: str = "animap"  #  type: ignore
 
     anilist_id: int = Field(primary_key=True)
     anidb_id: int | None = Field(index=False)
-    imdb_id: list[str] | None = Field(sa_type=JSON(none_as_null=True), index=True)
-    mal_id: list[int] | None = Field(sa_type=JSON(none_as_null=True), index=False)
-    tmdb_movie_id: list[int] | None = Field(sa_type=JSON(none_as_null=True), index=True)
-    tmdb_show_id: list[int] | None = Field(sa_type=JSON(none_as_null=True), index=True)
+    imdb_id: list[str] | None = Field(sa_type=TypedJson(none_as_null=True), index=True)
+    mal_id: list[int] | None = Field(sa_type=TypedJson(none_as_null=True), index=False)
+    tmdb_movie_id: list[int] | None = Field(
+        sa_type=TypedJson(none_as_null=True), index=True
+    )
+    tmdb_show_id: list[int] | None = Field(
+        sa_type=TypedJson(none_as_null=True), index=True
+    )
     tvdb_id: int | None = Field(index=True)
     tvdb_mappings: dict[str, str] | None = Field(
-        sa_type=JSON(none_as_null=True), index=False
+        sa_type=TypedJson(none_as_null=True),
+        index=False,
     )
 
     @cached_property
@@ -35,18 +45,16 @@ class AniMap(SQLModel, table=True):
 
         for season, s in self.tvdb_mappings.items():
             try:
-                season = int(season.lstrip("s"))
+                parsed = TVDBMapping.from_string(int(season.lstrip("s")), s)
+                res.extend(parsed)
             except ValueError:
                 continue
-            parsed = TVDBMapping.from_string(season, s)
-            res.extend(parsed)
-
         return res
 
     @field_validator(
         "imdb_id", "mal_id", "tmdb_movie_id", "tmdb_show_id", mode="before"
     )
-    def convert_to_list(cls, v) -> list:
+    def convert_to_list(cls, v) -> list | None:
         """Convert single values to lists.
 
         Args:
@@ -54,7 +62,7 @@ class AniMap(SQLModel, table=True):
             v: Value to convert
 
         Returns:
-            list: List of values
+            list | None: List of values
         """
         if v is None:
             return v

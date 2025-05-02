@@ -136,7 +136,7 @@ class Logger(logging.Logger):
         if self.isEnabledFor(self.SUCCESS):
             self._log(self.SUCCESS, msg, args, **kwargs)
 
-    def setup(self, log_level: str, log_dir: str) -> None:
+    def setup(self, log_level: str, log_dir: str | None = None) -> None:
         """Configure the logger with console and file output.
 
         Creates a logger that writes to both console (with colors) and a rotating
@@ -144,7 +144,7 @@ class Logger(logging.Logger):
 
         Args:
             log_level (str): Logging level ('DEBUG', 'INFO', 'SUCCESS', etc.)
-            log_dir (str): Directory where log files will be stored
+            log_dir (str | None, optional): Directory where log files will be stored
         """
         has_color_support = False
         if supports_color():
@@ -166,9 +166,6 @@ class Logger(logging.Logger):
 
         for handler in self.handlers[:]:
             self.removeHandler(handler)
-
-        log_path = Path(log_dir)
-        log_path.mkdir(parents=True, exist_ok=True)
 
         log_format = (
             "%(asctime)s - %(name)s - %(levelname)s\t%(filename)s:%(lineno)d\t%(message)s"
@@ -193,15 +190,19 @@ class Logger(logging.Logger):
             )
         )
 
-        log_file = log_path / f"{self.name}.{log_level}.log"
-        file_handler = RotatingFileHandler(
-            log_file,
-            maxBytes=10 * 1024 * 1024,  # 10MB
-            backupCount=5,
-        )
-        file_handler.setFormatter(file_formatter)
-        file_handler.setLevel(log_level_literal)
-        self.addHandler(file_handler)
+        if log_dir is not None:
+            log_path = Path(log_dir)
+            log_path.mkdir(parents=True, exist_ok=True)
+
+            log_file = log_path / f"{self.name}.{log_level}.log"
+            file_handler = RotatingFileHandler(
+                log_file,
+                maxBytes=10 * 1024 * 1024,  # 10MB
+                backupCount=5,
+            )
+            file_handler.setFormatter(file_formatter)
+            file_handler.setLevel(log_level_literal)
+            self.addHandler(file_handler)
 
         console_handler = logging.StreamHandler()
         console_handler.setFormatter(console_formatter)
@@ -212,13 +213,15 @@ class Logger(logging.Logger):
 logging.setLoggerClass(Logger)
 
 
-def get_logger(log_name: str, log_level: str = "INFO", log_dir: str = "logs") -> Logger:
+def get_logger(
+    log_name: str, log_level: str = "INFO", log_dir: str | None = None
+) -> Logger:
     """Get a configured instance of Logger.
 
     Args:
         log_name (str): Name of the logger and base name for log file
         log_level (str, optional): Logging level. Defaults to "INFO".
-        log_dir (str, optional): Directory where log files will be stored. Defaults to "logs".
+        log_dir (str | None, optional): Directory where log files will be stored
 
     Returns:
         Logger: Configured logger instance

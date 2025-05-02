@@ -12,7 +12,7 @@ from .base import BaseSyncClient, ParsedGuids
 
 class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
     def map_media(
-        self, item: Movie, **_
+        self, item: Movie
     ) -> Iterator[tuple[Movie, list[Movie], AniMap, Media]]:
         """Maps a Plex item to potential AniList matches.
 
@@ -27,19 +27,31 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
         guids = ParsedGuids.from_guids(item.guids)
 
         animapping: AniMap = next(
-            iter(self.animap_client.get_mappings(**dict(guids), is_movie=True)),
-            None,
-        ) or AniMap(
-            imdb_id=guids.imdb,
-            tmdb_movie_id=guids.tmdb,
-            tvdb_id=guids.tvdb,
+            iter(
+                self.animap_client.get_mappings(
+                    imdb=guids.imdb, tmdb=guids.tmdb, tvdb=guids.tvdb, is_movie=True
+                )
+            ),
+            AniMap(
+                anidb_id=None,
+                anilist_id=0,
+                imdb_id=[guids.imdb] if guids.imdb else None,
+                mal_id=None,
+                tmdb_movie_id=[guids.tmdb] if guids.tmdb else None,
+                tmdb_show_id=None,
+                tvdb_id=guids.tvdb,
+                tvdb_mappings=None,
+            ),
         )
 
         try:
             if animapping.anilist_id:
                 anilist_media = self.anilist_client.get_anime(animapping.anilist_id)
             else:
-                anilist_media = self.search_media(item)
+                _anilist_media = self.search_media(item, item)
+                if not _anilist_media:
+                    return
+                anilist_media = _anilist_media
         except Exception:
             log.error(
                 f"Failed to fetch AniList data for {self._debug_log_title(item)}: "
@@ -59,7 +71,7 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
 
         yield item, [item], animapping, anilist_media
 
-    def search_media(self, item: Movie, **_) -> Media | None:
+    def search_media(self, item: Movie, child_item: Movie) -> Media | None:
         """Searches for matching AniList entry by title.
 
         For movies, we search for single episode entries.
@@ -76,7 +88,14 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
         results = self.anilist_client.search_anime(item.title, True, 1)
         return self._best_search_result(item.title, results)
 
-    def _calculate_status(self, item: Movie, **_) -> MediaListStatus | None:
+    def _calculate_status(
+        self,
+        item: Movie,
+        child_item: Movie,
+        grandchild_items: list[Movie],
+        anilist_media: Media,
+        animapping: AniMap,
+    ) -> MediaListStatus | None:
         """Calculates the watch status for a media item.
 
         Args:
@@ -112,19 +131,33 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
             return MediaListStatus.DROPPED
         return None
 
-    def _calculate_score(self, item: Movie, **_) -> int | None:
+    def _calculate_score(
+        self,
+        item: Movie,
+        child_item: Movie,
+        grandchild_items: list[Movie],
+        anilist_media: Media,
+        animapping: AniMap,
+    ) -> int | float | None:
         """Calculates the user rating for a media item.
 
         Args:
             item (Movie): Main Plex media item
 
         Returns:
-            int | None: User rating for the media item
+            int | float | None: User rating for the media item
         """
         score = item.userRating
         return self._normalize_score(score) if score else None
 
-    def _calculate_progress(self, item: Movie, anilist_media: Media, **_) -> int | None:
+    def _calculate_progress(
+        self,
+        item: Movie,
+        child_item: Movie,
+        grandchild_items: list[Movie],
+        anilist_media: Media,
+        animapping: AniMap,
+    ) -> int | None:
         """Calculates the progress for a media item.
 
         Args:
@@ -136,7 +169,14 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
         """
         return (anilist_media.episodes or 1) if item.viewCount else None
 
-    def _calculate_repeats(self, item: Movie, **_) -> int | None:
+    def _calculate_repeats(
+        self,
+        item: Movie,
+        child_item: Movie,
+        grandchild_items: list[Movie],
+        anilist_media: Media,
+        animapping: AniMap,
+    ) -> int | None:
         """Calculates the number of repeats for a media item.
 
         Args:
@@ -147,7 +187,14 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
         """
         return item.viewCount - 1 if item.viewCount else None
 
-    def _calculate_started_at(self, item: Movie, **_) -> FuzzyDate | None:
+    def _calculate_started_at(
+        self,
+        item: Movie,
+        child_item: Movie,
+        grandchild_items: list[Movie],
+        anilist_media: Media,
+        animapping: AniMap,
+    ) -> FuzzyDate | None:
         """Calculates the start date for a media item.
 
         Args:
@@ -157,24 +204,20 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
             FuzzyDate | None: Start date for the media item
         """
         history = self.plex_client.get_history(item)
-        first_history = next(iter(history), None)
+        first_history = min(history, key=lambda h: h.viewedAt) if history else None
 
-        last_viewed = (
-            FuzzyDate.from_date(
-                item.lastViewedAt.replace(tzinfo=get_localzone()).astimezone(
-                    self.anilist_client.user_tz
-                )
+        last_viewed = FuzzyDate.from_date(
+            item.lastViewedAt.replace(tzinfo=get_localzone()).astimezone(
+                self.anilist_client.user_tz
             )
             if item.lastViewedAt
             else None
         )
-        history_viewed = (
-            FuzzyDate.from_date(
-                first_history.viewedAt.replace(tzinfo=get_localzone()).astimezone(
-                    self.anilist_client.user_tz
-                )
+        history_viewed = FuzzyDate.from_date(
+            first_history.viewedAt.replace(tzinfo=get_localzone()).astimezone(
+                self.anilist_client.user_tz
             )
-            if first_history
+            if first_history and first_history.viewedAt
             else None
         )
 
@@ -182,7 +225,14 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
             return min(last_viewed, history_viewed)
         return last_viewed or history_viewed
 
-    def _calculate_completed_at(self, item: Movie, **_) -> FuzzyDate | None:
+    def _calculate_completed_at(
+        self,
+        item: Movie,
+        child_item: Movie,
+        grandchild_items: list[Movie],
+        anilist_media: Media,
+        animapping: AniMap,
+    ) -> FuzzyDate | None:
         """Calculates the completion date for a media item.
 
         Args:
@@ -191,12 +241,17 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
         Returns:
             FuzzyDate | None: Completion date for the media item
         """
-        return self._calculate_started_at(item, **_)
+        return self._calculate_started_at(
+            item, child_item, grandchild_items, anilist_media, animapping
+        )
 
     def _calculate_notes(
         self,
         item: Movie,
-        **_,
+        child_item: Movie,
+        grandchild_items: list[Movie],
+        anilist_media: Media,
+        animapping: AniMap,
     ) -> str | None:
         """Chooses the most relevant user notes for a media item.
 
@@ -208,7 +263,7 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
         """
         return self.plex_client.get_user_review(item)
 
-    def _debug_log_title(self, item: Movie, **_) -> str:
+    def _debug_log_title(self, item: Movie, animapping: AniMap | None = None) -> str:
         """Creates a debug-friendly string of media titles.
 
         The outputted string uses color formatting syntax with the `$$` delimiters.
@@ -223,8 +278,8 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
 
     def _debug_log_ids(
         self,
-        key: int,
-        plex_id: str,
+        key: int | str,
+        plex_id: str | None,
         guids: ParsedGuids,
         anilist_id: int | None = None,
     ) -> str:

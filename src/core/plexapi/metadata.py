@@ -1,4 +1,3 @@
-import sys
 from collections import defaultdict
 from functools import cached_property, wraps
 from itertools import chain
@@ -10,7 +9,7 @@ from typing import (
 from xml.etree import ElementTree
 
 import requests
-from plexapi import log, utils
+from limiter import Limiter
 from plexapi.base import PlexObject
 from plexapi.exceptions import BadRequest, NotFound, Unauthorized
 from plexapi.library import (
@@ -20,11 +19,13 @@ from plexapi.library import (
     ShowSection,
 )
 from plexapi.server import PlexServer
+from plexapi.utils import cleanXMLString
 from plexapi.video import Episode, Movie, Season, Show, Video
-from requests.status_codes import _codes as codes
 
+from src import log
 from src.utils.cache import generic_ttl_cache
-from src.utils.rate_limiter import RateLimiter
+
+plex_metadata_limiter = Limiter(rate=300 / 60, capacity=30, jitter=True)
 
 
 def original_server(func: Callable[..., Any]) -> Callable[..., Any]:
@@ -42,8 +43,8 @@ def original_server(func: Callable[..., Any]) -> Callable[..., Any]:
         original_url = self._server._baseurl
         original_token = self._server._token
         try:
-            self._server._baseurl = self._server._original_baseurl
-            self._server._token = self._server._original_token
+            self._server._baseurl = self._server.__dict__.get("_original_baseurl", "")
+            self._server._token = self._server.__dict__.get("_original_token", "")
             return func(self, *args, **kwargs)
         finally:
             self._server._baseurl = original_url
@@ -111,7 +112,6 @@ class PlexMetadataObject(PlexObject):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._server: PlexMetadataServer
         self._source: str = self._server._baseurl
 
     @original_server
@@ -123,7 +123,7 @@ class PlexMetadataObject(PlexObject):
         return super()._reload(*args, **kwargs)
 
     def _reload(self, *args, **kwargs):
-        if self._source == self._server._original_baseurl:
+        if self._source == self._server.__dict__.get("_original_baseurl"):
             return self._reloadOriginalServer(*args, **kwargs)
         elif self._source == self._server.myPlexAccount().METADATA:
             return self._reloadMetadataServer(*args, **kwargs)
@@ -132,26 +132,26 @@ class PlexMetadataObject(PlexObject):
 
 class VideoMetadataMixin:
     def _loadData(self, data):
-        super()._loadData(data)
+        super()._loadData(data)  # type: ignore
         self.ratingKey = data.attrib.get("ratingKey")
 
 
 class EpisodeMetadataMixin:
     def _loadData(self, data):
-        super()._loadData(data)
+        super()._loadData(data)  # type: ignore
         self.parentRatingKey = data.attrib.get("parentRatingKey")
         self.grandparentRatingKey = data.attrib.get("grandparentRatingKey")
 
 
 class SeasonMetadataMixin:
     def _loadData(self, data):
-        super()._loadData(data)
+        super()._loadData(data)  # type: ignore
         self.parentRatingKey = data.attrib.get("parentRatingKey")
 
     @metadata_server
     def episodes(self, **kwargs):
-        key = f"{self.key}/children?includeUserState=1&episodeOrder=tvdbAiring"
-        return self.fetchItems(key, MetadataEpisode, **kwargs)
+        key = f"{self.key}/children?includeUserState=1&episodeOrder=tvdbAiring"  # type: ignore
+        return self.fetchItems(key, MetadataEpisode, **kwargs)  # type: ignore
 
 
 class ShowMetadataMixin:
@@ -162,7 +162,7 @@ class ShowMetadataMixin:
         rating_keys = [s.ratingKey.rsplit("/", 1)[-1] for s in seasons]
         key = f"/library/metadata/{','.join(rating_keys)}/userState"
 
-        data = self._server.query(key)
+        data = self._server.query(key)  # type: ignore
         if data is None:
             return seasons
 
@@ -184,10 +184,13 @@ class ShowMetadataMixin:
 
     @metadata_server
     def seasons(self, **kwargs):
-        key = f"{self.key}/children?excludeAllLeaves=1&episodeOrder=tvdbAiring"  # &includeUserState=1
+        key = f"{self.key}/children?excludeAllLeaves=1&episodeOrder=tvdbAiring"  # &includeUserState=1 # type: ignore
         return self.__loadUserStates(
-            self.fetchItems(
-                key, MetadataSeason, container_size=self.childCount, **kwargs
+            self.fetchItems(  # type: ignore
+                key,
+                MetadataSeason,
+                container_size=self.childCount,  # type: ignore
+                **kwargs,
             )
         )
 
@@ -200,7 +203,7 @@ class ShowMetadataMixin:
 class LibrarySectionMetadataMixin:
     @original_server
     def _search(self, *args, **kwargs):
-        return super().search(*args, **kwargs)
+        return super().search(*args, **kwargs)  # type: ignore
 
     @metadata_server
     def search(
@@ -235,7 +238,7 @@ class LibrarySectionMetadataMixin:
         if not metadata_guids:
             return []
 
-        return self.fetchItems(
+        return self.fetchItems(  # type: ignore
             f"/library/metadata/{','.join(metadata_guids)}?includeUserState=1",
             cls,
             **kwargs,
@@ -298,8 +301,8 @@ class MetadataLibrary(PlexMetadataObject, Library):
             "show": MetadataShowSection,
         }
 
-        for elem in self._server.query(key):
-            section = libcls.get(elem.attrib.get("type"), MetadataLibrarySection)(
+        for elem in self._server.query(key):  # type: ignore
+            section = libcls.get(elem.attrib.get("type"), MetadataLibrarySection)(  # type: ignore
                 self._server, elem, initpath=key
             )
             sectionsByID[section.key] = section
@@ -316,10 +319,6 @@ class PlexMetadataServer(PlexServer):
         self._original_baseurl = self._baseurl
         self._original_token = self._token
 
-        self.rate_limiter = RateLimiter(
-            self.__class__.__name__, requests_per_minute=sys.maxsize
-        )
-
     @cached_property
     def library(self):
         try:
@@ -328,6 +327,7 @@ class PlexMetadataServer(PlexServer):
             data = self.query("/library/sections/")
         return MetadataLibrary(self, data)
 
+    @plex_metadata_limiter()
     @generic_ttl_cache(maxsize=None, ttl=30)
     def query(
         self,
@@ -345,12 +345,6 @@ class PlexMetadataServer(PlexServer):
         """
         if retry_count >= 3:
             raise requests.exceptions.HTTPError("Failed to make request after 3 tries")
-
-        if self._baseurl in (
-            self.myPlexAccount().DISCOVER,
-            self.myPlexAccount().METADATA,
-        ):
-            self.rate_limiter.wait_if_needed()
 
         url = self.url(key)
         method = method or self._session.get
@@ -380,9 +374,8 @@ class PlexMetadataServer(PlexServer):
             )
 
         if response.status_code not in (200, 201, 204):
-            codename = codes.get(response.status_code)[0]
             errtext = response.text.replace("\n", " ")
-            message = f"({response.status_code}) {codename}; {response.url} {errtext}"
+            message = f"({response.status_code}) {response.status_code}; {response.url} {errtext}"
             if response.status_code == 401:
                 raise Unauthorized(message)
             elif response.status_code == 404:
@@ -390,5 +383,5 @@ class PlexMetadataServer(PlexServer):
             else:
                 raise BadRequest(message)
 
-        data = utils.cleanXMLString(response.text).encode("utf8")
+        data = cleanXMLString(response.text).encode("utf8")
         return ElementTree.fromstring(data) if data.strip() else None

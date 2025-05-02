@@ -4,7 +4,6 @@ import argparse
 import json
 from datetime import datetime
 from pathlib import Path
-from textwrap import dedent
 from time import sleep
 from typing import Any
 
@@ -69,7 +68,7 @@ class AniListRestoreClient:
             self._restore_entry(entry)
 
     def _restore_entry(self, entry: MediaList) -> None:
-        query = dedent("""
+        query = """
         mutation ($mediaId: Int, $status: MediaListStatus, $score: Float, $progress: Int, $repeat: Int, $notes: String, $startedAt: FuzzyDateInput, $completedAt: FuzzyDateInput) {
             SaveMediaListEntry(mediaId: $mediaId, status: $status, score: $score, progress: $progress, repeat: $repeat, notes: $notes, startedAt: $startedAt, completedAt: $completedAt) {
                 id
@@ -80,7 +79,7 @@ class AniListRestoreClient:
                 }
             }
         }
-        """).strip()
+        """
 
         variables = entry.model_dump_json()
 
@@ -99,7 +98,10 @@ class AniListRestoreClient:
         )
 
     def _make_request(
-        self, query: str, variables: dict[str, Any] | None = None, retry_count: int = 0
+        self,
+        query: str,
+        variables: dict[str, Any] | str | None = None,
+        retry_count: int = 0,
     ) -> dict[str, Any]:
         if retry_count >= 3:
             raise requests.exceptions.HTTPError("Failed to make request after 3 tries")
