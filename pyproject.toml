@@ -43,11 +43,8 @@ Source = "https://github.com/eliasbenb/PlexAniBridge"
 Issues = "https://github.com/eliasbenb/PlexAniBridge/issues"
 
 [tool.pyright]
-include = ["."]
+include = ["main.py", "src"]
 extraPaths = ["./src/stubs"]
-
-[tool.mypy]
-mypy_path = ["./src/stubs"]
 
 [tool.uv.workspace]
 members = ["docs"]
@@ -55,11 +52,3 @@ members = ["docs"]
 [tool.uv.sources]
 plexapi = { git = "https://github.com/pushingkarmaorg/python-plexapi" }
 
-[dependency-groups]
-dev = [
-    "mypy[mypyc]>=1.15.0",
-    "types-cachetools>=5.5.0.20240820",
-    "types-pyyaml>=6.0.12.20250402",
-    "types-requests>=2.32.0.20250328",
-    "types-setuptools>=78.1.0.20250329",
-]
