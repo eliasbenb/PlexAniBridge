@@ -7,7 +7,7 @@ from pydantic import ValidationError
 from sqlalchemy import and_, column, delete, exists, false, func, not_, or_, select
 from sqlalchemy.orm.base import Mapped
 from sqlalchemy.sql.elements import BinaryExpression, ColumnElement
-from sqlmodel import Session, col
+from sqlmodel import col
 
 from src import log
 from src.core.mappings import MappingsClient
@@ -71,8 +71,8 @@ class AniMapClient:
                 return None
             return [value] if not isinstance(value, list) else value
 
-        with Session(db.engine) as session:
-            last_mappings_hash = session.get(Housekeeping, "animap_mappings_hash")
+        with db as ctx:
+            last_mappings_hash = ctx.session.get(Housekeeping, "animap_mappings_hash")
 
             animap_defaults = {field: None for field in AniMap.model_fields}
             validated_count = 0
@@ -133,7 +133,7 @@ class AniMapClient:
             ]
 
             # Delete any entries in the database that are not in the new mappings
-            session.execute(
+            ctx.session.execute(
                 delete(AniMap).where(
                     not_(col(AniMap.anilist_id).in_([d["anilist_id"] for d in values]))
                 )
@@ -146,12 +146,12 @@ class AniMapClient:
                 for attr in ("mal_id", "imdb_id", "tmdb_movie_id", "tmdb_show_id"):
                     if attr in value:
                         value[attr] = single_val_to_list(value[attr])
-                session.merge(AniMap(**value))
+                ctx.session.merge(AniMap(**value))
 
-            session.merge(
+            ctx.session.merge(
                 Housekeeping(key="animap_mappings_hash", value=curr_mappings_hash)
             )
-            session.commit()
+            ctx.session.commit()
 
             log.debug(f"{self.__class__.__name__}: Database sync complete")
 
@@ -228,7 +228,7 @@ class AniMapClient:
             """
             return func.json_type(field, f"$.{key}").is_not(None)
 
-        with Session(db.engine) as session:
+        with db as ctx:
             or_conditions = []
             and_conditions = []
 
@@ -269,4 +269,4 @@ class AniMapClient:
             where_clause = and_(*merged_conditions)
 
             query = select(AniMap).where(where_clause)
-            return list(session.execute(query).scalars().all())
+            return list(ctx.session.execute(query).scalars().all())

@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from sqlalchemy.engine import Engine
-from sqlmodel import create_engine
+from sqlmodel import Session, create_engine
 
 from src import config
 
@@ -28,6 +28,7 @@ class PlexAniBridgeDB:
         self.db_path = data_path / "plexanibridge.db"
 
         self.engine = self._setup_db()
+        self.session = Session(self.engine)
         self._do_migrations()
 
     def _setup_db(self) -> Engine:
@@ -77,6 +78,14 @@ class PlexAniBridgeDB:
         config.set_main_option("sqlalchemy.url", f"sqlite:///{self.db_path}")
 
         command.upgrade(config, "head")
+
+    def __enter__(self) -> "PlexAniBridgeDB":
+        """Enters the context manager, returning the database instance."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        """Exits the context manager, closing the session."""
+        self.session.close()
 
 
 db = PlexAniBridgeDB(config.DATA_PATH)
