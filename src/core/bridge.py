@@ -1,7 +1,6 @@
 from datetime import datetime, timezone
 
 from plexapi.library import MovieSection, ShowSection
-from sqlmodel import Session
 
 from src import log
 from src.core import AniListClient, AniMapClient, PlexClient
@@ -66,8 +65,8 @@ class BridgeClient:
             Used to determine whether polling scanning is possible and
             to filter items for incremental syncs
         """
-        with Session(db.engine) as session:
-            last_synced = session.get(Housekeeping, "last_synced")
+        with db as ctx:
+            last_synced = ctx.session.get(Housekeeping, "last_synced")
             if last_synced is None or last_synced.value is None:
                 return None
             return datetime.fromisoformat(last_synced.value).replace(
@@ -83,8 +82,8 @@ class BridgeClient:
         Note:
             Used to determine whether a polling scan is eligible to run
         """
-        with Session(db.engine) as session:
-            last_polled = session.get(Housekeeping, "last_polled")
+        with db as ctx:
+            last_polled = ctx.session.get(Housekeeping, "last_polled")
             if last_polled is None or last_polled.value is None:
                 return None
             return datetime.fromisoformat(last_polled.value).replace(
@@ -101,11 +100,11 @@ class BridgeClient:
             Only called after a completely successful sync operation
         """
         self.last_synced = last_synced
-        with Session(db.engine) as session:
-            session.merge(
+        with db as ctx:
+            ctx.session.merge(
                 Housekeeping(key="last_synced", value=last_synced.isoformat())
             )
-            session.commit()
+            ctx.session.commit()
 
     def _set_last_polled(self, last_polled: datetime) -> None:
         """Stores the timestamp of a polling scan in the database.
@@ -117,11 +116,11 @@ class BridgeClient:
             Only called after a successful polling scan
         """
         self.last_polled = last_polled
-        with Session(db.engine) as session:
-            session.merge(
+        with db as ctx:
+            ctx.session.merge(
                 Housekeeping(key="last_polled", value=last_polled.isoformat())
             )
-            session.commit()
+            ctx.session.commit()
 
     def _get_last_config_encoded(self) -> str | None:
         """Retrieves the encoded configuration from the last sync.
@@ -132,8 +131,8 @@ class BridgeClient:
         Returns:
             str | None: Encoded configuration string, None if no previous sync
         """
-        with Session(db.engine) as session:
-            last_config_encoded = session.get(Housekeeping, "last_config_encoded")
+        with db as ctx:
+            last_config_encoded = ctx.session.get(Housekeeping, "last_config_encoded")
             if last_config_encoded is None:
                 return None
             return last_config_encoded.value
@@ -148,9 +147,11 @@ class BridgeClient:
             Used in conjunction with last_synced to validate polling scan eligibility
         """
         self.last_config_encoded = config_encoded
-        with Session(db.engine) as session:
-            session.merge(Housekeeping(key="last_config_encoded", value=config_encoded))
-            session.commit()
+        with db as ctx:
+            ctx.session.merge(
+                Housekeeping(key="last_config_encoded", value=config_encoded)
+            )
+            ctx.session.commit()
 
     def sync(self, poll: bool = False) -> None:
         """Initiates the synchronization process for all configured user pairs.
