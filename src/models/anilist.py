@@ -374,7 +374,7 @@ class MediaList(AniListBaseModel):
         """Generate a diff string between two MediaList objects
 
         Args:
-            old (MediaList): The old MediaList object
+            old (MediaList | None): The old MediaList object
             new (MediaList): The new MediaList object
 
         Returns:
@@ -383,8 +383,8 @@ class MediaList(AniListBaseModel):
         if old is None:
             old = MediaList(id=new.id, user_id=new.user_id, media_id=new.media_id)
 
-        diff_str = "("
-        for field, _ in old.model_fields.items():
+        diff_parts = []
+        for field, _ in old.__class__.model_fields.items():
             old_value = getattr(old, field)
             new_value = getattr(new, field)
 
@@ -394,9 +394,8 @@ class MediaList(AniListBaseModel):
                         old_value = old_value[:50].replace("\n", "  ") + "..."
                     if new_value:
                         new_value = new_value[:50].replace("\n", "  ") + "..."
-                diff_str += f"{field}: {old_value} -> {new_value}, "
-
-        return diff_str.rstrip(", ") + ")"
+                diff_parts.append(f"{field}: {old_value} -> {new_value}")
+        return "(" + ", ".join(diff_parts) + ")"
 
     def __str__(self) -> str:
         notes_truncated = None
