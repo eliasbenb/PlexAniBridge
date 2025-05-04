@@ -4,10 +4,9 @@ from pathlib import Path
 from typing import Any
 
 from pydantic import ValidationError
-from sqlalchemy import and_, column, delete, exists, false, func, not_, or_, select
 from sqlalchemy.orm.base import Mapped
 from sqlalchemy.sql.elements import BinaryExpression, ColumnElement
-from sqlmodel import col
+from sqlmodel import and_, col, column, delete, exists, false, func, not_, or_, select
 
 from src import log
 from src.core.mappings import MappingsClient
@@ -269,4 +268,4 @@ class AniMapClient:
             where_clause = and_(*merged_conditions)
 
             query = select(AniMap).where(where_clause)
-            return list(ctx.session.execute(query).scalars().all())
+            return list(ctx.session.exec(query))
