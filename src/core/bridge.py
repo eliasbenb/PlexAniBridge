@@ -1,6 +1,7 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from plexapi.library import MovieSection, ShowSection
+from sqlmodel import col, delete, select
 
 from src import log
 from src.core import AniListClient, AniMapClient, PlexClient
@@ -12,6 +13,7 @@ from src.core.sync import (
     SyncStats,
 )
 from src.database import db
+from src.models.failure import Failure
 from src.models.housekeeping import Housekeeping
 from src.settings import PlexAnibridgeConfig
 
@@ -312,10 +314,34 @@ class BridgeClient:
         last_sync = (
             datetime.now(timezone.utc) if last_sync == self.MIN_DATETIME else last_sync
         )
+
+        extra_rating_keys = []
+        if poll:
+            with db as ctx:
+                ctx.session.execute(
+                    delete(Failure).where(
+                        col(Failure.anilist_account_id) == anilist_client.user.id,
+                        col(Failure.plex_account_id) == plex_client.user_account_id,
+                        col(Failure.section_id) == section.key,
+                        col(Failure.failed_at)
+                        < datetime.now(timezone.utc) - timedelta(days=5),
+                    )
+                )
+
+                failures = ctx.session.exec(
+                    select(Failure).where(
+                        Failure.anilist_account_id == anilist_client.user.id,
+                        Failure.plex_account_id == plex_client.user_account_id,
+                        Failure.section_id == section.key,
+                    )
+                ).all()
+                extra_rating_keys = [f.rating_key for f in failures]
+
         items = plex_client.get_section_items(
             section,
             min_last_modified=last_sync if poll else None,
             require_watched=not self.config.FULL_SCAN,
+            extra_rating_keys=extra_rating_keys,
         )
 
         if self.config.BATCH_REQUESTS:

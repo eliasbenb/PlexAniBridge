@@ -256,6 +256,7 @@ class PlexClient:
         section: Section,
         min_last_modified: datetime | None = None,
         require_watched: bool = False,
+        extra_rating_keys: list[str] | None = None,
         **kwargs,
     ) -> list[Media]:
         """Retrieves items from a specified Plex library section with optional filtering.
@@ -268,7 +269,7 @@ class PlexClient:
         Returns:
             list[Media]: List of media items matching the criteria
         """
-        filters: dict = {"and": []}
+        filters = {"and": []}
 
         if min_last_modified:
             if self.is_online_user:
@@ -312,7 +313,16 @@ class PlexClient:
             )
             filters["and"].append({"genre": self.plex_genres})
 
-        return section.search(filters=filters, **kwargs)
+        res: list[Media] = section.search(filters=filters, **kwargs)
+
+        if extra_rating_keys:
+            log.debug(
+                f"{self.__class__.__name__}: Filtering section $$'{section.title}'$$ by "
+                f"rating keys: {extra_rating_keys}"
+            )
+            res.extend(section.search(ratingKey__in=extra_rating_keys))
+
+        return res
 
     @lru_cache(maxsize=32)
     def get_user_review(self, item: Media) -> str | None:
