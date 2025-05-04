@@ -13,6 +13,7 @@ sys.path.append(str(pathlib.Path(__file__).resolve().parent.parent))
 
 from src import config as app_config
 from src.models.animap import AniMap  # noqa: F401
+from src.models.failure import Failure  # noqa: F401
 from src.models.housekeeping import Housekeeping  # noqa: F401
 
 config = context.config
