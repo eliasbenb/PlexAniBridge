@@ -101,7 +101,12 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
                     f"{self._debug_log_ids(item.ratingKey, item.guid, guids, animapping.anilist_id)}",
                     exc_info=True,
                 )
-                self.sync_stats.failed += 1
+                self.sync_stats.fail_item(
+                    anilist_account_id=self.anilist_client.user.id,
+                    plex_account_id=self.plex_client.user_account_id,
+                    section_id=item.librarySectionID,
+                    rating_key=item.ratingKey,
+                )
                 continue
 
             if not anilist_media:
@@ -176,10 +181,15 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
                     continue
                 anilist_media = _anilist_media
             except Exception:
-                self.sync_stats.failed += 1
                 log.error(
                     f"Failed to fetch AniList data for {self._debug_log_title(item)}",
                     exc_info=True,
+                )
+                self.sync_stats.fail_item(
+                    anilist_account_id=self.anilist_client.user.id,
+                    plex_account_id=self.plex_client.user_account_id,
+                    section_id=item.librarySectionID,
+                    rating_key=item.ratingKey,
                 )
                 continue
 
@@ -189,7 +199,13 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
                     f"{self._debug_log_title(item, AniMap(anilist_id=0, anidb_id=None, imdb_id=None, mal_id=None, tmdb_movie_id=None, tmdb_show_id=None, tvdb_id=None, tvdb_mappings={f's{index}': ''}))}"
                     f"{self._debug_log_ids(item.ratingKey, season.guid, guids)}"
                 )
-                self.sync_stats.not_found += 1
+                self.sync_stats.fail_item(
+                    anilist_account_id=self.anilist_client.user.id,
+                    plex_account_id=self.plex_client.user_account_id,
+                    section_id=item.librarySectionID,
+                    rating_key=item.ratingKey,
+                    not_found=True,
+                )
                 continue
 
             episodes = episodes_by_season.get(index, [])

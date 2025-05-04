@@ -58,7 +58,12 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
                 f"{self._debug_log_ids(item.ratingKey, item.guid, guids, animapping.anilist_id)}",
                 exc_info=True,
             )
-            self.sync_stats.failed += 1
+            self.sync_stats.fail_item(
+                anilist_account_id=self.anilist_client.user.id,
+                plex_account_id=self.plex_client.user_account_id,
+                section_id=item.librarySectionID,
+                rating_key=item.ratingKey,
+            )
             return
 
         if not anilist_media:
@@ -66,7 +71,13 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
                 f"No AniList entry could be found for {self._debug_log_title(item)} "
                 f"{self._debug_log_ids(item.ratingKey, item.guid, guids)}"
             )
-            self.sync_stats.not_found += 1
+            self.sync_stats.fail_item(
+                anilist_account_id=self.anilist_client.user.id,
+                plex_account_id=self.plex_client.user_account_id,
+                section_id=item.librarySectionID,
+                rating_key=item.ratingKey,
+                not_found=True,
+            )
             return
 
         yield item, [item], animapping, anilist_media
