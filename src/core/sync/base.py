@@ -1,15 +1,19 @@
 from abc import ABC, abstractmethod
+from datetime import datetime, timezone
 from typing import Any, Callable, Generic, Iterator, TypeVar
 
 from plexapi.media import Guid
 from plexapi.video import Episode, Movie, Season, Show
 from pydantic import BaseModel
+from sqlalchemy.exc import IntegrityError
 from thefuzz import fuzz
 
 from src import log
 from src.core import AniListClient, AniMapClient, PlexClient
+from src.database import db
 from src.models.anilist import FuzzyDate, Media, MediaList, MediaListStatus, ScoreFormat
 from src.models.animap import AniMap
+from src.models.failure import Failure
 from src.settings import SyncField
 
 T = TypeVar("T", bound=Movie | Show)  # Section item
@@ -116,6 +120,43 @@ class SyncStats(BaseModel):
             float: Coverage percentage of successfully synced items
         """
         return len(self.covered) / len(self.possible) if self.possible else 0.0
+
+    def fail_item(
+        self,
+        anilist_account_id: int,
+        plex_account_id: int,
+        section_id: int,
+        rating_key: int | str,
+        not_found: bool = False,
+    ) -> None:
+        """Records a failed sync attempt for a specific item.
+
+        Args:
+            anilist_account_id (int): AniList account ID
+            plex_account_id (int): Plex account ID
+            section_id (int): Plex library section ID
+            rating_key (int | str): Plex item rating key
+            not_found (bool): Whether to record the failure as not found or a general failure
+        """
+        if not_found:
+            self.not_found += 1
+        else:
+            self.failed += 1
+
+        with db as ctx:
+            try:
+                ctx.session.merge(
+                    Failure(
+                        anilist_account_id=anilist_account_id,
+                        plex_account_id=plex_account_id,
+                        section_id=section_id,
+                        rating_key=str(rating_key),
+                        failed_at=datetime.now(timezone.utc),
+                    )
+                )
+                ctx.session.commit()
+            except IntegrityError:
+                ctx.session.rollback()
 
     def __add__(self, other: "SyncStats") -> "SyncStats":
         return SyncStats(
@@ -252,7 +293,12 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
                     f"{debug_log_title} {debug_log_ids}",
                     exc_info=True,
                 )
-                self.sync_stats.failed += 1
+                self.sync_stats.fail_item(
+                    anilist_account_id=self.anilist_client.user.id,
+                    plex_account_id=self.plex_client.user_account_id,
+                    section_id=item.librarySectionID,
+                    rating_key=item.ratingKey,
+                )
 
     @abstractmethod
     def map_media(self, item: T) -> Iterator[tuple[S, E, AniMap, Media]]:
