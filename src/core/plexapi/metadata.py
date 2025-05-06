@@ -2,15 +2,12 @@ from collections import defaultdict
 from functools import cached_property, wraps
 from itertools import chain
 from time import sleep
-from typing import (
-    Any,
-    Callable,
-)
+from typing import Any, Callable
 from xml.etree import ElementTree
 
 import requests
 from limiter import Limiter
-from plexapi.base import PlexObject
+from plexapi.base import PlexObject, cached_data_property
 from plexapi.exceptions import BadRequest, NotFound, Unauthorized
 from plexapi.library import (
     Library,
@@ -292,6 +289,7 @@ class MetadataShowSection(LibrarySectionMetadataMixin, PlexMetadataObject, ShowS
 
 
 class MetadataLibrary(PlexMetadataObject, Library):
+    @cached_data_property
     def _loadSections(self):
         key = "/library/sections"
         sectionsByID = {}
@@ -308,8 +306,7 @@ class MetadataLibrary(PlexMetadataObject, Library):
             sectionsByID[section.key] = section
             sectionsByTitle[section.title.lower().strip()].append(section)
 
-        self._sectionsByID = sectionsByID
-        self._sectionsByTitle = dict(sectionsByTitle)
+        return sectionsByID, dict(sectionsByTitle)
 
 
 class PlexMetadataServer(PlexServer):

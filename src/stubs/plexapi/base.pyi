@@ -1,6 +1,6 @@
 from collections.abc import Generator
 from datetime import datetime
-from functools import cached_property as cached_property
+from functools import cached_property
 from typing import Any, Generic, Iterable, Type, TypeVar
 from xml.etree.ElementTree import Element
 
@@ -18,6 +18,8 @@ PlexObjectT = TypeVar("PlexObjectT", bound="PlexObject")
 MediaContainerT = TypeVar("MediaContainerT", bound="MediaContainer")
 USER_DONT_RELOAD_FOR_KEYS: set[str]
 OPERATORS: dict
+
+class cached_data_property(cached_property): ...
 
 class PlexObject:
     TAG: str
