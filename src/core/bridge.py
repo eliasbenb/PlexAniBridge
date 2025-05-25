@@ -347,13 +347,10 @@ class BridgeClient:
             "show": self.show_sync,
         }[section.type]
 
-        for i, item in enumerate(items):
+        for item in items:
             try:
                 await sync_client.process_media(item)
-
-                # Add cancellation points every few items
-                if i % 10 == 0:
-                    await asyncio.sleep(0)
+                await asyncio.sleep(0)  # Yield control to allow cancellation
 
             except Exception:
                 log.error(
