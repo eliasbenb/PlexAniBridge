@@ -195,17 +195,14 @@ class AniListBaseModel(BaseModel):
 
     @classmethod
     @lru_cache(maxsize=None)
-    def model_dump_graphql(cls, indent_level: int = 0) -> str:
-        """Generate GraphQL query fields with proper indentation
+    def model_dump_graphql(cls) -> str:
+        """Generate GraphQL query fields
 
         This is a class method that converts all the available fields into a GraphQL query with support for nested fields.
         This allows us to dynamically generate GraphQL queries without having to manually write them for each model.
 
-        Args:
-            indent_level (int | None): How many levels to indent. Defaults to 0.
-
         Returns:
-            str: The GraphQL query fields with proper indentation
+            str: The GraphQL query fields
         """
         if cls.__name__ in cls._processed_models:
             return ""
@@ -213,7 +210,6 @@ class AniListBaseModel(BaseModel):
         cls._processed_models.add(cls.__name__)
         fields = cls.model_fields
         graphql_fields = []
-        indent = "    " * indent_level
 
         for field_name, field in fields.items():
             field_type = (
@@ -227,13 +223,11 @@ class AniListBaseModel(BaseModel):
             if isinstance(field_type, type) and issubclass(
                 field_type, AniListBaseModel
             ):
-                nested_fields = field_type.model_dump_graphql(indent_level + 1)
+                nested_fields = field_type.model_dump_graphql()
                 if nested_fields:
-                    graphql_fields.append(
-                        f"{indent}{camel_field_name} {{\n{nested_fields}\n{indent}}}"
-                    )
+                    graphql_fields.append(f"{camel_field_name} {{\n{nested_fields}\n}}")
             else:
-                graphql_fields.append(f"{indent}{camel_field_name}")
+                graphql_fields.append(f"{camel_field_name}")
 
         cls._processed_models.remove(cls.__name__)
         return "\n".join(graphql_fields)
