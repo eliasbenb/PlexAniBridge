@@ -1,7 +1,8 @@
+import asyncio
 import sys
 from collections import Counter
 from datetime import datetime
-from typing import Iterator
+from typing import AsyncIterator
 
 from plexapi.video import Episode, EpisodeHistory, MovieHistory, Season, Show
 from tzlocal import get_localzone
@@ -15,16 +16,16 @@ from .base import BaseSyncClient, ParsedGuids
 
 
 class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
-    def map_media(
+    async def map_media(
         self, item: Show
-    ) -> Iterator[tuple[Season, list[Episode], AniMap, Media]]:
+    ) -> AsyncIterator[tuple[Season, list[Episode], AniMap, Media]]:
         """Maps a Plex item to potential AniList matches.
 
         Args:
             item (Show): Plex media item to map
 
         Returns:
-            Iterator[tuple[Season, list[Episode], AniMap, Media]]: Mapping matches (child, grandchild, animapping, anilist_media)
+            AsyncIterator[tuple[Season, list[Episode], AniMap, Media]]: Mapping matches (child, grandchild, animapping, anilist_media)
         """
         guids = ParsedGuids.from_guids(item.guids)
 
@@ -161,6 +162,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             primary_season_idx = season_episode_counts.most_common(1)[0][0]
             primary_season = relevant_seasons[primary_season_idx]
 
+            await asyncio.sleep(0)  # Add a yield point for cancellation
             yield primary_season, episodes, animapping, anilist_media
 
         # We're done with the mapped seasons. Now we need to process the remaining seasons.
@@ -171,7 +173,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             season = seasons[index]
 
             try:
-                _anilist_media = self.search_media(item, season)
+                _anilist_media = await self.search_media(item, season)
                 if not _anilist_media:
                     continue
                 anilist_media = _anilist_media
@@ -205,9 +207,10 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
                 tvdb_mappings={f"s{index}": ""},
             )
 
+            await asyncio.sleep(0)  # Add a yield point for cancellation
             yield season, episodes, animapping, anilist_media
 
-    def search_media(self, item: Show, child_item: Season) -> Media | None:
+    async def search_media(self, item: Show, child_item: Season) -> Media | None:
         """Searches for matching AniList entry by title.
 
         For shows, we search for entries with matching episode counts and
