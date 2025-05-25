@@ -31,17 +31,6 @@ class SchedulerClient:
         self._current_task: asyncio.Task | None = None
         self.stop_event = stop_event or asyncio.Event()
 
-    async def run_sync(self, poll: bool) -> None:
-        """Function to run a sync job
-
-        Args:
-            poll (bool): Flag to enable polling-based sync
-        """
-        try:
-            await asyncio.to_thread(self.bridge.sync, poll=poll)
-        except Exception:
-            log.error(f"{self.__class__.__name__}: Sync process error", exc_info=True)
-
     async def sync(self, poll: bool = False) -> None:
         """Execute a single synchronization cycle with error handling
 
@@ -50,7 +39,7 @@ class SchedulerClient:
         """
         async with self._sync_lock:
             try:
-                self._current_task = asyncio.create_task(self.run_sync(poll))
+                self._current_task = asyncio.create_task(self.bridge.sync(poll=poll))
                 await self._current_task
 
             except asyncio.CancelledError:

@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime, timezone
 
 from plexapi.library import MovieSection, ShowSection
@@ -153,7 +154,7 @@ class BridgeClient:
             )
             ctx.session.commit()
 
-    def sync(self, poll: bool = False) -> None:
+    async def sync(self, poll: bool = False) -> None:
         """Initiates the synchronization process for all configured user pairs.
 
         This is the main entry point for the sync process. It:
@@ -174,7 +175,7 @@ class BridgeClient:
         sync_datetime = datetime.now(timezone.utc)
 
         for anilist_token, plex_user in self.token_user_pairs:
-            self._sync_user(anilist_token, plex_user, poll)
+            await self._sync_user(anilist_token, plex_user, poll)
 
         if poll:
             self._set_last_polled(sync_datetime)
@@ -189,7 +190,7 @@ class BridgeClient:
             f"{self.__class__.__name__}: {'Polling' if poll else 'Periodic'} sync completed"
         )
 
-    def _sync_user(self, anilist_token: str, plex_user: str, poll: bool) -> None:
+    async def _sync_user(self, anilist_token: str, plex_user: str, poll: bool) -> None:
         """Synchronizes a single Plex user's library with their AniList account.
 
         Args:
@@ -257,7 +258,10 @@ class BridgeClient:
 
         start_time = datetime.now(timezone.utc)
         for section in plex_sections:
-            sync_stats += self._sync_section(plex_client, anilist_client, section, poll)
+            section_stats = await self._sync_section(
+                plex_client, anilist_client, section, poll
+            )
+            sync_stats += section_stats
         end_time = datetime.now(timezone.utc)
         duration = end_time - start_time
 
@@ -281,7 +285,7 @@ class BridgeClient:
             f"{duration.total_seconds():.2f} seconds"
         )
 
-    def _sync_section(
+    async def _sync_section(
         self,
         plex_client: PlexClient,
         anilist_client: AniListClient,
@@ -342,9 +346,12 @@ class BridgeClient:
             "movie": self.movie_sync,
             "show": self.show_sync,
         }[section.type]
+
         for item in items:
             try:
-                sync_client.process_media(item)
+                await sync_client.process_media(item)
+                await asyncio.sleep(0)  # Yield control to allow cancellation
+
             except Exception:
                 log.error(
                     f"{self.__class__.__name__}: Failed to sync item $$'{item.title}'$$",
@@ -352,6 +359,6 @@ class BridgeClient:
                 )
 
         if self.config.BATCH_REQUESTS:
-            sync_client.batch_sync()
+            await sync_client.batch_sync()
 
         return sync_client.sync_stats

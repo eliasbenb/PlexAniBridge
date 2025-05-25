@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Generic, Iterator, TypeVar
+from typing import Any, AsyncIterator, Callable, Generic, TypeVar
 
 from plexapi.media import Guid
 from plexapi.video import Episode, Movie, Season, Show
@@ -198,7 +198,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             ):
                 getattr(self, attr).cache_clear()
 
-    def process_media(self, item: T) -> None:
+    async def process_media(self, item: T) -> None:
         """Processes a single media item for synchronization.
 
         Args:
@@ -221,9 +221,12 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             f"{debug_log_title} {debug_log_ids}"
         )
 
-        for child_item, grandchild_items, animapping, anilist_media in self.map_media(
-            item
-        ):
+        async for (
+            child_item,
+            grandchild_items,
+            animapping,
+            anilist_media,
+        ) in self.map_media(item):
             debug_log_title = self._debug_log_title(item=item, animapping=animapping)
             debug_log_ids = self._debug_log_ids(
                 key=child_item.ratingKey,
@@ -238,7 +241,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             )
 
             try:
-                self.sync_media(
+                await self.sync_media(
                     item=item,
                     child_item=child_item,
                     grandchild_items=grandchild_items,
@@ -255,7 +258,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
                 self.sync_stats.failed += 1
 
     @abstractmethod
-    def map_media(self, item: T) -> Iterator[tuple[S, E, AniMap, Media]]:
+    def map_media(self, item: T) -> AsyncIterator[tuple[S, E, AniMap, Media]]:
         """Maps a Plex item to potential AniList matches.
 
         Must be implemented by subclasses to handle different
@@ -265,12 +268,12 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             item (T): Plex media item to map
 
         Returns:
-            Iterator[tuple[S, E, AniMap, Media]]: Mapping matches (child, grandchild, animapping, anilist_media)
+            AsyncIterator[tuple[S, E, AniMap, Media]]: Mapping matches (child, grandchild, animapping, anilist_media)
         """
         pass
 
     @abstractmethod
-    def search_media(self, item: T, child_item: S) -> Media | None:
+    async def search_media(self, item: T, child_item: S) -> Media | None:
         """Searches for matching AniList entry by title.
 
         Must be implemented by subclasses to handle different
@@ -307,7 +310,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             return None
         return best_result
 
-    def sync_media(
+    async def sync_media(
         self,
         item: T,
         child_item: S,
@@ -409,7 +412,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             )
             self.sync_stats.synced += 1
 
-    def batch_sync(self) -> None:
+    async def batch_sync(self) -> None:
         """Executes batch synchronization of queued media lists.
 
         Sends all queued media lists to AniList in a single batch request.

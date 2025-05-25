@@ -1,4 +1,5 @@
-from typing import Iterator
+import asyncio
+from typing import AsyncIterator
 
 from plexapi.video import Movie
 from tzlocal import get_localzone
@@ -11,16 +12,16 @@ from .base import BaseSyncClient, ParsedGuids
 
 
 class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
-    def map_media(
+    async def map_media(
         self, item: Movie
-    ) -> Iterator[tuple[Movie, list[Movie], AniMap, Media]]:
+    ) -> AsyncIterator[tuple[Movie, list[Movie], AniMap, Media]]:
         """Maps a Plex item to potential AniList matches.
 
         Args:
             item (Movie): Plex media item to map
 
         Returns:
-            Iterator[tuple[Movie, list[Movie], AniMap, Media]]: Mapping matches (child, grandchild, animapping, anilist_media)
+            AsyncIterator[tuple[Movie, list[Movie], AniMap, Media]]: Mapping matches (child, grandchild, animapping, anilist_media)
         """
         self.sync_stats.possible.add(str(item))
 
@@ -48,7 +49,7 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
             if animapping.anilist_id:
                 anilist_media = self.anilist_client.get_anime(animapping.anilist_id)
             else:
-                _anilist_media = self.search_media(item, item)
+                _anilist_media = await self.search_media(item, item)
                 if not _anilist_media:
                     return
                 anilist_media = _anilist_media
@@ -69,9 +70,10 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
             self.sync_stats.not_found += 1
             return
 
+        await asyncio.sleep(0)  # Add a yield point for cancellation
         yield item, [item], animapping, anilist_media
 
-    def search_media(self, item: Movie, child_item: Movie) -> Media | None:
+    async def search_media(self, item: Movie, child_item: Movie) -> Media | None:
         """Searches for matching AniList entry by title.
 
         For movies, we search for single episode entries.
