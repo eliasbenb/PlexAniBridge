@@ -10,7 +10,9 @@
 				"charliermarsh.ruff",
 				"yzhang.markdown-all-in-one",
 				"yy0931.vscode-sqlite3-editor",
-				"redhat.vscode-yaml"
+				"redhat.vscode-yaml",
+				"rafaelha.vscode-flamegraph",
+				"eamodio.gitlens"
 			]
 		}
 	},

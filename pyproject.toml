@@ -48,3 +48,8 @@ extraPaths = ["./src/stubs"]
 
 [tool.uv.workspace]
 members = ["docs"]
+
+[dependency-groups]
+dev = [
+    "py-spy>=0.4.0",
+]
