@@ -6,7 +6,7 @@ from xml.etree import ElementTree
 
 import plexapi.utils
 import requests
-from cachetools.func import lru_cache
+from cachetools.func import ttl_cache
 from plexapi.library import LibrarySection, MovieSection, ShowSection
 from plexapi.myplex import MyPlexUser
 from plexapi.server import PlexServer
@@ -314,7 +314,7 @@ class PlexClient:
 
         return section.search(filters=filters, **kwargs)
 
-    @lru_cache(maxsize=32)
+    @ttl_cache(ttl=30)
     def get_user_review(self, item: Media) -> str | None:
         """Retrieves user review for a media item from Plex community.
 
@@ -361,7 +361,7 @@ class PlexClient:
             )
             return None
 
-    @lru_cache(maxsize=32)
+    @ttl_cache(ttl=30)
     def get_continue_watching_hub(
         self, section: LibrarySection
     ) -> list[Episode] | list[Movie]:
@@ -406,7 +406,7 @@ class PlexClient:
                 None,
             )
 
-    @lru_cache(maxsize=32)
+    @ttl_cache(ttl=30)
     def get_history(
         self,
         item: Media,
