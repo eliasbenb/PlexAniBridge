@@ -516,7 +516,7 @@ wheels = [
 
 [[package]]
 name = "plexanibridge"
-version = "0.6.1"
+version = "0.6.2"
 source = { virtual = "." }
 dependencies = [
     { name = "alembic" },
