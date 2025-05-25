@@ -28,10 +28,22 @@ jobs:
       id-token: write
 
     steps:
+      - name: Set lowercase repository name
+        id: repo-name
+        run: |
+          echo "IMAGE_NAME_LC=$(echo ${{ github.event.repository.name }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+      
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.inputs.ref || github.ref }}
+
+      - name: Set version variables
+        run: |
+          echo "IS_STABLE=${{ github.ref_type == 'tag' && !contains(github.ref, '-alpha.') && !contains(github.ref, '-beta.') }}" >> $GITHUB_ENV
+          echo "IS_ALPHA=${{ github.ref_type == 'tag' && contains(github.ref, '-alpha.') }}" >> $GITHUB_ENV
+          echo "IS_BETA=${{ github.ref_type == 'tag' && contains(github.ref, '-beta.') }}" >> $GITHUB_ENV
+          echo "IS_PRERELEASE=${{ github.ref_type == 'tag' && (contains(github.ref, '-alpha.') || contains(github.ref, '-beta.')) }}" >> $GITHUB_ENV
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -54,13 +66,25 @@ jobs:
           flavor: |
             latest=false
           tags: |
-            type=semver,pattern=v{{version}}
-            type=semver,pattern=v{{major}}.{{minor}}
-            type=semver,pattern=v{{major}}
-            type=raw,value=alpha,enable=${{ github.ref_type == 'tag' && contains(github.ref, 'alpha') }}
-            type=raw,value=beta,enable=${{ github.ref_type == 'tag' && contains(github.ref, 'beta') }}
-            type=raw,value=latest,enable=${{ github.ref_type == 'tag' && !contains(github.ref, 'alpha') && !contains(github.ref, 'beta') }}
+            # X.Y.Z, X.Y, X
+            type=semver,pattern={{version}},enable=${{ env.IS_STABLE }}
+            type=semver,pattern={{major}}.{{minor}},enable=${{ env.IS_STABLE }}
+            type=semver,pattern={{major}},enable=${{ env.IS_STABLE }}
+            # vX.Y.Z, vX.Y, vX
+            type=semver,pattern=v{{version}},enable=${{ env.IS_STABLE }}
+            type=semver,pattern=v{{major}}.{{minor}},enable=${{ env.IS_STABLE }}
+            type=semver,pattern=v{{major}},enable=${{ env.IS_STABLE }}
+            # X.Y.Z-alpha.W, X.Y.Z-beta.W
+            type=semver,pattern={{version}},enable=${{ env.IS_PRERELEASE }}
+            # vX.Y.Z-alpha.W, vX.Y.Z-beta.W
+            type=semver,pattern={{raw}},enable=${{ env.IS_PRERELEASE }}
+            # alpha, beta
+            type=raw,value=alpha,enable=${{ env.IS_ALPHA }}
+            type=raw,value=beta,enable=${{ env.IS_BETA }}
+            # main, develop
             type=ref,event=branch
+            # latest
+            type=raw,value=latest,enable=${{ env.IS_STABLE }}
 
       - name: Build and Push Docker Image
         id: build-and-push
@@ -82,4 +106,4 @@ jobs:
           delete-ghost-images: true
           delete-orphaned-images: true
           validate: true
-          package: plexanibridge
+          package: ${{ env.IMAGE_NAME_LC }}
