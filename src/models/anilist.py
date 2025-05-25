@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone
 from enum import StrEnum
-from functools import total_ordering
+from functools import lru_cache, total_ordering
 from typing import Annotated, Any, ClassVar, Generic, TypeVar, get_args, get_origin
 
 from pydantic import AfterValidator, AliasGenerator, BaseModel, ConfigDict
@@ -194,10 +194,11 @@ class AniListBaseModel(BaseModel):
                 setattr(self, field, field_info.default)
 
     @classmethod
+    @lru_cache(maxsize=None)
     def model_dump_graphql(cls, indent_level: int = 0) -> str:
         """Generate GraphQL query fields with proper indentation
 
-        This is a class method that converts all the avaiilable fields into a GraphQL query with support for nested fields.
+        This is a class method that converts all the available fields into a GraphQL query with support for nested fields.
         This allows us to dynamically generate GraphQL queries without having to manually write them for each model.
 
         Args:
