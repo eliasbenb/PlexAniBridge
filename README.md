@@ -26,7 +26,7 @@ PlexAniBridge is a tool designed to keep your AniList profile automatically sync
 ```yaml
 services:
   plexanibridge:
-    image: ghcr.io/eliasbenb/plexanibridge:latest
+    image: ghcr.io/eliasbenb/plexanibridge:v0
     environment:
       TZ: America/New_York
       ANILIST_TOKEN: eyJ...
