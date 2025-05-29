@@ -7,10 +7,10 @@ from pydantic import BaseModel
 from rapidfuzz import fuzz
 
 from src import log
+from src.config.settings import SyncField
 from src.core import AniListClient, AniMapClient, PlexClient
 from src.models.anilist import FuzzyDate, Media, MediaList, MediaListStatus, ScoreFormat
 from src.models.animap import AniMap
-from src.settings import SyncField
 
 T = TypeVar("T", bound=Movie | Show)  # Section item
 S = TypeVar("S", bound=Movie | Season)  # Item child (season)

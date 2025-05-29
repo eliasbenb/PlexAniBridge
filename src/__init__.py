@@ -1,10 +1,10 @@
 import os
 import uuid
 
-from .logging import Logger, get_logger
-from .settings import config
-from .utils.terminal import supports_utf8
-from .utils.version import get_docker_status, get_git_hash, get_pyproject_version
+from src.config import config
+from src.utils.logging import Logger, get_logger
+from src.utils.terminal import supports_utf8
+from src.utils.version import get_docker_status, get_git_hash, get_pyproject_version
 
 __author__ = "Elias Benbourenane <eliasbenbourenane@gmail.com>"
 __credits__ = ["eliasbenb"]

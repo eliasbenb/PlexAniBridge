@@ -7,7 +7,7 @@ from pydantic.alias_generators import to_camel
 from pydantic.fields import _Unset
 from pydantic_settings import BaseSettings
 
-from src.logging import get_logger
+from src.utils.logging import get_logger
 
 _log = get_logger(log_name="PlexAniBridge", log_level="INFO")
 
@@ -241,6 +241,3 @@ class PlexAnibridgeConfig(BaseSettings):
     class Config:
         env_file = ".env"
         extra = "allow"
-
-
-config = PlexAnibridgeConfig()

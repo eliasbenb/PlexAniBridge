@@ -8,11 +8,10 @@ from plexapi.video import Episode, EpisodeHistory, MovieHistory, Season, Show
 from tzlocal import get_localzone
 
 from src import log
+from src.core.sync.base import BaseSyncClient, ParsedGuids
 from src.models.anilist import FuzzyDate, Media, MediaListStatus
 from src.models.animap import AniMap
 from src.utils.cache import generic_lru_cache
-
-from .base import BaseSyncClient, ParsedGuids
 
 
 class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
