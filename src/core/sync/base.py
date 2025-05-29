@@ -4,7 +4,7 @@ from typing import Any, AsyncIterator, Callable, Generic, TypeVar
 from plexapi.media import Guid
 from plexapi.video import Episode, Movie, Season, Show
 from pydantic import BaseModel
-from thefuzz import fuzz
+from rapidfuzz import fuzz
 
 from src import log
 from src.core import AniListClient, AniMapClient, PlexClient
