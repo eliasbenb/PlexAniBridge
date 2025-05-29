@@ -3,6 +3,7 @@ from pathlib import Path
 from sqlalchemy.engine import Engine
 from sqlmodel import Session, create_engine
 
+from src import __file__ as src_file
 from src import config
 
 
@@ -73,7 +74,8 @@ class PlexAniBridgeDB:
 
         config = Config()
         config.set_main_option(
-            "script_location", str(Path(__file__).resolve().parent.parent / "alembic")
+            "script_location",
+            str(Path(src_file).resolve().parent.parent / "alembic"),
         )
         config.set_main_option("sqlalchemy.url", f"sqlite:///{self.db_path}")
 
