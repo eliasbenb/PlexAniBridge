@@ -1,11 +1,11 @@
 from abc import ABC, abstractmethod
 from typing import Any, AsyncIterator, Callable, Generic, TypeVar
 
-from plexapi.media import Guid
-from plexapi.video import Episode, Movie, Season, Show
 from pydantic import BaseModel
 from rapidfuzz import fuzz
 
+from plexapi.media import Guid
+from plexapi.video import Episode, Movie, Season, Show
 from src import log
 from src.config.settings import SyncField
 from src.core import AniListClient, AniMapClient, PlexClient
@@ -82,6 +82,9 @@ class ParsedGuids(BaseModel):
             if getattr(self, field) is not None
         )
 
+    class Config:
+        slots = True
+
 
 class SyncStats(BaseModel):
     """Statistics tracker for synchronization operations.
@@ -127,6 +130,9 @@ class SyncStats(BaseModel):
             possible=self.possible.union(other.possible),
             covered=self.covered.union(other.covered),
         )
+
+    class Config:
+        slots = True
 
 
 class BaseSyncClient(ABC, Generic[T, S, E]):
