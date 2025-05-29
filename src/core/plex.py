@@ -26,6 +26,8 @@ from src.plexapi.community import PlexCommunityClient
 from src.plexapi.metadata import PlexMetadataServer
 from src.utils.requests import SelectiveVerifySession
 
+__all__ = ["Media", "MediaHistory", "Section", "PlexClient"]
+
 Media: TypeAlias = Movie | Show | Season | Episode
 MediaHistory: TypeAlias = MovieHistory | EpisodeHistory
 Section: TypeAlias = MovieSection | ShowSection

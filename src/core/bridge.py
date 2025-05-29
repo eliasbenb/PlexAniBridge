@@ -15,6 +15,8 @@ from src.core.sync import (
 )
 from src.models.housekeeping import Housekeeping
 
+__all__ = ["BridgeClient"]
+
 
 class BridgeClient:
     """Main orchestrator for synchronizing Plex and AniList libraries.

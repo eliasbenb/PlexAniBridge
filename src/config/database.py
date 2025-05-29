@@ -6,6 +6,8 @@ from sqlmodel import Session, create_engine
 from src import __file__ as src_file
 from src import config
 
+__all__ = ["PlexAniBridgeDB", "db"]
+
 
 class PlexAniBridgeDB:
     """Database manager for PlexAniBridge application.

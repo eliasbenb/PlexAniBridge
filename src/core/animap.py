@@ -15,6 +15,8 @@ from src.core.mappings import MappingsClient
 from src.models.animap import AniMap
 from src.models.housekeeping import Housekeeping
 
+__all__ = ["AniMapClient"]
+
 
 class AniMapClient:
     """Client for managing the AniMap database.
