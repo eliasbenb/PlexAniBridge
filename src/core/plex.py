@@ -4,9 +4,11 @@ from typing import TypeAlias
 from urllib.parse import urlparse
 from xml.etree import ElementTree
 
-import plexapi.utils
 import requests
 from cachetools.func import ttl_cache
+from tzlocal import get_localzone
+
+import plexapi.utils
 from plexapi.library import LibrarySection, MovieSection, ShowSection
 from plexapi.myplex import MyPlexUser
 from plexapi.server import PlexServer
@@ -18,14 +20,13 @@ from plexapi.video import (
     Season,
     Show,
 )
-from tzlocal import get_localzone
-
 from src import log
-from src.settings import PlexMetadataSource
+from src.config.settings import PlexMetadataSource
+from src.plexapi.community import PlexCommunityClient
+from src.plexapi.metadata import PlexMetadataServer
 from src.utils.requests import SelectiveVerifySession
 
-from .plexapi.community import PlexCommunityClient
-from .plexapi.metadata import PlexMetadataServer
+__all__ = ["Media", "MediaHistory", "Section", "PlexClient"]
 
 Media: TypeAlias = Movie | Show | Season | Episode
 MediaHistory: TypeAlias = MovieHistory | EpisodeHistory

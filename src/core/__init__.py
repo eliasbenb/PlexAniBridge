@@ -1,6 +1,14 @@
-from .anilist import AniListClient as AniListClient
-from .animap import AniMapClient as AniMapClient
-from .plex import PlexClient as PlexClient
+from src.core.anilist import AniListClient
+from src.core.animap import AniMapClient
+from src.core.plex import PlexClient
 
-from .bridge import BridgeClient as BridgeClient  # isort:skip
-from .sched import SchedulerClient as SchedulerClient
+from src.core.bridge import BridgeClient  # isort:skip
+from src.core.sched import SchedulerClient
+
+__all__ = [
+    "AniListClient",
+    "AniMapClient",
+    "PlexClient",
+    "BridgeClient",
+    "SchedulerClient",
+]

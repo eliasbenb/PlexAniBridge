@@ -5,10 +5,9 @@ from plexapi.video import Movie
 from tzlocal import get_localzone
 
 from src import log
+from src.core.sync.base import BaseSyncClient, ParsedGuids
 from src.models.anilist import FuzzyDate, Media, MediaListStatus
 from src.models.animap import AniMap
-
-from .base import BaseSyncClient, ParsedGuids
 
 
 class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):

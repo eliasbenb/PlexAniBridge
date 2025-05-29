@@ -10,10 +10,12 @@ from sqlalchemy.sql.elements import BinaryExpression, ColumnElement
 from sqlmodel import col
 
 from src import log
+from src.config.database import db
 from src.core.mappings import MappingsClient
-from src.database import db
 from src.models.animap import AniMap
 from src.models.housekeeping import Housekeeping
+
+__all__ = ["AniMapClient"]
 
 
 class AniMapClient:

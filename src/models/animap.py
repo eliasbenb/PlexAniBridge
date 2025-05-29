@@ -4,7 +4,7 @@ from typing import Any
 from pydantic import field_validator
 from sqlmodel import JSON, Field, SQLModel
 
-from .mapping import TVDBMapping
+from src.models.mapping import TVDBMapping
 
 
 def TypedJson(*args, **kwargs) -> Any:
