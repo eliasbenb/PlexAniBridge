@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from math import isnan
 from typing import TypeAlias
 from urllib.parse import urlparse
@@ -269,27 +269,42 @@ class PlexClient:
         Returns:
             list[Media]: List of media items matching the criteria
         """
-        filters: dict = {"and": []}
+        filters: dict[str, list] = {"and": []}
 
         if min_last_modified:
-            if self.is_online_user:
-                min_last_modified = min_last_modified - timedelta(seconds=30)
-
             log.debug(
                 f"{self.__class__.__name__}: Filtering section $$'{section.title}'$$ by "
                 f"items last updated, viewed, or rated after {min_last_modified.astimezone(get_localzone())}"
             )
-            filters["and"].append(
-                {
-                    "or": [
-                        {"addedAt>>=": min_last_modified},
-                        {"updatedAt>>=": min_last_modified},
-                        {"originallyAvailableAt>>=": min_last_modified},
-                        {"lastViewedAt>>=": min_last_modified},
-                        {"lastRatedAt>>=": min_last_modified},
-                    ]
-                }
-            )
+
+            if section.TYPE == "movie":
+                filters["and"].append(
+                    {
+                        "or": [
+                            {"lastViewedAt>>=": min_last_modified},
+                            {"lastRatedAt>>=": min_last_modified},
+                            {"addedAt>>=": min_last_modified},
+                            {"updatedAt>>=": min_last_modified},
+                        ]
+                    }
+                )
+            elif section.TYPE == "show":
+                filters["and"].append(
+                    {
+                        "or": [
+                            {"show.lastRatedAt>>=": min_last_modified},
+                            {"show.addedAt>>=": min_last_modified},
+                            {"show.updatedAt>>=": min_last_modified},
+                            {"season.lastRatedAt>>=": min_last_modified},
+                            {"season.addedAt>>=": min_last_modified},
+                            {"season.updatedAt>>=": min_last_modified},
+                            {"episode.lastViewedAt>>=": min_last_modified},
+                            {"episode.lastRatedAt>>=": min_last_modified},
+                            {"episode.addedAt>>=": min_last_modified},
+                            {"episode.updatedAt>>=": min_last_modified},
+                        ]
+                    }
+                )
 
         if require_watched:
             log.debug(
@@ -301,7 +316,6 @@ class PlexClient:
                     "or": [
                         {"unwatched": False},
                         {"viewCount>>": 0},
-                        {"lastRatedAt>>=": datetime(1970, 1, 1, tzinfo=timezone.utc)},
                     ]
                 }
             )
