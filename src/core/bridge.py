@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from plexapi.library import MovieSection, ShowSection
 from src import log
@@ -24,8 +24,6 @@ class BridgeClient:
     Args:
         config (PlexAnibridgeConfig): Application configuration settings
     """
-
-    MIN_DATETIME = datetime.min.replace(tzinfo=timezone.utc)
 
     def __init__(self, config: PlexAnibridgeConfig) -> None:
         """Initialize the AniList client.
@@ -310,16 +308,11 @@ class BridgeClient:
         """
         log.info(f"{self.__class__.__name__}: Syncing section $$'{section.title}'$$")
 
-        last_sync = max(
-            self.last_synced or self.MIN_DATETIME,
-            self.last_polled or self.MIN_DATETIME,
-        )
-        last_sync = (
-            datetime.now(timezone.utc) if last_sync == self.MIN_DATETIME else last_sync
-        )
+        min_last_modified = self.last_synced or datetime.now(timezone.utc)
+
         items = plex_client.get_section_items(
             section,
-            min_last_modified=last_sync if poll else None,
+            min_last_modified=min_last_modified if poll else None,
             require_watched=not self.config.FULL_SCAN,
         )
 
