@@ -308,7 +308,9 @@ class BridgeClient:
         """
         log.info(f"{self.__class__.__name__}: Syncing section $$'{section.title}'$$")
 
-        min_last_modified = self.last_synced or datetime.now(timezone.utc)
+        min_last_modified = (
+            self.last_synced or datetime.now(timezone.utc)
+        ) - timedelta(seconds=15)
 
         items = plex_client.get_section_items(
             section,
