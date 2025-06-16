@@ -11,6 +11,8 @@ from tomlkit.exceptions import TOMLKitError
 
 from src import __version__, log
 
+__all__ = ["AniMapDict", "MappingsClient"]
+
 AniMapDict: TypeAlias = dict[str, dict[str, Any]]
 
 

@@ -9,6 +9,8 @@ from tzlocal import get_localzone
 from src import log
 from src.core import BridgeClient
 
+__all__ = ["SchedulerClient"]
+
 
 class SchedulerClient:
     def __init__(

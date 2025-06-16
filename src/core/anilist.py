@@ -21,6 +21,8 @@ from src.models.anilist import (
     User,
 )
 
+__all__ = ["AniListClient"]
+
 # The rate limit for the AniList API *should* be 90 requests per minute, but in practice
 # it seems to be around 30 requests per minute
 anilist_limiter = Limiter(rate=30 / 60, capacity=3, jitter=False)
