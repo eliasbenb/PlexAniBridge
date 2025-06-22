@@ -41,7 +41,6 @@ class BridgeClient:
         self.plex_clients: dict[str, PlexClient] = {}
 
         self.last_synced = self._get_last_synced()
-        self.last_polled = self._get_last_polled()
         self.last_config_encoded = self._get_last_config_encoded()
 
     def reinit(self) -> None:
@@ -69,26 +68,7 @@ class BridgeClient:
             last_synced = ctx.session.get(Housekeeping, "last_synced")
             if last_synced is None or last_synced.value is None:
                 return None
-            return datetime.fromisoformat(last_synced.value).replace(
-                tzinfo=timezone.utc
-            )
-
-    def _get_last_polled(self) -> datetime | None:
-        """Retrieves the timestamp of the last polling scan from the database.
-
-        Returns:
-            datetime | None: UTC timestamp of the last polling scan, None if never polled
-
-        Note:
-            Used to determine whether a polling scan is eligible to run
-        """
-        with db as ctx:
-            last_polled = ctx.session.get(Housekeeping, "last_polled")
-            if last_polled is None or last_polled.value is None:
-                return None
-            return datetime.fromisoformat(last_polled.value).replace(
-                tzinfo=timezone.utc
-            )
+            return datetime.fromisoformat(last_synced.value)
 
     def _set_last_synced(self, last_synced: datetime) -> None:
         """Stores the timestamp of a successful sync in the database.
@@ -103,22 +83,6 @@ class BridgeClient:
         with db as ctx:
             ctx.session.merge(
                 Housekeeping(key="last_synced", value=last_synced.isoformat())
-            )
-            ctx.session.commit()
-
-    def _set_last_polled(self, last_polled: datetime) -> None:
-        """Stores the timestamp of a polling scan in the database.
-
-        Args:
-            last_polled (datetime): UTC timestamp to store
-
-        Note:
-            Only called after a successful polling scan
-        """
-        self.last_polled = last_polled
-        with db as ctx:
-            ctx.session.merge(
-                Housekeeping(key="last_polled", value=last_polled.isoformat())
             )
             ctx.session.commit()
 
@@ -176,10 +140,7 @@ class BridgeClient:
         for anilist_token, plex_user in self.token_user_pairs:
             await self._sync_user(anilist_token, plex_user, poll)
 
-        if poll:
-            self._set_last_polled(sync_datetime)
-        else:
-            self._set_last_synced(sync_datetime)
+        self._set_last_synced(sync_datetime)
 
         config_encoded = self.config.encode()
         if config_encoded != self.last_config_encoded:
