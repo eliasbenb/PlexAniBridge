@@ -118,7 +118,7 @@ class SyncStats(BaseModel):
         Returns:
             float: Coverage percentage of successfully synced items
         """
-        return len(self.covered) / len(self.possible) if self.possible else 0.0
+        return len(self.covered) / len(self.possible) if self.possible else 1.0
 
     def __add__(self, other: "SyncStats") -> "SyncStats":
         return SyncStats(
