@@ -292,16 +292,26 @@ class PlexClient:
                 filters["and"].append(
                     {
                         "or": [
+                            # Show
+                            {"show.lastViewedAt>>=": min_last_modified},
                             {"show.lastRatedAt>>=": min_last_modified},
                             {"show.addedAt>>=": min_last_modified},
                             {"show.updatedAt>>=": min_last_modified},
+                            # Season
+                            {"season.lastViewedAt>>=": min_last_modified},
                             {"season.lastRatedAt>>=": min_last_modified},
                             {"season.addedAt>>=": min_last_modified},
                             {"season.updatedAt>>=": min_last_modified},
+                            # Episode
                             {"episode.lastViewedAt>>=": min_last_modified},
                             {"episode.lastRatedAt>>=": min_last_modified},
                             {"episode.addedAt>>=": min_last_modified},
                             {"episode.updatedAt>>=": min_last_modified},
+                            # Old Plex versions compatibility
+                            {"lastViewedAt>>=": min_last_modified},
+                            {"lastRatedAt>>=": min_last_modified},
+                            {"addedAt>>=": min_last_modified},
+                            {"updatedAt>>=": min_last_modified},
                         ]
                     }
                 )
