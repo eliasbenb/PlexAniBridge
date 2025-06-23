@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from math import isnan
 from typing import TypeAlias
 from urllib.parse import urlparse
@@ -321,14 +321,42 @@ class PlexClient:
                 f"{self.__class__.__name__}: Filtering section $$'{section.title}'$$ by "
                 f"items that have been watched"
             )
-            filters["and"].append(
-                {
-                    "or": [
-                        {"unwatched": False},
-                        {"viewCount>>": 0},
-                    ]
-                }
-            )
+
+            epoch = datetime.fromtimestamp(0, tz=timezone.utc)
+
+            if section.TYPE == "movie":
+                filters["and"].append(
+                    {
+                        "or": [
+                            {"viewCount>>": 0},
+                            {"lastViewedAt>>": epoch},
+                            {"lastRatedAt>>": epoch},
+                        ]
+                    }
+                )
+            elif section.TYPE == "show":
+                filters["and"].append(
+                    {
+                        "or": [
+                            # Show
+                            {"show.viewCount>>": 0},
+                            {"show.lastViewedAt>>": epoch},
+                            {"show.lastRatedAt>>": epoch},
+                            # Season
+                            {"season.viewCount>>": 0},
+                            {"season.lastViewedAt>>": epoch},
+                            {"season.lastRatedAt>>": epoch},
+                            # Episode
+                            {"episode.viewCount>>": 0},
+                            {"episode.lastViewedAt>>": epoch},
+                            {"episode.lastRatedAt>>": epoch},
+                            # Old Plex versions compatibility
+                            {"viewCount>>": 0},
+                            {"lastViewedAt>>": epoch},
+                            {"lastRatedAt>>": epoch},
+                        ]
+                    }
+                )
 
         if self.plex_genres:
             log.debug(
