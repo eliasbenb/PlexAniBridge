@@ -52,4 +52,5 @@ members = ["docs"]
 [dependency-groups]
 dev = [
     "py-spy>=0.4.0",
+    "ruff>=0.12.0",
 ]
