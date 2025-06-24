@@ -322,6 +322,9 @@ class FuzzyDate(AniListBaseModel):
             return None
         return datetime(year=self.year, month=self.month or 1, day=self.day or 1)
 
+    def __bool__(self) -> bool:
+        return self.year is not None
+
     def __eq__(self, other: Any) -> bool:
         if not isinstance(other, FuzzyDate):
             return False
