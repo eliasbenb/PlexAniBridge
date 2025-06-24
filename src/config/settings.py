@@ -14,23 +14,32 @@ __all__ = ["PlexMetadataSource", "SyncField", "LogLevel", "PlexAnibridgeConfig"]
 _log = get_logger(log_name="PlexAniBridge", log_level="INFO")
 
 
-class PlexMetadataSource(StrEnum):
+class BaseStrEnum(StrEnum):
+    """Base class for string-based enumerations with a custom __repr__ method."""
+
+    @classmethod
+    def _missing_(cls, value: object) -> "BaseStrEnum | None":
+        value = value.lower() if isinstance(value, str) else value
+        for member in cls:
+            if member.lower() == value:
+                return member
+        return None
+
+    def __repr__(self) -> str:
+        return self.value
+
+    def __str__(self) -> str:
+        return repr(self)
+
+
+class PlexMetadataSource(BaseStrEnum):
     """Defines the source of metadata for Plex media items."""
 
     LOCAL = "local"  # Metadata is sourced from the local Plex server
     ONLINE = "online"  # Metadata is sourced from Plex's online services
 
-    def __repr__(self) -> str:
-        """Provides a string representation of the metadata source.
 
-        Returns:
-            str: Quoted string of the metadata source
-                Example: PlexMetadataSource.LOCAL -> 'local'
-        """
-        return f"'{self.value}'"
-
-
-class SyncField(StrEnum):
+class SyncField(BaseStrEnum):
     """Enumeration of AniList fields that can be synchronized with Plex.
 
     These fields represent the data that can be synchronized between Plex
@@ -55,17 +64,8 @@ class SyncField(StrEnum):
         """
         return to_camel(self.value)
 
-    def __repr__(self) -> str:
-        """Provides a string representation of the enum value.
 
-        Returns:
-            str: Quoted string of the field name
-                Example: SyncField.STATUS -> 'status'
-        """
-        return f"'{self.value}'"
-
-
-class LogLevel(StrEnum):
+class LogLevel(BaseStrEnum):
     """Enumeration of available logging levels.
 
     Standard Python logging levels used to control log output verbosity.
@@ -78,15 +78,6 @@ class LogLevel(StrEnum):
     WARNING = "WARNING"  # Potential problems or issues
     ERROR = "ERROR"  # Error that prevented an operation
     CRITICAL = "CRITICAL"  # Error that prevents further program execution
-
-    def __repr__(self) -> str:
-        """Provides a string representation of the log level.
-
-        Returns:
-            str: Quoted string of the log level
-                Example: LogLevel.DEBUG -> 'DEBUG'
-        """
-        return f"'{self.value}'"
 
 
 class PlexAnibridgeConfig(BaseSettings):
@@ -113,7 +104,6 @@ class PlexAnibridgeConfig(BaseSettings):
     POLLING_SCAN: bool = False
     FULL_SCAN: bool = False
     DESTRUCTIVE_SYNC: bool = False
-
     EXCLUDED_SYNC_FIELDS: list[SyncField] = [SyncField.NOTES, SyncField.SCORE]
 
     # Advanced
