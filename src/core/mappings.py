@@ -207,7 +207,7 @@ class MappingsClient:
         Args:
             url (str): URL to load mappings from
             loaded_chain (set[str]): Set of already loaded includes to prevent circular includes
-            retry_count (int | None): Number of retries to attempt
+            retry_count (int): Number of retries to attempt (default: 0)
 
         Returns:
             AniMapDict: Mappings loaded from the URL
@@ -257,7 +257,7 @@ class MappingsClient:
 
         Args:
             src (str): Path to the file or URL to load mappings from
-            loaded_chain (set[str]): Set of already loaded includes to prevent circular includes
+            loaded_chain (set[str]): Set of already loaded includes to prevent circular includes (default: empty set)
 
         Returns:
             AniMapDict: Mappings loaded from the file or URL
@@ -307,8 +307,12 @@ class MappingsClient:
     def load_mappings(self) -> AniMapDict:
         """Load mappings from files and URLs and merge them together.
 
+        Loads custom mappings from local files (if they exist) and default mappings
+        from the CDN URL, then merges them with custom mappings taking precedence.
+        Filters out any keys starting with '$' from the final result.
+
         Returns:
-            AniMapDict: Merged mappings
+            AniMapDict: Merged mappings with system keys removed
         """
         self._loaded_sources = set()
 

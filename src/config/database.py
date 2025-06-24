@@ -1,4 +1,5 @@
 from pathlib import Path
+from types import TracebackType
 
 from sqlalchemy.engine import Engine
 from sqlmodel import Session, create_engine
@@ -15,10 +16,18 @@ class PlexAniBridgeDB:
     Handles the creation, initialization, and migration of the SQLite database,
     including file system operations and schema management. Uses SQLModel for ORM
     and Alembic for database migrations.
+
+    During initialization, this class automatically imports all database models
+    and runs any pending migrations.
+
+    Can be used as a context manager to automatically close the database session.
     """
 
     def __init__(self, data_path: Path) -> None:
         """Initializes the database manager.
+
+        Performs database setup including directory creation, model registration,
+        engine creation, session initialization, and migration execution.
 
         Args:
             data_path (Path): Directory where the database should be stored
@@ -47,6 +56,7 @@ class PlexAniBridgeDB:
 
         Raises:
             PermissionError: If unable to create the data directory
+            ValueError: If data_path exists but is a file instead of a directory
         """
         import src.models.animap  # noqa: F401
         import src.models.housekeeping  # noqa: F401
@@ -70,7 +80,15 @@ class PlexAniBridgeDB:
         return engine
 
     def _do_migrations(self) -> None:
-        """Executes database migrations using Alembic."""
+        """Executes database migrations using Alembic.
+
+        Configures Alembic to use the SQLite database and runs all pending
+        migrations to bring the schema up to the latest version.
+
+        Raises:
+            AlembicError: If migration execution fails
+            FileNotFoundError: If Alembic migration scripts are not found
+        """
         from alembic import command
         from alembic.config import Config
 
@@ -84,11 +102,26 @@ class PlexAniBridgeDB:
         command.upgrade(config, "head")
 
     def __enter__(self) -> "PlexAniBridgeDB":
-        """Enters the context manager, returning the database instance."""
+        """Enters the context manager, returning the database instance.
+
+        Returns:
+            PlexAniBridgeDB: This database instance
+        """
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
-        """Exits the context manager, closing the session."""
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        """Exits the context manager, closing the session.
+
+        Args:
+            exc_type (type[BaseException] | None): Exception type if an exception occurred
+            exc_val (BaseException | None): Exception value if an exception occurred
+            exc_tb (TracebackType | None): Exception traceback if an exception occurred
+        """
         self.session.close()
 
 

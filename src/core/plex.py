@@ -265,6 +265,7 @@ class PlexClient:
             section (Section): The library section to query
             min_last_modified (datetime | None): If provided, only returns items modified, viewed, or rated after this timestamp
             require_watched (bool): If True, only returns items that have been watched at least once. Defaults to False
+            **kwargs: Additional keyword arguments passed to the section.search() method
 
         Returns:
             list[Media]: List of media items matching the criteria
@@ -384,9 +385,6 @@ class PlexClient:
             requests.exceptions.HTTPError: If the API request fails
             KeyError: If the response format is unexpected
             ValueError: If the response cannot be parsed
-
-        Note:
-            Results are cached using functools.cache decorator
         """
         if not self.is_admin_user:
             return None
@@ -533,13 +531,13 @@ class PlexClient:
             return history
         except requests.exceptions.HTTPError:
             log.error(
-                f"Failed to get watch hsitory for {item.type} $$'{item.title}'$$ "
+                f"Failed to get watch history for {item.type} $$'{item.title}'$$ "
                 f"$${{key: {item.ratingKey}, plex_id: {item.guid}}}$$",
                 exc_info=True,
             )
         except Exception:
             log.error(
-                f"Failed to parse watch hsitory for {item.type} $$'{item.title}'$$ "
+                f"Failed to parse watch history for {item.type} $$'{item.title}'$$ "
                 f"$${{key: {item.ratingKey}, plex_id: {item.guid}}}$$",
                 exc_info=True,
             )

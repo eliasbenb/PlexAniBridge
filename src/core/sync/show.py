@@ -4,9 +4,9 @@ from collections import Counter
 from datetime import datetime
 from typing import AsyncIterator
 
-from plexapi.video import Episode, EpisodeHistory, MovieHistory, Season, Show
 from tzlocal import get_localzone
 
+from plexapi.video import Episode, EpisodeHistory, MovieHistory, Season, Show
 from src import log
 from src.core.sync.base import BaseSyncClient, ParsedGuids
 from src.models.anilist import FuzzyDate, Media, MediaListStatus
@@ -538,8 +538,8 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         The outputted string uses color formatting syntax with the `$$` delimiters.
 
         Args:
-            key (int): Plex rating key
-            plex_id (str): Plex ID
+            key (int | str): Plex rating key
+            plex_id (str | None): Plex identifier
             guids (ParsedGuids): Plex GUIDs
             anilist_id (int | None): AniList ID
 
@@ -554,18 +554,12 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
     ) -> list[EpisodeHistory | MovieHistory]:
         """Filters out history entries that don't exist in the grandchild items.
 
-        This function does four major tasks:
-            1. Filters out history entries that don't exist in the grandchild items.
-            2. Create history entries for episodes that don't have a history entry.
-            3. Only includes the FIRST history entry for each episode, skipping the rest.
-            4. Sorts and returns the processed history entries by the view date
-
         Args:
             item (Show): Main Plex media item
             grandchild_items (list[Episode]): List of relevant episodes
 
         Returns:
-            list[EpisodeHistory]: Filtered history entries
+            list[EpisodeHistory | MovieHistory]: Filtered history entries
         """
         grandchild_rating_keys = {e.ratingKey for e in grandchild_items}
         episode_map = {e.ratingKey: e for e in grandchild_items}

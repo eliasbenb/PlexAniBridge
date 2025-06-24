@@ -82,9 +82,6 @@ class ParsedGuids(BaseModel):
             if getattr(self, field) is not None
         )
 
-    class Config:
-        slots = True
-
 
 class SyncStats(BaseModel):
     """Statistics tracker for synchronization operations.
@@ -95,11 +92,10 @@ class SyncStats(BaseModel):
         synced (int): Number of successfully synced items
         deleted (int): Number of items deleted from AniList
         skipped (int): Number of items that needed no changes
+        not_found (int): Number of items that could not be found/matched
         failed (int): Number of items that failed to sync
-
-    Note:
-        Supports addition via the + operator for combining stats
-        from multiple operations
+        possible (set[str]): Set of all possible items that could be synced
+        covered (set[str]): Set of items that were successfully processed
     """
 
     synced: int = 0
@@ -121,6 +117,14 @@ class SyncStats(BaseModel):
         return len(self.covered) / len(self.possible) if self.possible else 1.0
 
     def __add__(self, other: "SyncStats") -> "SyncStats":
+        """Combines statistics from two SyncStats instances.
+
+        Args:
+            other (SyncStats): Another SyncStats instance to combine with
+
+        Returns:
+            SyncStats: New instance with combined statistics
+        """
         return SyncStats(
             synced=self.synced + other.synced,
             deleted=self.deleted + other.deleted,
@@ -130,9 +134,6 @@ class SyncStats(BaseModel):
             possible=self.possible.union(other.possible),
             covered=self.covered.union(other.covered),
         )
-
-    class Config:
-        slots = True
 
 
 class BaseSyncClient(ABC, Generic[T, S, E]):
@@ -144,7 +145,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
     Type Parameters:
         T: Main media type (Movie or Show)
         S: Child item type (Movie or Season)
-        E: Grandchild item type (Movie or Episode)
+        E: Grandchild item type (list[Movie] or list[Episode])
     """
 
     def __init__(
@@ -165,9 +166,10 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             animap_client (AniMapClient): AniMap API client
             plex_client (PlexClient): Plex API client
             excluded_sync_fields (list[SyncField]): Fields to exclude from synchronization
+            full_scan (bool): Whether to perform a full scan of all media
             destructive_sync (bool): Whether to delete AniList entries not found in Plex
-            search_fallback_threshold (int): Minimum match ratio for fuzzy title
-            batch_requests (bool): Whether to use batch requests to reduce API requests
+            search_fallback_threshold (int): Minimum similarity ratio (0-100) for fuzzy title matching
+            batch_requests (bool): Whether to use batch requests to reduce API calls
         """
         self.anilist_client = anilist_client
         self.animap_client = animap_client
@@ -197,7 +199,11 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         self.queued_batch_requests: list[MediaList] = []
 
     def clear_cache(self) -> None:
-        """Clears the cache for all decorated methods in the class."""
+        """Clears the cache for all decorated methods in the class.
+
+        Iterates through all class attributes and calls cache_clear()
+        on any cached methods to free memory and ensure fresh data.
+        """
         for attr in dir(self):
             if callable(getattr(self, attr)) and hasattr(
                 getattr(self, attr), "cache_clear"
@@ -423,6 +429,14 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
 
         Sends all queued media lists to AniList in a single batch request.
         This is more efficient than sending individual requests for each media list.
+
+        Updates sync_stats.synced count on success and clears the queue regardless
+        of outcome. Logs detailed information about the batch operation including
+        media IDs being synced.
+
+        Raises:
+            Exception: Any exception from the AniList client during batch update
+                      is logged but not re-raised to allow cleanup of the queue
         """
         if not self.queued_batch_requests:
             return

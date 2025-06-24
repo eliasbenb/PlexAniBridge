@@ -13,6 +13,12 @@ __all__ = ["SchedulerClient"]
 
 
 class SchedulerClient:
+    """Manages periodic and polling-based synchronization tasks for the bridge client.
+
+    Handles scheduling of sync operations, reinit tasks, and graceful shutdown.
+    Supports both time-based periodic sync and polling-based sync modes.
+    """
+
     def __init__(
         self,
         bridge: BridgeClient,
@@ -21,6 +27,15 @@ class SchedulerClient:
         poll_interval: int = 30,
         stop_event: asyncio.Event | None = None,
     ):
+        """Initialize the scheduler client.
+
+        Args:
+            bridge (BridgeClient): The bridge client to synchronize
+            sync_interval (int): Interval in seconds between periodic syncs. Use -1 for single run.
+            polling_scan (bool): If True, use polling mode instead of periodic sync
+            poll_interval (int, optional): Interval in seconds between polls. Defaults to 30.
+            stop_event (asyncio.Event | None, optional): Event to signal shutdown. Defaults to None.
+        """
         self.bridge = bridge
         self.sync_interval = sync_interval
         self.polling_scan = polling_scan
@@ -57,7 +72,7 @@ class SchedulerClient:
                 log.error(f"{self.__class__.__name__}: Sync error", exc_info=True)
 
     async def _periodic_sync(self) -> None:
-        """Handle periodic synchronization"""
+        """Handle periodic synchronization with configurable intervals."""
         while self._running and not self.stop_event.is_set():
             try:
                 await self.sync()
@@ -82,7 +97,7 @@ class SchedulerClient:
                 await asyncio.sleep(10)
 
     async def _poll_sync(self) -> None:
-        """Handle polling-based synchronization"""
+        """Handle polling-based synchronization for real-time updates."""
         while self._running:
             try:
                 await self.sync(poll=True)
@@ -95,7 +110,7 @@ class SchedulerClient:
                 await asyncio.sleep(10)
 
     async def _reinit(self) -> None:
-        """Handle periodic bridge reinitialization"""
+        """Handle periodic bridge reinitialization to refresh connections."""
         while self._running:
             try:
                 await asyncio.to_thread(self.bridge.reinit)
@@ -114,20 +129,28 @@ class SchedulerClient:
                 await asyncio.sleep(10)
 
     def _create_task(self, coro: Coroutine[Any, Any, None]) -> None:
-        """Create and track an asyncio task"""
+        """Create and track an asyncio task with automatic cleanup.
+
+        Args:
+            coro: The coroutine to run as a task
+        """
         task = asyncio.create_task(coro)
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
 
     def _handle_signal(self, sig: signal.Signals) -> None:
-        """Handle termination signals"""
+        """Handle termination signals for graceful shutdown.
+
+        Args:
+            sig: The signal received
+        """
         log.info(f"{self.__class__.__name__}: Received signal {sig.name}")
         if self._current_task and not self._current_task.done():
             self._current_task.cancel()
         exit(0)
 
     async def start(self) -> None:
-        """Start the scheduler"""
+        """Start the scheduler with appropriate sync mode and signal handlers."""
         if self._running:
             return
 
@@ -163,7 +186,7 @@ class SchedulerClient:
             self._create_task(self._reinit())
 
     async def stop(self) -> None:
-        """Stop the scheduler and clean up"""
+        """Stop the scheduler and clean up all running tasks."""
         self._running = False
         self.stop_event.set()
 

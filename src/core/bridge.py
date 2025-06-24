@@ -21,17 +21,28 @@ __all__ = ["BridgeClient"]
 class BridgeClient:
     """Main orchestrator for synchronizing Plex and AniList libraries.
 
+    This class manages the synchronization process between Plex media libraries
+    and AniList user accounts, handling multiple user pairs and maintaining
+    sync state between operations.
+
     Args:
         config (PlexAnibridgeConfig): Application configuration settings
+
+    Attributes:
+        config (PlexAnibridgeConfig): Application configuration
+        token_user_pairs (list[tuple[str, str]]): Paired AniList tokens and Plex users
+        animap_client (AniMapClient): Client for anime mapping data
+        anilist_clients (dict[str, AniListClient]): Cached AniList clients by token
+        plex_clients (dict[str, PlexClient]): Cached Plex clients by user
+        last_synced (datetime | None): Timestamp of last successful sync
+        last_config_encoded (str | None): Encoded config from last sync
     """
 
     def __init__(self, config: PlexAnibridgeConfig) -> None:
-        """Initialize the AniList client.
+        """Initialize the BridgeClient.
 
         Args:
-            anilist_token (str): Authentication token for AniList API access
-            backup_dir (Path): Directory path where backup files will be stored
-            dry_run (bool): If True, simulates API calls without making actual changes
+            config (PlexAnibridgeConfig): Application configuration settings
         """
         self.config = config
 
@@ -44,9 +55,11 @@ class BridgeClient:
         self.last_config_encoded = self._get_last_config_encoded()
 
     def reinit(self) -> None:
-        """Reinitializes the Plex and AniList clients to refresh user data during polling.
+        """Reinitializes clients to refresh user data during polling operations.
 
-        Refreshes Plex and AniList user data, clear caches, and reinitialize clients.
+        Refreshes Plex and AniList user data, clears caches, and reinitializes
+        clients. This is typically called between polling cycles to ensure
+        fresh data is retrieved.
         """
         self.animap_client.reinit()
         for plex_client in self.plex_clients.values():
@@ -157,17 +170,6 @@ class BridgeClient:
             anilist_token (str): Authentication token for AniList API
             plex_user (str): Username or email of the Plex user
             poll (bool): Flag to enable polling scan mode
-
-        Process:
-        1. Initializes AniList client with user's token
-        2. Initializes Plex client for the user
-        3. Creates sync clients for movies and shows
-        4. Processes each configured Plex section
-        5. Reports sync statistics
-
-        Note:
-            Creates new client instances for each user to maintain proper
-            authentication and separation of concerns
         """
         if plex_user not in self.plex_clients:
             self.plex_clients[plex_user] = PlexClient(
@@ -261,11 +263,7 @@ class BridgeClient:
             poll (bool): Flag to enable polling scan mode
 
         Returns:
-            SyncStats: Statistics about the sync operation including:
-                - Number of items synced
-                - Number of items deleted
-                - Number of items skipped
-                - Number of items that failed
+            SyncStats: Statistics about the sync operation for the section
         """
         log.info(f"{self.__class__.__name__}: Syncing section $$'{section.title}'$$")
 

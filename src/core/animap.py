@@ -32,13 +32,15 @@ class AniMapClient:
         https://github.com/eliasbenb/PlexAniBridge-Mappings
     """
 
-    MAPPING_FILES = [
-        "mappings.custom.json",
-        "mappings.custom.yaml",
-        "mappings.custom.yml",
-    ]
-
     def __init__(self, data_path: Path) -> None:
+        """Initializes the AniMapClient.
+
+        Args:
+            data_path (Path): Path to the data directory for storing mappings and cache files.
+
+        Raises:
+            Exception: If database synchronization fails during initialization.
+        """
         self.mappings_client = MappingsClient(data_path)
         self.data_path = data_path
 
@@ -54,6 +56,10 @@ class AniMapClient:
         """Reinitializes the AniMap database.
 
         Drops all tables and reinitializes the database from scratch.
+        This is useful when you need to force a complete refresh of the mapping data.
+
+        Raises:
+            Exception: If database synchronization fails during reinitialization.
         """
         self._sync_db()
 

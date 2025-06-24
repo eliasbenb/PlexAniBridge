@@ -4,6 +4,7 @@ from pathlib import Path
 from time import sleep
 from typing import Any
 
+import requests
 import requests.exceptions
 import urllib3.exceptions
 from cachetools.func import ttl_cache
@@ -604,7 +605,7 @@ class AniListClient:
 
         Args:
             query (str): GraphQL query string
-            variables (dict | str | None): Variables for the GraphQL query
+            variables (dict | str): Variables for the GraphQL query
             retry_count (int): Number of retries attempted (used for temporary errors)
 
         Returns:
@@ -614,7 +615,7 @@ class AniListClient:
             requests.exceptions.HTTPError: If the request fails for any reason other than rate limiting
 
         Note:
-            - Implements rate limiting of 90 requests per minute
+            - Implements rate limiting of 30 requests per minute
             - Automatically retries after waiting if rate limit is exceeded
             - Includes Authorization header using the stored token
         """

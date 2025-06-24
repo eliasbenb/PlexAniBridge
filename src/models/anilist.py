@@ -5,7 +5,7 @@ from enum import StrEnum
 from functools import lru_cache, total_ordering
 from typing import Annotated, Any, ClassVar, Generic, TypeVar, get_args, get_origin
 
-from pydantic import AfterValidator, BaseModel
+from pydantic import AfterValidator, BaseModel, ConfigDict
 from pydantic.alias_generators import to_camel
 
 UTCDateTime = Annotated[
@@ -238,10 +238,10 @@ class AniListBaseModel(BaseModel):
     def __repr__(self) -> str:
         return f"<{': '.join([f'{k}={v}' for k, v in self.model_dump().items() if v is not None])}>"
 
-    class Config:
-        alias_generator = to_camel
-        populate_by_name = True
-        slots = True
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
 
 
 class UserOptions(AniListBaseModel):
