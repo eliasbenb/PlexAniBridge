@@ -2,7 +2,7 @@ from functools import cached_property
 from typing import Any
 
 from pydantic import field_validator
-from sqlmodel import JSON, Field, SQLModel
+from sqlmodel import JSON, Field, Index, SQLModel
 
 from src.models.mapping import TVDBMapping
 
@@ -28,8 +28,12 @@ class AniMap(SQLModel, table=True):
     )
     tvdb_id: int | None = Field(index=True)
     tvdb_mappings: dict[str, str] | None = Field(
-        sa_type=TypedJson(none_as_null=True),
-        index=False,
+        sa_type=TypedJson(none_as_null=True), index=True
+    )
+
+    __table_args__ = (
+        Index("idx_imdb_tmdb", "imdb_id", "tmdb_movie_id"),
+        Index("idx_tvdb_season", "tvdb_id", "tvdb_mappings"),
     )
 
     @cached_property
