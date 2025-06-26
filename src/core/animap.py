@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from pydantic import ValidationError
-from sqlalchemy import and_, column, delete, exists, false, func, not_, or_, select
+from sqlalchemy import and_, column, delete, exists, false, func, or_, select
 from sqlalchemy.orm.base import Mapped
 from sqlalchemy.sql.elements import BinaryExpression, ColumnElement
 from sqlmodel import col
@@ -88,7 +88,6 @@ class AniMapClient:
             mappings = self.mappings_client.load_mappings()
             tmp_mappings = mappings.copy()
 
-            # Make sure that each entry is in the correct format
             for key, entry in tmp_mappings.items():
                 try:
                     anilist_id = int(key)
@@ -124,41 +123,86 @@ class AniMapClient:
             log.debug(
                 f"{self.__class__.__name__}: Anime mapping changes detected, syncing database"
             )
-            log.info(
-                f"{self.__class__.__name__}: Loading {validated_count} mapping entries into the local database"
-            )
 
-            values = [
-                {
-                    "anilist_id": int(key),
+            existing_entries_query = ctx.session.execute(select(AniMap))
+            existing_entries = {
+                entry.anilist_id: entry
+                for entry in existing_entries_query.scalars().all()
+            }
+
+            new_data = {}
+            for key, entry in mappings.items():
+                anilist_id = int(key)
+                processed_entry = {
+                    "anilist_id": anilist_id,
                     **{
                         field: entry[field]
                         for field in AniMap.model_fields
                         if field in entry
                     },
                 }
-                for key, entry in mappings.items()
-            ]
 
-            # Delete any entries in the database that are not in the new mappings
-            ctx.session.execute(
-                delete(AniMap).where(
-                    not_(col(AniMap.anilist_id).in_([d["anilist_id"] for d in values]))
-                )
-            )
-
-            # Merge any changes or new entries into the database
-            for value in values:
-                # Certain list fields can be either a single value or a list
-                # Convert single values to lists for consistency
                 for attr in ("mal_id", "imdb_id", "tmdb_movie_id", "tmdb_show_id"):
-                    if attr in value:
-                        value[attr] = single_val_to_list(value[attr])
-                ctx.session.merge(AniMap(**value))
+                    if attr in processed_entry:
+                        processed_entry[attr] = single_val_to_list(
+                            processed_entry[attr]
+                        )
+
+                new_data[anilist_id] = processed_entry
+
+            existing_ids = set(existing_entries.keys())
+            new_ids = set(new_data.keys())
+
+            to_delete = existing_ids - new_ids
+            to_insert = new_ids - existing_ids
+            to_check_update = existing_ids & new_ids
+
+            to_update = []
+            for anilist_id in to_check_update:
+                existing_entry = existing_entries[anilist_id]
+                new_entry_data = new_data[anilist_id]
+                new_entry = AniMap(**new_entry_data)
+
+                needs_update = False
+                for field_name in AniMap.model_fields:
+                    existing_value = getattr(existing_entry, field_name)
+                    new_value = getattr(new_entry, field_name)
+                    if existing_value != new_value:
+                        needs_update = True
+                        break
+
+                if needs_update:
+                    to_update.append(new_entry)
+
+            operations_count = len(to_delete) + len(to_insert) + len(to_update)
+
+            if operations_count == 0:
+                log.debug(f"{self.__class__.__name__}: No database changes needed")
+            else:
+                log.debug(
+                    f"{self.__class__.__name__}: Syncing database with upstream: "
+                    f"{len(to_delete)} deletions, {len(to_insert)} insertions, {len(to_update)} updates"
+                )
+
+            if to_delete:
+                ctx.session.execute(
+                    delete(AniMap).where(col(AniMap.anilist_id).in_(to_delete))
+                )
+
+            if to_insert:
+                new_entries = [
+                    AniMap(**new_data[anilist_id]) for anilist_id in to_insert
+                ]
+                ctx.session.add_all(new_entries)
+
+            if to_update:
+                for entry in to_update:
+                    ctx.session.merge(entry)
 
             ctx.session.merge(
                 Housekeeping(key="animap_mappings_hash", value=curr_mappings_hash)
             )
+
             ctx.session.commit()
 
             log.debug(f"{self.__class__.__name__}: Database sync complete")
