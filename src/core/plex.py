@@ -1,10 +1,10 @@
 from datetime import datetime, timedelta, timezone
 from math import isnan
-from typing import TypeAlias
+from typing import Iterator, TypeAlias
 from urllib.parse import urlparse
 from xml.etree import ElementTree
 
-import requests
+from async_lru import alru_cache
 from cachetools.func import ttl_cache
 from tzlocal import get_localzone
 
@@ -78,6 +78,17 @@ class PlexClient:
         self._init_community_client()
 
         self.on_deck_window = self._get_on_deck_window()
+
+    async def close(self):
+        """Close async clients."""
+        if hasattr(self, "community_client"):
+            await self.community_client.close()
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.close()
 
     def clear_cache(self) -> None:
         """Clears the cache for all decorated methods in the class."""
@@ -258,7 +269,7 @@ class PlexClient:
         min_last_modified: datetime | None = None,
         require_watched: bool = False,
         **kwargs,
-    ) -> list[Media]:
+    ) -> Iterator[Media]:
         """Retrieves items from a specified Plex library section with optional filtering.
 
         Args:
@@ -268,7 +279,7 @@ class PlexClient:
             **kwargs: Additional keyword arguments passed to the section.search() method
 
         Returns:
-            list[Media]: List of media items matching the criteria
+            Iterator[Media]: Iterator of media items matching the criteria
         """
         filters: dict[str, list] = {"and": []}
 
@@ -366,10 +377,11 @@ class PlexClient:
             )
             filters["and"].append({"genre": self.plex_genres})
 
-        return section.search(filters=filters, **kwargs)
+        for item in section.search(filters=filters, **kwargs):
+            yield item
 
-    @ttl_cache(ttl=30)
-    def get_user_review(self, item: Media) -> str | None:
+    @alru_cache(maxsize=1024, ttl=30)
+    async def get_user_review(self, item: Media) -> str | None:
         """Retrieves user review for a media item from Plex community.
 
         Makes a GraphQL query to the Plex community API to fetch review content.
@@ -382,7 +394,7 @@ class PlexClient:
             str | None: Review message if found, None if not found
 
         Raises:
-            requests.exceptions.HTTPError: If the API request fails
+            aiohttp.ClientError: If the API request fails
             KeyError: If the response format is unexpected
             ValueError: If the response cannot be parsed
         """
@@ -396,17 +408,10 @@ class PlexClient:
                 f"{self.__class__.__name__}: Getting reviews for {item.type} "
                 f"$$'{item.title}'$$ $${{ plex_id: {item.guid}}}$$"
             )
-            return self.community_client.get_reviews(self._guid_to_key(item.guid))
-        except requests.exceptions.HTTPError:
-            log.error(
-                f"Failed to get review for {item.type} $$'{item.title}'$$ "
-                f"$${{key: {item.ratingKey}, plex_id: {item.guid}}}$$",
-                exc_info=True,
-            )
-            return None
+            return await self.community_client.get_reviews(self._guid_to_key(item.guid))
         except Exception:
             log.error(
-                f"Failed to parse review for {item.type} $$'{item.title}'$$ "
+                f"Failed to get review for {item.type} $$'{item.title}'$$ "
                 f"$${{key: {item.ratingKey}, plex_id: {item.guid}}}$$",
                 exc_info=True,
             )
@@ -457,8 +462,8 @@ class PlexClient:
                 None,
             )
 
-    @ttl_cache(ttl=30)
-    def get_history(
+    @alru_cache(maxsize=1024, ttl=30)
+    async def get_history(
         self,
         item: Media,
     ) -> list[EpisodeHistory | MovieHistory]:
@@ -479,7 +484,7 @@ class PlexClient:
             )
 
         try:
-            data = self.community_client.get_watch_activity(
+            data = await self.community_client.get_watch_activity(
                 self._guid_to_key(item.guid)
             )
             history: list[EpisodeHistory | MovieHistory] = []
@@ -529,19 +534,13 @@ class PlexClient:
                 history.append(h)
 
             return history
-        except requests.exceptions.HTTPError:
+        except Exception:
             log.error(
                 f"Failed to get watch history for {item.type} $$'{item.title}'$$ "
                 f"$${{key: {item.ratingKey}, plex_id: {item.guid}}}$$",
                 exc_info=True,
             )
-        except Exception:
-            log.error(
-                f"Failed to parse watch history for {item.type} $$'{item.title}'$$ "
-                f"$${{key: {item.ratingKey}, plex_id: {item.guid}}}$$",
-                exc_info=True,
-            )
-        return []
+            return []
 
     def is_on_watchlist(self, item: Movie | Show) -> bool:
         """Checks if a media item is on the user's watchlist.

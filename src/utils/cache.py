@@ -1,10 +1,11 @@
 from functools import wraps
 from typing import Any
 
-from cachetools import LRUCache, TTLCache, cached
+import aiocache
+import cachetools
 
 
-def generic_lru_cache(maxsize: int | None = 128):
+def glru_cache(maxsize: int | None = 128):
     """Function decorator to cache function results using an LRU cache.
 
     Unlike functools.lru_cache, this decorator can be used with any object,
@@ -23,7 +24,7 @@ def generic_lru_cache(maxsize: int | None = 128):
 
     def decorator(func):
         @wraps(func)
-        @cached(LRUCache(maxsize), key=generic_hash)
+        @cachetools.cached(cachetools.LRUCache(maxsize), key=generic_hash)
         def wrapper(*args, **kwargs):
             return func(*args, **kwargs)
 
@@ -32,7 +33,7 @@ def generic_lru_cache(maxsize: int | None = 128):
     return decorator
 
 
-def generic_ttl_cache(maxsize: int | None = 128, ttl: int = 600):
+def gttl_cache(maxsize: int | None = 128, ttl: int = 600):
     """Function decorator to cache function results using a TTL cache.
 
     Unlike functools.lru_cache, this decorator can be used with any object,
@@ -48,7 +49,7 @@ def generic_ttl_cache(maxsize: int | None = 128, ttl: int = 600):
 
     def decorator(func):
         @wraps(func)
-        @cached(TTLCache(maxsize, ttl), key=generic_hash)
+        @cachetools.cached(cachetools.TTLCache(maxsize, ttl), key=generic_hash)
         def wrapper(*args, **kwargs):
             return func(*args, **kwargs)
 
@@ -57,9 +58,42 @@ def generic_ttl_cache(maxsize: int | None = 128, ttl: int = 600):
     return decorator
 
 
-def generic_hash(*args, **kwargs):
+def gattl_cache(ttl: int = 60):
+    """Decorator for async functions to cache results using a generic, async-aware TTL cache.
+
+    This decorator can be used with any object, even if it's unhashable,
+    because it uses the generic_hash function to compute the cache key.
+
+    It uses `aiocache` as the backend to ensure compatibility with async functions.
+
+    Args:
+        ttl (int): Time-to-live for cached items in seconds. Defaults to 60.
     """
-    Recursively computes a hash for any Python object(s).
+
+    def decorator(func):
+        # Create a unique alias for the cache configuration.
+        cache_alias = f"galru_{func.__module__}.{func.__qualname__}_{id(func)}"
+
+        aiocache.caches.add(
+            cache_alias,
+            {"cache": aiocache.Cache.MEMORY, "ttl": ttl},
+        )
+
+        def key_builder_adapter(f, *args, **kwargs):
+            return generic_hash(*args, **kwargs)
+
+        @wraps(func)
+        @aiocache.cached(alias=cache_alias, key_builder=key_builder_adapter)
+        async def wrapper(*args, **kwargs):
+            return await func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
+def generic_hash(*args, **kwargs):
+    """Recursively computes a hash for any Python object(s).
 
     If a single object is passed (and no keyword arguments), its hash is computed.
     If multiple positional and/or keyword arguments are passed, a combined hash

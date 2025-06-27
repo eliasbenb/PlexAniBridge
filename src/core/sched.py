@@ -1,7 +1,5 @@
 import asyncio
-import signal
 from datetime import datetime, timedelta, timezone
-from functools import partial
 from typing import Any, Coroutine
 
 from tzlocal import get_localzone
@@ -87,7 +85,7 @@ class SchedulerClient:
                 except asyncio.TimeoutError:
                     pass
             except asyncio.CancelledError:
-                log.info(f"{self.__class__.__name__}: Periodic sync cancelled")
+                log.debug(f"{self.__class__.__name__}: Periodic sync cancelled")
                 break
             except Exception:
                 log.error(
@@ -113,16 +111,24 @@ class SchedulerClient:
         """Handle periodic bridge reinitialization to refresh connections."""
         while self._running:
             try:
-                await asyncio.to_thread(self.bridge.reinit)
-                next_sync = datetime.now(timezone.utc) + timedelta(
+                async with self._sync_lock:
+                    log.debug(
+                        f"{self.__class__.__name__}: Starting bridge reinitialization"
+                    )
+                    await self.bridge.initialize()
+                    log.debug(
+                        f"{self.__class__.__name__}: Bridge reinitialization completed"
+                    )
+
+                next_reinit = datetime.now(timezone.utc) + timedelta(
                     seconds=self.reinit_interval
                 )
                 log.info(
-                    f"{self.__class__.__name__}: Next reinit scheduled for: {next_sync.astimezone(get_localzone())}"
+                    f"{self.__class__.__name__}: Next reinit scheduled for: {next_reinit.astimezone(get_localzone())}"
                 )
                 await asyncio.sleep(self.reinit_interval)
             except asyncio.CancelledError:
-                log.info(f"{self.__class__.__name__}: Reinit task cancelled")
+                log.debug(f"{self.__class__.__name__}: Reinit task cancelled")
                 break
             except Exception:
                 log.error(f"{self.__class__.__name__}: Reinit error", exc_info=True)
@@ -138,27 +144,18 @@ class SchedulerClient:
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
 
-    def _handle_signal(self, sig: signal.Signals) -> None:
-        """Handle termination signals for graceful shutdown.
-
-        Args:
-            sig: The signal received
-        """
-        log.info(f"{self.__class__.__name__}: Received signal {sig.name}")
-        if self._current_task and not self._current_task.done():
-            self._current_task.cancel()
-        exit(0)
-
     async def start(self) -> None:
-        """Start the scheduler with appropriate sync mode and signal handlers."""
+        """Start the scheduler with appropriate sync mode."""
         if self._running:
             return
 
         self._running = True
 
-        loop = asyncio.get_running_loop()
-        for sig in (signal.SIGTERM, signal.SIGINT):
-            loop.add_signal_handler(sig, partial(self._handle_signal, sig))
+        if self.reinit_interval >= 0:
+            log.info(
+                f"{self.__class__.__name__}: Starting reinit scheduler (interval: {self.reinit_interval}s)"
+            )
+            self._create_task(self._reinit())
 
         if self.polling_scan:
             log.info(
@@ -178,20 +175,13 @@ class SchedulerClient:
                 await self.sync()
                 exit(0)
 
-        if self.reinit_interval >= 0:
-            log.info(
-                f"{self.__class__.__name__}: Starting reinit scheduler (interval: {self.reinit_interval}s)"
-            )
-            await asyncio.sleep(self.reinit_interval)
-            self._create_task(self._reinit())
-
     async def stop(self) -> None:
         """Stop the scheduler and clean up all running tasks."""
         self._running = False
         self.stop_event.set()
 
         if self._tasks:
-            log.info(f"{self.__class__.__name__}: Stopping all scheduler tasks...")
+            log.debug(f"{self.__class__.__name__}: Stopping all scheduler tasks...")
             for task in self._tasks:
                 task.cancel()
 

@@ -1,4 +1,3 @@
-import asyncio
 from typing import AsyncIterator
 
 from tzlocal import get_localzone
@@ -27,10 +26,8 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
         guids = ParsedGuids.from_guids(item.guids)
 
         animapping: AniMap = next(
-            iter(
-                self.animap_client.get_mappings(
-                    imdb=guids.imdb, tmdb=guids.tmdb, tvdb=guids.tvdb, is_movie=True
-                )
+            self.animap_client.get_mappings(
+                imdb=guids.imdb, tmdb=guids.tmdb, tvdb=guids.tvdb, is_movie=True
             ),
             AniMap(
                 anidb_id=None,
@@ -46,7 +43,9 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
 
         try:
             if animapping.anilist_id:
-                anilist_media = self.anilist_client.get_anime(animapping.anilist_id)
+                anilist_media = await self.anilist_client.get_anime(
+                    animapping.anilist_id
+                )
             else:
                 _anilist_media = await self.search_media(item, item)
                 if not _anilist_media:
@@ -69,7 +68,6 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
             self.sync_stats.not_found += 1
             return
 
-        await asyncio.sleep(0)  # Add a yield point for cancellation
         yield item, [item], animapping, anilist_media
 
     async def search_media(self, item: Movie, child_item: Movie) -> Media | None:
@@ -86,10 +84,15 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
         if self.search_fallback_threshold == -1:
             return None
 
-        results = self.anilist_client.search_anime(item.title, True, 1)
+        results = [
+            result
+            async for result in self.anilist_client.search_anime(
+                search_str=item.title, is_movie=True, episodes=1
+            )
+        ]
         return self._best_search_result(item.title, results)
 
-    def _calculate_status(
+    async def _calculate_status(
         self,
         item: Movie,
         child_item: Movie,
@@ -136,7 +139,7 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
             return MediaListStatus.DROPPED
         return None
 
-    def _calculate_score(
+    async def _calculate_score(
         self,
         item: Movie,
         child_item: Movie,
@@ -159,7 +162,7 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
         score = item.userRating
         return self._normalize_score(score) if score else None
 
-    def _calculate_progress(
+    async def _calculate_progress(
         self,
         item: Movie,
         child_item: Movie,
@@ -181,7 +184,7 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
         """
         return (anilist_media.episodes or 1) if item.viewCount else None
 
-    def _calculate_repeats(
+    async def _calculate_repeats(
         self,
         item: Movie,
         child_item: Movie,
@@ -203,7 +206,7 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
         """
         return item.viewCount - 1 if item.viewCount else None
 
-    def _calculate_started_at(
+    async def _calculate_started_at(
         self,
         item: Movie,
         child_item: Movie,
@@ -223,7 +226,7 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
         Returns:
             FuzzyDate | None: Start date for the media item (earliest view date)
         """
-        history = self.plex_client.get_history(item)
+        history = await self.plex_client.get_history(item)
         first_history = min(history, key=lambda h: h.viewedAt) if history else None
 
         last_viewed = FuzzyDate.from_date(
@@ -245,7 +248,7 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
             return min(last_viewed, history_viewed)
         return last_viewed or history_viewed
 
-    def _calculate_completed_at(
+    async def _calculate_completed_at(
         self,
         item: Movie,
         child_item: Movie,
@@ -265,11 +268,11 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
         Returns:
             FuzzyDate | None: Completion date for the media item (same as start date for movies)
         """
-        return self._calculate_started_at(
+        return await self._calculate_started_at(
             item, child_item, grandchild_items, anilist_media, animapping
         )
 
-    def _calculate_notes(
+    async def _calculate_notes(
         self,
         item: Movie,
         child_item: Movie,
@@ -289,7 +292,7 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
         Returns:
             str | None: User notes for the media item (from Plex user review)
         """
-        return self.plex_client.get_user_review(item)
+        return await self.plex_client.get_user_review(item)
 
     def _debug_log_title(self, item: Movie, animapping: AniMap | None = None) -> str:
         """Creates a debug-friendly string of media titles.
