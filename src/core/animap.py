@@ -249,7 +249,7 @@ class AniMapClient:
             Iterator[AniMap]: Iterator of matching anime mapping entries
         """
         if not imdb and not tmdb and not tvdb:
-            return
+            return iter([])
 
         imdb_list = (
             [imdb] if isinstance(imdb, str) else imdb if isinstance(imdb, list) else []
