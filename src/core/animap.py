@@ -68,6 +68,23 @@ class AniMapClient:
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self.close()
 
+    def _entries_are_equal(self, existing_entry: AniMap, new_entry: AniMap) -> bool:
+        """Compare two AniMap entries for equality.
+
+        Args:
+            existing_entry (AniMap): Existing database entry
+            new_entry (AniMap): New entry to compare
+
+        Returns:
+            bool: True if entries are equal, False otherwise
+        """
+        for field_name in AniMap.model_fields:
+            existing_value = getattr(existing_entry, field_name)
+            new_value = getattr(new_entry, field_name)
+            if existing_value != new_value:
+                return False
+        return True
+
     async def _sync_db(self) -> None:
         """Synchronizes the local database with the mapping source."""
 
@@ -168,15 +185,7 @@ class AniMapClient:
                 new_entry_data = new_data[anilist_id]
                 new_entry = AniMap(**new_entry_data)
 
-                needs_update = False
-                for field_name in AniMap.model_fields:
-                    existing_value = getattr(existing_entry, field_name)
-                    new_value = getattr(new_entry, field_name)
-                    if existing_value != new_value:
-                        needs_update = True
-                        break
-
-                if needs_update:
+                if not self._entries_are_equal(existing_entry, new_entry):
                     to_update.append(new_entry)
 
             operations_count = len(to_delete) + len(to_insert) + len(to_update)
