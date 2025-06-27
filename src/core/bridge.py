@@ -1,4 +1,3 @@
-import asyncio
 from datetime import datetime, timedelta, timezone
 
 from plexapi.library import MovieSection, ShowSection
@@ -54,18 +53,33 @@ class BridgeClient:
         self.last_synced = self._get_last_synced()
         self.last_config_encoded = self._get_last_config_encoded()
 
-    def reinit(self) -> None:
-        """Reinitializes clients to refresh user data during polling operations.
+    async def initialize(self) -> None:
+        """Initialize the bridge client with async setup.
 
-        Refreshes Plex and AniList user data, clears caches, and reinitializes
-        clients. This is typically called between polling cycles to ensure
-        fresh data is retrieved.
+        This should be called after creating the bridge instance.
         """
-        self.animap_client.reinit()
+        await self.animap_client.initialize()
         for plex_client in self.plex_clients.values():
             plex_client.clear_cache()
         for anilist_client in self.anilist_clients.values():
-            anilist_client.reinit()
+            await anilist_client.initialize()
+
+    async def close(self) -> None:
+        """Close all async clients."""
+        await self.animap_client.close()
+
+        for client in self.anilist_clients.values():
+            await client.close()
+
+        for client in self.plex_clients.values():
+            await client.close()
+
+    async def __aenter__(self):
+        await self.initialize()
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.close()
 
     def _get_last_synced(self) -> datetime | None:
         """Retrieves the timestamp of the last successful sync from the database.
@@ -183,10 +197,13 @@ class BridgeClient:
         plex_client = self.plex_clients[plex_user]
 
         if anilist_token not in self.anilist_clients:
-            self.anilist_clients[anilist_token] = AniListClient(
+            anilist_client = AniListClient(
                 anilist_token, self.config.DATA_PATH / "backups", self.config.DRY_RUN
             )
-        anilist_client = self.anilist_clients[anilist_token]
+            await anilist_client.initialize()
+            self.anilist_clients[anilist_token] = anilist_client
+        else:
+            anilist_client = self.anilist_clients[anilist_token]
 
         log.info(
             f"{self.__class__.__name__}: Syncing Plex user $$'{plex_user}'$$ "
@@ -295,7 +312,7 @@ class BridgeClient:
                 f"from the AniList API in batch requests (this may take a while)"
             )
 
-            anilist_client.batch_get_anime(anilist_ids)
+            await anilist_client.batch_get_anime(anilist_ids)
 
         sync_client: BaseSyncClient = {
             "movie": self.movie_sync,
@@ -305,7 +322,6 @@ class BridgeClient:
         for item in items:
             try:
                 await sync_client.process_media(item)
-                await asyncio.sleep(0)  # Yield control to allow cancellation
 
             except Exception:
                 log.error(

@@ -113,12 +113,12 @@ class SchedulerClient:
         """Handle periodic bridge reinitialization to refresh connections."""
         while self._running:
             try:
-                await asyncio.to_thread(self.bridge.reinit)
-                next_sync = datetime.now(timezone.utc) + timedelta(
+                await self.bridge.initialize()
+                next_reinit = datetime.now(timezone.utc) + timedelta(
                     seconds=self.reinit_interval
                 )
                 log.info(
-                    f"{self.__class__.__name__}: Next reinit scheduled for: {next_sync.astimezone(get_localzone())}"
+                    f"{self.__class__.__name__}: Next reinit scheduled for: {next_reinit.astimezone(get_localzone())}"
                 )
                 await asyncio.sleep(self.reinit_interval)
             except asyncio.CancelledError:
@@ -182,7 +182,6 @@ class SchedulerClient:
             log.info(
                 f"{self.__class__.__name__}: Starting reinit scheduler (interval: {self.reinit_interval}s)"
             )
-            await asyncio.sleep(self.reinit_interval)
             self._create_task(self._reinit())
 
     async def stop(self) -> None:
