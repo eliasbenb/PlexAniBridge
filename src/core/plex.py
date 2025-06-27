@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from math import isnan
-from typing import TypeAlias
+from typing import Iterator, TypeAlias
 from urllib.parse import urlparse
 from xml.etree import ElementTree
 
@@ -269,7 +269,7 @@ class PlexClient:
         min_last_modified: datetime | None = None,
         require_watched: bool = False,
         **kwargs,
-    ) -> list[Media]:
+    ) -> Iterator[Media]:
         """Retrieves items from a specified Plex library section with optional filtering.
 
         Args:
@@ -279,7 +279,7 @@ class PlexClient:
             **kwargs: Additional keyword arguments passed to the section.search() method
 
         Returns:
-            list[Media]: List of media items matching the criteria
+            Iterator[Media]: Iterator of media items matching the criteria
         """
         filters: dict[str, list] = {"and": []}
 
@@ -377,7 +377,8 @@ class PlexClient:
             )
             filters["and"].append({"genre": self.plex_genres})
 
-        return section.search(filters=filters, **kwargs)
+        for item in section.search(filters=filters, **kwargs):
+            yield item
 
     @alru_cache(maxsize=1024, ttl=30)
     async def get_user_review(self, item: Media) -> str | None:

@@ -1,7 +1,7 @@
 import json
 from hashlib import md5
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 from pydantic import ValidationError
 from sqlalchemy import and_, column, delete, exists, false, func, or_, select
@@ -220,7 +220,7 @@ class AniMapClient:
         tvdb: int | list[int] | None = None,
         season: int | None = None,
         is_movie: bool = True,
-    ) -> list[AniMap]:
+    ) -> Iterator[AniMap]:
         """Retrieves anime ID mappings based on provided criteria.
 
         Performs a complex database query to find entries that match the given identifiers
@@ -234,10 +234,10 @@ class AniMapClient:
             is_movie (bool): Whether the search is for a movie or TV show
 
         Returns:
-            list[AniMap]: Matching anime mapping entries
+            Iterator[AniMap]: Iterator of matching anime mapping entries
         """
         if not imdb and not tmdb and not tvdb:
-            return []
+            return
 
         imdb_list = (
             [imdb] if isinstance(imdb, str) else imdb if isinstance(imdb, list) else []
@@ -327,4 +327,6 @@ class AniMapClient:
             where_clause = and_(*merged_conditions)
 
             query = select(AniMap).where(where_clause)
-            return list(ctx.session.execute(query).scalars().all())
+
+            for result in ctx.session.execute(query).scalars():
+                yield result

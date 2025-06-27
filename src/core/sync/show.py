@@ -227,11 +227,13 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             return None
 
         episodes = child_item.leafCount
-        results = await self.anilist_client.search_anime(
-            item.title,
-            is_movie=False,
-            episodes=episodes,
-        )
+
+        results = [
+            result
+            async for result in self.anilist_client.search_anime(
+                search_str=item.title, is_movie=False, episodes=episodes
+            )
+        ]
         return self._best_search_result(item.title, results)
 
     async def _calculate_status(

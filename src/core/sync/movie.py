@@ -26,10 +26,8 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
         guids = ParsedGuids.from_guids(item.guids)
 
         animapping: AniMap = next(
-            iter(
-                self.animap_client.get_mappings(
-                    imdb=guids.imdb, tmdb=guids.tmdb, tvdb=guids.tvdb, is_movie=True
-                )
+            self.animap_client.get_mappings(
+                imdb=guids.imdb, tmdb=guids.tmdb, tvdb=guids.tvdb, is_movie=True
             ),
             AniMap(
                 anidb_id=None,
@@ -86,7 +84,12 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
         if self.search_fallback_threshold == -1:
             return None
 
-        results = await self.anilist_client.search_anime(item.title, True, 1)
+        results = [
+            result
+            async for result in self.anilist_client.search_anime(
+                search_str=item.title, is_movie=True, episodes=1
+            )
+        ]
         return self._best_search_result(item.title, results)
 
     async def _calculate_status(

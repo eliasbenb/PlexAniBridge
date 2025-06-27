@@ -2,7 +2,7 @@ import asyncio
 import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, AsyncIterator
 
 import aiohttp
 from async_lru import alru_cache
@@ -295,7 +295,7 @@ class AniListClient:
         is_movie: bool,
         episodes: int | None = None,
         limit: int = 10,
-    ) -> list[Media]:
+    ) -> AsyncIterator[Media]:
         """Searches for anime on AniList with filtering capabilities.
 
         Performs a search query and filters results based on media format and episode count.
@@ -308,7 +308,7 @@ class AniListClient:
             limit (int): Maximum number of results to return. Defaults to 10
 
         Returns:
-            list[Media]: Filtered list of matching anime entries, sorted by relevance
+            AsyncIterator[Media]: Async iterator of filtered matching anime entries, sorted by relevance
 
         Raises:
             aiohttp.ClientError: If the API request fails
@@ -319,13 +319,13 @@ class AniListClient:
         )
 
         res = await self._search_anime(search_str, is_movie, limit)
-        return [
-            m
-            for m in res
-            if m.status == MediaStatus.RELEASING
-            or m.episodes == episodes
-            or not episodes
-        ]
+        for m in res:
+            if (
+                m.status == MediaStatus.RELEASING
+                or m.episodes == episodes
+                or not episodes
+            ):
+                yield m
 
     @alru_cache(maxsize=None, ttl=604800)
     async def _search_anime(

@@ -288,10 +288,12 @@ class BridgeClient:
             self.last_synced or datetime.now(timezone.utc)
         ) - timedelta(seconds=15)
 
-        items = plex_client.get_section_items(
-            section,
-            min_last_modified=min_last_modified if poll else None,
-            require_watched=not self.config.FULL_SCAN,
+        items = list(
+            plex_client.get_section_items(
+                section,
+                min_last_modified=min_last_modified if poll else None,
+                require_watched=not self.config.FULL_SCAN,
+            )
         )
 
         if self.config.BATCH_REQUESTS:
@@ -300,8 +302,10 @@ class BridgeClient:
             tmdb_ids = [guid.tmdb for guid in parsed_guids if guid.tmdb is not None]
             tvdb_ids = [guid.tvdb for guid in parsed_guids if guid.tvdb is not None]
 
-            animappings = self.animap_client.get_mappings(
-                imdb_ids, tmdb_ids, tvdb_ids, is_movie=section.type != "show"
+            animappings = list(
+                self.animap_client.get_mappings(
+                    imdb_ids, tmdb_ids, tvdb_ids, is_movie=section.type != "show"
+                )
             )
             anilist_ids = [
                 a.anilist_id for a in animappings if a.anilist_id is not None
