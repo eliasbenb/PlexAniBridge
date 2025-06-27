@@ -105,7 +105,8 @@ class AniMapClient:
             last_mappings_hash = ctx.session.get(Housekeeping, "animap_mappings_hash")
 
             animap_defaults = {field: None for field in AniMap.model_fields}
-            validated_count = 0
+            valid_count = 0
+            invalid_count = 0
 
             mappings = await self.mappings_client.load_mappings()
             tmp_mappings = mappings.copy()
@@ -114,6 +115,7 @@ class AniMapClient:
                 try:
                     anilist_id = int(key)
                 except ValueError:
+                    invalid_count += 1
                     continue
 
                 try:
@@ -124,13 +126,14 @@ class AniMapClient:
                             **entry,
                         }
                     )
-                    validated_count += 1
+                    valid_count += 1
                 except (ValueError, ValidationError) as e:
                     log.warning(
                         f"{self.__class__.__name__}: Found an invalid mapping entry "
                         f"$${{anilist_id: {anilist_id}}}$$: {e}"
                     )
                     mappings.pop(key)
+                    invalid_count += 1
 
             curr_mappings_hash = md5(
                 json.dumps(mappings, sort_keys=True).encode()
@@ -143,7 +146,8 @@ class AniMapClient:
                 return
 
             log.debug(
-                f"{self.__class__.__name__}: Anime mapping changes detected, syncing database"
+                f"{self.__class__.__name__}: Anime mapping changes detected, syncing database. "
+                f"Validated {valid_count} entries, removed {invalid_count} invalid entries"
             )
 
             existing_entries_query = ctx.session.execute(select(AniMap))
