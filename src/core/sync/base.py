@@ -184,13 +184,15 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         self.sync_stats = SyncStats()
 
         extra_fields: dict[SyncField, Callable] = {
-            SyncField.STATUS: self._calculate_status,
-            SyncField.PROGRESS: self._calculate_progress,
-            SyncField.REPEAT: self._calculate_repeats,
-            SyncField.SCORE: self._calculate_score,
-            SyncField.NOTES: self._calculate_notes,
-            SyncField.STARTED_AT: self._calculate_started_at,
-            SyncField.COMPLETED_AT: self._calculate_completed_at,
+            SyncField.STATUS: lambda **kwargs: self._calculate_status(**kwargs),
+            SyncField.PROGRESS: lambda **kwargs: self._calculate_progress(**kwargs),
+            SyncField.REPEAT: lambda **kwargs: self._calculate_repeats(**kwargs),
+            SyncField.SCORE: lambda **kwargs: self._calculate_score(**kwargs),
+            SyncField.NOTES: lambda **kwargs: self._calculate_notes(**kwargs),
+            SyncField.STARTED_AT: lambda **kwargs: self._calculate_started_at(**kwargs),
+            SyncField.COMPLETED_AT: lambda **kwargs: self._calculate_completed_at(
+                **kwargs
+            ),
         }
         self._extra_fields = {
             k: v for k, v in extra_fields.items() if k not in self.excluded_sync_fields
@@ -350,7 +352,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         )
 
         anilist_media_list = anilist_media.media_list_entry
-        plex_media_list = self._get_plex_media_list(
+        plex_media_list = await self._get_plex_media_list(
             item=item,
             child_item=child_item,
             grandchild_items=grandchild_items,
@@ -383,7 +385,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             log.success(f"\t\tDELETE: {anilist_media_list}")
 
             if anilist_media.media_list_entry:
-                self.anilist_client.delete_anime_entry(
+                await self.anilist_client.delete_anime_entry(
                     anilist_media.media_list_entry.id,
                     anilist_media.media_list_entry.media_id,
                 )
@@ -416,7 +418,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             log.success(
                 f"\t\tUPDATE: {MediaList.diff(anilist_media_list, final_media_list)}"
             )
-            self.anilist_client.update_anime_entry(final_media_list)
+            await self.anilist_client.update_anime_entry(final_media_list)
 
             log.success(
                 f"{self.__class__.__name__}: Synced {item.type} "
@@ -446,7 +448,9 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             f"with batch mode $${{anilist_id: {[m.media_id for m in self.queued_batch_requests]}}}$$"
         )
         try:
-            self.anilist_client.batch_update_anime_entries(self.queued_batch_requests)
+            await self.anilist_client.batch_update_anime_entries(
+                self.queued_batch_requests
+            )
             self.sync_stats.synced += len(self.queued_batch_requests)
             log.success(
                 f"{self.__class__.__name__}: Synced {len(self.queued_batch_requests)} items to AniList "
@@ -455,7 +459,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         finally:
             self.queued_batch_requests.clear()
 
-    def _get_plex_media_list(
+    async def _get_plex_media_list(
         self,
         item: T,
         child_item: S,
@@ -489,7 +493,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             or 0,
             user_id=self.anilist_client.user.id,
             media_id=anilist_media.id,
-            status=self._calculate_status(**kwargs),
+            status=await self._calculate_status(**kwargs),
         )
 
         if media_list.status is None:
@@ -501,20 +505,24 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
                     pass
                 case SyncField.REPEAT | SyncField.SCORE | SyncField.COMPLETED_AT:
                     if media_list.status >= MediaListStatus.COMPLETED:
-                        setattr(media_list, field, self._extra_fields[field](**kwargs))
+                        setattr(
+                            media_list, field, await self._extra_fields[field](**kwargs)
+                        )
                 case SyncField.STARTED_AT:
                     media_list.started_at = (
-                        self._extra_fields[field](**kwargs)
+                        await self._extra_fields[field](**kwargs)
                         if media_list.status > MediaListStatus.PLANNING
                         else None
                     )
                 case _:
-                    setattr(media_list, field, self._extra_fields[field](**kwargs))
+                    setattr(
+                        media_list, field, await self._extra_fields[field](**kwargs)
+                    )
 
         return media_list
 
     @abstractmethod
-    def _calculate_status(
+    async def _calculate_status(
         self,
         item: T,
         child_item: S,
@@ -539,7 +547,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         pass
 
     @abstractmethod
-    def _calculate_score(
+    async def _calculate_score(
         self,
         item: T,
         child_item: S,
@@ -564,7 +572,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         pass
 
     @abstractmethod
-    def _calculate_progress(
+    async def _calculate_progress(
         self,
         item: T,
         child_item: S,
@@ -589,7 +597,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         pass
 
     @abstractmethod
-    def _calculate_repeats(
+    async def _calculate_repeats(
         self,
         item: T,
         child_item: S,
@@ -614,7 +622,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         pass
 
     @abstractmethod
-    def _calculate_started_at(
+    async def _calculate_started_at(
         self,
         item: T,
         child_item: S,
@@ -639,7 +647,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         pass
 
     @abstractmethod
-    def _calculate_completed_at(
+    async def _calculate_completed_at(
         self,
         item: T,
         child_item: S,
@@ -664,7 +672,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         pass
 
     @abstractmethod
-    def _calculate_notes(
+    async def _calculate_notes(
         self,
         item: T,
         child_item: S,

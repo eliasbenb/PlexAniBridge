@@ -1,4 +1,3 @@
-import asyncio
 import sys
 from collections import Counter
 from datetime import datetime
@@ -11,7 +10,7 @@ from src import log
 from src.core.sync.base import BaseSyncClient, ParsedGuids
 from src.models.anilist import FuzzyDate, Media, MediaListStatus
 from src.models.animap import AniMap
-from src.utils.cache import generic_lru_cache
+from src.utils.cache import gattl_cache, glru_cache
 
 
 class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
@@ -94,7 +93,9 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
                     continue
 
             try:
-                anilist_media = self.anilist_client.get_anime(animapping.anilist_id)
+                anilist_media = await self.anilist_client.get_anime(
+                    animapping.anilist_id
+                )
             except Exception:
                 log.error(
                     f"Failed to fetch AniList data for {self._debug_log_title(item, animapping)} "
@@ -161,7 +162,6 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             primary_season_idx = season_episode_counts.most_common(1)[0][0]
             primary_season = relevant_seasons[primary_season_idx]
 
-            await asyncio.sleep(0)  # Add a yield point for cancellation
             yield primary_season, episodes, animapping, anilist_media
 
         # We're done with the mapped seasons. Now we need to process the remaining seasons.
@@ -206,7 +206,6 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
                 tvdb_mappings={f"s{index}": ""},
             )
 
-            await asyncio.sleep(0)  # Add a yield point for cancellation
             yield season, episodes, animapping, anilist_media
 
     async def search_media(self, item: Show, child_item: Season) -> Media | None:
@@ -228,14 +227,14 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             return None
 
         episodes = child_item.leafCount
-        results = self.anilist_client.search_anime(
+        results = await self.anilist_client.search_anime(
             item.title,
             is_movie=False,
             episodes=episodes,
         )
         return self._best_search_result(item.title, results)
 
-    def _calculate_status(
+    async def _calculate_status(
         self,
         item: Show,
         child_item: Season,
@@ -307,7 +306,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             return MediaListStatus.DROPPED
         return None
 
-    def _calculate_score(
+    async def _calculate_score(
         self,
         item: Show,
         child_item: Season,
@@ -339,7 +338,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
 
         return self._normalize_score(score)
 
-    def _calculate_progress(
+    async def _calculate_progress(
         self,
         item: Show,
         child_item: Season,
@@ -359,7 +358,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         watched_episodes = len(self._filter_watched_episodes(grandchild_items))
         return min(watched_episodes, anilist_media.episodes or watched_episodes)
 
-    def _calculate_repeats(
+    async def _calculate_repeats(
         self,
         item: Show,
         child_item: Season,
@@ -381,7 +380,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         )
         return int(least_views - 1) if least_views else None
 
-    def _calculate_started_at(
+    async def _calculate_started_at(
         self,
         item: Show,
         child_item: Season,
@@ -398,7 +397,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         Returns:
             FuzzyDate | None: Start date for the media item
         """
-        history = self._filter_history_by_episodes(item, grandchild_items)
+        history = await self._filter_history_by_episodes(item, grandchild_items)
         first_history = min(history, key=lambda h: h.viewedAt) if history else None
 
         last_viewed_dt = min(
@@ -425,7 +424,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             return min(last_viewed, history_viewed)
         return last_viewed or history_viewed
 
-    def _calculate_completed_at(
+    async def _calculate_completed_at(
         self,
         item: Show,
         child_item: Season,
@@ -442,7 +441,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         Returns:
             FuzzyDate | None: Completion date for the media item
         """
-        history = self._filter_history_by_episodes(item, grandchild_items)
+        history = await self._filter_history_by_episodes(item, grandchild_items)
         last_history = max(history, key=lambda h: h.viewedAt) if history else None
 
         last_viewed_at = max(
@@ -471,7 +470,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             return max(last_viewed, history_viewed)
         return last_viewed or history_viewed
 
-    def _calculate_notes(
+    async def _calculate_notes(
         self,
         item: Show,
         child_item: Season,
@@ -494,10 +493,11 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             str | None: User notes for the media item
         """
         if len(grandchild_items) == anilist_media.episodes == 1:
-            return self.plex_client.get_user_review(grandchild_items[0])
-        return self.plex_client.get_user_review(
-            child_item
-        ) or self.plex_client.get_user_review(item)
+            return await self.plex_client.get_user_review(grandchild_items[0])
+        review = await self.plex_client.get_user_review(child_item)
+        if review:
+            return review
+        return await self.plex_client.get_user_review(item)
 
     def _debug_log_title(
         self,
@@ -548,8 +548,8 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         """
         return f"$${{key: {key}, plex_id: {plex_id}, {guids}{f', anilist_id: {anilist_id}' if anilist_id else ''}}}$$"
 
-    @generic_lru_cache(maxsize=1)
-    def _filter_history_by_episodes(
+    @gattl_cache()
+    async def _filter_history_by_episodes(
         self, item: Show, grandchild_items: list[Episode]
     ) -> list[EpisodeHistory | MovieHistory]:
         """Filters out history entries that don't exist in the grandchild items.
@@ -563,7 +563,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         """
         grandchild_rating_keys = {e.ratingKey for e in grandchild_items}
         episode_map = {e.ratingKey: e for e in grandchild_items}
-        history = self.plex_client.get_history(item)
+        history = await self.plex_client.get_history(item)
 
         filtered_history: dict[int | str, EpisodeHistory | MovieHistory] = {}
         for h in history:
@@ -589,7 +589,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
 
         return list(filtered_history.values())
 
-    @generic_lru_cache(maxsize=1)
+    @glru_cache(maxsize=1)
     def _filter_watched_episodes(self, episodes: list[Episode]) -> list[Episode]:
         """Filters watched episodes based on AniList entry.
 
