@@ -257,15 +257,20 @@ class AniMapClient:
             [tvdb] if isinstance(tvdb, int) else tvdb if isinstance(tvdb, list) else []
         )
 
-        def json_array_contains(field: Mapped, values: list[Any]) -> Any:
+        def json_array_contains(
+            field: Mapped, values: list[Any]
+        ) -> ColumnElement[bool]:
             """Generates a JSON_CONTAINS function for the given field.
 
+            Creates SQL conditions to check if any of the provided values exist
+            within a JSON array field using SQLite's json_each function.
+
             Args:
-                field (InstrumentedAttribute): Field to search in
-                values (list[Any]): Values to search for
+                field (Mapped): SQLAlchemy mapped field representing a JSON array column
+                values (list[Any]): List of values to search for within the JSON array
 
             Returns:
-                Any: JSON_CONTAINS function
+                ColumnElement[bool]: SQL condition that evaluates to True if any value is found
             """
 
             if not values:
@@ -285,12 +290,15 @@ class AniMapClient:
         def json_dict_contains(field: Mapped, key: str) -> BinaryExpression:
             """Generate a SQL expression for checking if a JSON field contains a key.
 
+            Uses SQLite's json_type function to check if a specific key exists
+            in a JSON object field.
+
             Args:
-                field (InstrumentedAttribute): Field to search in
-                key (str): Value to search for
+                field (Mapped): SQLAlchemy mapped field representing a JSON object column
+                key (str): JSON object key to search for (e.g., "s1" for season 1)
 
             Returns:
-                BinaryExpression: JSON_CONTAINS function
+                BinaryExpression: SQL condition that evaluates to True if key exists
             """
             return func.json_type(field, f"$.{key}").is_not(None)
 
