@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, AsyncIterator, Callable, Generic, TypeVar
+from typing import Any, AsyncIterator, Callable, Generic, Protocol, TypeVar
 
 from pydantic import BaseModel
 from rapidfuzz import fuzz
@@ -134,6 +134,15 @@ class SyncStats(BaseModel):
             possible=self.possible.union(other.possible),
             covered=self.covered.union(other.covered),
         )
+
+
+class Comparable(Protocol):
+    """Protocol for objects that can be compared using <, >, <=, >= operators."""
+
+    def __lt__(self, other: Any) -> bool: ...
+    def __gt__(self, other: Any) -> bool: ...
+    def __le__(self, other: Any) -> bool: ...
+    def __ge__(self, other: Any) -> bool: ...
 
 
 class BaseSyncClient(ABC, Generic[T, S, E]):
@@ -807,21 +816,23 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
 
             if self.destructive_sync and plex_val is not None:
                 setattr(res_media_list, key, plex_val)
-            elif self.__should_update_field(rule, plex_val, anilist_val):
+            elif self._should_update_field(rule, plex_val, anilist_val):
                 setattr(res_media_list, key, plex_val)
 
         return res_media_list
 
-    def __should_update_field(self, op: str, plex_val: Any, anilist_val: Any) -> bool:
+    def _should_update_field(
+        self, op: str, plex_val: Comparable, anilist_val: Comparable
+    ) -> bool:
         """Determines if a field should be updated based on the comparison rule.
 
         Args:
             op (str): Comparison rule
-            plex_val: Plex value
-            anilist_val: AniList value
+            plex_val (Comparable): Plex value to compare against
+            anilist_val (Comparable): AniList value to compare against
 
         Returns:
-                bool: True if the field should be updated, False otherwise
+            bool: True if the field should be updated, False otherwise
         """
         if anilist_val == plex_val:
             return False
