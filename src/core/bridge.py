@@ -75,7 +75,6 @@ class BridgeClient:
             await client.close()
 
     async def __aenter__(self):
-        await self.initialize()
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):

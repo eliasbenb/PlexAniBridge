@@ -111,7 +111,15 @@ class SchedulerClient:
         """Handle periodic bridge reinitialization to refresh connections."""
         while self._running:
             try:
-                await self.bridge.initialize()
+                async with self._sync_lock:
+                    log.debug(
+                        f"{self.__class__.__name__}: Starting bridge reinitialization"
+                    )
+                    await self.bridge.initialize()
+                    log.debug(
+                        f"{self.__class__.__name__}: Bridge reinitialization completed"
+                    )
+
                 next_reinit = datetime.now(timezone.utc) + timedelta(
                     seconds=self.reinit_interval
                 )
@@ -143,6 +151,12 @@ class SchedulerClient:
 
         self._running = True
 
+        if self.reinit_interval >= 0:
+            log.info(
+                f"{self.__class__.__name__}: Starting reinit scheduler (interval: {self.reinit_interval}s)"
+            )
+            self._create_task(self._reinit())
+
         if self.polling_scan:
             log.info(
                 f"{self.__class__.__name__}: Starting polling scheduler (interval: {self.poll_interval}s)"
@@ -160,12 +174,6 @@ class SchedulerClient:
                 )
                 await self.sync()
                 exit(0)
-
-        if self.reinit_interval >= 0:
-            log.info(
-                f"{self.__class__.__name__}: Starting reinit scheduler (interval: {self.reinit_interval}s)"
-            )
-            self._create_task(self._reinit())
 
     async def stop(self) -> None:
         """Stop the scheduler and clean up all running tasks."""
