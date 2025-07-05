@@ -1,148 +1,25 @@
 from abc import ABC, abstractmethod
-from typing import Any, AsyncIterator, Callable, Generic, Protocol, TypeVar
+from typing import AsyncIterator, Callable, Generic, TypeVar
 
-from pydantic import BaseModel
 from rapidfuzz import fuzz
 
-from plexapi.media import Guid
 from plexapi.video import Episode, Movie, Season, Show
 from src import log
 from src.config.settings import SyncField
 from src.core import AniListClient, AniMapClient, PlexClient
 from src.models.anilist import FuzzyDate, Media, MediaList, MediaListStatus, ScoreFormat
 from src.models.animap import AniMap
+from src.models.sync import (
+    Comparable,
+    ItemIdentifier,
+    ParsedGuids,
+    SyncOutcome,
+    SyncStats,
+)
 
 T = TypeVar("T", bound=Movie | Show)  # Section item
 S = TypeVar("S", bound=Movie | Season)  # Item child (season)
 E = TypeVar("E", bound=list[Movie] | list[Episode])  # Item grandchild (episode)
-
-
-class ParsedGuids(BaseModel):
-    """Container for parsed media identifiers from different services.
-
-    Handles parsing and storage of media IDs from various services (TVDB, TMDB, IMDB)
-    from Plex's GUID format into a structured format. Provides iteration and string
-    representation for debugging.
-
-    Attributes:
-        tvdb (int | None): TVDB ID if available
-        tmdb (int | None): TMDB ID if available
-        imdb (str | None): IMDB ID if available
-
-    Note:
-        GUID formats expected from Plex:
-        - TVDB: "tvdb://123456"
-        - TMDB: "tmdb://123456"
-        - IMDB: "imdb://tt1234567"
-    """
-
-    tvdb: int | None = None
-    tmdb: int | None = None
-    imdb: str | None = None
-
-    @staticmethod
-    def from_guids(guids: list[Guid]) -> "ParsedGuids":
-        """Creates a ParsedGuids instance from a list of Plex GUIDs.
-
-        Args:
-            guids (list[Guid]): List of Plex GUID objects
-
-        Returns:
-            ParsedGuids: New instance with parsed IDs
-        """
-        parsed_guids = ParsedGuids()
-        for guid in guids:
-            if not guid.id:
-                continue
-
-            split_guid = guid.id.split("://")
-            if len(split_guid) != 2:
-                continue
-
-            attr = split_guid[0]
-            if not hasattr(parsed_guids, attr):
-                continue
-
-            try:
-                setattr(parsed_guids, attr, int(split_guid[1]))
-            except ValueError:
-                setattr(parsed_guids, attr, str(split_guid[1]))
-
-        return parsed_guids
-
-    def __str__(self) -> str:
-        """Creates a string representation of the parsed IDs.
-
-        Returns:
-            str: String representation of the parsed IDs in a format like "id: xxx, id: xxx, id: xxx"
-        """
-        return ", ".join(
-            f"{field}: {getattr(self, field)}"
-            for field in self.__class__.model_fields
-            if getattr(self, field) is not None
-        )
-
-
-class SyncStats(BaseModel):
-    """Statistics tracker for synchronization operations.
-
-    Keeps count of various sync outcomes for reporting and monitoring.
-
-    Attributes:
-        synced (int): Number of successfully synced items
-        deleted (int): Number of items deleted from AniList
-        skipped (int): Number of items that needed no changes
-        not_found (int): Number of items that could not be found/matched
-        failed (int): Number of items that failed to sync
-        possible (set[str]): Set of all possible items that could be synced
-        covered (set[str]): Set of items that were successfully processed
-    """
-
-    synced: int = 0
-    deleted: int = 0
-    skipped: int = 0
-    not_found: int = 0
-    failed: int = 0
-
-    possible: set[str] = set()
-    covered: set[str] = set()
-
-    @property
-    def coverage(self) -> float:
-        """Calculates the coverage percentage of successfully synced items.
-
-        Returns:
-            float: Coverage percentage of successfully synced items
-        """
-        return len(self.covered) / len(self.possible) if self.possible else 1.0
-
-    def __add__(self, other: "SyncStats") -> "SyncStats":
-        """Combines statistics from two SyncStats instances.
-
-        Args:
-            other (SyncStats): Another SyncStats instance to combine with
-
-        Returns:
-            SyncStats: New instance with combined statistics
-        """
-        return SyncStats(
-            synced=self.synced + other.synced,
-            deleted=self.deleted + other.deleted,
-            skipped=self.skipped + other.skipped,
-            not_found=self.not_found + other.not_found,
-            failed=self.failed + other.failed,
-            possible=self.possible.union(other.possible),
-            covered=self.covered.union(other.covered),
-        )
-
-
-class Comparable(Protocol):
-    """Protocol for objects that can be compared using <, >, <=, >= operators."""
-
-    def __lt__(self, other: Any) -> bool: ...
-    def __gt__(self, other: Any) -> bool: ...
-    def __le__(self, other: Any) -> bool: ...
-    def __ge__(self, other: Any) -> bool: ...
 
 
 class BaseSyncClient(ABC, Generic[T, S, E]):
@@ -226,9 +103,6 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
 
         Args:
             item (T): Grandparent Plex media item to sync
-
-        Returns:
-            SyncStats: Updated synchronization statistics with counts of synced, deleted, skipped and failed items
         """
         guids = ParsedGuids.from_guids(item.guids)
 
@@ -244,12 +118,19 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             f"{debug_log_title} {debug_log_ids}"
         )
 
+        # Track all items that we attempt to process
+        item_id = ItemIdentifier.from_media(item)
+        found_any_match = False
+
         async for (
             child_item,
             grandchild_items,
             animapping,
             anilist_media,
         ) in self.map_media(item):
+            found_any_match = True
+            grandchild_ids = ItemIdentifier.from_items(grandchild_items)
+
             debug_log_title = self._debug_log_title(item=item, animapping=animapping)
             debug_log_ids = self._debug_log_ids(
                 key=child_item.ratingKey,
@@ -264,21 +145,28 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             )
 
             try:
-                await self.sync_media(
+                outcome = await self.sync_media(
                     item=item,
                     child_item=child_item,
                     grandchild_items=grandchild_items,
                     anilist_media=anilist_media,
                     animapping=animapping,
                 )
-                self.sync_stats.covered |= {str(e) for e in grandchild_items}
+
+                # Track the outcome for all grandchild items
+                self.sync_stats.track_items(grandchild_ids, outcome)
+
             except Exception:
                 log.error(
                     f"{self.__class__.__name__}: Failed to process {item.type} "
                     f"{debug_log_title} {debug_log_ids}",
                     exc_info=True,
                 )
-                self.sync_stats.failed += 1
+                self.sync_stats.track_items(grandchild_ids, SyncOutcome.FAILED)
+
+        # If no matches were found for any mapping, mark the main item as not found
+        if not found_any_match:
+            self.sync_stats.track_item(item_id, SyncOutcome.NOT_FOUND)
 
     @abstractmethod
     def map_media(self, item: T) -> AsyncIterator[tuple[S, E, AniMap, Media]]:
@@ -340,7 +228,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         grandchild_items: E,
         anilist_media: Media,
         animapping: AniMap,
-    ) -> None:
+    ) -> SyncOutcome:
         """Synchronizes a matched media item with AniList.
 
         Args:
@@ -349,6 +237,9 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             grandchild_items (E): Grandchild items to extract data from
             anilist_media (Media): Matched AniList entry
             animapping (AniMap): ID mapping information
+
+        Returns:
+            SyncOutcome: The result of the synchronization operation
         """
         guids = ParsedGuids.from_guids(item.guids)
 
@@ -382,9 +273,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
                 f"{self.__class__.__name__}: Skipping {item.type} because it is already up to date "
                 f"{debug_log_title} {debug_log_ids}"
             )
-
-            self.sync_stats.skipped += 1
-            return
+            return SyncOutcome.SKIPPED
 
         if self.destructive_sync and anilist_media_list and not plex_media_list.status:
             log.success(
@@ -398,17 +287,15 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
                     anilist_media.media_list_entry.id,
                     anilist_media.media_list_entry.media_id,
                 )
-                self.sync_stats.synced += 1
-                self.sync_stats.deleted += 1
-            return
+                return SyncOutcome.DELETED
+            return SyncOutcome.SKIPPED
 
         if not final_media_list.status:
             log.info(
                 f"{self.__class__.__name__}: Skipping {item.type} due to no activity "
                 f"{debug_log_title} {debug_log_ids}"
             )
-            self.sync_stats.skipped += 1
-            return
+            return SyncOutcome.SKIPPED
 
         if self.batch_requests:
             log.info(
@@ -419,6 +306,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
                 f"\t\tQUEUED UDPATE: {MediaList.diff(anilist_media_list, final_media_list)}"
             )
             self.queued_batch_requests.append(final_media_list)
+            return SyncOutcome.SYNCED  # Will be synced in batch
         else:
             log.info(
                 f"{self.__class__.__name__}: Syncing AniList entry for {item.type} "
@@ -433,21 +321,13 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
                 f"{self.__class__.__name__}: Synced {item.type} "
                 f"{debug_log_title} {debug_log_ids}"
             )
-            self.sync_stats.synced += 1
+            return SyncOutcome.SYNCED
 
     async def batch_sync(self) -> None:
         """Executes batch synchronization of queued media lists.
 
         Sends all queued media lists to AniList in a single batch request.
         This is more efficient than sending individual requests for each media list.
-
-        Updates sync_stats.synced count on success and clears the queue regardless
-        of outcome. Logs detailed information about the batch operation including
-        media IDs being synced.
-
-        Raises:
-            Exception: Any exception from the AniList client during batch update
-                      is logged but not re-raised to allow cleanup of the queue
         """
         if not self.queued_batch_requests:
             return
@@ -460,7 +340,6 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             await self.anilist_client.batch_update_anime_entries(
                 self.queued_batch_requests
             )
-            self.sync_stats.synced += len(self.queued_batch_requests)
             log.success(
                 f"{self.__class__.__name__}: Synced {len(self.queued_batch_requests)} items to AniList "
                 f"with batch mode $${{anilist_id: {[m.media_id for m in self.queued_batch_requests]}}}$$"

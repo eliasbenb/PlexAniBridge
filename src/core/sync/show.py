@@ -52,11 +52,6 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             if episode.parentIndex in seasons:
                 episodes_by_season.setdefault(episode.parentIndex, []).append(episode)
 
-        all_possible_episodes = {
-            str(e) for eps in episodes_by_season.values() for e in eps
-        }
-        self.sync_stats.possible |= all_possible_episodes
-
         processed_seasons: set[int] = set()
 
         animappings = list(
@@ -74,7 +69,6 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             }
 
             if not relevant_seasons:
-                self.sync_stats.covered |= all_possible_episodes
                 continue
             elif not self.destructive_sync:
                 any_relevant_episodes = False
@@ -89,7 +83,6 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
                         any_relevant_episodes = True
                         break
                 if not any_relevant_episodes:
-                    self.sync_stats.covered |= all_possible_episodes
                     continue
 
             try:
@@ -102,7 +95,6 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
                     f"{self._debug_log_ids(item.ratingKey, item.guid, guids, animapping.anilist_id)}",
                     exc_info=True,
                 )
-                self.sync_stats.failed += 1
                 continue
 
             if not anilist_media:
@@ -141,15 +133,11 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
                 # A positive ratio means 1 Plex episode covers multiple AniList episodes
                 elif tvdb_mapping.ratio > 0:
                     # Skip every ratio-th episode
-                    tmp_episodes = {
+                    filtered_episodes = [
                         e
                         for i, e in enumerate(filtered_episodes)
                         if i % tvdb_mapping.ratio == 0
-                    }
-                    self.sync_stats.covered |= {
-                        str(e) for e in set(filtered_episodes) - tmp_episodes
-                    }
-                    filtered_episodes = list(tmp_episodes)
+                    ]
 
                 episodes.extend(filtered_episodes)
                 season_episode_counts.update({season_idx: len(filtered_episodes)})
@@ -177,7 +165,6 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
                     continue
                 anilist_media = _anilist_media
             except Exception:
-                self.sync_stats.failed += 1
                 log.error(
                     f"Failed to fetch AniList data for {self._debug_log_title(item)}",
                     exc_info=True,
@@ -190,7 +177,6 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
                     f"{self._debug_log_title(item, AniMap(anilist_id=0, anidb_id=None, imdb_id=None, mal_id=None, tmdb_movie_id=None, tmdb_show_id=None, tvdb_id=None, tvdb_mappings={f's{index}': ''}))}"
                     f"{self._debug_log_ids(item.ratingKey, season.guid, guids)}"
                 )
-                self.sync_stats.not_found += 1
                 continue
 
             episodes = episodes_by_season.get(index, [])

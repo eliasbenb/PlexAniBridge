@@ -21,8 +21,6 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
         Returns:
             AsyncIterator[tuple[Movie, list[Movie], AniMap, Media]]: Mapping matches (child, grandchild, animapping, anilist_media)
         """
-        self.sync_stats.possible.add(str(item))
-
         guids = ParsedGuids.from_guids(item.guids)
 
         animapping: AniMap = next(
@@ -57,7 +55,6 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
                 f"{self._debug_log_ids(item.ratingKey, item.guid, guids, animapping.anilist_id)}",
                 exc_info=True,
             )
-            self.sync_stats.failed += 1
             return
 
         if not anilist_media:
@@ -65,7 +62,6 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
                 f"No AniList entry could be found for {self._debug_log_title(item)} "
                 f"{self._debug_log_ids(item.ratingKey, item.guid, guids)}"
             )
-            self.sync_stats.not_found += 1
             return
 
         yield item, [item], animapping, anilist_media
