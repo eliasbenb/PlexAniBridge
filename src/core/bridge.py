@@ -8,11 +8,10 @@ from src.core import AniListClient, AniMapClient, PlexClient
 from src.core.sync import (
     BaseSyncClient,
     MovieSyncClient,
-    ParsedGuids,
     ShowSyncClient,
-    SyncStats,
 )
 from src.models.housekeeping import Housekeeping
+from src.models.sync import ParsedGuids, SyncStats
 
 __all__ = ["BridgeClient"]
 
@@ -239,7 +238,7 @@ class BridgeClient:
             section_stats = await self._sync_section(
                 plex_client, anilist_client, section, poll
             )
-            sync_stats += section_stats
+            sync_stats = sync_stats.combine(section_stats)
         end_time = datetime.now(timezone.utc)
         duration = end_time - start_time
 
@@ -248,19 +247,11 @@ class BridgeClient:
             f"$$'{anilist_client.user.name}'$$ completed"
         )
 
-        # The unsynced items will include anything that failed or was not found
-        unsynced_items = list(sync_stats.possible - sync_stats.covered)
-        if unsynced_items:
-            unsynced_items_str = ", ".join(str(i) for i in sorted(unsynced_items))
-            log.debug(
-                f"{self.__class__.__name__}: The following items could not be synced: {unsynced_items_str}"
-            )
-
         log.info(
             f"{self.__class__.__name__}: {sync_stats.synced} items synced, {sync_stats.deleted} items deleted, "
             f"{sync_stats.skipped} items skipped, {sync_stats.not_found} items not found, "
-            f"and {sync_stats.failed} items failed with a coverage of {sync_stats.coverage:.2%} in "
-            f"{duration.total_seconds():.2f} seconds"
+            f"and {sync_stats.failed} items failed. Success rate: {sync_stats.success_rate:.2%} "
+            f"({sync_stats.total_processed} total) in {duration.total_seconds():.2f} seconds"
         )
 
     async def _sync_section(
