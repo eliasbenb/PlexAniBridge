@@ -7,7 +7,6 @@ from pydantic import ValidationError
 from sqlalchemy import and_, column, delete, exists, false, func, or_, select
 from sqlalchemy.orm.base import Mapped
 from sqlalchemy.sql.elements import BinaryExpression, ColumnElement
-from sqlmodel import col
 
 from src import log
 from src.config.database import db
@@ -78,7 +77,8 @@ class AniMapClient:
         Returns:
             bool: True if entries are equal, False otherwise
         """
-        for field_name in AniMap.model_fields:
+        for column_attr in AniMap.__table__.columns:
+            field_name = column_attr.name
             existing_value = getattr(existing_entry, field_name)
             new_value = getattr(new_entry, field_name)
             if existing_value != new_value:
@@ -104,7 +104,7 @@ class AniMapClient:
         with db as ctx:
             last_mappings_hash = ctx.session.get(Housekeeping, "animap_mappings_hash")
 
-            animap_defaults = {field: None for field in AniMap.model_fields}
+            animap_defaults = {column.name: None for column in AniMap.__table__.columns}
             valid_count = 0
             invalid_count = 0
 
@@ -119,15 +119,15 @@ class AniMapClient:
                     continue
 
                 try:
-                    AniMap.model_validate(
-                        {
+                    AniMap(
+                        **{
                             **animap_defaults,
                             "anilist_id": anilist_id,
                             **entry,
                         }
                     )
                     valid_count += 1
-                except (ValueError, ValidationError) as e:
+                except (ValueError, ValidationError, TypeError) as e:
                     log.warning(
                         f"{self.__class__.__name__}: Found an invalid mapping entry "
                         f"$${{anilist_id: {anilist_id}}}$$: {e}"
@@ -159,14 +159,14 @@ class AniMapClient:
             new_data = {}
             for key, entry in mappings.items():
                 anilist_id = int(key)
-                processed_entry = {
+                processed_entry: dict[str, Any] = {
                     "anilist_id": anilist_id,
-                    **{
-                        field: entry[field]
-                        for field in AniMap.model_fields
-                        if field in entry
-                    },
                 }
+
+                for column in AniMap.__table__.columns:
+                    field_name = column.name
+                    if field_name in entry:
+                        processed_entry[field_name] = entry[field_name]
 
                 for attr in ("mal_id", "imdb_id", "tmdb_movie_id", "tmdb_show_id"):
                     if attr in processed_entry:
@@ -204,7 +204,7 @@ class AniMapClient:
 
             if to_delete:
                 ctx.session.execute(
-                    delete(AniMap).where(col(AniMap.anilist_id).in_(to_delete))
+                    delete(AniMap).where(AniMap.anilist_id.in_(to_delete))
                 )
 
             if to_insert:
@@ -312,31 +312,27 @@ class AniMapClient:
 
             if is_movie:
                 if imdb_list:
-                    or_conditions.append(
-                        json_array_contains(col(AniMap.imdb_id), imdb_list)
-                    )
+                    or_conditions.append(json_array_contains(AniMap.imdb_id, imdb_list))
                 if tmdb_list:
                     or_conditions.append(
-                        json_array_contains(col(AniMap.tmdb_movie_id), tmdb_list)
+                        json_array_contains(AniMap.tmdb_movie_id, tmdb_list)
                     )
             else:
                 if imdb_list:
-                    or_conditions.append(
-                        json_array_contains(col(AniMap.imdb_id), imdb_list)
-                    )
+                    or_conditions.append(json_array_contains(AniMap.imdb_id, imdb_list))
                 if tmdb_list:
                     or_conditions.append(
-                        json_array_contains(col(AniMap.tmdb_show_id), tmdb_list)
+                        json_array_contains(AniMap.tmdb_show_id, tmdb_list)
                     )
 
                 if tvdb_list:
                     if len(tvdb_list) == 1:
                         or_conditions.append(AniMap.tvdb_id == tvdb_list[0])
                     else:
-                        or_conditions.append(col(AniMap.tvdb_id).in_(tvdb_list))
+                        or_conditions.append(AniMap.tvdb_id.in_(tvdb_list))
                 if season:
                     and_conditions.append(
-                        json_dict_contains(col(AniMap.tvdb_mappings), f"s{season}")
+                        json_dict_contains(AniMap.tvdb_mappings, f"s{season}")
                     )
 
             merged_conditions: list[ColumnElement[bool]] = []
