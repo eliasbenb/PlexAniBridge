@@ -1,8 +1,9 @@
 from pathlib import Path
 from types import TracebackType
 
+from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
-from sqlmodel import Session, create_engine
+from sqlalchemy.orm import Session
 
 from src import __file__ as src_file
 from src import config
@@ -14,7 +15,7 @@ class PlexAniBridgeDB:
     """Database manager for PlexAniBridge application.
 
     Handles the creation, initialization, and migration of the SQLite database,
-    including file system operations and schema management. Uses SQLModel for ORM
+    including file system operations and schema management. Uses SQLAlchemy for ORM
     and Alembic for database migrations.
 
     During initialization, this class automatically imports all database models
@@ -48,7 +49,7 @@ class PlexAniBridgeDB:
 
         Performs the following setup steps:
         1. Validates or creates the data directory
-        2. Imports database models to register them with SQLModel
+        2. Imports database models to register them with SQLAlchemy
         3. Creates a SQLAlchemy engine for database connections
 
         Returns:
@@ -58,8 +59,7 @@ class PlexAniBridgeDB:
             PermissionError: If unable to create the data directory
             ValueError: If data_path exists but is a file instead of a directory
         """
-        import src.models.animap  # noqa: F401
-        import src.models.housekeeping  # noqa: F401
+        import src.models  # noqa: F401
 
         if not self.data_path.exists():
             try:

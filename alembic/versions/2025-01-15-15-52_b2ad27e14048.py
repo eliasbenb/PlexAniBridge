@@ -7,7 +7,6 @@ Create Date: 2025-01-15 15:52:56.167462
 """
 
 import sqlalchemy as sa
-from sqlmodel import JSON
 
 from alembic import op
 
@@ -24,10 +23,10 @@ def upgrade() -> None:
         "animap_new",
         sa.Column("anilist_id", sa.Integer, primary_key=True),
         sa.Column("anidb_id", sa.Integer, primary_key=False, nullable=True),
-        sa.Column("imdb_id", JSON(none_as_null=True), nullable=True),
-        sa.Column("mal_id", JSON(none_as_null=True), nullable=True),
-        sa.Column("tmdb_movie_id", JSON(none_as_null=True), nullable=True),
-        sa.Column("tmdb_show_id", JSON(none_as_null=True), nullable=True),
+        sa.Column("imdb_id", sa.JSON(none_as_null=True), nullable=True),
+        sa.Column("mal_id", sa.JSON(none_as_null=True), nullable=True),
+        sa.Column("tmdb_movie_id", sa.JSON(none_as_null=True), nullable=True),
+        sa.Column("tmdb_show_id", sa.JSON(none_as_null=True), nullable=True),
         sa.Column("tvdb_id", sa.Integer, nullable=True),
         sa.Column("tvdb_epoffset", sa.Integer, nullable=True),
         sa.Column("tvdb_season", sa.Integer, nullable=True),
@@ -59,10 +58,10 @@ def downgrade() -> None:
             "anilist_id", sa.Integer, primary_key=True, nullable=False
         ),  # Revert to original primary key
         sa.Column("anidb_id", sa.Integer, nullable=True),
-        sa.Column("imdb_id", JSON(none_as_null=True), nullable=True),
-        sa.Column("mal_id", JSON(none_as_null=True), nullable=True),
-        sa.Column("tmdb_movie_id", JSON(none_as_null=True), nullable=True),
-        sa.Column("tmdb_show_id", JSON(none_as_null=True), nullable=True),
+        sa.Column("imdb_id", sa.JSON(none_as_null=True), nullable=True),
+        sa.Column("mal_id", sa.JSON(none_as_null=True), nullable=True),
+        sa.Column("tmdb_movie_id", sa.JSON(none_as_null=True), nullable=True),
+        sa.Column("tmdb_show_id", sa.JSON(none_as_null=True), nullable=True),
         sa.Column("tvdb_id", sa.Integer, nullable=True),
         sa.Column("tvdb_epoffset", sa.Integer, nullable=True),
         sa.Column("tvdb_season", sa.Integer, nullable=True),

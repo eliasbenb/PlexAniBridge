@@ -5,22 +5,20 @@ import sys
 from logging.config import fileConfig
 
 from sqlalchemy import create_engine
-from sqlmodel import SQLModel
 
 from alembic import context
 
 sys.path.append(str(pathlib.Path(__file__).resolve().parent.parent))
 
+import src.models  # noqa: F401
 from src import config as app_config
-from src.models.animap import AniMap  # noqa: F401
-from src.models.housekeeping import Housekeeping  # noqa: F401
 
 config = context.config
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-target_metadata = SQLModel.metadata
+target_metadata = src.models.Base.metadata
 
 db_url = f"sqlite:///{app_config.DATA_PATH / 'plexanibridge.db'}"
 config.set_main_option("sqlalchemy.url", db_url)
