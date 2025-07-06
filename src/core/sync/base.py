@@ -701,14 +701,14 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         return res_media_list
 
     def _should_update_field(
-        self, op: str, plex_val: Comparable, anilist_val: Comparable
+        self, op: str, plex_val: Comparable | None, anilist_val: Comparable | None
     ) -> bool:
         """Determines if a field should be updated based on the comparison rule.
 
         Args:
             op (str): Comparison rule
-            plex_val (Comparable): Plex value to compare against
-            anilist_val (Comparable): AniList value to compare against
+            plex_val (Comparable | None): Plex value to compare against
+            anilist_val (Comparable | None): AniList value to compare against
 
         Returns:
             bool: True if the field should be updated, False otherwise
