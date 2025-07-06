@@ -34,7 +34,7 @@ dependencies = [
     "pyyaml>=6.0.2",
     "rapidfuzz>=3.13.0",
     "requests>=2.32.3",
-    "sqlmodel>=0.0.24",
+    "sqlalchemy>=2.0.41",
     "tomlkit>=0.13.2",
     "tzlocal>=5.3.1",
 ]
