@@ -9,7 +9,6 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
-import sqlmodel # added
 
 
 # revision identifiers, used by Alembic.
@@ -40,8 +39,8 @@ def upgrade() -> None:
     op.create_index(op.f('ix_animap_tmdb_show_id'), 'animap', ['tmdb_show_id'], unique=False)
     op.create_index(op.f('ix_animap_tvdb_id'), 'animap', ['tvdb_id'], unique=False)
     op.create_table('house_keeping',
-    sa.Column('key', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-    sa.Column('value', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+    sa.Column('key', sa.String(), nullable=False),
+    sa.Column('value', sa.String(), nullable=True),
     sa.PrimaryKeyConstraint('key')
     )
     # ### end Alembic commands ###
