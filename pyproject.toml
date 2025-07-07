@@ -1,6 +1,6 @@
 [project]
 name = "PlexAniBridge"
-version = "0.6.2"
+version = "0.7.0"
 description = "Synchronize your Plex watch history, ratings, and reviews with AniList"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -21,7 +21,10 @@ classifiers = [
     "Operating System :: OS Independent"
 ]
 dependencies = [
+    "aiocache>=0.12.3",
+    "aiohttp>=3.12.13",
     "alembic>=1.15.2",
+    "async-lru>=2.0.5",
     "cachetools>=5.5.2",
     "colorama>=0.4.6",
     "limiter>=0.5.0",
@@ -31,7 +34,7 @@ dependencies = [
     "pyyaml>=6.0.2",
     "rapidfuzz>=3.13.0",
     "requests>=2.32.3",
-    "sqlmodel>=0.0.24",
+    "sqlalchemy>=2.0.41",
     "tomlkit>=0.13.2",
     "tzlocal>=5.3.1",
 ]
@@ -52,4 +55,5 @@ members = ["docs"]
 [dependency-groups]
 dev = [
     "py-spy>=0.4.0",
+    "ruff>=0.12.0",
 ]

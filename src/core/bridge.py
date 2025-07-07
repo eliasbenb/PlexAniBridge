@@ -1,4 +1,3 @@
-import asyncio
 from datetime import datetime, timedelta, timezone
 
 from plexapi.library import MovieSection, ShowSection
@@ -9,11 +8,10 @@ from src.core import AniListClient, AniMapClient, PlexClient
 from src.core.sync import (
     BaseSyncClient,
     MovieSyncClient,
-    ParsedGuids,
     ShowSyncClient,
-    SyncStats,
 )
 from src.models.housekeeping import Housekeeping
+from src.models.sync import ParsedGuids, SyncStats
 
 __all__ = ["BridgeClient"]
 
@@ -21,17 +19,28 @@ __all__ = ["BridgeClient"]
 class BridgeClient:
     """Main orchestrator for synchronizing Plex and AniList libraries.
 
+    This class manages the synchronization process between Plex media libraries
+    and AniList user accounts, handling multiple user pairs and maintaining
+    sync state between operations.
+
     Args:
         config (PlexAnibridgeConfig): Application configuration settings
+
+    Attributes:
+        config (PlexAnibridgeConfig): Application configuration
+        token_user_pairs (list[tuple[str, str]]): Paired AniList tokens and Plex users
+        animap_client (AniMapClient): Client for anime mapping data
+        anilist_clients (dict[str, AniListClient]): Cached AniList clients by token
+        plex_clients (dict[str, PlexClient]): Cached Plex clients by user
+        last_synced (datetime | None): Timestamp of last successful sync
+        last_config_encoded (str | None): Encoded config from last sync
     """
 
     def __init__(self, config: PlexAnibridgeConfig) -> None:
-        """Initialize the AniList client.
+        """Initialize the BridgeClient.
 
         Args:
-            anilist_token (str): Authentication token for AniList API access
-            backup_dir (Path): Directory path where backup files will be stored
-            dry_run (bool): If True, simulates API calls without making actual changes
+            config (PlexAnibridgeConfig): Application configuration settings
         """
         self.config = config
 
@@ -41,19 +50,34 @@ class BridgeClient:
         self.plex_clients: dict[str, PlexClient] = {}
 
         self.last_synced = self._get_last_synced()
-        self.last_polled = self._get_last_polled()
         self.last_config_encoded = self._get_last_config_encoded()
 
-    def reinit(self) -> None:
-        """Reinitializes the Plex and AniList clients to refresh user data during polling.
+    async def initialize(self) -> None:
+        """Initialize the bridge client with async setup.
 
-        Refreshes Plex and AniList user data, clear caches, and reinitialize clients.
+        This should be called after creating the bridge instance.
         """
-        self.animap_client.reinit()
+        await self.animap_client.initialize()
         for plex_client in self.plex_clients.values():
             plex_client.clear_cache()
         for anilist_client in self.anilist_clients.values():
-            anilist_client.reinit()
+            await anilist_client.initialize()
+
+    async def close(self) -> None:
+        """Close all async clients."""
+        await self.animap_client.close()
+
+        for client in self.anilist_clients.values():
+            await client.close()
+
+        for client in self.plex_clients.values():
+            await client.close()
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.close()
 
     def _get_last_synced(self) -> datetime | None:
         """Retrieves the timestamp of the last successful sync from the database.
@@ -69,26 +93,7 @@ class BridgeClient:
             last_synced = ctx.session.get(Housekeeping, "last_synced")
             if last_synced is None or last_synced.value is None:
                 return None
-            return datetime.fromisoformat(last_synced.value).replace(
-                tzinfo=timezone.utc
-            )
-
-    def _get_last_polled(self) -> datetime | None:
-        """Retrieves the timestamp of the last polling scan from the database.
-
-        Returns:
-            datetime | None: UTC timestamp of the last polling scan, None if never polled
-
-        Note:
-            Used to determine whether a polling scan is eligible to run
-        """
-        with db as ctx:
-            last_polled = ctx.session.get(Housekeeping, "last_polled")
-            if last_polled is None or last_polled.value is None:
-                return None
-            return datetime.fromisoformat(last_polled.value).replace(
-                tzinfo=timezone.utc
-            )
+            return datetime.fromisoformat(last_synced.value)
 
     def _set_last_synced(self, last_synced: datetime) -> None:
         """Stores the timestamp of a successful sync in the database.
@@ -103,22 +108,6 @@ class BridgeClient:
         with db as ctx:
             ctx.session.merge(
                 Housekeeping(key="last_synced", value=last_synced.isoformat())
-            )
-            ctx.session.commit()
-
-    def _set_last_polled(self, last_polled: datetime) -> None:
-        """Stores the timestamp of a polling scan in the database.
-
-        Args:
-            last_polled (datetime): UTC timestamp to store
-
-        Note:
-            Only called after a successful polling scan
-        """
-        self.last_polled = last_polled
-        with db as ctx:
-            ctx.session.merge(
-                Housekeeping(key="last_polled", value=last_polled.isoformat())
             )
             ctx.session.commit()
 
@@ -176,10 +165,7 @@ class BridgeClient:
         for anilist_token, plex_user in self.token_user_pairs:
             await self._sync_user(anilist_token, plex_user, poll)
 
-        if poll:
-            self._set_last_polled(sync_datetime)
-        else:
-            self._set_last_synced(sync_datetime)
+        self._set_last_synced(sync_datetime)
 
         config_encoded = self.config.encode()
         if config_encoded != self.last_config_encoded:
@@ -196,17 +182,6 @@ class BridgeClient:
             anilist_token (str): Authentication token for AniList API
             plex_user (str): Username or email of the Plex user
             poll (bool): Flag to enable polling scan mode
-
-        Process:
-        1. Initializes AniList client with user's token
-        2. Initializes Plex client for the user
-        3. Creates sync clients for movies and shows
-        4. Processes each configured Plex section
-        5. Reports sync statistics
-
-        Note:
-            Creates new client instances for each user to maintain proper
-            authentication and separation of concerns
         """
         if plex_user not in self.plex_clients:
             self.plex_clients[plex_user] = PlexClient(
@@ -220,10 +195,13 @@ class BridgeClient:
         plex_client = self.plex_clients[plex_user]
 
         if anilist_token not in self.anilist_clients:
-            self.anilist_clients[anilist_token] = AniListClient(
+            anilist_client = AniListClient(
                 anilist_token, self.config.DATA_PATH / "backups", self.config.DRY_RUN
             )
-        anilist_client = self.anilist_clients[anilist_token]
+            await anilist_client.initialize()
+            self.anilist_clients[anilist_token] = anilist_client
+        else:
+            anilist_client = self.anilist_clients[anilist_token]
 
         log.info(
             f"{self.__class__.__name__}: Syncing Plex user $$'{plex_user}'$$ "
@@ -260,7 +238,7 @@ class BridgeClient:
             section_stats = await self._sync_section(
                 plex_client, anilist_client, section, poll
             )
-            sync_stats += section_stats
+            sync_stats = sync_stats.combine(section_stats)
         end_time = datetime.now(timezone.utc)
         duration = end_time - start_time
 
@@ -269,19 +247,11 @@ class BridgeClient:
             f"$$'{anilist_client.user.name}'$$ completed"
         )
 
-        # The unsynced items will include anything that failed or was not found
-        unsynced_items = list(sync_stats.possible - sync_stats.covered)
-        if unsynced_items:
-            unsynced_items_str = ", ".join(str(i) for i in sorted(unsynced_items))
-            log.debug(
-                f"{self.__class__.__name__}: The following items could not be synced: {unsynced_items_str}"
-            )
-
         log.info(
             f"{self.__class__.__name__}: {sync_stats.synced} items synced, {sync_stats.deleted} items deleted, "
             f"{sync_stats.skipped} items skipped, {sync_stats.not_found} items not found, "
-            f"and {sync_stats.failed} items failed with a coverage of {sync_stats.coverage:.2%} in "
-            f"{duration.total_seconds():.2f} seconds"
+            f"and {sync_stats.failed} items failed. Success rate: {sync_stats.success_rate:.2%} "
+            f"({sync_stats.total_processed} total) in {duration.total_seconds():.2f} seconds"
         )
 
     async def _sync_section(
@@ -300,11 +270,7 @@ class BridgeClient:
             poll (bool): Flag to enable polling scan mode
 
         Returns:
-            SyncStats: Statistics about the sync operation including:
-                - Number of items synced
-                - Number of items deleted
-                - Number of items skipped
-                - Number of items that failed
+            SyncStats: Statistics about the sync operation for the section
         """
         log.info(f"{self.__class__.__name__}: Syncing section $$'{section.title}'$$")
 
@@ -312,10 +278,12 @@ class BridgeClient:
             self.last_synced or datetime.now(timezone.utc)
         ) - timedelta(seconds=15)
 
-        items = plex_client.get_section_items(
-            section,
-            min_last_modified=min_last_modified if poll else None,
-            require_watched=not self.config.FULL_SCAN,
+        items = list(
+            plex_client.get_section_items(
+                section,
+                min_last_modified=min_last_modified if poll else None,
+                require_watched=not self.config.FULL_SCAN,
+            )
         )
 
         if self.config.BATCH_REQUESTS:
@@ -324,8 +292,10 @@ class BridgeClient:
             tmdb_ids = [guid.tmdb for guid in parsed_guids if guid.tmdb is not None]
             tvdb_ids = [guid.tvdb for guid in parsed_guids if guid.tvdb is not None]
 
-            animappings = self.animap_client.get_mappings(
-                imdb_ids, tmdb_ids, tvdb_ids, is_movie=section.type != "show"
+            animappings = list(
+                self.animap_client.get_mappings(
+                    imdb_ids, tmdb_ids, tvdb_ids, is_movie=section.type != "show"
+                )
             )
             anilist_ids = [
                 a.anilist_id for a in animappings if a.anilist_id is not None
@@ -336,7 +306,7 @@ class BridgeClient:
                 f"from the AniList API in batch requests (this may take a while)"
             )
 
-            anilist_client.batch_get_anime(anilist_ids)
+            await anilist_client.batch_get_anime(anilist_ids)
 
         sync_client: BaseSyncClient = {
             "movie": self.movie_sync,
@@ -346,7 +316,6 @@ class BridgeClient:
         for item in items:
             try:
                 await sync_client.process_media(item)
-                await asyncio.sleep(0)  # Yield control to allow cancellation
 
             except Exception:
                 log.error(

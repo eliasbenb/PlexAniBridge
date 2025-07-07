@@ -5,7 +5,7 @@ from pathlib import Path
 from pydantic import Field, model_validator
 from pydantic.alias_generators import to_camel
 from pydantic.fields import _Unset
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from src.utils.logging import get_logger
 
@@ -14,23 +14,63 @@ __all__ = ["PlexMetadataSource", "SyncField", "LogLevel", "PlexAnibridgeConfig"]
 _log = get_logger(log_name="PlexAniBridge", log_level="INFO")
 
 
-class PlexMetadataSource(StrEnum):
+class BaseStrEnum(StrEnum):
+    """Base class for string-based enumerations with a custom __repr__ method.
+
+    Provides case-insensitive lookup functionality and consistent string
+    representation for enumeration values.
+    """
+
+    @classmethod
+    def _missing_(cls, value: object) -> "BaseStrEnum | None":
+        """Handle case-insensitive lookup for enum values.
+
+        Args:
+            value: The value to look up in the enumeration
+
+        Returns:
+            BaseStrEnum | None: The matching enum member if found, None otherwise
+        """
+        value = value.lower() if isinstance(value, str) else value
+        for member in cls:
+            if member.lower() == value:
+                return member
+        return None
+
+    def __repr__(self) -> str:
+        """Return the string value of the enum member."""
+        return self.value
+
+    def __str__(self) -> str:
+        """Return the string representation of the enum member."""
+        return repr(self)
+
+
+class PlexMetadataSource(BaseStrEnum):
     """Defines the source of metadata for Plex media items."""
 
     LOCAL = "local"  # Metadata is sourced from the local Plex server
     ONLINE = "online"  # Metadata is sourced from Plex's online services
 
-    def __repr__(self) -> str:
-        """Provides a string representation of the metadata source.
 
-        Returns:
-            str: Quoted string of the metadata source
-                Example: PlexMetadataSource.LOCAL -> 'local'
-        """
-        return f"'{self.value}'"
+class LogLevel(BaseStrEnum):
+    """Enumeration of available logging levels.
+
+    Standard Python logging levels used to control log output verbosity.
+    Ordered from most verbose (DEBUG) to least verbose (CRITICAL).
+
+    Note: SUCCESS is a custom level used by this application.
+    """
+
+    DEBUG = "DEBUG"  # Detailed information for debugging
+    INFO = "INFO"  # General information about program execution
+    SUCCESS = "SUCCESS"  # Successful operations (custom level)
+    WARNING = "WARNING"  # Potential problems or issues
+    ERROR = "ERROR"  # Error that prevented an operation
+    CRITICAL = "CRITICAL"  # Error that prevents further program execution
 
 
-class SyncField(StrEnum):
+class SyncField(BaseStrEnum):
     """Enumeration of AniList fields that can be synchronized with Plex.
 
     These fields represent the data that can be synchronized between Plex
@@ -39,54 +79,26 @@ class SyncField(StrEnum):
     """
 
     STATUS = "status"  # Watch status (watching, completed, etc.)
-    SCORE = "score"  # User rating
+    SCORE = "score"  # User rating (0-100 or 0-10 depending on user settings)
     PROGRESS = "progress"  # Number of episodes/movies watched
     REPEAT = "repeat"  # Number of times rewatched
     NOTES = "notes"  # User's notes/comments
-    STARTED_AT = "started_at"  # When the user started watching
-    COMPLETED_AT = "completed_at"  # When the user finished watching
+    STARTED_AT = "started_at"  # When the user started watching (date)
+    COMPLETED_AT = "completed_at"  # When the user finished watching (date)
 
     def to_camel(self) -> str:
-        """Converts the field name to camelCase for AniList API compatibility.
+        """Convert the field name to camelCase for AniList API compatibility.
 
         Returns:
             str: The field name in camelCase format
-                Example: 'started_at' -> 'startedAt'
+
+        Examples:
+            >>> SyncField.STARTED_AT.to_camel()
+            'startedAt'
+            >>> SyncField.STATUS.to_camel()
+            'status'
         """
         return to_camel(self.value)
-
-    def __repr__(self) -> str:
-        """Provides a string representation of the enum value.
-
-        Returns:
-            str: Quoted string of the field name
-                Example: SyncField.STATUS -> 'status'
-        """
-        return f"'{self.value}'"
-
-
-class LogLevel(StrEnum):
-    """Enumeration of available logging levels.
-
-    Standard Python logging levels used to control log output verbosity.
-    Ordered from most verbose (DEBUG) to least verbose (CRITICAL).
-    """
-
-    DEBUG = "DEBUG"  # Detailed information for debugging
-    INFO = "INFO"  # General information about program execution
-    SUCCESS = "SUCCESS"  # Successful operations that caused a tangible change
-    WARNING = "WARNING"  # Potential problems or issues
-    ERROR = "ERROR"  # Error that prevented an operation
-    CRITICAL = "CRITICAL"  # Error that prevents further program execution
-
-    def __repr__(self) -> str:
-        """Provides a string representation of the log level.
-
-        Returns:
-            str: Quoted string of the log level
-                Example: LogLevel.DEBUG -> 'DEBUG'
-        """
-        return f"'{self.value}'"
 
 
 class PlexAnibridgeConfig(BaseSettings):
@@ -95,33 +107,39 @@ class PlexAnibridgeConfig(BaseSettings):
     Handles loading, validation, and storage of configuration settings from
     environment variables or .env file. Provides type checking and validation
     rules for all settings.
+
+    Settings are loaded in the following order of precedence:
+    1. Environment variables
+    2. .env file
+    3. Default values
     """
 
-    # AniList
+    # AniList Configuration
     ANILIST_TOKEN: str | list[str] = _Unset
 
-    # Plex
+    # Plex Configuration
     PLEX_TOKEN: str = _Unset
     PLEX_USER: str | list[str] = _Unset
     PLEX_URL: str = "http://localhost:32400"
-    PLEX_SECTIONS: list[str] = []
-    PLEX_GENRES: list[str] = []
+    PLEX_SECTIONS: list[str] = []  # Library sections to sync (empty = all)
+    PLEX_GENRES: list[str] = []  # Genre filter (empty = all genres)
     PLEX_METADATA_SOURCE: PlexMetadataSource = PlexMetadataSource.LOCAL
 
-    # General
-    SYNC_INTERVAL: int = Field(default=3600, ge=-1)
-    POLLING_SCAN: bool = False
-    FULL_SCAN: bool = False
-    DESTRUCTIVE_SYNC: bool = False
-
+    # Synchronization Settings
+    SYNC_INTERVAL: int = Field(default=3600, ge=-1)  # Seconds (-1 = run once)
+    POLLING_SCAN: bool = False  # Use polling instead of webhooks
+    FULL_SCAN: bool = False  # Perform full library scan on startup
+    DESTRUCTIVE_SYNC: bool = False  # Allow removing items from AniList
     EXCLUDED_SYNC_FIELDS: list[SyncField] = [SyncField.NOTES, SyncField.SCORE]
 
-    # Advanced
-    DATA_PATH: Path = Path("./data")
-    DRY_RUN: bool = False
+    # Advanced Configuration
+    DATA_PATH: Path = Path("./data")  # Directory for application data
+    DRY_RUN: bool = False  # Preview changes without applying them
     LOG_LEVEL: LogLevel = LogLevel.INFO
-    BATCH_REQUESTS: bool = False
-    SEARCH_FALLBACK_THRESHOLD: int = Field(default=-1, ge=-1, le=100)
+    BATCH_REQUESTS: bool = False  # Batch API requests for better performance
+    SEARCH_FALLBACK_THRESHOLD: int = Field(
+        default=-1, ge=-1, le=100
+    )  # Fuzzy search threshold
 
     @model_validator(mode="before")
     def catch_extra_env_vars(cls, values) -> dict[str, str]:
@@ -240,6 +258,4 @@ class PlexAnibridgeConfig(BaseSettings):
             ]
         )
 
-    class Config:
-        env_file = ".env"
-        extra = "allow"
+    model_config = SettingsConfigDict(env_file=".env", extra="allow")

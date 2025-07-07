@@ -111,6 +111,3 @@ class TVDBMapping(BaseModel):
 
     def __hash__(self) -> int:
         return hash(repr(self))
-
-    class Config:
-        slots = True

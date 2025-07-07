@@ -1,7 +1,7 @@
-from time import sleep
+import asyncio
+from typing import Any
 
-import requests
-import urllib3.exceptions
+import aiohttp
 from limiter import Limiter
 
 from src import __version__, log
@@ -14,18 +14,32 @@ class PlexCommunityClient:
 
     def __init__(self, plex_token: str):
         self.plex_token = plex_token
+        self._session: aiohttp.ClientSession | None = None
 
-        self.session = requests.Session()
-        self.session.headers.update(
-            {
+    async def _get_session(self) -> aiohttp.ClientSession:
+        """Get or create the aiohttp session."""
+        if self._session is None or self._session.closed:
+            headers = {
                 "Accept": "application/json",
                 "Content-Type": "application/json",
                 "User-Agent": f"PlexAniBridge/{__version__}",
                 "X-Plex-Token": self.plex_token,
             }
-        )
+            self._session = aiohttp.ClientSession(headers=headers)
+        return self._session
 
-    def get_watch_activity(self, metadata_id: str) -> list:
+    async def close(self):
+        """Close the aiohttp session."""
+        if self._session and not self._session.closed:
+            await self._session.close()
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.close()
+
+    async def get_watch_activity(self, metadata_id: str) -> list:
         """Fetches only watch activity for a given metadata ID and returns a list of PlexAPI EpisodeHistory or MovieHistory objects.
 
         Args:
@@ -81,7 +95,7 @@ class PlexCommunityClient:
         res = []
         current_after = None
         while True:
-            response = self._make_request(
+            response = await self._make_request(
                 query,
                 {"metadataID": metadata_id, "first": 50, "after": current_after},
                 "GetWatchActivity",
@@ -98,7 +112,7 @@ class PlexCommunityClient:
 
         return res
 
-    def get_reviews(self, metadata_id: str) -> str | None:
+    async def get_reviews(self, metadata_id: str) -> str | None:
         """Fetches reviews for a given metadata ID.
 
         Args:
@@ -120,17 +134,20 @@ class PlexCommunityClient:
         }
         """
 
-        response = self._make_request(query, {"metadataID": metadata_id}, "GetReview")
+        response = await self._make_request(
+            query, {"metadataID": metadata_id}, "GetReview"
+        )
         data = response["data"]["metadataReviewV2"]
 
         if not data or "message" not in data:
             return None
         return data["message"]
 
-    def _make_request(
+    @plex_community_limiter()
+    async def _make_request(
         self,
         query: str,
-        variables: dict | str | None = None,
+        variables: dict[str, Any] | str | None = None,
         operation_name: str | None = None,
         retry_count: int = 0,
     ) -> dict:
@@ -149,63 +166,63 @@ class PlexCommunityClient:
             dict: JSON response from the API
 
         Raises:
-            requests.exceptions.HTTPError: If the request fails for any reason other than rate limiting
+            aiohttp.ClientError: If the request fails for any reason other than rate limiting
         """
         if retry_count >= 3:
-            raise requests.exceptions.HTTPError("Failed to make request after 3 tries")
+            raise aiohttp.ClientError("Failed to make request after 3 tries")
+
+        session = await self._get_session()
 
         try:
-            response = self.session.post(
+            async with session.post(
                 self.API_URL,
                 json={
                     "query": query,
                     "variables": variables,
                     "operationName": operation_name,
                 },
-            )
-        except (
-            requests.exceptions.RequestException,
-            urllib3.exceptions.ProtocolError,
-        ):
+            ) as response:
+                if response.status == 429:  # Handle rate limit retries
+                    retry_after = int(response.headers.get("Retry-After", 60))
+                    log.warning(
+                        f"{self.__class__.__name__}: Rate limit exceeded, waiting {retry_after} seconds"
+                    )
+                    await asyncio.sleep(retry_after + 1)
+                    return await self._make_request(
+                        query=query,
+                        variables=variables,
+                        operation_name=operation_name,
+                        retry_count=retry_count,
+                    )
+                elif response.status == 502:  # Bad Gateway
+                    log.warning(
+                        f"{self.__class__.__name__}: Received 502 Bad Gateway, retrying"
+                    )
+                    await asyncio.sleep(1)
+                    return await self._make_request(
+                        query=query,
+                        variables=variables,
+                        operation_name=operation_name,
+                        retry_count=retry_count + 1,
+                    )
+
+                try:
+                    response.raise_for_status()
+                except aiohttp.ClientResponseError as e:
+                    log.error(
+                        f"{self.__class__.__name__}: Failed to make request to the Plex Community API"
+                    )
+                    response_text = await response.text()
+                    log.error(f"\t\t{response_text}")
+                    raise e
+
+                return await response.json()
+
+        except (aiohttp.ClientError, asyncio.TimeoutError):
             log.error(
                 f"{self.__class__.__name__}: Connection error while making request to the Plex Community API"
             )
-            sleep(1)
-            return self._make_request(
+            await asyncio.sleep(1)
+            return await self._make_request(
                 query=query, variables=variables, retry_count=retry_count + 1
             )
-
-        if response.status_code == 429:  # Handle rate limit retries
-            retry_after = int(response.headers.get("Retry-After", 60))
-            log.warning(
-                f"{self.__class__.__name__}: Rate limit exceeded, waiting {retry_after} seconds"
-            )
-            sleep(retry_after + 1)
-            return self._make_request(
-                query,
-                variables=variables,
-                operation_name=operation_name,
-                retry_count=retry_count,
-            )
-        elif response.status_code == 502:  # Bad Gateway
-            log.warning(
-                f"{self.__class__.__name__}: Received 502 Bad Gateway, retrying"
-            )
-            sleep(1)
-            return self._make_request(
-                query,
-                variables=variables,
-                operation_name=operation_name,
-                retry_count=retry_count + 1,
-            )
-
-        try:
-            response.raise_for_status()
-        except requests.exceptions.HTTPError as e:
-            log.error(
-                f"{self.__class__.__name__}: Failed to make request to the Plex Community API"
-            )
-            log.error(f"\t\t{response.text}")
-            raise e
-
-        return response.json()

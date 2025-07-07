@@ -1,7 +1,8 @@
-import sys
 from pathlib import Path
 
 import tomlkit
+
+from src import __file__ as src_file
 
 
 def get_pyproject_version() -> str:
@@ -10,16 +11,20 @@ def get_pyproject_version() -> str:
     Returns:
         str: PlexAniBridge's version
     """
-    toml_file = Path(sys.argv[0]).parent / "pyproject.toml"
+    try:
+        project_root = Path(src_file).resolve().parent.parent
+        toml_file = project_root / "pyproject.toml"
 
-    if not toml_file.exists() or not toml_file.is_file():
+        if not toml_file.exists() or not toml_file.is_file():
+            return "unknown"
+
+        toml_data = tomlkit.load(toml_file.open())
+        project_data = toml_data.get("project", {})
+        if isinstance(project_data, dict) and "version" in project_data:
+            return project_data["version"]
         return "unknown"
-
-    toml_data = tomlkit.load(toml_file.open())
-    project_data = toml_data.get("project", {})
-    if isinstance(project_data, dict) and "version" in project_data:
-        return project_data["version"]
-    return "unknown"
+    except Exception:
+        return "unknown"
 
 
 def get_git_hash() -> str:
@@ -29,7 +34,8 @@ def get_git_hash() -> str:
         str: PlexAniBridge's current commit hash
     """
     try:
-        git_dir_path = Path(sys.argv[0]).parent / ".git"
+        project_root = Path(src_file).resolve().parent.parent
+        git_dir_path = project_root / ".git"
         if not git_dir_path.exists() or not git_dir_path.is_dir():
             return "unknown"
 
@@ -63,7 +69,7 @@ def get_git_hash() -> str:
 
 
 def get_docker_status() -> bool:
-    """Check if PlexAniBridge is running inside a Docker container"
+    """Check if PlexAniBridge is running inside a Docker container
 
     Returns:
         bool: True if running inside a Docker container, False otherwise

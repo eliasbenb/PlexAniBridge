@@ -1,13 +1,16 @@
-from sqlmodel import Field, SQLModel
+from sqlalchemy import String
+from sqlalchemy.orm import Mapped, mapped_column
+
+from src.models.base import Base
 
 
-class Housekeeping(SQLModel, table=True):
+class Housekeeping(Base):
     """Model for the Housekeeping table.
 
     This table is used to store miscellaneous data such as timestamps and hashes.
     """
 
-    __tablename__: str = "house_keeping"  # type: ignore
+    __tablename__ = "house_keeping"
 
-    key: str = Field(primary_key=True)
-    value: str | None
+    key: Mapped[str] = mapped_column(String, primary_key=True)
+    value: Mapped[str | None] = mapped_column(String, nullable=True)

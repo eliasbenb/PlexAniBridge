@@ -22,7 +22,6 @@ async def main():
     log.info(f"\n{PLEXANIBDRIGE_HEADER}")
     log.info(f"PlexAniBridge: [CONFIG] => {config}")
 
-    bridge = BridgeClient(config)
     stop_event = asyncio.Event()
 
     def shutdown():
@@ -34,14 +33,15 @@ async def main():
         loop.add_signal_handler(sig, shutdown)
 
     try:
-        async with create_scheduler(
-            bridge,
-            stop_event=stop_event,
-            sync_interval=config.SYNC_INTERVAL,
-            polling_scan=config.POLLING_SCAN,
-            poll_interval=30,
-        ) as _:
-            await stop_event.wait()
+        async with BridgeClient(config) as bridge:
+            async with create_scheduler(
+                bridge,
+                stop_event=stop_event,
+                sync_interval=config.SYNC_INTERVAL,
+                polling_scan=config.POLLING_SCAN,
+                poll_interval=30,
+            ) as _:
+                await stop_event.wait()
 
     except asyncio.CancelledError:
         log.info("PlexAniBridge: Main task cancelled")

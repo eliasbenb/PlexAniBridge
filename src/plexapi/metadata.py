@@ -7,6 +7,7 @@ from xml.etree import ElementTree
 
 import requests
 from limiter import Limiter
+
 from plexapi.base import PlexObject, cached_data_property
 from plexapi.exceptions import BadRequest, NotFound, Unauthorized
 from plexapi.library import (
@@ -18,9 +19,8 @@ from plexapi.library import (
 from plexapi.server import PlexServer
 from plexapi.utils import cleanXMLString
 from plexapi.video import Episode, Movie, Season, Show, Video
-
 from src import log
-from src.utils.cache import generic_ttl_cache
+from src.utils.cache import gttl_cache
 
 plex_metadata_limiter = Limiter(rate=300 / 60, capacity=30, jitter=True)
 
@@ -325,7 +325,7 @@ class PlexMetadataServer(PlexServer):
         return MetadataLibrary(self, data)
 
     @plex_metadata_limiter()
-    @generic_ttl_cache(maxsize=None, ttl=30)
+    @gttl_cache(maxsize=None, ttl=30)
     def query(
         self,
         key,

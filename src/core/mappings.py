@@ -1,11 +1,11 @@
+import asyncio
 import json
 from pathlib import Path
 from typing import Any, TypeAlias
 from urllib.parse import urljoin, urlparse
 
-import requests
+import aiohttp
 import tomlkit
-import urllib3.exceptions
 import yaml
 from tomlkit.exceptions import TOMLKitError
 
@@ -30,15 +30,29 @@ class MappingsClient:
     def __init__(self, data_path: Path) -> None:
         self.data_path = data_path
         self._loaded_sources: set[str] = set()
+        self._session: aiohttp.ClientSession | None = None
 
-        self.session = requests.Session()
-        self.session.headers.update(
-            {
+    async def _get_session(self) -> aiohttp.ClientSession:
+        """Get or create the aiohttp session."""
+        if self._session is None or self._session.closed:
+            headers = {
                 "Accept": "application/json",
                 "Content-Type": "application/json",
                 "User-Agent": f"PlexAniBridge/{__version__}",
             }
-        )
+            self._session = aiohttp.ClientSession(headers=headers)
+        return self._session
+
+    async def close(self):
+        """Close the aiohttp session."""
+        if self._session and not self._session.closed:
+            await self._session.close()
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.close()
 
     def _is_file(self, src: str) -> bool:
         """Check if the source is a file.
@@ -112,7 +126,7 @@ class MappingsClient:
         # Invalid path
         return include_path
 
-    def _load_includes(
+    async def _load_includes(
         self, includes: list[str], loaded_chain: set[str], parent: str
     ) -> AniMapDict:
         """Load mappings from included files or URLs.
@@ -141,11 +155,15 @@ class MappingsClient:
                 continue
 
             new_loaded_chain = loaded_chain | {resolved_include}
-            include_mappings = self._load_mappings(resolved_include, new_loaded_chain)
+            include_mappings = await self._load_mappings(
+                resolved_include, new_loaded_chain
+            )
             mappings = self._deep_merge(include_mappings, mappings)
         return mappings
 
-    def _load_mappings_file(self, file: str, loaded_chain: set[str]) -> AniMapDict:
+    async def _load_mappings_file(
+        self, file: str, loaded_chain: set[str]
+    ) -> AniMapDict:
         """Load mappings from a file.
 
         Args:
@@ -195,11 +213,11 @@ class MappingsClient:
             )
 
         return self._deep_merge(
-            self._load_includes(includes, loaded_chain, str(file_path)),
+            await self._load_includes(includes, loaded_chain, str(file_path)),
             mappings,
         )
 
-    def _load_mappings_url(
+    async def _load_mappings_url(
         self, url: str, loaded_chain: set[str], retry_count: int = 0
     ) -> AniMapDict:
         """Load mappings from a URL.
@@ -207,32 +225,64 @@ class MappingsClient:
         Args:
             url (str): URL to load mappings from
             loaded_chain (set[str]): Set of already loaded includes to prevent circular includes
-            retry_count (int | None): Number of retries to attempt
+            retry_count (int): Number of retries to attempt (default: 0)
 
         Returns:
             AniMapDict: Mappings loaded from the URL
         """
         mappings: AniMapDict = {}
+        mappings_raw: str = ""
+        session = await self._get_session()
+
         try:
-            raw_res = self.session.get(url)
-            raw_res.raise_for_status()
-            mappings = raw_res.json()
-        except (requests.exceptions.RequestException, urllib3.exceptions.ProtocolError):
-            if retry_count > 1:
+            async with session.get(url) as response:
+                response.raise_for_status()
+                mappings_raw = await response.text()
+        except (aiohttp.ClientError, asyncio.TimeoutError):
+            if retry_count < 2:
                 log.warning(
-                    f"{self.__class__.__name__}: Error reaching mappings URL $$'{url}'$$, retrying..."
+                    f"{self.__class__.__name__}: Error reaching mappings URL $$'{url}'$$, retrying...",
+                    exc_info=True,
                 )
-                return self._load_mappings_url(url, loaded_chain, retry_count - 1)
+                await asyncio.sleep(1)
+                return await self._load_mappings_url(url, loaded_chain, retry_count + 1)
             log.error(
-                f"{self.__class__.__name__}: Error reaching mappings URL $$'{url}'$$"
+                f"{self.__class__.__name__}: Error reaching mappings URL $$'{url}'$$",
+                exc_info=True,
             )
-        except json.JSONDecodeError:
+        except (json.JSONDecodeError, aiohttp.ContentTypeError):
             log.error(
                 f"{self.__class__.__name__}: Error decoding mappings from URL $$'{url}'$$"
             )
         except Exception:
             log.error(
                 f"{self.__class__.__name__}: Unexpected error fetching mappings from URL $$'{url}'$$",
+                exc_info=True,
+            )
+
+        try:
+            match Path(url).suffix:
+                case ".json":
+                    mappings = json.loads(mappings_raw)
+                case ".yaml" | ".yml":
+                    mappings = self._dict_str_keys(yaml.safe_load(mappings_raw))
+                case ".toml":
+                    mappings = tomlkit.loads(mappings_raw)
+                case _:
+                    log.warning(
+                        f"{self.__class__.__name__}: Unknown file type for URL $$'{url}'$$, "
+                        "defaulting to JSON parsing"
+                    )
+                    mappings = json.loads(mappings_raw)
+        except (json.JSONDecodeError, yaml.YAMLError, TOMLKitError):
+            log.error(
+                f"{self.__class__.__name__}: Error decoding file $$'{str(url)}'$$",
+                exc_info=True,
+            )
+        except Exception:
+            log.error(
+                f"{self.__class__.__name__}: Unexpected error reading file "
+                f"$$'{str(url)}'$$",
                 exc_info=True,
             )
 
@@ -248,16 +298,18 @@ class MappingsClient:
             )
 
         return self._deep_merge(
-            self._load_includes(includes, loaded_chain, url),
+            await self._load_includes(includes, loaded_chain, url),
             mappings,
         )
 
-    def _load_mappings(self, src: str, loaded_chain: set[str] = set()) -> AniMapDict:
+    async def _load_mappings(
+        self, src: str, loaded_chain: set[str] = set()
+    ) -> AniMapDict:
         """Load mappings from a file or URL.
 
         Args:
             src (str): Path to the file or URL to load mappings from
-            loaded_chain (set[str]): Set of already loaded includes to prevent circular includes
+            loaded_chain (set[str]): Set of already loaded includes to prevent circular includes (default: empty set)
 
         Returns:
             AniMapDict: Mappings loaded from the file or URL
@@ -268,12 +320,12 @@ class MappingsClient:
             log.info(
                 f"{self.__class__.__name__}: Loading mappings from file $$'{src}'$$"
             )
-            return self._load_mappings_file(src, loaded_chain)
+            return await self._load_mappings_file(src, loaded_chain)
         elif self._is_url(src):
             log.info(
                 f"{self.__class__.__name__}: Loading mappings from URL $$'{src}'$$"
             )
-            return self._load_mappings_url(src, loaded_chain)
+            return await self._load_mappings_url(src, loaded_chain)
         else:
             log.warning(
                 f"{self.__class__.__name__}: Invalid mappings source: $$'{src}'$$, skipping"
@@ -304,11 +356,15 @@ class MappingsClient:
 
         return result
 
-    def load_mappings(self) -> AniMapDict:
+    async def load_mappings(self) -> AniMapDict:
         """Load mappings from files and URLs and merge them together.
 
+        Loads custom mappings from local files (if they exist) and default mappings
+        from the CDN URL, then merges them with custom mappings taking precedence.
+        Filters out any keys starting with '$' from the final result.
+
         Returns:
-            AniMapDict: Merged mappings
+            AniMapDict: Merged mappings with system keys removed
         """
         self._loaded_sources = set()
 
@@ -320,7 +376,7 @@ class MappingsClient:
             custom_mappings_path = str(
                 (self.data_path / existing_custom_mapping_files[0]).resolve()
             )
-            custom_mappings = self._load_mappings(custom_mappings_path)
+            custom_mappings = await self._load_mappings(custom_mappings_path)
         else:
             custom_mappings_path = ""
             custom_mappings = {}
@@ -331,7 +387,7 @@ class MappingsClient:
                 f"Only one mappings file can be used at a time. Defaulting to $$'{custom_mappings_path}'$$"
             )
 
-        db_mappings = self._load_mappings(self.CDN_URL)
+        db_mappings = await self._load_mappings(self.CDN_URL)
         merged_mappings = self._deep_merge(db_mappings, custom_mappings)
 
         return {k: v for k, v in merged_mappings.items() if not k.startswith("$")}

@@ -1,36 +1,61 @@
 from functools import cached_property
-from typing import Any
 
-from pydantic import field_validator
-from sqlmodel import JSON, Field, SQLModel
+from sqlalchemy import JSON, Index, Integer
+from sqlalchemy.orm import Mapped, mapped_column
 
+from src.models.base import Base
 from src.models.mapping import TVDBMapping
 
 
-def TypedJson(*args, **kwargs) -> Any:
-    return JSON(*args, **kwargs)
-
-
-class AniMap(SQLModel, table=True):
+class AniMap(Base):
     """Model for the animap table."""
 
-    __tablename__: str = "animap"  #  type: ignore
+    __tablename__ = "animap"
 
-    anilist_id: int = Field(primary_key=True)
-    anidb_id: int | None = Field(index=False)
-    imdb_id: list[str] | None = Field(sa_type=TypedJson(none_as_null=True), index=True)
-    mal_id: list[int] | None = Field(sa_type=TypedJson(none_as_null=True), index=False)
-    tmdb_movie_id: list[int] | None = Field(
-        sa_type=TypedJson(none_as_null=True), index=True
+    anilist_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    anidb_id: Mapped[int | None] = mapped_column(Integer, index=False, nullable=True)
+    imdb_id: Mapped[list[str] | None] = mapped_column(JSON, index=True, nullable=True)
+    mal_id: Mapped[list[int] | None] = mapped_column(JSON, index=False, nullable=True)
+    tmdb_movie_id: Mapped[list[int] | None] = mapped_column(
+        JSON, index=True, nullable=True
     )
-    tmdb_show_id: list[int] | None = Field(
-        sa_type=TypedJson(none_as_null=True), index=True
+    tmdb_show_id: Mapped[list[int] | None] = mapped_column(
+        JSON, index=True, nullable=True
     )
-    tvdb_id: int | None = Field(index=True)
-    tvdb_mappings: dict[str, str] | None = Field(
-        sa_type=TypedJson(none_as_null=True),
-        index=False,
+    tvdb_id: Mapped[int | None] = mapped_column(Integer, index=True, nullable=True)
+    tvdb_mappings: Mapped[dict[str, str] | None] = mapped_column(
+        JSON, index=True, nullable=True
     )
+
+    __table_args__ = (
+        Index("idx_imdb_tmdb", "imdb_id", "tmdb_movie_id"),
+        Index("idx_tvdb_season", "tvdb_id", "tvdb_mappings"),
+    )
+
+    def __init__(self, **kwargs) -> None:
+        """Initialize AniMap with data validation."""
+        # Convert single values to lists for specific fields
+        for field in ("imdb_id", "mal_id", "tmdb_movie_id", "tmdb_show_id"):
+            if field in kwargs:
+                kwargs[field] = self._convert_to_list(kwargs[field])
+
+        super().__init__(**kwargs)
+
+    @staticmethod
+    def _convert_to_list(v) -> list | None:
+        """Convert single values to lists.
+
+        Args:
+            v: Value to convert
+
+        Returns:
+            list | None: List of values
+        """
+        if v is None:
+            return v
+        if not isinstance(v, list):
+            return [v]
+        return v
 
     @cached_property
     def length(self) -> int:
@@ -51,27 +76,8 @@ class AniMap(SQLModel, table=True):
                 continue
         return res
 
-    @field_validator(
-        "imdb_id", "mal_id", "tmdb_movie_id", "tmdb_show_id", mode="before"
-    )
-    def convert_to_list(cls, v) -> list | None:
-        """Convert single values to lists.
-
-        Args:
-            cls: Class instance
-            v: Value to convert
-
-        Returns:
-            list | None: List of values
-        """
-        if v is None:
-            return v
-        if not isinstance(v, list):
-            return [v]
-        return v
-
     def __hash__(self) -> int:
         return hash(self.__repr__())
 
     def __repr__(self):
-        return f"<{':'.join(f'{k}={v}' for k, v in self.model_dump().items() if v is not None)}>"
+        return f"<{':'.join(f'{k}={v}' for k, v in self.__dict__.items() if v is not None and not k.startswith('_'))}>"

@@ -1,13 +1,12 @@
 import json
 from hashlib import md5
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 from pydantic import ValidationError
-from sqlalchemy import and_, column, delete, exists, false, func, not_, or_, select
+from sqlalchemy import and_, column, delete, exists, false, func, or_, select
 from sqlalchemy.orm.base import Mapped
 from sqlalchemy.sql.elements import BinaryExpression, ColumnElement
-from sqlmodel import col
 
 from src import log
 from src.config.database import db
@@ -32,32 +31,61 @@ class AniMapClient:
         https://github.com/eliasbenb/PlexAniBridge-Mappings
     """
 
-    MAPPING_FILES = [
-        "mappings.custom.json",
-        "mappings.custom.yaml",
-        "mappings.custom.yml",
-    ]
-
     def __init__(self, data_path: Path) -> None:
+        """Initializes the AniMapClient.
+
+        Args:
+            data_path (Path): Path to the data directory for storing mappings and cache files.
+        """
         self.mappings_client = MappingsClient(data_path)
         self.data_path = data_path
 
+    async def initialize(self) -> None:
+        """Initialize the client by syncing the database.
+
+        This should be called after creating the client instance.
+
+        Raises:
+            Exception: If database synchronization fails during initialization.
+        """
         try:
-            self._sync_db()
+            await self._sync_db()
         except Exception as e:
             log.error(
                 f"{self.__class__.__name__}: Failed to sync database: {e}",
                 exc_info=True,
             )
+            raise
 
-    def reinit(self) -> None:
-        """Reinitializes the AniMap database.
+    async def close(self) -> None:
+        """Close the mappings client."""
+        await self.mappings_client.close()
 
-        Drops all tables and reinitializes the database from scratch.
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.close()
+
+    def _entries_are_equal(self, existing_entry: AniMap, new_entry: AniMap) -> bool:
+        """Compare two AniMap entries for equality.
+
+        Args:
+            existing_entry (AniMap): Existing database entry
+            new_entry (AniMap): New entry to compare
+
+        Returns:
+            bool: True if entries are equal, False otherwise
         """
-        self._sync_db()
+        for column_attr in AniMap.__table__.columns:
+            field_name = column_attr.name
+            existing_value = getattr(existing_entry, field_name)
+            new_value = getattr(new_entry, field_name)
+            if existing_value != new_value:
+                return False
+        return True
 
-    def _sync_db(self) -> None:
+    async def _sync_db(self) -> None:
         """Synchronizes the local database with the mapping source."""
 
         def single_val_to_list(value: Any) -> list[Any] | None:
@@ -76,34 +104,36 @@ class AniMapClient:
         with db as ctx:
             last_mappings_hash = ctx.session.get(Housekeeping, "animap_mappings_hash")
 
-            animap_defaults = {field: None for field in AniMap.model_fields}
-            validated_count = 0
+            animap_defaults = {column.name: None for column in AniMap.__table__.columns}
+            valid_count = 0
+            invalid_count = 0
 
-            mappings = self.mappings_client.load_mappings()
+            mappings = await self.mappings_client.load_mappings()
             tmp_mappings = mappings.copy()
 
-            # Make sure that each entry is in the correct format
             for key, entry in tmp_mappings.items():
                 try:
                     anilist_id = int(key)
                 except ValueError:
+                    invalid_count += 1
                     continue
 
                 try:
-                    AniMap.model_validate(
-                        {
+                    AniMap(
+                        **{
                             **animap_defaults,
                             "anilist_id": anilist_id,
                             **entry,
                         }
                     )
-                    validated_count += 1
-                except (ValueError, ValidationError) as e:
+                    valid_count += 1
+                except (ValueError, ValidationError, TypeError) as e:
                     log.warning(
                         f"{self.__class__.__name__}: Found an invalid mapping entry "
                         f"$${{anilist_id: {anilist_id}}}$$: {e}"
                     )
                     mappings.pop(key)
+                    invalid_count += 1
 
             curr_mappings_hash = md5(
                 json.dumps(mappings, sort_keys=True).encode()
@@ -116,43 +146,81 @@ class AniMapClient:
                 return
 
             log.debug(
-                f"{self.__class__.__name__}: Anime mapping changes detected, syncing database"
-            )
-            log.info(
-                f"{self.__class__.__name__}: Loading {validated_count} mapping entries into the local database"
+                f"{self.__class__.__name__}: Anime mapping changes detected, syncing database. "
+                f"Validated {valid_count} entries, removed {invalid_count} invalid entries"
             )
 
-            values = [
-                {
-                    "anilist_id": int(key),
-                    **{
-                        field: entry[field]
-                        for field in AniMap.model_fields
-                        if field in entry
-                    },
+            existing_entries_query = ctx.session.execute(select(AniMap))
+            existing_entries = {
+                entry.anilist_id: entry
+                for entry in existing_entries_query.scalars().all()
+            }
+
+            new_data = {}
+            for key, entry in mappings.items():
+                anilist_id = int(key)
+                processed_entry: dict[str, Any] = {
+                    "anilist_id": anilist_id,
                 }
-                for key, entry in mappings.items()
-            ]
 
-            # Delete any entries in the database that are not in the new mappings
-            ctx.session.execute(
-                delete(AniMap).where(
-                    not_(col(AniMap.anilist_id).in_([d["anilist_id"] for d in values]))
-                )
-            )
+                for column in AniMap.__table__.columns:
+                    field_name = column.name
+                    if field_name in entry:
+                        processed_entry[field_name] = entry[field_name]
 
-            # Merge any changes or new entries into the database
-            for value in values:
-                # Certain list fields can be either a single value or a list
-                # Convert single values to lists for consistency
                 for attr in ("mal_id", "imdb_id", "tmdb_movie_id", "tmdb_show_id"):
-                    if attr in value:
-                        value[attr] = single_val_to_list(value[attr])
-                ctx.session.merge(AniMap(**value))
+                    if attr in processed_entry:
+                        processed_entry[attr] = single_val_to_list(
+                            processed_entry[attr]
+                        )
+
+                new_data[anilist_id] = processed_entry
+
+            existing_ids = set(existing_entries.keys())
+            new_ids = set(new_data.keys())
+
+            to_delete = existing_ids - new_ids
+            to_insert = new_ids - existing_ids
+            to_check_update = existing_ids & new_ids
+
+            to_update = []
+            for anilist_id in to_check_update:
+                existing_entry = existing_entries[anilist_id]
+                new_entry_data = new_data[anilist_id]
+                new_entry = AniMap(**new_entry_data)
+
+                if not self._entries_are_equal(existing_entry, new_entry):
+                    to_update.append(new_entry)
+
+            operations_count = len(to_delete) + len(to_insert) + len(to_update)
+
+            if operations_count == 0:
+                log.debug(f"{self.__class__.__name__}: No database changes needed")
+            else:
+                log.debug(
+                    f"{self.__class__.__name__}: Syncing database with upstream: "
+                    f"{len(to_delete)} deletions, {len(to_insert)} insertions, {len(to_update)} updates"
+                )
+
+            if to_delete:
+                ctx.session.execute(
+                    delete(AniMap).where(AniMap.anilist_id.in_(to_delete))
+                )
+
+            if to_insert:
+                new_entries = [
+                    AniMap(**new_data[anilist_id]) for anilist_id in to_insert
+                ]
+                ctx.session.add_all(new_entries)
+
+            if to_update:
+                for entry in to_update:
+                    ctx.session.merge(entry)
 
             ctx.session.merge(
                 Housekeeping(key="animap_mappings_hash", value=curr_mappings_hash)
             )
+
             ctx.session.commit()
 
             log.debug(f"{self.__class__.__name__}: Database sync complete")
@@ -164,7 +232,7 @@ class AniMapClient:
         tvdb: int | list[int] | None = None,
         season: int | None = None,
         is_movie: bool = True,
-    ) -> list[AniMap]:
+    ) -> Iterator[AniMap]:
         """Retrieves anime ID mappings based on provided criteria.
 
         Performs a complex database query to find entries that match the given identifiers
@@ -178,10 +246,10 @@ class AniMapClient:
             is_movie (bool): Whether the search is for a movie or TV show
 
         Returns:
-            list[AniMap]: Matching anime mapping entries
+            Iterator[AniMap]: Iterator of matching anime mapping entries
         """
         if not imdb and not tmdb and not tvdb:
-            return []
+            return iter([])
 
         imdb_list = (
             [imdb] if isinstance(imdb, str) else imdb if isinstance(imdb, list) else []
@@ -193,15 +261,20 @@ class AniMapClient:
             [tvdb] if isinstance(tvdb, int) else tvdb if isinstance(tvdb, list) else []
         )
 
-        def json_array_contains(field: Mapped, values: list[Any]) -> Any:
+        def json_array_contains(
+            field: Mapped, values: list[Any]
+        ) -> ColumnElement[bool]:
             """Generates a JSON_CONTAINS function for the given field.
 
+            Creates SQL conditions to check if any of the provided values exist
+            within a JSON array field using SQLite's json_each function.
+
             Args:
-                field (InstrumentedAttribute): Field to search in
-                values (list[Any]): Values to search for
+                field (Mapped): SQLAlchemy mapped field representing a JSON array column
+                values (list[Any]): List of values to search for within the JSON array
 
             Returns:
-                Any: JSON_CONTAINS function
+                ColumnElement[bool]: SQL condition that evaluates to True if any value is found
             """
 
             if not values:
@@ -221,12 +294,15 @@ class AniMapClient:
         def json_dict_contains(field: Mapped, key: str) -> BinaryExpression:
             """Generate a SQL expression for checking if a JSON field contains a key.
 
+            Uses SQLite's json_type function to check if a specific key exists
+            in a JSON object field.
+
             Args:
-                field (InstrumentedAttribute): Field to search in
-                key (str): Value to search for
+                field (Mapped): SQLAlchemy mapped field representing a JSON object column
+                key (str): JSON object key to search for (e.g., "s1" for season 1)
 
             Returns:
-                BinaryExpression: JSON_CONTAINS function
+                BinaryExpression: SQL condition that evaluates to True if key exists
             """
             return func.json_type(field, f"$.{key}").is_not(None)
 
@@ -236,31 +312,27 @@ class AniMapClient:
 
             if is_movie:
                 if imdb_list:
-                    or_conditions.append(
-                        json_array_contains(col(AniMap.imdb_id), imdb_list)
-                    )
+                    or_conditions.append(json_array_contains(AniMap.imdb_id, imdb_list))
                 if tmdb_list:
                     or_conditions.append(
-                        json_array_contains(col(AniMap.tmdb_movie_id), tmdb_list)
+                        json_array_contains(AniMap.tmdb_movie_id, tmdb_list)
                     )
             else:
                 if imdb_list:
-                    or_conditions.append(
-                        json_array_contains(col(AniMap.imdb_id), imdb_list)
-                    )
+                    or_conditions.append(json_array_contains(AniMap.imdb_id, imdb_list))
                 if tmdb_list:
                     or_conditions.append(
-                        json_array_contains(col(AniMap.tmdb_show_id), tmdb_list)
+                        json_array_contains(AniMap.tmdb_show_id, tmdb_list)
                     )
 
                 if tvdb_list:
                     if len(tvdb_list) == 1:
                         or_conditions.append(AniMap.tvdb_id == tvdb_list[0])
                     else:
-                        or_conditions.append(col(AniMap.tvdb_id).in_(tvdb_list))
+                        or_conditions.append(AniMap.tvdb_id.in_(tvdb_list))
                 if season:
                     and_conditions.append(
-                        json_dict_contains(col(AniMap.tvdb_mappings), f"s{season}")
+                        json_dict_contains(AniMap.tvdb_mappings, f"s{season}")
                     )
 
             merged_conditions: list[ColumnElement[bool]] = []
@@ -271,4 +343,6 @@ class AniMapClient:
             where_clause = and_(*merged_conditions)
 
             query = select(AniMap).where(where_clause)
-            return list(ctx.session.execute(query).scalars().all())
+
+            for result in ctx.session.execute(query).scalars():
+                yield result

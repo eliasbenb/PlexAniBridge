@@ -1,138 +1,25 @@
 from abc import ABC, abstractmethod
-from typing import Any, AsyncIterator, Callable, Generic, TypeVar
+from typing import AsyncIterator, Callable, Generic, TypeVar
 
-from pydantic import BaseModel
 from rapidfuzz import fuzz
 
-from plexapi.media import Guid
 from plexapi.video import Episode, Movie, Season, Show
 from src import log
 from src.config.settings import SyncField
 from src.core import AniListClient, AniMapClient, PlexClient
 from src.models.anilist import FuzzyDate, Media, MediaList, MediaListStatus, ScoreFormat
 from src.models.animap import AniMap
+from src.models.sync import (
+    Comparable,
+    ItemIdentifier,
+    ParsedGuids,
+    SyncOutcome,
+    SyncStats,
+)
 
 T = TypeVar("T", bound=Movie | Show)  # Section item
 S = TypeVar("S", bound=Movie | Season)  # Item child (season)
 E = TypeVar("E", bound=list[Movie] | list[Episode])  # Item grandchild (episode)
-
-
-class ParsedGuids(BaseModel):
-    """Container for parsed media identifiers from different services.
-
-    Handles parsing and storage of media IDs from various services (TVDB, TMDB, IMDB)
-    from Plex's GUID format into a structured format. Provides iteration and string
-    representation for debugging.
-
-    Attributes:
-        tvdb (int | None): TVDB ID if available
-        tmdb (int | None): TMDB ID if available
-        imdb (str | None): IMDB ID if available
-
-    Note:
-        GUID formats expected from Plex:
-        - TVDB: "tvdb://123456"
-        - TMDB: "tmdb://123456"
-        - IMDB: "imdb://tt1234567"
-    """
-
-    tvdb: int | None = None
-    tmdb: int | None = None
-    imdb: str | None = None
-
-    @staticmethod
-    def from_guids(guids: list[Guid]) -> "ParsedGuids":
-        """Creates a ParsedGuids instance from a list of Plex GUIDs.
-
-        Args:
-            guids (list[Guid]): List of Plex GUID objects
-
-        Returns:
-            ParsedGuids: New instance with parsed IDs
-        """
-        parsed_guids = ParsedGuids()
-        for guid in guids:
-            if not guid.id:
-                continue
-
-            split_guid = guid.id.split("://")
-            if len(split_guid) != 2:
-                continue
-
-            attr = split_guid[0]
-            if not hasattr(parsed_guids, attr):
-                continue
-
-            try:
-                setattr(parsed_guids, attr, int(split_guid[1]))
-            except ValueError:
-                setattr(parsed_guids, attr, str(split_guid[1]))
-
-        return parsed_guids
-
-    def __str__(self) -> str:
-        """Creates a string representation of the parsed IDs.
-
-        Returns:
-            str: String representation of the parsed IDs in a format like "id: xxx, id: xxx, id: xxx"
-        """
-        return ", ".join(
-            f"{field}: {getattr(self, field)}"
-            for field in self.__class__.model_fields
-            if getattr(self, field) is not None
-        )
-
-    class Config:
-        slots = True
-
-
-class SyncStats(BaseModel):
-    """Statistics tracker for synchronization operations.
-
-    Keeps count of various sync outcomes for reporting and monitoring.
-
-    Attributes:
-        synced (int): Number of successfully synced items
-        deleted (int): Number of items deleted from AniList
-        skipped (int): Number of items that needed no changes
-        failed (int): Number of items that failed to sync
-
-    Note:
-        Supports addition via the + operator for combining stats
-        from multiple operations
-    """
-
-    synced: int = 0
-    deleted: int = 0
-    skipped: int = 0
-    not_found: int = 0
-    failed: int = 0
-
-    possible: set[str] = set()
-    covered: set[str] = set()
-
-    @property
-    def coverage(self) -> float:
-        """Calculates the coverage percentage of successfully synced items.
-
-        Returns:
-            float: Coverage percentage of successfully synced items
-        """
-        return len(self.covered) / len(self.possible) if self.possible else 0.0
-
-    def __add__(self, other: "SyncStats") -> "SyncStats":
-        return SyncStats(
-            synced=self.synced + other.synced,
-            deleted=self.deleted + other.deleted,
-            skipped=self.skipped + other.skipped,
-            not_found=self.not_found + other.not_found,
-            failed=self.failed + other.failed,
-            possible=self.possible.union(other.possible),
-            covered=self.covered.union(other.covered),
-        )
-
-    class Config:
-        slots = True
 
 
 class BaseSyncClient(ABC, Generic[T, S, E]):
@@ -144,7 +31,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
     Type Parameters:
         T: Main media type (Movie or Show)
         S: Child item type (Movie or Season)
-        E: Grandchild item type (Movie or Episode)
+        E: Grandchild item type (list[Movie] or list[Episode])
     """
 
     def __init__(
@@ -165,9 +52,10 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             animap_client (AniMapClient): AniMap API client
             plex_client (PlexClient): Plex API client
             excluded_sync_fields (list[SyncField]): Fields to exclude from synchronization
+            full_scan (bool): Whether to perform a full scan of all media
             destructive_sync (bool): Whether to delete AniList entries not found in Plex
-            search_fallback_threshold (int): Minimum match ratio for fuzzy title
-            batch_requests (bool): Whether to use batch requests to reduce API requests
+            search_fallback_threshold (int): Minimum similarity ratio (0-100) for fuzzy title matching
+            batch_requests (bool): Whether to use batch requests to reduce API calls
         """
         self.anilist_client = anilist_client
         self.animap_client = animap_client
@@ -182,13 +70,15 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         self.sync_stats = SyncStats()
 
         extra_fields: dict[SyncField, Callable] = {
-            SyncField.STATUS: self._calculate_status,
-            SyncField.PROGRESS: self._calculate_progress,
-            SyncField.REPEAT: self._calculate_repeats,
-            SyncField.SCORE: self._calculate_score,
-            SyncField.NOTES: self._calculate_notes,
-            SyncField.STARTED_AT: self._calculate_started_at,
-            SyncField.COMPLETED_AT: self._calculate_completed_at,
+            SyncField.STATUS: lambda **kwargs: self._calculate_status(**kwargs),
+            SyncField.PROGRESS: lambda **kwargs: self._calculate_progress(**kwargs),
+            SyncField.REPEAT: lambda **kwargs: self._calculate_repeats(**kwargs),
+            SyncField.SCORE: lambda **kwargs: self._calculate_score(**kwargs),
+            SyncField.NOTES: lambda **kwargs: self._calculate_notes(**kwargs),
+            SyncField.STARTED_AT: lambda **kwargs: self._calculate_started_at(**kwargs),
+            SyncField.COMPLETED_AT: lambda **kwargs: self._calculate_completed_at(
+                **kwargs
+            ),
         }
         self._extra_fields = {
             k: v for k, v in extra_fields.items() if k not in self.excluded_sync_fields
@@ -197,7 +87,11 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         self.queued_batch_requests: list[MediaList] = []
 
     def clear_cache(self) -> None:
-        """Clears the cache for all decorated methods in the class."""
+        """Clears the cache for all decorated methods in the class.
+
+        Iterates through all class attributes and calls cache_clear()
+        on any cached methods to free memory and ensure fresh data.
+        """
         for attr in dir(self):
             if callable(getattr(self, attr)) and hasattr(
                 getattr(self, attr), "cache_clear"
@@ -209,9 +103,6 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
 
         Args:
             item (T): Grandparent Plex media item to sync
-
-        Returns:
-            SyncStats: Updated synchronization statistics with counts of synced, deleted, skipped and failed items
         """
         guids = ParsedGuids.from_guids(item.guids)
 
@@ -227,12 +118,19 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             f"{debug_log_title} {debug_log_ids}"
         )
 
+        # Track all items that we attempt to process
+        item_id = ItemIdentifier.from_media(item)
+        found_any_match = False
+
         async for (
             child_item,
             grandchild_items,
             animapping,
             anilist_media,
         ) in self.map_media(item):
+            found_any_match = True
+            grandchild_ids = ItemIdentifier.from_items(grandchild_items)
+
             debug_log_title = self._debug_log_title(item=item, animapping=animapping)
             debug_log_ids = self._debug_log_ids(
                 key=child_item.ratingKey,
@@ -247,21 +145,28 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             )
 
             try:
-                await self.sync_media(
+                outcome = await self.sync_media(
                     item=item,
                     child_item=child_item,
                     grandchild_items=grandchild_items,
                     anilist_media=anilist_media,
                     animapping=animapping,
                 )
-                self.sync_stats.covered |= {str(e) for e in grandchild_items}
+
+                # Track the outcome for all grandchild items
+                self.sync_stats.track_items(grandchild_ids, outcome)
+
             except Exception:
                 log.error(
                     f"{self.__class__.__name__}: Failed to process {item.type} "
                     f"{debug_log_title} {debug_log_ids}",
                     exc_info=True,
                 )
-                self.sync_stats.failed += 1
+                self.sync_stats.track_items(grandchild_ids, SyncOutcome.FAILED)
+
+        # If no matches were found for any mapping, mark the main item as not found
+        if not found_any_match:
+            self.sync_stats.track_item(item_id, SyncOutcome.NOT_FOUND)
 
     @abstractmethod
     def map_media(self, item: T) -> AsyncIterator[tuple[S, E, AniMap, Media]]:
@@ -323,7 +228,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         grandchild_items: E,
         anilist_media: Media,
         animapping: AniMap,
-    ) -> None:
+    ) -> SyncOutcome:
         """Synchronizes a matched media item with AniList.
 
         Args:
@@ -332,6 +237,9 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             grandchild_items (E): Grandchild items to extract data from
             anilist_media (Media): Matched AniList entry
             animapping (AniMap): ID mapping information
+
+        Returns:
+            SyncOutcome: The result of the synchronization operation
         """
         guids = ParsedGuids.from_guids(item.guids)
 
@@ -344,7 +252,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         )
 
         anilist_media_list = anilist_media.media_list_entry
-        plex_media_list = self._get_plex_media_list(
+        plex_media_list = await self._get_plex_media_list(
             item=item,
             child_item=child_item,
             grandchild_items=grandchild_items,
@@ -365,9 +273,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
                 f"{self.__class__.__name__}: Skipping {item.type} because it is already up to date "
                 f"{debug_log_title} {debug_log_ids}"
             )
-
-            self.sync_stats.skipped += 1
-            return
+            return SyncOutcome.SKIPPED
 
         if self.destructive_sync and anilist_media_list and not plex_media_list.status:
             log.success(
@@ -377,21 +283,19 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             log.success(f"\t\tDELETE: {anilist_media_list}")
 
             if anilist_media.media_list_entry:
-                self.anilist_client.delete_anime_entry(
+                await self.anilist_client.delete_anime_entry(
                     anilist_media.media_list_entry.id,
                     anilist_media.media_list_entry.media_id,
                 )
-                self.sync_stats.synced += 1
-                self.sync_stats.deleted += 1
-            return
+                return SyncOutcome.DELETED
+            return SyncOutcome.SKIPPED
 
         if not final_media_list.status:
             log.info(
                 f"{self.__class__.__name__}: Skipping {item.type} due to no activity "
                 f"{debug_log_title} {debug_log_ids}"
             )
-            self.sync_stats.skipped += 1
-            return
+            return SyncOutcome.SKIPPED
 
         if self.batch_requests:
             log.info(
@@ -402,6 +306,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
                 f"\t\tQUEUED UDPATE: {MediaList.diff(anilist_media_list, final_media_list)}"
             )
             self.queued_batch_requests.append(final_media_list)
+            return SyncOutcome.SYNCED  # Will be synced in batch
         else:
             log.info(
                 f"{self.__class__.__name__}: Syncing AniList entry for {item.type} "
@@ -410,13 +315,13 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             log.success(
                 f"\t\tUPDATE: {MediaList.diff(anilist_media_list, final_media_list)}"
             )
-            self.anilist_client.update_anime_entry(final_media_list)
+            await self.anilist_client.update_anime_entry(final_media_list)
 
             log.success(
                 f"{self.__class__.__name__}: Synced {item.type} "
                 f"{debug_log_title} {debug_log_ids}"
             )
-            self.sync_stats.synced += 1
+            return SyncOutcome.SYNCED
 
     async def batch_sync(self) -> None:
         """Executes batch synchronization of queued media lists.
@@ -432,8 +337,9 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             f"with batch mode $${{anilist_id: {[m.media_id for m in self.queued_batch_requests]}}}$$"
         )
         try:
-            self.anilist_client.batch_update_anime_entries(self.queued_batch_requests)
-            self.sync_stats.synced += len(self.queued_batch_requests)
+            await self.anilist_client.batch_update_anime_entries(
+                self.queued_batch_requests
+            )
             log.success(
                 f"{self.__class__.__name__}: Synced {len(self.queued_batch_requests)} items to AniList "
                 f"with batch mode $${{anilist_id: {[m.media_id for m in self.queued_batch_requests]}}}$$"
@@ -441,7 +347,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         finally:
             self.queued_batch_requests.clear()
 
-    def _get_plex_media_list(
+    async def _get_plex_media_list(
         self,
         item: T,
         child_item: S,
@@ -475,7 +381,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             or 0,
             user_id=self.anilist_client.user.id,
             media_id=anilist_media.id,
-            status=self._calculate_status(**kwargs),
+            status=await self._calculate_status(**kwargs),
         )
 
         if media_list.status is None:
@@ -487,20 +393,24 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
                     pass
                 case SyncField.REPEAT | SyncField.SCORE | SyncField.COMPLETED_AT:
                     if media_list.status >= MediaListStatus.COMPLETED:
-                        setattr(media_list, field, self._extra_fields[field](**kwargs))
+                        setattr(
+                            media_list, field, await self._extra_fields[field](**kwargs)
+                        )
                 case SyncField.STARTED_AT:
                     media_list.started_at = (
-                        self._extra_fields[field](**kwargs)
+                        await self._extra_fields[field](**kwargs)
                         if media_list.status > MediaListStatus.PLANNING
                         else None
                     )
                 case _:
-                    setattr(media_list, field, self._extra_fields[field](**kwargs))
+                    setattr(
+                        media_list, field, await self._extra_fields[field](**kwargs)
+                    )
 
         return media_list
 
     @abstractmethod
-    def _calculate_status(
+    async def _calculate_status(
         self,
         item: T,
         child_item: S,
@@ -525,7 +435,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         pass
 
     @abstractmethod
-    def _calculate_score(
+    async def _calculate_score(
         self,
         item: T,
         child_item: S,
@@ -550,7 +460,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         pass
 
     @abstractmethod
-    def _calculate_progress(
+    async def _calculate_progress(
         self,
         item: T,
         child_item: S,
@@ -575,7 +485,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         pass
 
     @abstractmethod
-    def _calculate_repeats(
+    async def _calculate_repeats(
         self,
         item: T,
         child_item: S,
@@ -600,7 +510,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         pass
 
     @abstractmethod
-    def _calculate_started_at(
+    async def _calculate_started_at(
         self,
         item: T,
         child_item: S,
@@ -625,7 +535,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         pass
 
     @abstractmethod
-    def _calculate_completed_at(
+    async def _calculate_completed_at(
         self,
         item: T,
         child_item: S,
@@ -650,7 +560,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         pass
 
     @abstractmethod
-    def _calculate_notes(
+    async def _calculate_notes(
         self,
         item: T,
         child_item: S,
@@ -785,21 +695,23 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
 
             if self.destructive_sync and plex_val is not None:
                 setattr(res_media_list, key, plex_val)
-            elif self.__should_update_field(rule, plex_val, anilist_val):
+            elif self._should_update_field(rule, plex_val, anilist_val):
                 setattr(res_media_list, key, plex_val)
 
         return res_media_list
 
-    def __should_update_field(self, op: str, plex_val: Any, anilist_val: Any) -> bool:
+    def _should_update_field(
+        self, op: str, plex_val: Comparable | None, anilist_val: Comparable | None
+    ) -> bool:
         """Determines if a field should be updated based on the comparison rule.
 
         Args:
             op (str): Comparison rule
-            plex_val: Plex value
-            anilist_val: AniList value
+            plex_val (Comparable | None): Plex value to compare against
+            anilist_val (Comparable | None): AniList value to compare against
 
         Returns:
-                bool: True if the field should be updated, False otherwise
+            bool: True if the field should be updated, False otherwise
         """
         if anilist_val == plex_val:
             return False

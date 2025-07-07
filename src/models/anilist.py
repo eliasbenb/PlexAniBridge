@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone
 from enum import StrEnum
-from functools import lru_cache, total_ordering
+from functools import lru_cache
 from typing import Annotated, Any, ClassVar, Generic, TypeVar, get_args, get_origin
 
-from pydantic import AfterValidator, BaseModel
+from pydantic import AfterValidator, BaseModel, ConfigDict
 from pydantic.alias_generators import to_camel
 
 UTCDateTime = Annotated[
@@ -238,10 +238,10 @@ class AniListBaseModel(BaseModel):
     def __repr__(self) -> str:
         return f"<{': '.join([f'{k}={v}' for k, v in self.model_dump().items() if v is not None])}>"
 
-    class Config:
-        alias_generator = to_camel
-        populate_by_name = True
-        slots = True
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
 
 
 class UserOptions(AniListBaseModel):
@@ -292,7 +292,6 @@ class MediaTitle(AniListBaseModel):
         return self.user_preferred or self.english or self.romaji or self.native or ""
 
 
-@total_ordering
 class FuzzyDate(AniListBaseModel):
     year: int | None = None
     month: int | None = None
@@ -322,6 +321,9 @@ class FuzzyDate(AniListBaseModel):
             return None
         return datetime(year=self.year, month=self.month or 1, day=self.day or 1)
 
+    def __bool__(self) -> bool:
+        return self.year is not None
+
     def __eq__(self, other: Any) -> bool:
         if not isinstance(other, FuzzyDate):
             return False
@@ -331,13 +333,48 @@ class FuzzyDate(AniListBaseModel):
             and self.day == other.day
         )
 
-    def __lt__(self, other: FuzzyDate | None) -> bool:
-        if other is None:
-            return False
-        return ((self.year or 0), (self.month or 0), (self.day or 0)) < (
-            (other.year or 0),
-            (other.month or 0),
-            (other.day or 0),
+    def __lt__(self, other: Any) -> bool:
+        if not isinstance(other, FuzzyDate):
+            return NotImplemented
+        if not self.year or not other.year:
+            return True
+        return ((self.year), (self.month or 1), (self.day or 1)) < (
+            (other.year),
+            (other.month or 1),
+            (other.day or 1),
+        )
+
+    def __le__(self, other: Any) -> bool:
+        if not isinstance(other, FuzzyDate):
+            return NotImplemented
+        if not self.year or not other.year:
+            return True
+        return ((self.year), (self.month or 1), (self.day or 1)) <= (
+            (other.year),
+            (other.month or 1),
+            (other.day or 1),
+        )
+
+    def __gt__(self, other: Any) -> bool:
+        if not isinstance(other, FuzzyDate):
+            return NotImplemented
+        if not self.year or not other.year:
+            return True
+        return ((self.year), (self.month or 1), (self.day or 1)) > (
+            (other.year),
+            (other.month or 1),
+            (other.day or 1),
+        )
+
+    def __ge__(self, other: Any) -> bool:
+        if not isinstance(other, FuzzyDate):
+            return NotImplemented
+        if not self.year or not other.year:
+            return True
+        return ((self.year), (self.month or 1), (self.day or 1)) >= (
+            (other.year),
+            (other.month or 1),
+            (other.day or 1),
         )
 
     def __str__(self) -> str:
