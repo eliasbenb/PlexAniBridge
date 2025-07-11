@@ -2,7 +2,9 @@ services:
   plexanibridge:
     image: ghcr.io/eliasbenb/plexanibridge:v0 # :vX, :vX.Y, :vX.Y.Z, :main, :develop, :latest
     environment:
-      TZ: America/New_York
+      PUID: 1000
+      PGID: 1000
+      TZ: Etc/UTC
       ANILIST_TOKEN: eyJ...
       PLEX_TOKEN: 2Sb...
       PLEX_USER: username
@@ -21,5 +23,5 @@ services:
       # SEARCH_FALLBACK_THRESHOLD=-1
       # DATA_PATH: ./data
     volumes:
-      - ./data:/app/data
+      - /path/to/plexanibridge/data:/config
     restart: unless-stopped
