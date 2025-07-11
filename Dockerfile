@@ -39,16 +39,18 @@ LABEL maintainer="Elias Benbourenane <eliasbenbourenane@gmail.com>" \
 ENV PYTHONPATH=/opt/venv/lib/python3.13/site-packages \
     PYTHONUNBUFFERED=1 \
     PUID=1000 \
-    PGID=1000
+    PGID=1000 \
+    DATA_PATH=/config
 
 WORKDIR /app
 
 COPY --chown=abc:abc . /app
 COPY --chown=abc:abc ./scripts/docker_init.sh /init
 
-RUN mkdir -p /data && chown abc:abc /data
+RUN mkdir -p /config && \
+    chown abc:abc /config
 
-VOLUME ["/data"]
+VOLUME ["/config"]
 
 ENTRYPOINT ["/init"]
 CMD ["python", "/app/main.py"]

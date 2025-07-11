@@ -19,8 +19,8 @@ if [ "$PUID" != "$CURRENT_UID" ]; then
 fi
 
 chown -R abc:abc /app
-if [ -d "/data" ]; then
-    chown -R abc:abc /data
+if [ -d "/config" ]; then
+    chown -R abc:abc /config
 fi
 
 umask 022
