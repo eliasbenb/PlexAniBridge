@@ -20,7 +20,12 @@ RUN uv sync --frozen --no-dev --no-editable
 
 FROM python:3.13-alpine
 
-COPY --from=builder --chown=app:app /opt/venv /opt/venv
+RUN apk add --no-cache shadow su-exec
+
+RUN addgroup -g 1000 abc && \
+    adduser -u 1000 -G abc -s /bin/sh -D abc
+
+COPY --from=builder /opt/venv /opt/venv
 
 LABEL maintainer="Elias Benbourenane <eliasbenbourenane@gmail.com>" \
     org.opencontainers.image.title="PlexAniBridge" \
@@ -32,10 +37,16 @@ LABEL maintainer="Elias Benbourenane <eliasbenbourenane@gmail.com>" \
     org.opencontainers.image.licenses="MIT"
 
 ENV PYTHONPATH=/opt/venv/lib/python3.13/site-packages \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    PUID=1000 \
+    PGID=1000
 
 WORKDIR /app
 
-COPY --chown=app:app . /app
+COPY --chown=abc:abc . /app
+COPY --chown=abc:abc ./scripts/docker_init.sh /init
 
-ENTRYPOINT ["python", "/app/main.py"]
+RUN mkdir -p /data && chown abc:abc /data
+
+ENTRYPOINT ["/init"]
+CMD ["python", "/app/main.py"]
