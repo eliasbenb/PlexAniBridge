@@ -1,4 +1,6 @@
-FROM ghcr.io/astral-sh/uv:python3.13-alpine AS builder
+FROM python:3.13-alpine AS builder
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 ENV UV_LINK_MODE=copy \
     UV_PROJECT_ENVIRONMENT=/opt/venv \
