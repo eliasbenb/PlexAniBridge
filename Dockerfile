@@ -48,5 +48,7 @@ COPY --chown=abc:abc ./scripts/docker_init.sh /init
 
 RUN mkdir -p /data && chown abc:abc /data
 
+VOLUME ["/data"]
+
 ENTRYPOINT ["/init"]
 CMD ["python", "/app/main.py"]
