@@ -38,6 +38,7 @@ docker compose -f compose.yaml up -d
     - `vX.Y.Z`: A specific version from the [releases page](https://github.com/eliasbenb/PlexAniBridge/releases) (e.g. `v0.4.0`)
     - `main`: The latest commit on the `main` branch, which is usually tied to the latest release
     - `develop`: The latest commit on the `develop` branch (may be unstable)
+    - `experimental`: The latest commit on the `experimental` branch (may be unstable)
 
 
 ### Docker CLI

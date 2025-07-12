@@ -1,6 +1,6 @@
 services:
   plexanibridge:
-    image: ghcr.io/eliasbenb/plexanibridge:v0 # :vX, :vX.Y, :vX.Y.Z, :main, :develop, :latest
+    image: ghcr.io/eliasbenb/plexanibridge:v0 # :vX, :vX.Y, :vX.Y.Z, :main, :develop, :experimental, :latest
     environment:
       TZ: America/New_York
       ANILIST_TOKEN: eyJ...
