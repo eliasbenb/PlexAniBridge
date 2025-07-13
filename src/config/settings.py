@@ -417,12 +417,53 @@ class PlexAnibridgeConfig(BaseSettings):
         """
         self.data_path = Path(self.data_path).resolve()  # Ensure data path is absolute
 
+        # If no configs are provided, try to create a default config from global settings
         if not self.configs:
-            raise ValueError(
-                "No sync profiles configured. Please set up at least one profile using "
-                "PAB_CONFIGS__${PROFILE_NAME}__ANILIST_TOKEN, PAB_CONFIGS__${PROFILE_NAME}__PLEX_TOKEN, "
-                "and PAB_CONFIGS__${PROFILE_NAME}__PLEX_USER"
-            )
+            if (
+                self.anilist_token
+                and self.anilist_token != _Unset
+                and self.plex_token
+                and self.plex_token != _Unset
+                and self.plex_user
+                and self.plex_user != _Unset
+            ):
+                _log.info(
+                    f"{self.__class__.__name__}: No profiles configured, creating "
+                    f"default profile from global settings"
+                )
+
+                default_config_data = {}
+
+                config_fields = set(PlexAnibridgeProfileConfig.model_fields.keys())
+                multi_config_fields = set(self.__class__.model_fields.keys())
+                shared_fields = config_fields.intersection(multi_config_fields)
+
+                for field_name in shared_fields:
+                    global_value = getattr(self, field_name)
+                    if global_value is not None:
+                        default_config_data[field_name] = global_value
+
+                try:
+                    default_config = PlexAnibridgeProfileConfig(**default_config_data)
+                    self.configs["default"] = default_config
+                    _log.info(
+                        f"{self.__class__.__name__}: Created default profile configuration from global settings"
+                    )
+                except Exception as e:
+                    _log.error(
+                        f"{self.__class__.__name__}: Failed to create default profile from global settings: {e}"
+                    )
+                    raise ValueError(
+                        f"Invalid global configuration for default profile: {e}"
+                    )
+            else:
+                raise ValueError(
+                    "No sync profiles configured and insufficient global settings for default profile. "
+                    "Please either:\n"
+                    "1. Set up at least one profile using PAB_CONFIGS__${PROFILE_NAME}__ANILIST_TOKEN, "
+                    "PAB_CONFIGS__${PROFILE_NAME}__PLEX_TOKEN, and PAB_CONFIGS__${PROFILE_NAME}__PLEX_USER, or\n"
+                    "2. Provide global defaults using PAB_ANILIST_TOKEN, PAB_PLEX_TOKEN, and PAB_PLEX_USER"
+                )
 
         self._apply_global_defaults()
 
