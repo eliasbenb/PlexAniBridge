@@ -125,4 +125,4 @@ class PlexAniBridgeDB:
         self.session.close()
 
 
-db = PlexAniBridgeDB(config.DATA_PATH)
+db = PlexAniBridgeDB(config.data_path)

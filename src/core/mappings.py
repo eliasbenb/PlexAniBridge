@@ -208,7 +208,7 @@ class MappingsClient:
             includes = [str(item) for item in includes_value]
         else:
             log.warning(
-                f"{self.__class__.__name__}: The $includes key in $'{str(file_path.resolve())}'$ "
+                f"{self.__class__.__name__}: The $includes key in $$'{str(file_path.resolve())}'$$ "
                 "is not a list, ignoring all entries"
             )
 
