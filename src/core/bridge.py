@@ -80,19 +80,23 @@ class BridgeClient:
 
         This should be called after creating the bridge instance.
         """
-        log.info(f"[{self.profile_name}] Initializing bridge client")
+        log.info(
+            f"{self.__class__.__name__}: [{self.profile_name}] Initializing bridge client"
+        )
 
         self.plex_client.clear_cache()
         await self.anilist_client.initialize()
 
         log.info(
-            f"[{self.profile_name}] Bridge client initialized for Plex user "
+            f"{self.__class__.__name__}: [{self.profile_name}] Bridge client initialized for Plex user "
             f"$$'{self.profile_config.plex_user}'$$ -> AniList user $$'{self.anilist_client.user.name}'$$"
         )
 
     async def close(self) -> None:
         """Close all async clients."""
-        log.debug(f"[{self.profile_name}] Closing bridge client")
+        log.debug(
+            f"{self.__class__.__name__}: [{self.profile_name}] Closing bridge client"
+        )
         await self.anilist_client.close()
         await self.plex_client.close()
 
@@ -156,7 +160,7 @@ class BridgeClient:
             poll (bool): Flag to enable polling scan mode, default False
         """
         log.info(
-            f"[{self.profile_name}] Starting "
+            f"{self.__class__.__name__}: [{self.profile_name}] Starting "
             f"{'full ' if self.profile_config.full_scan else 'partial '}"
             f"{'and destructive ' if self.profile_config.destructive_sync else ''}"
             f"sync for Plex user $$'{self.profile_config.plex_user}'$$ "
@@ -174,6 +178,7 @@ class BridgeClient:
             destructive_sync=self.profile_config.destructive_sync,
             search_fallback_threshold=self.profile_config.search_fallback_threshold,
             batch_requests=self.profile_config.batch_requests,
+            profile_name=self.profile_name,
         )
 
         show_sync = ShowSyncClient(
@@ -185,6 +190,7 @@ class BridgeClient:
             destructive_sync=self.profile_config.destructive_sync,
             search_fallback_threshold=self.profile_config.search_fallback_threshold,
             batch_requests=self.profile_config.batch_requests,
+            profile_name=self.profile_name,
         )
 
         plex_sections = self.plex_client.get_sections()
@@ -202,7 +208,7 @@ class BridgeClient:
         self._set_last_synced(sync_datetime)
 
         log.info(
-            f"[{self.profile_name}] Sync completed: {sync_stats.synced} synced, "
+            f"{self.__class__.__name__}: [{self.profile_name}] Sync completed: {sync_stats.synced} synced, "
             f"{sync_stats.deleted} deleted, {sync_stats.skipped} skipped, "
             f"{sync_stats.not_found} not found, {sync_stats.failed} failed. "
             f"Success rate: {sync_stats.success_rate:.2%} ({sync_stats.total_processed} total) "
@@ -227,7 +233,10 @@ class BridgeClient:
         Returns:
             SyncStats: Statistics about the sync operation for the section
         """
-        log.info(f"[{self.profile_name}] Syncing section $$'{section.title}'$$")
+        log.info(
+            f"{self.__class__.__name__}: [{self.profile_name}] Syncing "
+            f"section $$'{section.title}'$$"
+        )
 
         min_last_modified = (
             self.last_synced or datetime.now(timezone.utc)
@@ -257,7 +266,7 @@ class BridgeClient:
             ]
 
             log.info(
-                f"[{self.profile_name}] Prefetching {len(anilist_ids)} entries "
+                f"{self.__class__.__name__}: [{self.profile_name}] Prefetching {len(anilist_ids)} entries "
                 f"from the AniList API in batch requests (this may take a while)"
             )
 
@@ -274,7 +283,8 @@ class BridgeClient:
 
             except Exception:
                 log.error(
-                    f"[{self.profile_name}] Failed to sync item $$'{item.title}'$$",
+                    f"{self.__class__.__name__}: [{self.profile_name}] Failed "
+                    f"to sync item $$'{item.title}'$$",
                     exc_info=True,
                 )
 

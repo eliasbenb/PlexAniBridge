@@ -44,6 +44,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         destructive_sync: bool,
         search_fallback_threshold: int,
         batch_requests: bool,
+        profile_name: str,
     ) -> None:
         """Initializes a new synchronization client.
 
@@ -56,6 +57,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             destructive_sync (bool): Whether to delete AniList entries not found in Plex
             search_fallback_threshold (int): Minimum similarity ratio (0-100) for fuzzy title matching
             batch_requests (bool): Whether to use batch requests to reduce API calls
+            profile_name (str): Name of the sync profile for logging
         """
         self.anilist_client = anilist_client
         self.animap_client = animap_client
@@ -66,6 +68,8 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         self.destructive_sync = destructive_sync
         self.search_fallback_threshold = search_fallback_threshold
         self.batch_requests = batch_requests
+
+        self.profile_name = profile_name
 
         self.sync_stats = SyncStats()
 
@@ -114,7 +118,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         )
 
         log.debug(
-            f"{self.__class__.__name__}: Processing {item.type} "
+            f"{self.__class__.__name__}: [{self.profile_name}] Processing {item.type} "
             f"{debug_log_title} {debug_log_ids}"
         )
 
@@ -140,7 +144,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             )
 
             log.debug(
-                f"{self.__class__.__name__}: Found AniList entry for {item.type} "
+                f"{self.__class__.__name__}: [{self.profile_name}] Found AniList entry for {item.type} "
                 f"{debug_log_title} {debug_log_ids}"
             )
 
@@ -158,7 +162,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
 
             except Exception:
                 log.error(
-                    f"{self.__class__.__name__}: Failed to process {item.type} "
+                    f"{self.__class__.__name__}: [{self.profile_name}] Failed to process {item.type} "
                     f"{debug_log_title} {debug_log_ids}",
                     exc_info=True,
                 )
@@ -270,14 +274,14 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
 
         if final_media_list == anilist_media_list:
             log.info(
-                f"{self.__class__.__name__}: Skipping {item.type} because it is already up to date "
+                f"{self.__class__.__name__}: [{self.profile_name}] Skipping {item.type} because it is already up to date "
                 f"{debug_log_title} {debug_log_ids}"
             )
             return SyncOutcome.SKIPPED
 
         if self.destructive_sync and anilist_media_list and not plex_media_list.status:
             log.success(
-                f"{self.__class__.__name__}: Deleting AniList entry for {item.type} "
+                f"{self.__class__.__name__}: [{self.profile_name}] Deleting AniList entry for {item.type} "
                 f"{debug_log_title} {debug_log_ids}"
             )
             log.success(f"\t\tDELETE: {anilist_media_list}")
@@ -292,14 +296,14 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
 
         if not final_media_list.status:
             log.info(
-                f"{self.__class__.__name__}: Skipping {item.type} due to no activity "
+                f"{self.__class__.__name__}: [{self.profile_name}] Skipping {item.type} due to no activity "
                 f"{debug_log_title} {debug_log_ids}"
             )
             return SyncOutcome.SKIPPED
 
         if self.batch_requests:
             log.info(
-                f"{self.__class__.__name__}: Queuing {item.type} for batch sync "
+                f"{self.__class__.__name__}: [{self.profile_name}] Queuing {item.type} for batch sync "
                 f"{debug_log_title} {debug_log_ids}"
             )
             log.success(
@@ -309,7 +313,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             return SyncOutcome.SYNCED  # Will be synced in batch
         else:
             log.info(
-                f"{self.__class__.__name__}: Syncing AniList entry for {item.type} "
+                f"{self.__class__.__name__}: [{self.profile_name}] Syncing AniList entry for {item.type} "
                 f"{debug_log_title} {debug_log_ids}"
             )
             log.success(
@@ -318,7 +322,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             await self.anilist_client.update_anime_entry(final_media_list)
 
             log.success(
-                f"{self.__class__.__name__}: Synced {item.type} "
+                f"{self.__class__.__name__}: [{self.profile_name}] Synced {item.type} "
                 f"{debug_log_title} {debug_log_ids}"
             )
             return SyncOutcome.SYNCED
@@ -333,7 +337,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             return
 
         log.info(
-            f"{self.__class__.__name__}: Syncing {len(self.queued_batch_requests)} items to AniList "
+            f"{self.__class__.__name__}: [{self.profile_name}] Syncing {len(self.queued_batch_requests)} items to AniList "
             f"with batch mode $${{anilist_id: {[m.media_id for m in self.queued_batch_requests]}}}$$"
         )
         try:
@@ -341,7 +345,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
                 self.queued_batch_requests
             )
             log.success(
-                f"{self.__class__.__name__}: Synced {len(self.queued_batch_requests)} items to AniList "
+                f"{self.__class__.__name__}: [{self.profile_name}] Synced {len(self.queued_batch_requests)} items to AniList "
                 f"with batch mode $${{anilist_id: {[m.media_id for m in self.queued_batch_requests]}}}$$"
             )
         finally:
