@@ -33,7 +33,6 @@ class BridgeClient:
         anilist_clients (dict[str, AniListClient]): Cached AniList clients by token
         plex_clients (dict[str, PlexClient]): Cached Plex clients by user
         last_synced (datetime | None): Timestamp of last successful sync
-        last_config_encoded (str | None): Encoded config from last sync
     """
 
     def __init__(self, config: PlexAnibridgeConfig) -> None:
@@ -50,7 +49,6 @@ class BridgeClient:
         self.plex_clients: dict[str, PlexClient] = {}
 
         self.last_synced = self._get_last_synced()
-        self.last_config_encoded = self._get_last_config_encoded()
 
     async def initialize(self) -> None:
         """Initialize the bridge client with async setup.
@@ -111,37 +109,6 @@ class BridgeClient:
             )
             ctx.session.commit()
 
-    def _get_last_config_encoded(self) -> str | None:
-        """Retrieves the encoded configuration from the last sync.
-
-        The encoded configuration is used to determine if settings have
-        changed between syncs, which affects polling scan eligibility.
-
-        Returns:
-            str | None: Encoded configuration string, None if no previous sync
-        """
-        with db as ctx:
-            last_config_encoded = ctx.session.get(Housekeeping, "last_config_encoded")
-            if last_config_encoded is None:
-                return None
-            return last_config_encoded.value
-
-    def _set_last_config_encoded(self, config_encoded: str) -> None:
-        """Stores the encoded configuration after a successful sync.
-
-        Args:
-            config_encoded (str): Encoded configuration string
-
-        Note:
-            Used in conjunction with last_synced to validate polling scan eligibility
-        """
-        self.last_config_encoded = config_encoded
-        with db as ctx:
-            ctx.session.merge(
-                Housekeeping(key="last_config_encoded", value=config_encoded)
-            )
-            ctx.session.commit()
-
     async def sync(self, poll: bool = False) -> None:
         """Initiates the synchronization process for all configured user pairs.
 
@@ -166,10 +133,6 @@ class BridgeClient:
             await self._sync_user(anilist_token, plex_user, poll)
 
         self._set_last_synced(sync_datetime)
-
-        config_encoded = self.config.encode()
-        if config_encoded != self.last_config_encoded:
-            self._set_last_config_encoded(config_encoded)
 
         log.info(
             f"{self.__class__.__name__}: {'Polling' if poll else 'Periodic'} sync completed"

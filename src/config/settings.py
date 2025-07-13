@@ -215,32 +215,6 @@ class PlexAnibridgeConfig(BaseSettings):
             raise ValueError("Plex users cannot be empty")
         return self
 
-    def encode(self) -> str:
-        """Creates a hash of the configuration for change detection.
-
-        Generates an MD5 hash of sorted configuration values, excluding
-        runtime-specific settings (LOG_LEVEL, DRY_RUN, SYNC_INTERVAL).
-
-        Returns:
-            str: MD5 hash of the configuration
-        """
-
-        def sort_value(value):
-            if isinstance(value, (list, set, tuple)):
-                return sorted(value)
-            elif isinstance(value, dict):
-                return {k: sort_value(v) for k, v in sorted(value.items())}
-            return value
-
-        # We exclude certain 'inconsequential' fields from the hash to avoid
-        # unnecessary restarts of the application when they change.
-        config_str = "".join(
-            str(sort_value(getattr(self, key)))
-            for key in sorted(self.__class__.model_fields.keys())
-            if key not in ("LOG_LEVEL", "DRY_RUN", "SYNC_INTERVAL")
-        )
-        return md5(config_str.encode()).hexdigest()
-
     def __str__(self) -> str:
         """Creates a human-readable representation of the configuration.
 
