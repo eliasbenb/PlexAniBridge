@@ -1,15 +1,20 @@
 from enum import StrEnum
-from hashlib import md5
 from pathlib import Path
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic.alias_generators import to_camel
 from pydantic.fields import _Unset
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from src.utils.logging import get_logger
 
-__all__ = ["PlexMetadataSource", "SyncField", "LogLevel", "PlexAnibridgeConfig"]
+__all__ = [
+    "PlexMetadataSource",
+    "SyncField",
+    "LogLevel",
+    "PlexAnibridgeProfileConfig",
+    "PlexAnibridgeConfig",
+]
 
 _log = get_logger(log_name="PlexAniBridge", log_level="INFO")
 
@@ -101,118 +106,120 @@ class SyncField(BaseStrEnum):
         return to_camel(self.value)
 
 
-class PlexAnibridgeConfig(BaseSettings):
-    """Configuration manager for PlexAniBridge application.
+class PlexAnibridgeProfileConfig(BaseSettings):
+    """Configuration for a single PlexAniBridge profile.
 
-    Handles loading, validation, and storage of configuration settings from
-    environment variables or .env file. Provides type checking and validation
-    rules for all settings.
-
-    Settings are loaded in the following order of precedence:
-    1. Environment variables
-    2. .env file
-    3. Default values
+    Represents one sync profile with one Plex user and one AniList account.
     """
 
-    # AniList Configuration
-    ANILIST_TOKEN: str | list[str] = _Unset
+    anilist_token: str = Field(
+        _Unset,
+        description="AniList API token for authentication",
+    )
+    plex_token: str = Field(
+        _Unset,
+        description="Plex API token for authentication",
+    )
+    plex_user: str = Field(
+        _Unset,
+        description="Plex username of target user",
+    )
+    plex_url: str = Field(
+        "http://localhost:32400",
+        description="Plex server URL",
+    )
+    plex_sections: list[str] = Field(
+        default_factory=list,
+        description="Library sections to sync (empty = all)",
+    )
+    plex_genres: list[str] = Field(
+        default_factory=list,
+        description="Genre filter (empty = all)",
+    )
+    plex_metadata_source: PlexMetadataSource = Field(
+        PlexMetadataSource.LOCAL,
+        description="Source of metadata for Plex media items",
+    )
+    sync_interval: int = Field(
+        default=3600,
+        ge=-1,
+        description="Sync interval in seconds (-1 = run once)",
+    )
+    polling_scan: bool = Field(
+        default=False,
+        description="Poll for changes every 30 seconds instead of a periodic scan",
+    )
+    full_scan: bool = Field(
+        default=False,
+        description="Perform full library scans, even on unwatched items",
+    )
+    destructive_sync: bool = Field(
+        default=False,
+        description="Allow decreasing watch progress and removing items from AniList",
+    )
+    excluded_sync_fields: list[SyncField] = Field(
+        default_factory=lambda: [SyncField.NOTES, SyncField.SCORE],
+        description="AniList fields to exclude from synchronization",
+    )
+    dry_run: bool = Field(
+        default=False,
+        description="Log changes without applying them",
+    )
+    batch_requests: bool = Field(
+        default=False,
+        description="Batch AniList API requests for better performance",
+    )
+    search_fallback_threshold: int = Field(
+        default=-1,
+        ge=-1,
+        le=100,
+        description="Fuzzy search threshold",
+    )
 
-    # Plex Configuration
-    PLEX_TOKEN: str = _Unset
-    PLEX_USER: str | list[str] = _Unset
-    PLEX_URL: str = "http://localhost:32400"
-    PLEX_SECTIONS: list[str] = []  # Library sections to sync (empty = all)
-    PLEX_GENRES: list[str] = []  # Genre filter (empty = all genres)
-    PLEX_METADATA_SOURCE: PlexMetadataSource = PlexMetadataSource.LOCAL
+    _parent: "PlexAnibridgeConfig | None" = None
 
-    # Synchronization Settings
-    SYNC_INTERVAL: int = Field(default=3600, ge=-1)  # Seconds (-1 = run once)
-    POLLING_SCAN: bool = False  # Use polling instead of webhooks
-    FULL_SCAN: bool = False  # Perform full library scan on startup
-    DESTRUCTIVE_SYNC: bool = False  # Allow removing items from AniList
-    EXCLUDED_SYNC_FIELDS: list[SyncField] = [SyncField.NOTES, SyncField.SCORE]
-
-    # Advanced Configuration
-    DATA_PATH: Path = Path("./data")  # Directory for application data
-    DRY_RUN: bool = False  # Preview changes without applying them
-    LOG_LEVEL: LogLevel = LogLevel.INFO
-    BATCH_REQUESTS: bool = False  # Batch API requests for better performance
-    SEARCH_FALLBACK_THRESHOLD: int = Field(
-        default=-1, ge=-1, le=100
-    )  # Fuzzy search threshold
-
-    @model_validator(mode="before")
-    def catch_extra_env_vars(cls, values) -> dict[str, str]:
-        """Catches extra environment variables not defined in the model and logs them."""
-        # `DEPRECATED` and `DEPRECATED_ALIAS` are used to warn users about
-        # upcoming changes to configuration settings.
-        DEPRECATED: dict[str, str] = {}
-        # `DEPRECATED_ALIAS` allows for deprecated settings to be (temporarily)
-        # aliased to new settings to ease the transition.
-        DEPRECATED_ALIAS: dict[str, str] = {
-            "FUZZY_SEARCH_THRESHOLD": "SEARCH_FALLBACK_THRESHOLD"
-        }
-
-        wanted: set[str] = set(cls.model_fields.keys())
-        extra: set[str] = set(values.keys()) - wanted
-
-        for key in extra:
-            key = key.upper()
-            if key in DEPRECATED:
-                _log.warning(
-                    f"$$'{key}'$$ is going to become deprecated soon, use $$'{DEPRECATED[key]}'$$ instead"
-                )
-            elif key in DEPRECATED_ALIAS:
-                _log.warning(
-                    f"$$'{key}'$$ is going to become deprecated soon, use $$'{DEPRECATED_ALIAS[key]}'$$ instead"
-                )
-                values[DEPRECATED_ALIAS[key]] = values[key.lower()]
-            else:
-                _log.warning(f"Unrecognized configuration setting: $$'{key}'$$")
-            del values[key.lower()]
-
-        return values
-
-    @model_validator(mode="after")
-    def absolute_data_path(self) -> "PlexAnibridgeConfig":
-        """Ensures DATA_PATH is an absolute path.
-
-        Converts relative paths to absolute using the current working directory
-        as the base.
-
-        Returns:
-            PlexAnibridgeConfig: Self with validated DATA_PATH
-
-        Example:
-            "./data" -> "/home/user/project/data"
-        """
-        self.DATA_PATH = Path(self.DATA_PATH).resolve()
-        return self
-
-    @model_validator(mode="after")
-    def token_validation(self) -> "PlexAnibridgeConfig":
-        """Validates AniList tokens and Plex users.
-
-        Performs the following validations:
-        1. Converts single values to lists for consistency
-        2. Ensures equal number of tokens and users
+    @property
+    def parent(self) -> "PlexAnibridgeConfig":
+        """Get the parent multi-config instance.
 
         Returns:
-            PlexAnibridgeConfig: Self with validated tokens/users
+            PlexAnibridgeConfig: Parent configuration
 
         Raises:
-            ValueError: If token and user counts don't match
+            ValueError: If this config is not part of a multi-config
         """
-        if isinstance(self.ANILIST_TOKEN, str):
-            self.ANILIST_TOKEN = [self.ANILIST_TOKEN]
-        if isinstance(self.PLEX_USER, str):
-            self.PLEX_USER = [self.PLEX_USER]
-        if len(self.ANILIST_TOKEN) != len(self.PLEX_USER):
-            raise ValueError("The number of Plex users and AniList tokens must match")
-        if any(not token for token in self.ANILIST_TOKEN):
-            raise ValueError("AniList tokens cannot be empty")
-        if any(not user for user in self.PLEX_USER):
-            raise ValueError("Plex users cannot be empty")
+        if not self._parent:
+            raise ValueError(
+                "This configuration is not part of a multi-config instance"
+            )
+        return self._parent
+
+    @property
+    def data_path(self) -> Path:
+        """Get the global data path from parent config."""
+        return self.parent.data_path
+
+    @property
+    def log_level(self) -> LogLevel:
+        """Get the global log level from parent config."""
+        return self.parent.log_level
+
+    @model_validator(mode="after")
+    def validate_required_fields(self) -> "PlexAnibridgeProfileConfig":
+        """Validates that required fields are provided.
+
+        Returns:
+            PlexAnibridgeProfileConfig: Self with validated fields
+
+        Raises:
+            ValueError: If required fields are missing or empty
+        """
+        if not self.anilist_token or self.anilist_token == _Unset:
+            raise ValueError("ANILIST_TOKEN is required for each profile")
+        if not self.plex_token or self.plex_token == _Unset:
+            raise ValueError("PLEX_TOKEN is required for each profile")
+        if not self.plex_user or self.plex_user == _Unset:
+            raise ValueError("PLEX_USER is required for each profile")
         return self
 
     def __str__(self) -> str:
@@ -220,16 +227,251 @@ class PlexAnibridgeConfig(BaseSettings):
 
         Returns:
             str: Comma-separated list of key-value pairs with sensitive
-                 values masked (ANILIST_TOKEN, PLEX_TOKEN)
+                 values masked
         """
-        secrets = ["ANILIST_TOKEN", "PLEX_TOKEN"]
+        secrets = ["anilist_token", "plex_token"]
         return ", ".join(
             [
-                f"{key}: {getattr(self, key)}"
+                f"{key.upper()}: {getattr(self, key)}"
                 if key not in secrets
-                else f"{key}: **********"
+                else f"{key.upper()}: **********"
                 for key in self.__class__.model_fields
+                if not key.startswith("_") and getattr(self, key) != _Unset
             ]
         )
 
-    model_config = SettingsConfigDict(env_file=".env", extra="allow")
+    model_config = SettingsConfigDict(extra="forbid")
+
+
+class PlexAnibridgeConfig(BaseSettings):
+    """Multi-configuration manager for PlexAniBridge application.
+
+    Supports loading multiple PlexAniBridge configurations from environment variables
+    using nested delimiters. Automatically parses PAB_CONFIGS__${PROFILE_NAME}__${SETTING}
+    format into individual profile configurations.
+
+    Global settings are shared across all profiles, while profile-specific settings
+    override global defaults.
+
+    Environment Variable Format:
+        Global settings:
+            PAB_DATA_PATH: Application data directory
+            PAB_LOG_LEVEL: Logging level
+
+        Profile settings:
+            PAB_CONFIGS__${PROFILE_NAME}__ANILIST_TOKEN: AniList token
+            PAB_CONFIGS__${PROFILE_NAME}__PLEX_TOKEN: Plex token
+            PAB_CONFIGS__${PROFILE_NAME}__PLEX_USER: Plex username
+            ... (all other PlexAnibridgeConfig settings)
+
+    Example:
+        PAB_DATA_PATH=/app/data
+        PAB_LOG_LEVEL=INFO
+        PAB_CONFIGS__personal__ANILIST_TOKEN=token1
+        PAB_CONFIGS__personal__PLEX_TOKEN=plex_token1
+        PAB_CONFIGS__personal__PLEX_USER=user1
+        PAB_CONFIGS__family__ANILIST_TOKEN=token2
+        PAB_CONFIGS__family__PLEX_TOKEN=plex_token2
+        PAB_CONFIGS__family__PLEX_USER=user2
+    """
+
+    def __init__(self, **data):
+        super().__init__(**data)
+        self._apply_global_defaults()
+
+    configs: dict[str, PlexAnibridgeProfileConfig] = Field(
+        default_factory=dict,
+        description="PlexAniBridge profile configurations",
+    )
+
+    data_path: Path = Field(
+        default=Path("./data"),
+        description="Directory for application data",
+    )
+    log_level: LogLevel = Field(
+        default=LogLevel.INFO,
+        description="Logging level for the application",
+    )
+
+    anilist_token: str | None = Field(
+        default=None,
+        description="Global default AniList API token",
+    )
+    plex_token: str | None = Field(
+        default=None,
+        description="Global default Plex API token",
+    )
+    plex_user: str | None = Field(
+        default=None,
+        description="Global default Plex username",
+    )
+    plex_url: str | None = Field(
+        default=None,
+        description="Global default Plex server URL",
+    )
+    plex_sections: list[str] | None = Field(
+        default=None,
+        description="Global default library sections to sync",
+    )
+    plex_genres: list[str] | None = Field(
+        default=None,
+        description="Global default genre filter",
+    )
+    plex_metadata_source: PlexMetadataSource | None = Field(
+        default=None,
+        description="Global default metadata source",
+    )
+    sync_interval: int | None = Field(
+        default=None,
+        ge=-1,
+        description="Global default sync interval in seconds",
+    )
+    polling_scan: bool | None = Field(
+        default=None,
+        description="Global default polling scan setting",
+    )
+    full_scan: bool | None = Field(
+        default=None,
+        description="Global default full scan setting",
+    )
+    destructive_sync: bool | None = Field(
+        default=None,
+        description="Global default destructive sync setting",
+    )
+    excluded_sync_fields: list[SyncField] | None = Field(
+        default=None,
+        description="Global default excluded sync fields",
+    )
+    dry_run: bool | None = Field(
+        default=None,
+        description="Global default dry run setting",
+    )
+    batch_requests: bool | None = Field(
+        default=None,
+        description="Global default batch requests setting",
+    )
+    search_fallback_threshold: int | None = Field(
+        default=None,
+        ge=-1,
+        le=100,
+        description="Global default search fallback threshold",
+    )
+
+    def _apply_global_defaults(self) -> None:
+        """Apply global defaults to all configs and set parent references."""
+        # Get all field names that exist in both configs (excluding multi-config specific fields)
+        config_fields = set(PlexAnibridgeProfileConfig.model_fields.keys())
+        multi_config_fields = set(self.__class__.model_fields.keys())
+        shared_fields = config_fields.intersection(multi_config_fields)
+
+        for profile_name, config in self.configs.items():
+            config._parent = self
+
+            # Apply global defaults where profile values are not set
+            for field_name in shared_fields:
+                global_value = getattr(self, field_name)
+                config_value = getattr(config, field_name)
+
+                # Apply global default if:
+                # 1. Global value is not None
+                # 2. Config value is the default or unset
+                if global_value is not None and (
+                    config_value == _Unset
+                    or config_value
+                    == PlexAnibridgeConfig.model_fields[field_name].default
+                ):
+                    setattr(config, field_name, global_value)
+
+    @field_validator("configs", mode="before")
+    @classmethod
+    def validate_configs(cls, v):
+        """Validate and convert config dictionaries to PlexAnibridgeProfileConfig instances."""
+        if isinstance(v, dict):
+            validated_configs = {}
+            for profile_name, config_data in v.items():
+                if isinstance(config_data, dict):
+                    try:
+                        config = PlexAnibridgeProfileConfig(**config_data)
+                        validated_configs[profile_name] = config
+                        _log.info(f"Loaded profile configuration: $$'{profile_name}'$$")
+                    except Exception as e:
+                        _log.error(f"Failed to load profile $$'{profile_name}'$$: {e}")
+                        raise ValueError(
+                            f"Invalid configuration for profile '{profile_name}': {e}"
+                        )
+                elif isinstance(config_data, PlexAnibridgeProfileConfig):
+                    validated_configs[profile_name] = config_data
+                    _log.info(f"Loaded profile configuration: $$'{profile_name}'$$")
+            return validated_configs
+        return v
+
+    @model_validator(mode="after")
+    def validate_global_config(self) -> "PlexAnibridgeConfig":
+        """Validates global configuration settings.
+
+        Returns:
+            PlexAnibridgeConfig: Self with validated settings
+
+        Raises:
+            ValueError: If required global settings are missing or invalid
+        """
+        self.data_path = Path(self.data_path).resolve()  # Ensure data path is absolute
+
+        if not self.configs:
+            raise ValueError(
+                "No sync profiles configured. Please set up at least one profile using "
+                "PAB_CONFIGS__${PROFILE_NAME}__ANILIST_TOKEN, PAB_CONFIGS__${PROFILE_NAME}__PLEX_TOKEN, "
+                "and PAB_CONFIGS__${PROFILE_NAME}__PLEX_USER"
+            )
+
+        self._apply_global_defaults()
+
+        return self
+
+    def get_profile_names(self) -> list[str]:
+        """Get a list of all configured profile names.
+
+        Returns:
+            list[str]: List of profile names
+        """
+        return list(self.configs.keys())
+
+    def get_profile(self, name: str) -> PlexAnibridgeProfileConfig:
+        """Get a specific profile configuration.
+
+        Args:
+            name: Profile name
+
+        Returns:
+            PlexAnibridgeProfileConfig: The profile configuration
+
+        Raises:
+            KeyError: If profile doesn't exist
+        """
+        if name not in self.configs:
+            raise KeyError(
+                f"Profile '{name}' not found. Available profiles: {list(self.configs.keys())}"
+            )
+        return self.configs[name]
+
+    def __str__(self) -> str:
+        """Creates a human-readable representation of the configuration.
+
+        Returns:
+            str: Configuration summary with profile count and global settings
+        """
+        profile_count = len(self.configs)
+        profile_names = ", ".join(self.configs.keys())
+
+        return (
+            f"PlexAniBridge Config: {profile_count} profile(s) [{profile_names}], "
+            f"DATA_PATH: {self.data_path}, LOG_LEVEL: {self.log_level}"
+        )
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        env_prefix="PAB_",
+        env_nested_delimiter="__",
+        extra="forbid",
+    )
