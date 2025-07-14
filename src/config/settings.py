@@ -378,7 +378,7 @@ class PlexAnibridgeConfig(BaseSettings):
                 if global_value is not None and (
                     config_value == _Unset
                     or config_value
-                    == PlexAnibridgeConfig.model_fields[field_name].default
+                    == PlexAnibridgeProfileConfig.model_fields[field_name].default
                 ):
                     setattr(config, field_name, global_value)
 
