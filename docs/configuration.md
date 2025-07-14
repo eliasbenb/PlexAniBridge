@@ -15,7 +15,7 @@ Below is an example `.env` file for PlexAniBridge:
 --8<-- ".env.example"
 ```
 
-??? tip "Single Profile"
+!!! tip "Single Profile"
 
     If you only need a single profile, you can use the global settings directly without the `PAB_CONFIGS__{PROFILE_NAME}__` prefix and this will automatically create a profile named `default` for you. Example:
 
