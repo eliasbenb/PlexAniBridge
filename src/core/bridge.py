@@ -167,7 +167,7 @@ class BridgeClient:
             f"-> AniList user $$'{self.anilist_client.user.name}'$$"
         )
 
-        sync_datetime = datetime.now(timezone.utc)
+        sync_start_time = datetime.now(timezone.utc)
 
         movie_sync = MovieSyncClient(
             anilist_client=self.anilist_client,
@@ -196,24 +196,36 @@ class BridgeClient:
         plex_sections = self.plex_client.get_sections()
         sync_stats = SyncStats()
 
-        start_time = datetime.now(timezone.utc)
-        for section in plex_sections:
-            section_stats = await self._sync_section(
-                section, poll, movie_sync, show_sync
+        try:
+            for section in plex_sections:
+                section_stats = await self._sync_section(
+                    section, poll, movie_sync, show_sync
+                )
+                sync_stats = sync_stats.combine(section_stats)
+
+            sync_completion_time = datetime.now(timezone.utc)
+            duration = sync_completion_time - sync_start_time
+
+            self._set_last_synced(sync_start_time)
+
+            log.info(
+                f"{self.__class__.__name__}: [{self.profile_name}] Sync completed: {sync_stats.synced} synced, "
+                f"{sync_stats.deleted} deleted, {sync_stats.skipped} skipped, "
+                f"{sync_stats.not_found} not found, {sync_stats.failed} failed. "
+                f"Success rate: {sync_stats.success_rate:.2%} ({sync_stats.total_processed} total) "
+                f"in {duration.total_seconds():.2f} seconds"
             )
-            sync_stats = sync_stats.combine(section_stats)
-        end_time = datetime.now(timezone.utc)
-        duration = end_time - start_time
 
-        self._set_last_synced(sync_datetime)
+        except Exception as e:
+            end_time = datetime.now(timezone.utc)
+            duration = end_time - sync_start_time
 
-        log.info(
-            f"{self.__class__.__name__}: [{self.profile_name}] Sync completed: {sync_stats.synced} synced, "
-            f"{sync_stats.deleted} deleted, {sync_stats.skipped} skipped, "
-            f"{sync_stats.not_found} not found, {sync_stats.failed} failed. "
-            f"Success rate: {sync_stats.success_rate:.2%} ({sync_stats.total_processed} total) "
-            f"in {duration.total_seconds():.2f} seconds"
-        )
+            log.error(
+                f"{self.__class__.__name__}: [{self.profile_name}] Sync failed after "
+                f"{duration.total_seconds():.2f} seconds: {e}",
+                exc_info=True,
+            )
+            raise
 
     async def _sync_section(
         self,
