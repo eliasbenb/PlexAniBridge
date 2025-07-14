@@ -125,7 +125,7 @@ class PlexAnibridgeProfileConfig(BaseSettings):
         description="Plex username of target user",
     )
     plex_url: str = Field(
-        "http://localhost:32400",
+        _Unset,
         description="Plex server URL",
     )
     plex_sections: list[str] = Field(
