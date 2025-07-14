@@ -393,7 +393,6 @@ class PlexAnibridgeConfig(BaseSettings):
                     try:
                         config = PlexAnibridgeProfileConfig(**config_data)
                         validated_configs[profile_name] = config
-                        _log.info(f"Loaded profile configuration: $$'{profile_name}'$$")
                     except Exception as e:
                         _log.error(f"Failed to load profile $$'{profile_name}'$$: {e}")
                         raise ValueError(
@@ -464,8 +463,6 @@ class PlexAnibridgeConfig(BaseSettings):
                     "PAB_CONFIGS__${PROFILE_NAME}__PLEX_TOKEN, and PAB_CONFIGS__${PROFILE_NAME}__PLEX_USER, or\n"
                     "2. Provide global defaults using PAB_ANILIST_TOKEN, PAB_PLEX_TOKEN, and PAB_PLEX_USER"
                 )
-
-        self._apply_global_defaults()
 
         return self
 
