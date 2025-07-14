@@ -192,6 +192,10 @@ class SchedulerClient:
         """Initialize the application scheduler and all components."""
         log.info(f"{self.__class__.__name__}: Initializing application scheduler")
 
+        log.info(f"{self.__class__.__name__}: Initializing anime mapping database")
+        await self.shared_animap_client.initialize()
+        log.success(f"{self.__class__.__name__}: Anime mapping database ready")
+
         for profile_name, profile_config in self.global_config.configs.items():
             log.info(
                 f"{self.__class__.__name__}: [{profile_name}] Setting up bridge client"
