@@ -76,6 +76,8 @@ class ProfileScheduler:
                     f"{self.__class__.__name__}: [{self.profile_name}] Sync error",
                     exc_info=True,
                 )
+            finally:
+                self._current_task = None
 
     async def start(self) -> None:
         """Start the profile scheduler."""
@@ -108,10 +110,11 @@ class ProfileScheduler:
         self._running = False
         self.stop_event.set()
 
-        if self._current_task and not self._current_task.done():
-            self._current_task.cancel()
+        current_task = self._current_task
+        if current_task and not current_task.done():
+            current_task.cancel()
             try:
-                await self._current_task
+                await current_task
             except asyncio.CancelledError:
                 pass
 
@@ -265,12 +268,14 @@ class SchedulerClient:
                 f"{self.__class__.__name__}: Single-run profiles completed: "
                 f"{single_run_profiles}"
             )
-            # If all profiles are single-run, stop the application
+            # If all profiles are single-run, wait for them to complete and then stop
             if len(single_run_profiles) == len(self.profile_schedulers):
                 log.info(
                     f"{self.__class__.__name__}: All profiles are single-run mode, "
-                    f"stopping application"
+                    f"waiting for completion before stopping application"
                 )
+                # Wait a bit for any final tasks to complete
+                await asyncio.sleep(1)
                 self.stop_event.set()
 
         if self.profile_schedulers:
