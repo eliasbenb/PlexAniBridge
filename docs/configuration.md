@@ -44,7 +44,7 @@ For example, if you set `PAB_SYNC_INTERVAL=900` globally and `PAB_CONFIGS__perso
 
 AniList API access token for this profile.
 
-[:simple-anilist: Generate AniList Token](https://anilist.co/login?apiVersion=v2&client_id=23079&response_type=token){: .md-button .md-button--primary}
+[:simple-anilist: Generate AniList Token](https://anilist.co/login?apiVersion=v2&client_id=23079&response_type=token){: .md-button style="background-color: #02a9ff; color: white;"}
 
 ---
 
@@ -54,7 +54,7 @@ AniList API access token for this profile.
 
 Plex API access token.
 
-[:material-plex: Finding the Plex Token](https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/){: .md-button .md-button--primary}
+[:material-plex: Finding the Plex Token](https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/){: .md-button style="background-color: #e5a00d; color: white;"}
 
 !!! note
 
