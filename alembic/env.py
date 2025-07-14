@@ -20,7 +20,7 @@ if config.config_file_name is not None:
 
 target_metadata = src.models.Base.metadata
 
-db_url = f"sqlite:///{app_config.DATA_PATH / 'plexanibridge.db'}"
+db_url = f"sqlite:///{app_config.data_path / 'plexanibridge.db'}"
 config.set_main_option("sqlalchemy.url", db_url)
 
 

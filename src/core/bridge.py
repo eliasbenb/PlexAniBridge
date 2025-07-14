@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 from plexapi.library import MovieSection, ShowSection
 from src import log
 from src.config.database import db
-from src.config.settings import PlexAnibridgeConfig
+from src.config.settings import PlexAnibridgeConfig, PlexAnibridgeProfileConfig
 from src.core import AniListClient, AniMapClient, PlexClient
 from src.core.sync import (
     BaseSyncClient,
@@ -17,36 +17,61 @@ __all__ = ["BridgeClient"]
 
 
 class BridgeClient:
-    """Main orchestrator for synchronizing Plex and AniList libraries.
+    """Single-profile bridge client for synchronizing Plex and AniList libraries.
 
-    This class manages the synchronization process between Plex media libraries
-    and AniList user accounts, handling multiple user pairs and maintaining
-    sync state between operations.
+    This class manages the synchronization process for one Plex user with one AniList
+    account, using the settings from a single profile configuration.
 
     Args:
-        config (PlexAnibridgeConfig): Application configuration settings
+        profile_name (str): Name of the sync profile
+        profile_config (PlexAnibridgeProfileConfig): Profile-specific configuration settings
+        global_config (PlexAnibridgeConfig): Global application configuration
+        shared_animap_client (AniMapClient): Shared anime mapping client
 
     Attributes:
-        config (PlexAnibridgeConfig): Application configuration
-        token_user_pairs (list[tuple[str, str]]): Paired AniList tokens and Plex users
-        animap_client (AniMapClient): Client for anime mapping data
-        anilist_clients (dict[str, AniListClient]): Cached AniList clients by token
-        plex_clients (dict[str, PlexClient]): Cached Plex clients by user
+        profile_name (str): Name of the sync profile
+        profile_config (PlexAnibridgeProfileConfig): Profile-specific configuration
+        global_config (PlexAnibridgeConfig): Global configuration
+        animap_client (AniMapClient): Shared anime mapping client
+        anilist_client (AniListClient): AniList API client for this profile
+        plex_client (PlexClient): Plex API client for this profile
         last_synced (datetime | None): Timestamp of last successful sync
     """
 
-    def __init__(self, config: PlexAnibridgeConfig) -> None:
-        """Initialize the BridgeClient.
+    def __init__(
+        self,
+        profile_name: str,
+        profile_config: PlexAnibridgeProfileConfig,
+        global_config: PlexAnibridgeConfig,
+        shared_animap_client: AniMapClient,
+    ) -> None:
+        """Initialize the single-profile BridgeClient.
 
         Args:
-            config (PlexAnibridgeConfig): Application configuration settings
+            profile_name (str): Name of the sync profile
+            profile_config (PlexAnibridgeProfileConfig): Profile-specific configuration settings
+            global_config (PlexAnibridgeConfig): Global application configuration
+            shared_animap_client (AniMapClient): Shared anime mapping client
         """
-        self.config = config
+        self.profile_name = profile_name
+        self.profile_config = profile_config
+        self.global_config = global_config
+        self.animap_client = shared_animap_client
 
-        self.token_user_pairs = list(zip(config.ANILIST_TOKEN, config.PLEX_USER))
-        self.animap_client = AniMapClient(config.DATA_PATH)
-        self.anilist_clients: dict[str, AniListClient] = {}
-        self.plex_clients: dict[str, PlexClient] = {}
+        self.anilist_client = AniListClient(
+            anilist_token=profile_config.anilist_token,
+            backup_dir=profile_config.data_path / "backups",
+            dry_run=profile_config.dry_run,
+        )
+
+        self.plex_client = PlexClient(
+            plex_token=profile_config.plex_token,
+            plex_user=profile_config.plex_user,
+            plex_url=profile_config.plex_url,
+            plex_sections=profile_config.plex_sections,
+            plex_genres=profile_config.plex_genres,
+            plex_metadata_source=profile_config.plex_metadata_source,
+        )
 
         self.last_synced = self._get_last_synced()
 
@@ -55,27 +80,39 @@ class BridgeClient:
 
         This should be called after creating the bridge instance.
         """
-        await self.animap_client.initialize()
-        for plex_client in self.plex_clients.values():
-            plex_client.clear_cache()
-        for anilist_client in self.anilist_clients.values():
-            await anilist_client.initialize()
+        log.info(
+            f"{self.__class__.__name__}: [{self.profile_name}] Initializing bridge client"
+        )
+
+        self.plex_client.clear_cache()
+        await self.anilist_client.initialize()
+
+        log.info(
+            f"{self.__class__.__name__}: [{self.profile_name}] Bridge client initialized for Plex user "
+            f"$$'{self.profile_config.plex_user}'$$ -> AniList user $$'{self.anilist_client.user.name}'$$"
+        )
 
     async def close(self) -> None:
         """Close all async clients."""
-        await self.animap_client.close()
-
-        for client in self.anilist_clients.values():
-            await client.close()
-
-        for client in self.plex_clients.values():
-            await client.close()
+        log.debug(
+            f"{self.__class__.__name__}: [{self.profile_name}] Closing bridge client"
+        )
+        await self.anilist_client.close()
+        await self.plex_client.close()
 
     async def __aenter__(self):
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self.close()
+
+    def _get_last_synced_key(self) -> str:
+        """Generate the database key for this profile's last sync timestamp.
+
+        Returns:
+            str: Database key for last sync timestamp
+        """
+        return f"last_synced_{self.profile_name}"
 
     def _get_last_synced(self) -> datetime | None:
         """Retrieves the timestamp of the last successful sync from the database.
@@ -88,7 +125,7 @@ class BridgeClient:
             to filter items for incremental syncs
         """
         with db as ctx:
-            last_synced = ctx.session.get(Housekeeping, "last_synced")
+            last_synced = ctx.session.get(Housekeeping, self._get_last_synced_key())
             if last_synced is None or last_synced.value is None:
                 return None
             return datetime.fromisoformat(last_synced.value)
@@ -105,151 +142,127 @@ class BridgeClient:
         self.last_synced = last_synced
         with db as ctx:
             ctx.session.merge(
-                Housekeeping(key="last_synced", value=last_synced.isoformat())
+                Housekeeping(
+                    key=self._get_last_synced_key(), value=last_synced.isoformat()
+                )
             )
             ctx.session.commit()
 
     async def sync(self, poll: bool = False) -> None:
-        """Initiates the synchronization process for all configured user pairs.
+        """Initiates the synchronization process for this profile.
 
         This is the main entry point for the sync process. It:
         1. Determines the appropriate sync mode (polling/partial/full, destructive/non-destructive)
-        2. Processes each Plex user + AniList token pair
+        2. Processes the configured Plex sections
         3. Updates sync metadata upon successful completion
 
         Args:
             poll (bool): Flag to enable polling scan mode, default False
         """
         log.info(
-            f"{self.__class__.__name__}: Starting "
-            f"{'full ' if self.config.FULL_SCAN else 'partial '}"
-            f"{'and destructive ' if self.config.DESTRUCTIVE_SYNC else ''}"
-            f"sync between Plex and AniList libraries"
+            f"{self.__class__.__name__}: [{self.profile_name}] Starting "
+            f"{'full ' if self.profile_config.full_scan else 'partial '}"
+            f"{'and destructive ' if self.profile_config.destructive_sync else ''}"
+            f"sync for Plex user $$'{self.profile_config.plex_user}'$$ "
+            f"-> AniList user $$'{self.anilist_client.user.name}'$$"
         )
 
-        sync_datetime = datetime.now(timezone.utc)
+        sync_start_time = datetime.now(timezone.utc)
 
-        for anilist_token, plex_user in self.token_user_pairs:
-            await self._sync_user(anilist_token, plex_user, poll)
-
-        self._set_last_synced(sync_datetime)
-
-        log.info(
-            f"{self.__class__.__name__}: {'Polling' if poll else 'Periodic'} sync completed"
-        )
-
-    async def _sync_user(self, anilist_token: str, plex_user: str, poll: bool) -> None:
-        """Synchronizes a single Plex user's library with their AniList account.
-
-        Args:
-            anilist_token (str): Authentication token for AniList API
-            plex_user (str): Username or email of the Plex user
-            poll (bool): Flag to enable polling scan mode
-        """
-        if plex_user not in self.plex_clients:
-            self.plex_clients[plex_user] = PlexClient(
-                self.config.PLEX_TOKEN,
-                plex_user,
-                self.config.PLEX_URL,
-                self.config.PLEX_SECTIONS,
-                self.config.PLEX_GENRES,
-                self.config.PLEX_METADATA_SOURCE,
-            )
-        plex_client = self.plex_clients[plex_user]
-
-        if anilist_token not in self.anilist_clients:
-            anilist_client = AniListClient(
-                anilist_token, self.config.DATA_PATH / "backups", self.config.DRY_RUN
-            )
-            await anilist_client.initialize()
-            self.anilist_clients[anilist_token] = anilist_client
-        else:
-            anilist_client = self.anilist_clients[anilist_token]
-
-        log.info(
-            f"{self.__class__.__name__}: Syncing Plex user $$'{plex_user}'$$ "
-            f"with AniList user $$'{anilist_client.user.name}'$$"
-        )
-
-        self.movie_sync = MovieSyncClient(
-            anilist_client=anilist_client,
+        movie_sync = MovieSyncClient(
+            anilist_client=self.anilist_client,
             animap_client=self.animap_client,
-            plex_client=plex_client,
-            excluded_sync_fields=self.config.EXCLUDED_SYNC_FIELDS,
-            full_scan=self.config.FULL_SCAN,
-            destructive_sync=self.config.DESTRUCTIVE_SYNC,
-            search_fallback_threshold=self.config.SEARCH_FALLBACK_THRESHOLD,
-            batch_requests=self.config.BATCH_REQUESTS,
+            plex_client=self.plex_client,
+            excluded_sync_fields=self.profile_config.excluded_sync_fields,
+            full_scan=self.profile_config.full_scan,
+            destructive_sync=self.profile_config.destructive_sync,
+            search_fallback_threshold=self.profile_config.search_fallback_threshold,
+            batch_requests=self.profile_config.batch_requests,
+            profile_name=self.profile_name,
         )
-        self.show_sync = ShowSyncClient(
-            anilist_client=anilist_client,
+
+        show_sync = ShowSyncClient(
+            anilist_client=self.anilist_client,
             animap_client=self.animap_client,
-            plex_client=plex_client,
-            excluded_sync_fields=self.config.EXCLUDED_SYNC_FIELDS,
-            full_scan=self.config.FULL_SCAN,
-            destructive_sync=self.config.DESTRUCTIVE_SYNC,
-            search_fallback_threshold=self.config.SEARCH_FALLBACK_THRESHOLD,
-            batch_requests=self.config.BATCH_REQUESTS,
+            plex_client=self.plex_client,
+            excluded_sync_fields=self.profile_config.excluded_sync_fields,
+            full_scan=self.profile_config.full_scan,
+            destructive_sync=self.profile_config.destructive_sync,
+            search_fallback_threshold=self.profile_config.search_fallback_threshold,
+            batch_requests=self.profile_config.batch_requests,
+            profile_name=self.profile_name,
         )
 
-        plex_sections = plex_client.get_sections()
-
+        plex_sections = self.plex_client.get_sections()
         sync_stats = SyncStats()
 
-        start_time = datetime.now(timezone.utc)
-        for section in plex_sections:
-            section_stats = await self._sync_section(
-                plex_client, anilist_client, section, poll
+        try:
+            for section in plex_sections:
+                section_stats = await self._sync_section(
+                    section, poll, movie_sync, show_sync
+                )
+                sync_stats = sync_stats.combine(section_stats)
+
+            sync_completion_time = datetime.now(timezone.utc)
+            duration = sync_completion_time - sync_start_time
+
+            self._set_last_synced(sync_start_time)
+
+            log.info(
+                f"{self.__class__.__name__}: [{self.profile_name}] Sync completed: {sync_stats.synced} synced, "
+                f"{sync_stats.deleted} deleted, {sync_stats.skipped} skipped, "
+                f"{sync_stats.not_found} not found, {sync_stats.failed} failed. "
+                f"Success rate: {sync_stats.success_rate:.2%} ({sync_stats.total_processed} total) "
+                f"in {duration.total_seconds():.2f} seconds"
             )
-            sync_stats = sync_stats.combine(section_stats)
-        end_time = datetime.now(timezone.utc)
-        duration = end_time - start_time
 
-        log.info(
-            f"{self.__class__.__name__}: Syncing Plex user $$'{plex_user}'$$ to AniList user "
-            f"$$'{anilist_client.user.name}'$$ completed"
-        )
+        except Exception as e:
+            end_time = datetime.now(timezone.utc)
+            duration = end_time - sync_start_time
 
-        log.info(
-            f"{self.__class__.__name__}: {sync_stats.synced} items synced, {sync_stats.deleted} items deleted, "
-            f"{sync_stats.skipped} items skipped, {sync_stats.not_found} items not found, "
-            f"and {sync_stats.failed} items failed. Success rate: {sync_stats.success_rate:.2%} "
-            f"({sync_stats.total_processed} total) in {duration.total_seconds():.2f} seconds"
-        )
+            log.error(
+                f"{self.__class__.__name__}: [{self.profile_name}] Sync failed after "
+                f"{duration.total_seconds():.2f} seconds: {e}",
+                exc_info=True,
+            )
+            raise
 
     async def _sync_section(
         self,
-        plex_client: PlexClient,
-        anilist_client: AniListClient,
         section: MovieSection | ShowSection,
         poll: bool,
+        movie_sync: MovieSyncClient,
+        show_sync: ShowSyncClient,
     ) -> SyncStats:
         """Synchronizes a single Plex library section.
 
         Args:
-            plex_client (PlexClient): Client for the Plex user
-            anilist_client (AniListClient): Client for the AniList user
             section (MovieSection | ShowSection): Plex library section to process
             poll (bool): Flag to enable polling scan mode
+            movie_sync (MovieSyncClient): Movie sync client
+            show_sync (ShowSyncClient): Show sync client
 
         Returns:
             SyncStats: Statistics about the sync operation for the section
         """
-        log.info(f"{self.__class__.__name__}: Syncing section $$'{section.title}'$$")
+        log.info(
+            f"{self.__class__.__name__}: [{self.profile_name}] Syncing "
+            f"section $$'{section.title}'$$"
+        )
 
         min_last_modified = (
             self.last_synced or datetime.now(timezone.utc)
         ) - timedelta(seconds=15)
 
         items = list(
-            plex_client.get_section_items(
+            self.plex_client.get_section_items(
                 section,
                 min_last_modified=min_last_modified if poll else None,
-                require_watched=not self.config.FULL_SCAN,
+                require_watched=not self.profile_config.full_scan,
             )
         )
 
-        if self.config.BATCH_REQUESTS:
+        if self.profile_config.batch_requests:
             parsed_guids = [ParsedGuids.from_guids(item.guids) for item in items]
             imdb_ids = [guid.imdb for guid in parsed_guids if guid.imdb is not None]
             tmdb_ids = [guid.tmdb for guid in parsed_guids if guid.tmdb is not None]
@@ -265,15 +278,15 @@ class BridgeClient:
             ]
 
             log.info(
-                f"{self.__class__.__name__}: Prefetching {len(anilist_ids)} entries "
+                f"{self.__class__.__name__}: [{self.profile_name}] Prefetching {len(anilist_ids)} entries "
                 f"from the AniList API in batch requests (this may take a while)"
             )
 
-            await anilist_client.batch_get_anime(anilist_ids)
+            await self.anilist_client.batch_get_anime(anilist_ids)
 
         sync_client: BaseSyncClient = {
-            "movie": self.movie_sync,
-            "show": self.show_sync,
+            "movie": movie_sync,
+            "show": show_sync,
         }[section.type]
 
         for item in items:
@@ -282,11 +295,12 @@ class BridgeClient:
 
             except Exception:
                 log.error(
-                    f"{self.__class__.__name__}: Failed to sync item $$'{item.title}'$$",
+                    f"{self.__class__.__name__}: [{self.profile_name}] Failed "
+                    f"to sync item $$'{item.title}'$$",
                     exc_info=True,
                 )
 
-        if self.config.BATCH_REQUESTS:
+        if self.profile_config.batch_requests:
             await sync_client.batch_sync()
 
         return sync_client.sync_stats
