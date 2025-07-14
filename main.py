@@ -1,10 +1,8 @@
 import asyncio
 import signal
 import sys
-from pathlib import Path
 
-# Add src to path for imports
-sys.path.insert(0, str(Path(__file__).parent))
+from pydantic import ValidationError
 
 from src import PLEXANIBDRIGE_HEADER, log
 from src.config import config
@@ -65,16 +63,38 @@ def validate_configuration():
                     f"interval {profile_config.sync_interval}s, "
                     f"{'polling' if profile_config.polling_scan else 'periodic'} mode"
                 )
-            except Exception as e:
+            except KeyError as e:
+                log.error(f"PlexAniBridge: Profile $$'{profile_name}'$$ not found: {e}")
+                return False
+            except ValidationError as e:
                 log.error(
                     f"PlexAniBridge: Invalid configuration for profile $$'{profile_name}'$$: {e}"
+                )
+                return False
+            except ValueError as e:
+                log.error(
+                    f"PlexAniBridge: Configuration error for profile $$'{profile_name}'$$: {e}"
+                )
+                return False
+            except (AttributeError, TypeError) as e:
+                log.error(
+                    f"PlexAniBridge: Configuration structure error for profile $$'{profile_name}'$$: {e}"
                 )
                 return False
 
         return True
 
+    except ValidationError as e:
+        log.error(f"PlexAniBridge: Global configuration validation failed: {e}")
+        return False
+    except ValueError as e:
+        log.error(f"PlexAniBridge: Configuration value error: {e}")
+        return False
+    except (OSError, PermissionError) as e:
+        log.error(f"PlexAniBridge: File system error during configuration: {e}")
+        return False
     except Exception as e:
-        log.error(f"PlexAniBridge: Configuration validation failed: {e}")
+        log.error(f"PlexAniBridge: Unexpected configuration error: {e}", exc_info=True)
         return False
 
 
@@ -105,16 +125,30 @@ async def run():
 
     except KeyboardInterrupt:
         log.info("PlexAniBridge: Keyboard interrupt received, shutting down...")
+    except ValidationError as e:
+        log.error(f"PlexAniBridge: Configuration validation error: {e}")
+        return 1
+    except ConnectionError as e:
+        log.error(f"PlexAniBridge: Connection error: {e}")
+        return 1
+    except (OSError, PermissionError) as e:
+        log.error(f"PlexAniBridge: File system error: {e}")
+        return 1
+    except asyncio.CancelledError:
+        log.info("PlexAniBridge: Application cancelled")
+        return 0
     except Exception as e:
-        log.error(f"PlexAniBridge: Application error: {e}", exc_info=True)
+        log.error(f"PlexAniBridge: Unexpected application error: {e}", exc_info=True)
         return 1
     finally:
-        # Cleanup
         if app_scheduler:
             log.info("PlexAniBridge: Shutting down application...")
             try:
                 await app_scheduler.stop()
                 log.success("PlexAniBridge: Application shutdown complete")
+            except asyncio.CancelledError:
+                log.info("PlexAniBridge: Shutdown cancelled")
+                return 1
             except Exception as e:
                 log.error(f"PlexAniBridge: Error during shutdown: {e}", exc_info=True)
                 return 1
