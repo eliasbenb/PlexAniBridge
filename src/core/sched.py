@@ -411,18 +411,35 @@ class SchedulerClient:
 
         return status
 
+    def _get_next_1am_utc(self, now: datetime) -> datetime:
+        """Calculate the next 1:00 AM UTC, handling DST transitions properly.
+
+        Args:
+            now: Current UTC datetime
+
+        Returns:
+            datetime: Next 1:00 AM UTC
+        """
+        # Start with next day at 1:00 AM UTC
+        next_sync_naive = (now + timedelta(days=1)).replace(
+            hour=1, minute=0, second=0, microsecond=0
+        )
+
+        # If we're already past 1:00 AM today, use today
+        today_1am = now.replace(hour=1, minute=0, second=0, microsecond=0)
+        if now < today_1am:
+            next_sync_naive = today_1am
+
+        return next_sync_naive
+
     async def _daily_db_sync_loop(self) -> None:
-        """Handle daily database synchronization at 1:00 AM UTC."""
+        """Handle daily database synchronization at 1:00 AM UTC with proper DST handling."""
         log.info(f"{self.__class__.__name__}: Starting daily database sync scheduler")
 
         while self._running and not self.stop_event.is_set():
             try:
-                # Calculate time until next 1:00 AM UTC
                 now = datetime.now(timezone.utc)
-                next_sync_time = now.replace(hour=1, minute=0, second=0, microsecond=0)
-
-                if now >= next_sync_time:
-                    next_sync_time += timedelta(days=1)
+                next_sync_time = self._get_next_1am_utc(now)
 
                 sleep_duration = (next_sync_time - now).total_seconds()
 
