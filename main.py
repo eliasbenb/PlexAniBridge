@@ -47,8 +47,8 @@ def validate_configuration():
         bool: True if configuration is valid, False otherwise
     """
     try:
-        profile_count = len(config.configs)
-        profile_names = list(config.configs.keys())
+        profile_count = len(config.profiles)
+        profile_names = list(config.profiles.keys())
 
         if profile_count == 0:
             log.error("PlexAniBridge: No sync profiles configured")

@@ -17,7 +17,7 @@ Below is an example `.env` file for PlexAniBridge:
 
 !!! tip "Single Profile"
 
-    If you only need a single profile, you can use the global settings directly without the `PAB_CONFIGS__{PROFILE_NAME}__` prefix and this will automatically create a profile named `default` for you. Example:
+    If you only need a single profile, you can use the global settings directly without the `PAB_PROFILES__{PROFILE_NAME}__` prefix and this will automatically create a profile named `default` for you. Example:
 
     ```dosini title=".env"
     PAB_ANILIST_TOKEN=eyJ...
@@ -34,7 +34,7 @@ Settings are applied in the following order:
 2. **Global default settings** (medium priority)
 3. **Built-in defaults** (lowest priority)
 
-For example, if you set `PAB_SYNC_INTERVAL=900` globally and `PAB_CONFIGS__personal__SYNC_INTERVAL=1800` for a specific profile, the personal profile will use 1800 seconds while other profiles use 900 seconds. If you don't set `PAB_CONFIGS__personal__SYNC_INTERVAL`, it will fall back to the application's built-in default of 3600 seconds.
+For example, if you set `PAB_SYNC_INTERVAL=900` globally and `PAB_PROFILES__personal__SYNC_INTERVAL=1800` for a specific profile, the personal profile will use 1800 seconds while other profiles use 900 seconds. If you don't set `PAB_PROFILES__personal__SYNC_INTERVAL`, it will fall back to the application's built-in default of 3600 seconds.
 
 ## Configuration Options
 
@@ -323,19 +323,19 @@ PAB_PLEX_URL=http://localhost:32400
 PAB_POLLING_SCAN=True
 
 # Admin user - aggressive sync with full features
-PAB_CONFIGS__admin__ANILIST_TOKEN=admin_anilist_token
-PAB_CONFIGS__admin__PLEX_USER=admin_plex_user
-PAB_CONFIGS__admin__DESTRUCTIVE_SYNC=True
-PAB_CONFIGS__admin__EXCLUDED_SYNC_FIELDS=[]
+PAB_PROFILES__admin__ANILIST_TOKEN=admin_anilist_token
+PAB_PROFILES__admin__PLEX_USER=admin_plex_user
+PAB_PROFILES__admin__DESTRUCTIVE_SYNC=True
+PAB_PROFILES__admin__EXCLUDED_SYNC_FIELDS=[]
 
 # Family member - typical sync
-PAB_CONFIGS__family__ANILIST_TOKEN=family_anilist_token
-PAB_CONFIGS__family__PLEX_USER=family_plex_user
+PAB_PROFILES__family__ANILIST_TOKEN=family_anilist_token
+PAB_PROFILES__family__PLEX_USER=family_plex_user
 
 # Guest user - minimal sync
-PAB_CONFIGS__guest__ANILIST_TOKEN=guest_anilist_token
-PAB_CONFIGS__guest__PLEX_USER=guest_plex_user
-PAB_CONFIGS__guest__EXCLUDED_SYNC_FIELDS=["notes", "score", "repeat", "started_at", "completed_at"]
+PAB_PROFILES__guest__ANILIST_TOKEN=guest_anilist_token
+PAB_PROFILES__guest__PLEX_USER=guest_plex_user
+PAB_PROFILES__guest__EXCLUDED_SYNC_FIELDS=["notes", "score", "repeat", "started_at", "completed_at"]
 ```
 
 ### Per-Library Profiles
@@ -350,12 +350,12 @@ PAB_PLEX_USER=admin_plex_user
 PAB_PLEX_URL=http://localhost:32400
 
 # Movies library - aggressive sync with full features
-PAB_CONFIGS__movies__PLEX_SECTIONS=["Anime Movies"]
-PAB_CONFIGS__movies__FULL_SCAN=True
-PAB_CONFIGS__movies__SYNC_INTERVAL=1800
-PAB_CONFIGS__movies__EXCLUDED_SYNC_FIELDS=[]
+PAB_PROFILES__movies__PLEX_SECTIONS=["Anime Movies"]
+PAB_PROFILES__movies__FULL_SCAN=True
+PAB_PROFILES__movies__SYNC_INTERVAL=1800
+PAB_PROFILES__movies__EXCLUDED_SYNC_FIELDS=[]
 
 # TV Shows library - more conservative with updates
-PAB_CONFIGS__tvshows__PLEX_SECTIONS=["Anime"]
-PAB_CONFIGS__tvshows__POLLING_SCAN=True
+PAB_PROFILES__tvshows__PLEX_SECTIONS=["Anime"]
+PAB_PROFILES__tvshows__POLLING_SCAN=True
 ```

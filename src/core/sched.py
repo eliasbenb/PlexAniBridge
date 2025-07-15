@@ -196,7 +196,7 @@ class SchedulerClient:
         await self.shared_animap_client.initialize()
         log.success(f"{self.__class__.__name__}: Anime mapping database ready")
 
-        for profile_name, profile_config in self.global_config.configs.items():
+        for profile_name, profile_config in self.global_config.profiles.items():
             log.info(
                 f"{self.__class__.__name__}: [{profile_name}] Setting up bridge client"
             )

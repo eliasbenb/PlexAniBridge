@@ -247,7 +247,7 @@ class PlexAnibridgeConfig(BaseSettings):
     """Multi-configuration manager for PlexAniBridge application.
 
     Supports loading multiple PlexAniBridge configurations from environment variables
-    using nested delimiters. Automatically parses PAB_CONFIGS__${PROFILE_NAME}__${SETTING}
+    using nested delimiters. Automatically parses PAB_PROFILES__${PROFILE_NAME}__${SETTING}
     format into individual profile configurations.
 
     Global settings are shared across all profiles, while profile-specific settings
@@ -259,27 +259,27 @@ class PlexAnibridgeConfig(BaseSettings):
             PAB_LOG_LEVEL: Logging level
 
         Profile settings:
-            PAB_CONFIGS__${PROFILE_NAME}__ANILIST_TOKEN: AniList token
-            PAB_CONFIGS__${PROFILE_NAME}__PLEX_TOKEN: Plex token
-            PAB_CONFIGS__${PROFILE_NAME}__PLEX_USER: Plex username
+            PAB_PROFILES__${PROFILE_NAME}__ANILIST_TOKEN: AniList token
+            PAB_PROFILES__${PROFILE_NAME}__PLEX_TOKEN: Plex token
+            PAB_PROFILES__${PROFILE_NAME}__PLEX_USER: Plex username
             ... (all other PlexAnibridgeConfig settings)
 
     Example:
         PAB_DATA_PATH=/app/data
         PAB_LOG_LEVEL=INFO
-        PAB_CONFIGS__personal__ANILIST_TOKEN=token1
-        PAB_CONFIGS__personal__PLEX_TOKEN=plex_token1
-        PAB_CONFIGS__personal__PLEX_USER=user1
-        PAB_CONFIGS__family__ANILIST_TOKEN=token2
-        PAB_CONFIGS__family__PLEX_TOKEN=plex_token2
-        PAB_CONFIGS__family__PLEX_USER=user2
+        PAB_PROFILES__personal__ANILIST_TOKEN=token1
+        PAB_PROFILES__personal__PLEX_TOKEN=plex_token1
+        PAB_PROFILES__personal__PLEX_USER=user1
+        PAB_PROFILES__family__ANILIST_TOKEN=token2
+        PAB_PROFILES__family__PLEX_TOKEN=plex_token2
+        PAB_PROFILES__family__PLEX_USER=user2
     """
 
     def __init__(self, **data):
         super().__init__(**data)
         self._apply_global_defaults()
 
-    configs: dict[str, PlexAnibridgeProfileConfig] = Field(
+    profiles: dict[str, PlexAnibridgeProfileConfig] = Field(
         default_factory=dict,
         description="PlexAniBridge profile configurations",
     )
@@ -364,7 +364,7 @@ class PlexAnibridgeConfig(BaseSettings):
         multi_config_fields = set(self.__class__.model_fields.keys())
         shared_fields = config_fields.intersection(multi_config_fields)
 
-        for profile_name, config in self.configs.items():
+        for profile_name, config in self.profiles.items():
             config._parent = self
 
             # Apply global defaults where profile values are not set
@@ -382,26 +382,26 @@ class PlexAnibridgeConfig(BaseSettings):
                 ):
                     setattr(config, field_name, global_value)
 
-    @field_validator("configs", mode="before")
+    @field_validator("profiles", mode="before")
     @classmethod
-    def validate_configs(cls, v):
+    def validate_profiles(cls, v):
         """Validate and convert config dictionaries to PlexAnibridgeProfileConfig instances."""
         if isinstance(v, dict):
-            validated_configs = {}
+            validated_profiles = {}
             for profile_name, config_data in v.items():
                 if isinstance(config_data, dict):
                     try:
                         config = PlexAnibridgeProfileConfig(**config_data)
-                        validated_configs[profile_name] = config
+                        validated_profiles[profile_name] = config
                     except Exception as e:
                         _log.error(f"Failed to load profile $$'{profile_name}'$$: {e}")
                         raise ValueError(
                             f"Invalid configuration for profile '{profile_name}': {e}"
                         )
                 elif isinstance(config_data, PlexAnibridgeProfileConfig):
-                    validated_configs[profile_name] = config_data
+                    validated_profiles[profile_name] = config_data
                     _log.info(f"Loaded profile configuration: $$'{profile_name}'$$")
-            return validated_configs
+            return validated_profiles
         return v
 
     @model_validator(mode="after")
@@ -416,8 +416,8 @@ class PlexAnibridgeConfig(BaseSettings):
         """
         self.data_path = Path(self.data_path).resolve()  # Ensure data path is absolute
 
-        # If no configs are provided, try to create a default config from global settings
-        if not self.configs:
+        # If no profiles are provided, try to create a default config from global settings
+        if not self.profiles:
             if (
                 self.anilist_token
                 and self.anilist_token != _Unset
@@ -444,7 +444,7 @@ class PlexAnibridgeConfig(BaseSettings):
 
                 try:
                     default_config = PlexAnibridgeProfileConfig(**default_config_data)
-                    self.configs["default"] = default_config
+                    self.profiles["default"] = default_config
                     _log.info(
                         f"{self.__class__.__name__}: Created default profile configuration from global settings"
                     )
@@ -459,8 +459,8 @@ class PlexAnibridgeConfig(BaseSettings):
                 raise ValueError(
                     "No sync profiles configured and insufficient global settings for default profile. "
                     "Please either:\n"
-                    "1. Set up at least one profile using PAB_CONFIGS__${PROFILE_NAME}__ANILIST_TOKEN, "
-                    "PAB_CONFIGS__${PROFILE_NAME}__PLEX_TOKEN, and PAB_CONFIGS__${PROFILE_NAME}__PLEX_USER, or\n"
+                    "1. Set up at least one profile using PAB_PROFILES__${PROFILE_NAME}__ANILIST_TOKEN, "
+                    "PAB_PROFILES__${PROFILE_NAME}__PLEX_TOKEN, and PAB_PROFILES__${PROFILE_NAME}__PLEX_USER, or\n"
                     "2. Provide global defaults using PAB_ANILIST_TOKEN, PAB_PLEX_TOKEN, and PAB_PLEX_USER"
                 )
 
@@ -472,7 +472,7 @@ class PlexAnibridgeConfig(BaseSettings):
         Returns:
             list[str]: List of profile names
         """
-        return list(self.configs.keys())
+        return list(self.profiles.keys())
 
     def get_profile(self, name: str) -> PlexAnibridgeProfileConfig:
         """Get a specific profile configuration.
@@ -486,11 +486,11 @@ class PlexAnibridgeConfig(BaseSettings):
         Raises:
             KeyError: If profile doesn't exist
         """
-        if name not in self.configs:
+        if name not in self.profiles:
             raise KeyError(
-                f"Profile '{name}' not found. Available profiles: {list(self.configs.keys())}"
+                f"Profile '{name}' not found. Available profiles: {list(self.profiles.keys())}"
             )
-        return self.configs[name]
+        return self.profiles[name]
 
     def __str__(self) -> str:
         """Creates a human-readable representation of the configuration.
@@ -498,8 +498,8 @@ class PlexAnibridgeConfig(BaseSettings):
         Returns:
             str: Configuration summary with profile count and global settings
         """
-        profile_count = len(self.configs)
-        profile_names = ", ".join(self.configs.keys())
+        profile_count = len(self.profiles)
+        profile_names = ", ".join(self.profiles.keys())
 
         return (
             f"PlexAniBridge Config: {profile_count} profile(s) [{profile_names}], "
