@@ -49,6 +49,22 @@ Issues = "https://github.com/eliasbenb/PlexAniBridge/issues"
 include = ["main.py", "src"]
 extraPaths = ["./src/stubs"]
 
+[tool.ruff]
+include = ["pyproject.toml", "src/**/*.py", "scripts/**/*.py"]
+line-length = 88
+indent-width = 4
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+docstring-code-format = true
+
+[tool.ruff.lint]
+select = ["E", "F", "UP", "B", "SIM", "I", "D"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
 [tool.uv.workspace]
 members = ["docs"]
 
