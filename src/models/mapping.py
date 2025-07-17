@@ -1,3 +1,5 @@
+"""TVDB Mapping Model Module."""
+
 import re
 
 from pydantic import BaseModel, Field
@@ -26,16 +28,20 @@ class TVDBMapping(BaseModel):
     @classmethod
     def from_string(cls, season: int, s: str) -> list["TVDBMapping"]:
         """Parse a string pattern into a TVDBMapping instance.
+
         Args:
             season (int): Season number
-            s (str): Pattern string in format 'e{start}-e{end}|{ratio},e{start2}-e{end2}|{ratio2}'
+            s (str): Pattern string in format
+                    'e{start}-e{end}|{ratio},e{start2}-e{end2}|{ratio2}'
                     Examples:
                     - 'e1-e12|2'
                     - 'e12-,e2'
                     - 'e1-e5,e8-e10'
                     - '' (empty string for full season)
+
         Returns:
-            TVDBMapping | None: New TVDBMapping instance if pattern is valid, None otherwise
+            TVDBMapping | None: New TVDBMapping instance if pattern is valid, None
+                                otherwise
         """
         PATTERN = re.compile(
             r"""
@@ -97,6 +103,11 @@ class TVDBMapping(BaseModel):
         return episode_ranges
 
     def __str__(self) -> str:
+        """Generate a string representation of the TVDBMapping instance.
+
+        Returns:
+            str: String representation in format 'S{season}E{start}-{end}|{ratio}'
+        """
         season = f"S{self.season:02d}"
         if self.start == 1 and self.end is None:
             return season
@@ -110,4 +121,9 @@ class TVDBMapping(BaseModel):
         )
 
     def __hash__(self) -> int:
+        """Generate a hash for the TVDBMapping instance.
+
+        Returns:
+            int: Hash value of the instance
+        """
         return hash(repr(self))

@@ -1,3 +1,5 @@
+"""Bridge Client Module."""
+
 from datetime import datetime, timedelta, timezone
 
 from plexapi.library import MovieSection, ShowSection
@@ -24,7 +26,8 @@ class BridgeClient:
 
     Args:
         profile_name (str): Name of the sync profile
-        profile_config (PlexAnibridgeProfileConfig): Profile-specific configuration settings
+        profile_config (PlexAnibridgeProfileConfig): Profile-specific configuration
+                                                     settings
         global_config (PlexAnibridgeConfig): Global application configuration
         shared_animap_client (AniMapClient): Shared anime mapping client
 
@@ -49,7 +52,8 @@ class BridgeClient:
 
         Args:
             profile_name (str): Name of the sync profile
-            profile_config (PlexAnibridgeProfileConfig): Profile-specific configuration settings
+            profile_config (PlexAnibridgeProfileConfig): Profile-specific configuration
+                                                         settings
             global_config (PlexAnibridgeConfig): Global application configuration
             shared_animap_client (AniMapClient): Shared anime mapping client
         """
@@ -81,15 +85,17 @@ class BridgeClient:
         This should be called after creating the bridge instance.
         """
         log.info(
-            f"{self.__class__.__name__}: [{self.profile_name}] Initializing bridge client"
+            f"{self.__class__.__name__}: [{self.profile_name}] Initializing bridge "
+            f"client"
         )
 
         self.plex_client.clear_cache()
         await self.anilist_client.initialize()
 
         log.info(
-            f"{self.__class__.__name__}: [{self.profile_name}] Bridge client initialized for Plex user "
-            f"$$'{self.profile_config.plex_user}'$$ -> AniList user $$'{self.anilist_client.user.name}'$$"
+            f"{self.__class__.__name__}: [{self.profile_name}] Bridge client "
+            f"initialized for Plex user $$'{self.profile_config.plex_user}'$$ -> "
+            f"AniList user $$'{self.anilist_client.user.name}'$$"
         )
 
     async def close(self) -> None:
@@ -100,10 +106,22 @@ class BridgeClient:
         await self.anilist_client.close()
         await self.plex_client.close()
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> "BridgeClient":
+        """Context manager enter method.
+
+        Returns:
+            BridgeClient: The initialized bridge client instance.
+        """
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        """Context manager exit method.
+
+        Args:
+            exc_type: Exception type if an exception occurred.
+            exc_val: Exception value if an exception occurred.
+            exc_tb: Traceback object if an exception occurred.
+        """
         await self.close()
 
     def _get_last_synced_key(self) -> str:
@@ -152,7 +170,7 @@ class BridgeClient:
         """Initiates the synchronization process for this profile.
 
         This is the main entry point for the sync process. It:
-        1. Determines the appropriate sync mode (polling/partial/full, destructive/non-destructive)
+        1. Determines the appropriate sync mode (polling/partial/full, destructive/not)
         2. Processes the configured Plex sections
         3. Updates sync metadata upon successful completion
 
@@ -209,10 +227,11 @@ class BridgeClient:
             self._set_last_synced(sync_start_time)
 
             log.info(
-                f"{self.__class__.__name__}: [{self.profile_name}] Sync completed: {sync_stats.synced} synced, "
-                f"{sync_stats.deleted} deleted, {sync_stats.skipped} skipped, "
-                f"{sync_stats.not_found} not found, {sync_stats.failed} failed. "
-                f"Success rate: {sync_stats.success_rate:.2%} ({sync_stats.total_processed} total) "
+                f"{self.__class__.__name__}: [{self.profile_name}] Sync completed: "
+                f"{sync_stats.synced} synced,  {sync_stats.deleted} deleted, "
+                f"{sync_stats.skipped} skipped, {sync_stats.not_found} not found, "
+                f"{sync_stats.failed} failed. Success rate: "
+                f"{sync_stats.success_rate:.2%} ({sync_stats.total_processed} total) "
                 f"in {duration.total_seconds():.2f} seconds"
             )
 
@@ -278,8 +297,9 @@ class BridgeClient:
             ]
 
             log.info(
-                f"{self.__class__.__name__}: [{self.profile_name}] Prefetching {len(anilist_ids)} entries "
-                f"from the AniList API in batch requests (this may take a while)"
+                f"{self.__class__.__name__}: [{self.profile_name}] Prefetching "
+                f"{len(anilist_ids)} entries from the AniList API in batch requests"
+                f"(this may take a while)"
             )
 
             await self.anilist_client.batch_get_anime(anilist_ids)

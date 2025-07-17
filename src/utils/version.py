@@ -1,3 +1,5 @@
+"""Version Utilities Module."""
+
 from pathlib import Path
 
 import tomlkit
@@ -6,7 +8,7 @@ from src import __file__ as src_file
 
 
 def get_pyproject_version() -> str:
-    """Get the PlexAniBridge's version from the pyproject.toml file
+    """Get the PlexAniBridge's version from the pyproject.toml file.
 
     Returns:
         str: PlexAniBridge's version
@@ -28,7 +30,7 @@ def get_pyproject_version() -> str:
 
 
 def get_git_hash() -> str:
-    """Get the git commit hash of the PlexAniBridge repository
+    """Get the git commit hash of the PlexAniBridge repository.
 
     Returns:
         str: PlexAniBridge's current commit hash
@@ -69,7 +71,7 @@ def get_git_hash() -> str:
 
 
 def get_docker_status() -> bool:
-    """Check if PlexAniBridge is running inside a Docker container
+    """Check if PlexAniBridge is running inside a Docker container.
 
     Returns:
         bool: True if running inside a Docker container, False otherwise

@@ -1,3 +1,5 @@
+"""Terminal Utilities Module."""
+
 import locale
 import os
 import sys

@@ -1,8 +1,12 @@
+"""AniList Client."""
+
 import asyncio
+import contextlib
 import json
+from collections.abc import AsyncIterator
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, AsyncIterator
+from typing import Any
 
 import aiohttp
 from async_lru import alru_cache
@@ -28,11 +32,11 @@ anilist_limiter = Limiter(rate=30 / 60, capacity=3, jitter=False)
 
 
 class AniListClient:
-    """Client for interacting with the AniList GraphQL API
+    """Client for interacting with the AniList GraphQL API.
 
-    This client provides methods to interact with the AniList GraphQL API, including searching for anime,
-    updating user lists, and managing anime entries. It implements rate limiting and local caching
-    to optimize API usage.
+    This client provides methods to interact with the AniList GraphQL API, including
+    searching for anime, updating user lists, and managing anime entries. It implements
+    rate limiting and local caching to optimize API usage.
     """
 
     API_URL = "https://graphql.anilist.co"
@@ -54,7 +58,11 @@ class AniListClient:
         self.offline_anilist_entries: dict[int, Media] = {}
 
     async def _get_session(self) -> aiohttp.ClientSession:
-        """Get or create the aiohttp session."""
+        """Get or create the aiohttp session.
+
+        Returns:
+            aiohttp.ClientSession: The active session for making HTTP requests.
+        """
         if self._session is None or self._session.closed:
             headers = {
                 "Accept": "application/json",
@@ -70,10 +78,22 @@ class AniListClient:
         if self._session and not self._session.closed:
             await self._session.close()
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> "AniListClient":
+        """Async context manager entry.
+
+        Returns:
+            AniListClient: Self for use in async with statements.
+        """
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Async context manager exit.
+
+        Args:
+            exc_type: Exception type if an exception occurred.
+            exc_val: Exception value if an exception occurred.
+            exc_tb: Exception traceback if an exception occurred.
+        """
         await self.close()
 
     async def initialize(self):
@@ -134,8 +154,16 @@ class AniListClient:
             aiohttp.ClientError: If the API request fails
         """
         query = f"""
-        mutation ($mediaId: Int, $status: MediaListStatus, $score: Float, $progress: Int, $repeat: Int, $notes: String, $startedAt: FuzzyDateInput, $completedAt: FuzzyDateInput) {{
-            SaveMediaListEntry(mediaId: $mediaId, status: $status, score: $score, progress: $progress, repeat: $repeat, notes: $notes, startedAt: $startedAt, completedAt: $completedAt) {{
+        mutation (
+            $mediaId: Int, $status: MediaListStatus, $score: Float, $progress: Int,
+            $repeat: Int, $notes: String, $startedAt: FuzzyDateInput,
+            $completedAt: FuzzyDateInput
+        ) {{
+            SaveMediaListEntry(
+                mediaId: $mediaId, status: $status, score: $score, progress: $progress,
+                repeat: $repeat, notes: $notes, startedAt: $startedAt,
+                completedAt: $completedAt
+            ) {{
                 {MediaListWithMedia.model_dump_graphql()}
             }}
         }}
@@ -143,7 +171,8 @@ class AniListClient:
 
         if self.dry_run:  # Skip the request, only log the variables
             log.info(
-                f"{self.__class__.__name__}: Dry run enabled, skipping anime entry update $${{anilist_id: {media_list_entry.media_id}}}$$"
+                f"{self.__class__.__name__}: Dry run enabled, skipping anime entry "
+                f"update $${{anilist_id: {media_list_entry.media_id}}}$$"
             )
             return None
 
@@ -161,14 +190,15 @@ class AniListClient:
     ) -> None:
         """Updates multiple anime entries on the authenticated user's list.
 
-        Sends a batch mutation to modify multiple existing anime entries in the user's list.
-        Processes entries in batches of 10 to avoid overwhelming the API.
+        Sends a batch mutation to modify multiple existing anime entries in the user's
+        list. Processes entries in batches of 10 to avoid overwhelming the API.
 
         Args:
-            media_list_entries (list[MediaList]): List of updated AniList entries to save
+            media_list_entries (list[MediaList]): List of updated AniList entries to
+                save.
 
         Raises:
-            aiohttp.ClientError: If the API request fails
+            aiohttp.ClientError: If the API request fails.
         """
         BATCH_SIZE = 10
 
@@ -230,8 +260,8 @@ class AniListClient:
 
             if self.dry_run:
                 log.info(
-                    f"{self.__class__.__name__}: Dry run enabled, skipping anime entry update "
-                    f"$${{anilist_id: {[m.media_id for m in batch]}}}$$"
+                    f"{self.__class__.__name__}: Dry run enabled, skipping anime entry "
+                    f"update $${{anilist_id: {[m.media_id for m in batch]}}}$$"
                 )
                 continue
 
@@ -252,14 +282,15 @@ class AniListClient:
         Sends a mutation to remove a specific anime entry from the user's list.
 
         Args:
-            entry_id (int): The AniList ID of the list entry to delete
-            media_id (int): The AniList ID of the anime being deleted
+            entry_id (int): The AniList ID of the list entry to delete.
+            media_id (int): The AniList ID of the anime being deleted.
 
         Returns:
-            bool: True if the entry was successfully deleted and not in dry run mode, False otherwise
+            bool: True if the entry was successfully deleted and not in dry run mode,
+                  False otherwise.
 
         Raises:
-            aiohttp.ClientError: If the API request fails
+            aiohttp.ClientError: If the API request fails.
         """
         query = """
         mutation ($id: Int) {
@@ -271,7 +302,8 @@ class AniListClient:
 
         if self.dry_run:
             log.info(
-                f"{self.__class__.__name__}: Dry run enabled, skipping anime entry deletion $${{anilist_id: {media_id}}}$$"
+                f"{self.__class__.__name__}: Dry run enabled, skipping anime entry "
+                f"deletion $${{anilist_id: {media_id}}}$$"
             )
             return False
 
@@ -282,10 +314,8 @@ class AniListClient:
         response = await self._make_request(query, variables)
         delete_response = response["data"]["DeleteMediaListEntry"]
 
-        try:
+        with contextlib.suppress(KeyError):
             del self.offline_anilist_entries[media_id]
-        except KeyError:
-            pass
 
         return delete_response["deleted"]
 
@@ -296,26 +326,32 @@ class AniListClient:
         episodes: int | None = None,
         limit: int = 10,
     ) -> AsyncIterator[Media]:
-        """Searches for anime on AniList with filtering capabilities.
+        """Search for anime on AniList with filtering capabilities.
 
-        Performs a search query and filters results based on media format and episode count.
-        Uses local caching through _search_anime() to optimize repeated searches.
+        Performs a search query and filters results based on media format and episode
+        count. Uses local caching through _search_anime() to optimize repeated searches.
 
         Args:
-            search_str (str): Title or keywords to search for
-            is_movie (bool): If True, searches only for movies and specials. If False, searches for TV series, OVAs, and ONAs
-            episodes (int | None): Filter results to match this episode count. If None, returns all results
-            limit (int): Maximum number of results to return. Defaults to 10
+            search_str (str): Title or keywords to search for.
+            is_movie (bool): If True, searches only for movies and specials. If False,
+                searches for TV series, OVAs, and ONAs.
+            episodes (int | None): Filter results to match this episode count. If None,
+                returns all results.
+            limit (int): Maximum number of results to return.
 
-        Returns:
-            AsyncIterator[Media]: Async iterator of filtered matching anime entries, sorted by relevance
+        Yields:
+            Media: Filtered matching anime entries, sorted by relevance.
 
         Raises:
-            aiohttp.ClientError: If the API request fails
+            aiohttp.ClientError: If the API request fails.
         """
         log.debug(
-            f"{self.__class__.__name__}: Searching for {'movie' if is_movie else 'show'} "
-            f"with title $$'{search_str}'$$ that is releasing and has {episodes or 'unknown'} episodes"
+            f"{self.__class__.__name__}: Searching for {
+                'movie' if is_movie else 'show'
+            } "
+            f"with title $$'{search_str}'$$ that is releasing and has {
+                episodes or 'unknown'
+            } episodes"
         )
 
         res = await self._search_anime(search_str, is_movie, limit)
@@ -340,15 +376,16 @@ class AniListClient:
         to reduce API calls for repeated searches.
 
         Args:
-            search_str (str): Title or keywords to search for
-            is_movie (bool): If True, limits to movies and specials. If False, limits to TV series, OVAs, and ONAs
-            limit (int): Maximum number of results to return. Defaults to 10
+            search_str (str): Title or keywords to search for.
+            is_movie (bool): If True, limits to movies and specials. If False, limits
+                to TV series, OVAs, and ONAs.
+            limit (int): Maximum number of results to return. Defaults to 10.
 
         Returns:
-            list[Media]: List of matching anime entries, unfiltered
+            list[Media]: List of matching anime entries, unfiltered.
 
         Raises:
-            aiohttp.ClientError: If the API request fails
+            aiohttp.ClientError: If the API request fails.
         """
         query = f"""
             query ($search: String, $formats: [MediaFormat], $limit: Int) {{
@@ -390,17 +427,18 @@ class AniListClient:
         an API request if not found in cache.
 
         Args:
-            anilist_id (int): The AniList ID of the anime to retrieve
+            anilist_id (int): The AniList ID of the anime to retrieve.
 
         Returns:
-            Media: Detailed information about the requested anime
+            Media: Detailed information about the requested anime.
 
         Raises:
-            aiohttp.ClientError: If the API request fails
+            aiohttp.ClientError: If the API request fails.
         """
         if anilist_id in self.offline_anilist_entries:
             log.debug(
-                f"{self.__class__.__name__}: Pulling AniList data from local cache $${{anilist_id: {anilist_id}}}$$"
+                f"{self.__class__.__name__}: Pulling AniList data from local cache "
+                f"$${{anilist_id: {anilist_id}}}$$"
             )
             return self.offline_anilist_entries[anilist_id]
 
@@ -413,7 +451,8 @@ class AniListClient:
         """
 
         log.debug(
-            f"{self.__class__.__name__}: Pulling AniList data from API $${{anilist_id: {anilist_id}}}$$"
+            f"{self.__class__.__name__}: Pulling AniList data from API "
+            f"$${{anilist_id: {anilist_id}}}$$"
         )
 
         response = await self._make_request(query, {"id": anilist_id})
@@ -431,13 +470,13 @@ class AniListClient:
         in batches of 10 to avoid overwhelming the API.
 
         Args:
-            anilist_ids (list[int]): The AniList IDs of the anime to retrieve
+            anilist_ids (list[int]): The AniList IDs of the anime to retrieve.
 
         Returns:
-            list[Media]: Detailed information about the requested anime
+            list[Media]: Detailed information about the requested anime.
 
         Raises:
-            aiohttp.ClientError: If the API request fails
+            aiohttp.ClientError: If the API request fails.
         """
         BATCH_SIZE = 10
 
@@ -450,8 +489,8 @@ class AniListClient:
         cached_ids = [id for id in anilist_ids if id in self.offline_anilist_entries]
         if cached_ids:
             log.debug(
-                f"{self.__class__.__name__}: Pulling AniList data from local cache in batched mode "
-                f"$${{anilist_ids: {cached_ids}}}$$"
+                f"{self.__class__.__name__}: Pulling AniList data from local cache in "
+                f"batched mode $${{anilist_ids: {cached_ids}}}$$"
             )
             result.extend(self.offline_anilist_entries[id] for id in cached_ids)
 
@@ -464,8 +503,8 @@ class AniListClient:
         for i in range(0, len(missing_ids), BATCH_SIZE):
             batch_ids = missing_ids[i : i + BATCH_SIZE]
             log.debug(
-                f"{self.__class__.__name__}: Pulling AniList data from API in batched mode "
-                f"$${{anilist_ids: {batch_ids}}}$$"
+                f"{self.__class__.__name__}: Pulling AniList data from API in batched "
+                f"mode $${{anilist_ids: {batch_ids}}}$$"
             )
 
             query_parts = []
@@ -480,7 +519,9 @@ class AniListClient:
                 variables[f"id{j}"] = anilist_id
 
             query = f"""
-            query BatchGetAnime({", ".join([f"$id{j}: Int" for j in range(len(batch_ids))])}) {{
+            query BatchGetAnime({
+                ", ".join([f"$id{j}: Int" for j in range(len(batch_ids))])
+            }) {{
                 {" ".join(query_parts)}
             }}
             """
@@ -499,7 +540,8 @@ class AniListClient:
         """Creates a JSON backup of the user's AniList data.
 
         Fetches all anime entries from the user's lists and saves them to a JSON file.
-        Implements a rotating backup system that maintains backups for BACKUP_RETENTION_DAYS.
+        Implements a rotating backup system that maintains backups for
+        BACKUP_RETENTION_DAYS.
 
         The backup includes:
             - User information
@@ -507,8 +549,8 @@ class AniListClient:
             - Detailed information about each anime entry
 
         Raises:
-            aiohttp.ClientError: If the API request fails
-            OSError: If unable to create backup directory or write backup file
+            aiohttp.ClientError: If the API request fails.
+            OSError: If unable to create backup directory or write backup file.
         """
         query = f"""
         query MediaListCollection($userId: Int, $type: MediaType, $chunk: Int) {{
@@ -551,7 +593,7 @@ class AniListClient:
         if not backup_file.parent.exists():
             backup_file.parent.mkdir(parents=True)
 
-        # To compress the backup file, remove the unecessary media field from each list entry
+        # To compress the backup file, remove the unecessary media field from each entry
         data_without_media = MediaListCollection(
             **{
                 field: getattr(data, field)
@@ -578,13 +620,15 @@ class AniListClient:
         with the anime's metadata.
 
         Args:
-            media_list_entry (MediaListWithMedia): Combined object containing both list entry and media information
+            media_list_entry (MediaListWithMedia): Combined object containing both list
+                entry and media information.
 
         Returns:
-            Media: New Media object containing all relevant fields from both the list entry and media information
+            Media: New Media object containing all relevant fields from both the list
+                entry and media information.
 
         Note:
-            This is an internal helper method used primarily by backup_anilist()
+            This is an internal helper method used primarily by backup_anilist().
         """
         return Media(
             media_list_entry=MediaList(
@@ -603,7 +647,7 @@ class AniListClient:
 
     @anilist_limiter()
     async def _make_request(
-        self, query: str, variables: dict | str = {}, retry_count: int = 0
+        self, query: str, variables: dict | str | None = None, retry_count: int = 0
     ) -> dict:
         """Makes a rate-limited request to the AniList GraphQL API.
 
@@ -619,7 +663,8 @@ class AniListClient:
             dict: JSON response from the API
 
         Raises:
-            aiohttp.ClientError: If the request fails for any reason other than rate limiting
+            aiohttp.ClientError: If the request fails for any reason other than rate
+                limiting
 
         Note:
             - Implements rate limiting of 30 requests per minute
@@ -629,17 +674,21 @@ class AniListClient:
         if retry_count >= 3:
             raise aiohttp.ClientError("Failed to make request after 3 tries")
 
+        if variables is None:
+            variables = {}
+
         session = await self._get_session()
 
         try:
             async with session.post(
                 self.API_URL,
-                json={"query": query, "variables": variables or {}},
+                json={"query": query, "variables": variables},
             ) as response:
                 if response.status == 429:  # Handle rate limit retries
                     retry_after = int(response.headers.get("Retry-After", 60))
                     log.warning(
-                        f"{self.__class__.__name__}: Rate limit exceeded, waiting {retry_after} seconds"
+                        f"{self.__class__.__name__}: Rate limit exceeded, waiting "
+                        f"{retry_after} seconds"
                     )
                     await asyncio.sleep(retry_after + 1)
                     return await self._make_request(
@@ -658,7 +707,8 @@ class AniListClient:
                     response.raise_for_status()
                 except aiohttp.ClientResponseError as e:
                     log.error(
-                        f"{self.__class__.__name__}: Failed to make request to AniList API"
+                        f"{self.__class__.__name__}: Failed to make request to AniList "
+                        f"API"
                     )
                     response_text = await response.text()
                     log.error(f"\t\t{response_text}")
@@ -668,7 +718,8 @@ class AniListClient:
 
         except (aiohttp.ClientError, asyncio.TimeoutError):
             log.error(
-                f"{self.__class__.__name__}: Connection error while making request to AniList API"
+                f"{self.__class__.__name__}: Connection error while making request to "
+                f"AniList API"
             )
             await asyncio.sleep(1)
             return await self._make_request(

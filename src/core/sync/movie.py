@@ -1,4 +1,6 @@
-from typing import AsyncIterator
+"""Sync client for Plex movies to AniList."""
+
+from collections.abc import AsyncIterator
 
 from tzlocal import get_localzone
 
@@ -10,16 +12,32 @@ from src.models.animap import AniMap
 
 
 class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
+    """Sync client for Plex movies to AniList.
+
+    This client handles:
+        - Mapping Plex movies to AniList entries using GUIDs (IMDB, TMDB, etc.).
+        - Searching for AniList entries by title if no GUID mapping is found.
+        - Determining watch status, ratings, progress, repeats, start/completion dates.
+    """
+
     async def map_media(
         self, item: Movie
     ) -> AsyncIterator[tuple[Movie, list[Movie], AniMap, Media]]:
-        """Maps a Plex item to potential AniList matches.
+        """Maps a Plex movie to potential AniList matches.
+
+        Searches for AniList entries that match the provided Plex movie using
+        GUID mappings (IMDB, TMDB) and falls back to title-based search if
+        no mapping is found.
 
         Args:
-            item (Movie): Plex media item to map
+            item (Movie): Plex movie to map.
 
-        Returns:
-            AsyncIterator[tuple[Movie, list[Movie], AniMap, Media]]: Mapping matches (child, grandchild, animapping, anilist_media)
+        Yields:
+            tuple: A tuple containing:
+                - Movie: The movie itself.
+                - list[Movie]: List containing the movie.
+                - AniMap: AniMap entry with ID mappings.
+                - Media: Matched AniList media entry.
         """
         guids = ParsedGuids.from_guids(item.guids)
 
@@ -52,7 +70,11 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
         except Exception:
             log.error(
                 f"Failed to fetch AniList data for {self._debug_log_title(item)}: "
-                f"{self._debug_log_ids(item.ratingKey, item.guid, guids, animapping.anilist_id)}",
+                f"{
+                    self._debug_log_ids(
+                        item.ratingKey, item.guid, guids, animapping.anilist_id
+                    )
+                }",
                 exc_info=True,
             )
             return
@@ -69,13 +91,14 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
     async def search_media(self, item: Movie, child_item: Movie) -> Media | None:
         """Searches for matching AniList entry by title.
 
-        For movies, we search for single episode entries.
+        For movies, searches for single-episode entries.
 
         Args:
-            item (Movie): Main Plex item
+            item (Movie): Main Plex item.
+            child_item (Movie): Child Plex item.
 
         Returns:
-            Media | None: Matching AniList entry or None if not found
+            Media | None: Matching AniList entry or None if not found.
         """
         if self.search_fallback_threshold == -1:
             return None
@@ -99,14 +122,14 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
         """Calculates the watch status for a media item.
 
         Args:
-            item (Movie): Main Plex media item
-            child_item (Movie): Child Plex media item (same as item for movies)
-            grandchild_items (list[Movie]): List containing the movie item
-            anilist_media (Media): AniList media entry
-            animapping (AniMap): Mapping between Plex and AniList
+            item (Movie): Main Plex media item.
+            child_item (Movie): Child Plex media item (same as item for movies).
+            grandchild_items (list[Movie]): List containing the movie item.
+            anilist_media (Media): AniList media entry.
+            animapping (AniMap): Mapping between Plex and AniList.
 
         Returns:
-            MediaListStatus | None: Watch status for the media item
+            MediaListStatus | None: Watch status for the media item.
         """
         is_viewed = item.viewCount > 0
         is_partially_viewed = item.viewOffset > 0
@@ -124,7 +147,8 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
 
         is_on_watchlist = self.plex_client.is_on_watchlist(item)
 
-        # We've watched part of it and it's not on continue watching. However, we've watchlisted it
+        # We've watched part of it and it's not on continue watching. However, we've
+        # watchlisted it
         if is_on_watchlist and is_partially_viewed:
             return MediaListStatus.PAUSED
         # It's on our watchlist and we haven't watched it yet
@@ -146,14 +170,14 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
         """Calculates the user rating for a media item.
 
         Args:
-            item (Movie): Main Plex media item
-            child_item (Movie): Child Plex media item (same as item for movies)
-            grandchild_items (list[Movie]): List containing the movie item
-            anilist_media (Media): AniList media entry
-            animapping (AniMap): Mapping between Plex and AniList
+            item (Movie): Main Plex media item.
+            child_item (Movie): Child Plex media item (same as item for movies).
+            grandchild_items (list[Movie]): List containing the movie item.
+            anilist_media (Media): AniList media entry.
+            animapping (AniMap): Mapping between Plex and AniList.
 
         Returns:
-            int | float | None: User rating for the media item (normalized to AniList scale)
+            int | float | None: User rating for the media item (normalized by scale).
         """
         score = item.userRating
         return self._normalize_score(score) if score else None
@@ -169,14 +193,14 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
         """Calculates the progress for a media item.
 
         Args:
-            item (Movie): Main Plex media item
-            child_item (Movie): Child Plex media item (same as item for movies)
-            grandchild_items: list[Movie]: List containing the movie item
-            anilist_media (Media): AniList media entry
-            animapping (AniMap): Mapping between Plex and AniList
+            item (Movie): Main Plex media item.
+            child_item (Movie): Child Plex media item (same as item for movies).
+            grandchild_items (list[Movie]): List containing the movie item.
+            anilist_media (Media): AniList media entry.
+            animapping (AniMap): Mapping between Plex and AniList.
 
         Returns:
-            int | None: Progress for the media item (total episodes if watched, None if not)
+            int | None: Progress for the media item (None if not watched).
         """
         return (anilist_media.episodes or 1) if item.viewCount else None
 
@@ -191,14 +215,14 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
         """Calculates the number of repeats for a media item.
 
         Args:
-            item (Movie): Main Plex media item
-            child_item (Movie): Child Plex media item (same as item for movies)
-            grandchild_items: list[Movie]: List containing the movie item
-            anilist_media (Media): AniList media entry
-            animapping (AniMap): Mapping between Plex and AniList
+            item (Movie): Main Plex media item.
+            child_item (Movie): Child Plex media item (same as item for movies).
+            grandchild_items (list[Movie]): List containing the movie item.
+            anilist_media (Media): AniList media entry.
+            animapping (AniMap): Mapping between Plex and AniList.
 
         Returns:
-            int | None: Number of repeats for the media item (viewCount - 1)
+            int | None: Number of repeats for the media item (viewCount - 1).
         """
         return item.viewCount - 1 if item.viewCount else None
 
@@ -213,14 +237,14 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
         """Calculates the start date for a media item.
 
         Args:
-            item (Movie): Main Plex media item
-            child_item (Movie): Child Plex media item (same as item for movies)
-            grandchild_items: list[Movie]: List containing the movie item
-            anilist_media (Media): AniList media entry
-            animapping (AniMap): Mapping between Plex and AniList
+            item (Movie): Main Plex media item.
+            child_item (Movie): Child Plex media item (same as item for movies).
+            grandchild_items (list[Movie]): List containing the movie item.
+            anilist_media (Media): AniList media entry.
+            animapping (AniMap): Mapping between Plex and AniList.
 
         Returns:
-            FuzzyDate | None: Start date for the media item (earliest view date)
+            FuzzyDate | None: Start date for the media item (earliest view date).
         """
         history = await self.plex_client.get_history(item)
         first_history = min(history, key=lambda h: h.viewedAt) if history else None
@@ -255,14 +279,15 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
         """Calculates the completion date for a media item.
 
         Args:
-            item (Movie): Main Plex media item
-            child_item (Movie): Child Plex media item (same as item for movies)
-            grandchild_items: list[Movie]: List containing the movie item
-            anilist_media (Media): AniList media entry
-            animapping (AniMap): Mapping between Plex and AniList
+            item (Movie): Main Plex media item.
+            child_item (Movie): Child Plex media item (same as item for movies).
+            grandchild_items (list[Movie]): List containing the movie item.
+            anilist_media (Media): AniList media entry.
+            animapping (AniMap): Mapping between Plex and AniList.
 
         Returns:
-            FuzzyDate | None: Completion date for the media item (same as start date for movies)
+            FuzzyDate | None: Completion date for the media item (same as start date
+                              for movies).
         """
         return await self._calculate_started_at(
             item, child_item, grandchild_items, anilist_media, animapping
@@ -279,14 +304,14 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
         """Chooses the most relevant user notes for a media item.
 
         Args:
-            item (Movie): Main Plex media item
-            child_item (Movie): Child Plex media item (same as item for movies)
-            grandchild_items: list[Movie]: List containing the movie item
-            anilist_media (Media): AniList media entry
-            animapping (AniMap): Mapping between Plex and AniList
+            item (Movie): Main Plex media item.
+            child_item (Movie): Child Plex media item (same as item for movies).
+            grandchild_items (list[Movie]): List containing the movie item.
+            anilist_media (Media): AniList media entry.
+            animapping (AniMap): Mapping between Plex and AniList.
 
         Returns:
-            str | None: User notes for the media item (from Plex user review)
+            str | None: User notes for the media item (from Plex user review).
         """
         return await self.plex_client.get_user_review(item)
 
@@ -296,11 +321,11 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
         The outputted string uses color formatting syntax with the `$$` delimiters.
 
         Args:
-            item (Movie): Plex media item
-            animapping (AniMap | None): Optional mapping data (not used for movies)
+            item (Movie): Plex media item.
+            animapping (AniMap | None): Optional mapping data (not used for movies).
 
         Returns:
-            str: Debug-friendly string of media titles
+            str: Debug-friendly string of media titles.
         """
         return f"$$'{item.title}'$$"
 
@@ -316,12 +341,15 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
         The outputted string uses color formatting syntax with the `$$` delimiters.
 
         Args:
-            key (int): Plex rating key
-            plex_id (str): Plex ID
-            guids (ParsedGuids): Plex GUIDs
-            anilist_id (int | None): AniList ID
+            key (int | str): Plex rating key.
+            plex_id (str | None): Plex ID.
+            guids (ParsedGuids): Plex GUIDs.
+            anilist_id (int | None): AniList ID.
 
         Returns:
-            str: Debug-friendly string of media identifiers
+            str: Debug-friendly string of media identifiers.
         """
-        return f"$${{key: {key}, plex_id: {plex_id}, {guids}{f', anilist_id: {anilist_id}' if anilist_id else ''}}}$$"
+        return (
+            f"$${{key: {key}, plex_id: {plex_id}, {guids}"
+            f"{f', anilist_id: {anilist_id}' if anilist_id else ''}}}$$"
+        )

@@ -1,3 +1,5 @@
+"""PlexAniBridge Main Application."""
+
 import asyncio
 import signal
 import sys
@@ -12,7 +14,8 @@ from src.core.sched import SchedulerClient
 class GracefulShutdownHandler:
     """Handles graceful shutdown on SIGINT and SIGTERM signals."""
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Initialize the shutdown handler."""
         self.shutdown_event = asyncio.Event()
         self._setup_signal_handlers()
 
@@ -31,7 +34,8 @@ class GracefulShutdownHandler:
         """Handle shutdown signals."""
         sig_name = signal.Signals(sig_num).name if sig_num else "UNKNOWN"
         log.info(
-            f"PlexAniBridge: Received {sig_name} signal, initiating graceful shutdown..."
+            f"PlexAniBridge: Received {sig_name} signal, initiating graceful "
+            f"shutdown..."
         )
         self.shutdown_event.set()
 
@@ -68,17 +72,20 @@ def validate_configuration():
                 return False
             except ValidationError as e:
                 log.error(
-                    f"PlexAniBridge: Invalid configuration for profile $$'{profile_name}'$$: {e}"
+                    f"PlexAniBridge: Invalid configuration for profile "
+                    f"$$'{profile_name}'$$: {e}"
                 )
                 return False
             except ValueError as e:
                 log.error(
-                    f"PlexAniBridge: Configuration error for profile $$'{profile_name}'$$: {e}"
+                    f"PlexAniBridge: Configuration error for profile "
+                    f"$$'{profile_name}'$$: {e}"
                 )
                 return False
             except (AttributeError, TypeError) as e:
                 log.error(
-                    f"PlexAniBridge: Configuration structure error for profile $$'{profile_name}'$$: {e}"
+                    f"PlexAniBridge: Configuration structure error for profile "
+                    f"$$'{profile_name}'$$: {e}"
                 )
                 return False
 

@@ -1,3 +1,5 @@
+"""PlexAniBridge Initialization Module."""
+
 import os
 import uuid
 

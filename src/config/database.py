@@ -1,3 +1,5 @@
+"""Database Configuration for PlexAniBridge."""
+
 from pathlib import Path
 from types import TracebackType
 
@@ -64,11 +66,11 @@ class PlexAniBridgeDB:
         if not self.data_path.exists():
             try:
                 self.data_path.mkdir(parents=True, exist_ok=True)
-            except PermissionError:
+            except PermissionError as e:
                 raise PermissionError(
                     f"{self.__class__.__name__}: You do not have permissions to create "
                     f"files at '{self.data_path}'"
-                )
+                ) from e
         elif self.data_path.is_file():
             raise ValueError(
                 f"{self.__class__.__name__}: The path '{self.data_path}' is a file, "
@@ -118,7 +120,8 @@ class PlexAniBridgeDB:
         """Exits the context manager, closing the session.
 
         Args:
-            exc_type (type[BaseException] | None): Exception type if an exception occurred
+            exc_type (type[BaseException] | None): Exception type if an exception
+                                                   occurred
             exc_val (BaseException | None): Exception value if an exception occurred
             exc_tb (TracebackType | None): Exception traceback if an exception occurred
         """
