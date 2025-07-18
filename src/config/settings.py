@@ -139,7 +139,7 @@ class PlexAnibridgeProfileConfig(BaseSettings):
         description="Genre filter (empty = all)",
     )
     plex_metadata_source: PlexMetadataSource = Field(
-        PlexMetadataSource.LOCAL,
+        default=PlexMetadataSource.LOCAL,
         description="Source of metadata for Plex media items",
     )
     sync_interval: int = Field(
