@@ -3,10 +3,6 @@ title: Configuration
 icon: material/cog
 ---
 
-## Multi-Profile Configuration
-
-PlexAniBridge now supports multiple sync profiles, allowing you to sync different Plex users with different AniList accounts using different settings. Each profile is completely independent.
-
 ## Example
 
 Below is an example `.env` file for PlexAniBridge:

@@ -26,14 +26,16 @@ PlexAniBridge is a tool designed to keep your AniList profile automatically sync
 ```yaml
 services:
   plexanibridge:
-    image: ghcr.io/eliasbenb/plexanibridge:v0
+    image: ghcr.io/eliasbenb/plexanibridge:v1
     environment:
-      TZ: America/New_York
-      ANILIST_TOKEN: eyJ...
-      PLEX_TOKEN: 2Sb...
-      PLEX_USER: username
-      PLEX_URL: http://plex:32400
+      PUID: 1000
+      PGID: 1000
+      TZ: Etc/UTC
+      PAB_ANILIST_TOKEN: eyJ...
+      PAB_PLEX_TOKEN: 2Sb...
+      PAB_PLEX_USER: username
+      PAB_PLEX_URL: http://plex:32400
     volumes:
-      - ./data:/app/data
+      - /path/to/plexanibridge/data:/config
     restart: unless-stopped
 ```

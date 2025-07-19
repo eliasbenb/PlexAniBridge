@@ -34,7 +34,7 @@ Below is a PlexAniBridge Docker compose file with example values. Optional envir
     ```
 
 ```yaml title="compose.yaml"
---8<-- "compose.yaml"
+--8<-- "docs/compose.yaml"
 ```
 
 To start the container, run:
