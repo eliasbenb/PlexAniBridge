@@ -50,8 +50,8 @@ docker compose -f compose.yaml up -d
     - `latest`: The latest stable release
     - `beta`: The latest beta release (may be unstable)
     - `alpha`: The latest alpha release (may be unstable)
-    - `vX.Y.Z`: A specific version from the [releases page](https://github.com/eliasbenb/PlexAniBridge/releases) (e.g. `v0.4.0`)
-    - `X.Y.Z`: Alias of `vX.Y.Z` (e.g. `0.4.0`)
+    - `vX.Y.Z`: A specific version from the [releases page](https://github.com/eliasbenb/PlexAniBridge/releases) (e.g. `v1.0.0`)
+    - `X.Y.Z`: Alias of `vX.Y.Z` (e.g. `1.0.0`)
     - `main`: The latest commit on the `main` branch, which is usually tied to the latest release
     - `develop`: The latest commit on the `develop` branch (may be unstable)
     - `experimental`: The latest commit on the `experimental` branch (may be unstable)
@@ -64,10 +64,13 @@ Below is a minimal example of a Docker run command with only the required variab
 ```shell
 docker run \
   --name plexanibridge \
-  -e ANILIST_TOKEN \
-  -e PLEX_TOKEN \
-  -e PLEX_USER \
-  -e PLEX_URL \
-  -v ./data:/app/data \
-  ghcr.io/eliasbenb/plexanibridge:v0
+  -e PUID=1000 \
+  -e PGID=1000 \
+  -e TZ=Etc/UTC \
+  -e PAB_ANILIST_TOKEN=eyJ... \
+  -e PAB_PLEX_TOKEN=2Sb... \
+  -e PAB_PLEX_USER=username \
+  -e PAB_PLEX_URL=http://plex:32400 \
+  -v /path/to/plexanibridge/data:/config \
+  ghcr.io/eliasbenb/plexanibridge:v1
 ```

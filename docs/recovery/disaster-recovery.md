@@ -11,15 +11,26 @@ Given that software will always be susceptible to bugs, PlexAniBridge offers a b
 
 ## Backups
 
-Before any scheduled sync job, PlexAniBridge will create a backup of your current AniList data. These backups are stored under the data folder (defined in `DATA_PATH`) in the `backups` directory as JSON files.
+Before any scheduled sync job, PlexAniBridge will create a backup of your current AniList data. These backups are stored under the data folder (defined in `PAB_DATA_PATH`) in the `backups` directory as JSON files.
 
 !!! warning
 
     These backups are automatically deleted after 7 days.
 
+## Restoring from Backups
+
 To restore from a backup, use the [restore script](https://github.com/eliasbenb/PlexAniBridge/blob/HEAD/scripts/anilist_restore.py) in the `scripts` folder. You will need to pass the backup file and AniList token as arguments:
 
 ```shell
 pip install requests pydantic # Python 3.10+
-python scripts/anilist_restore.py --token <YOUR_ANILIST_TOKEN> ./data/backups/plexanibridge-user.1.json
+python scripts/anilist_restore.py --token "$ANILIST_TOKEN" "./data/backups/plexanibridge-$ANILIST_USERNAME.$BACKUP_TIME.json"
 ```
+
+!!! tip "Restoring With Docker"
+
+    If you are using Docker, you can run the restore script inside your Docker container:
+
+    ```shell
+    # docker exec -it plexanibridge ls /config/backups
+    docker exec -it plexanibridge python scripts/anilist_restore.py --token "$ANILIST_TOKEN" "/config/backups/plexanibridge-$ANILIST_USERNAME.$BACKUP_TIME.json"
+    ```
