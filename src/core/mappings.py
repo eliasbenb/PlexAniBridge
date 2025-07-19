@@ -1,3 +1,5 @@
+"""Mappings Client Module."""
+
 import asyncio
 import json
 from pathlib import Path
@@ -28,6 +30,7 @@ class MappingsClient:
     ]
 
     def __init__(self, data_path: Path) -> None:
+        """Initialize the MappingsClient with the data path."""
         self.data_path = data_path
         self._loaded_sources: set[str] = set()
         self._session: aiohttp.ClientSession | None = None
@@ -48,10 +51,22 @@ class MappingsClient:
         if self._session and not self._session.closed:
             await self._session.close()
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> "MappingsClient":
+        """Context manager enter method.
+
+        Returns:
+            MappingsClient: The initialized mappings client instance.
+        """
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        """Context manager exit method.
+
+        Args:
+            exc_type: Exception type if an exception occurred.
+            exc_val: Exception value if an exception occurred.
+            exc_tb: Traceback object if an exception occurred.
+        """
         await self.close()
 
     def _is_file(self, src: str) -> bool:
@@ -133,7 +148,8 @@ class MappingsClient:
 
         Args:
             includes (list[str]): List of file paths or URLs to include
-            loaded_chain (set[str]): Set of already loaded includes to prevent circular includes
+            loaded_chain (set[str]): Set of already loaded includes to prevent circular
+                                     includes
             parent (str): Parent path or URL to resolve relative paths against
 
         Returns:
@@ -145,12 +161,14 @@ class MappingsClient:
 
             if resolved_include in loaded_chain:
                 log.warning(
-                    f"{self.__class__.__name__}: Circular include detected: '{resolved_include}' has already been loaded in this chain"
+                    f"{self.__class__.__name__}: Circular include detected: "
+                    f"$$'{resolved_include}'$$ has already been loaded in this chain"
                 )
                 continue
             if resolved_include in self._loaded_sources:
                 log.info(
-                    f"{self.__class__.__name__}: Skipping already loaded include: '{resolved_include}'"
+                    f"{self.__class__.__name__}: Skipping already loaded include: "
+                    f"$$'{resolved_include}'$$"
                 )
                 continue
 
@@ -168,7 +186,8 @@ class MappingsClient:
 
         Args:
             file (str): Path to the file to load
-            loaded_chain (set[str]): Set of already loaded includes to prevent circular includes
+            loaded_chain (set[str]): Set of already loaded includes to prevent circular
+                                     includes
 
         Returns:
             AniMapDict: Mappings loaded from the file
@@ -208,8 +227,8 @@ class MappingsClient:
             includes = [str(item) for item in includes_value]
         else:
             log.warning(
-                f"{self.__class__.__name__}: The $includes key in $'{str(file_path.resolve())}'$ "
-                "is not a list, ignoring all entries"
+                f"{self.__class__.__name__}: The $includes key in "
+                f"$$'{str(file_path.resolve())}'$$ is not a list, ignoring all entries"
             )
 
         return self._deep_merge(
@@ -224,7 +243,8 @@ class MappingsClient:
 
         Args:
             url (str): URL to load mappings from
-            loaded_chain (set[str]): Set of already loaded includes to prevent circular includes
+            loaded_chain (set[str]): Set of already loaded includes to prevent circular
+                                     includes
             retry_count (int): Number of retries to attempt (default: 0)
 
         Returns:
@@ -241,7 +261,8 @@ class MappingsClient:
         except (aiohttp.ClientError, asyncio.TimeoutError):
             if retry_count < 2:
                 log.warning(
-                    f"{self.__class__.__name__}: Error reaching mappings URL $$'{url}'$$, retrying...",
+                    f"{self.__class__.__name__}: Error reaching mappings URL "
+                    f"$$'{url}'$$, retrying...",
                     exc_info=True,
                 )
                 await asyncio.sleep(1)
@@ -252,11 +273,13 @@ class MappingsClient:
             )
         except (json.JSONDecodeError, aiohttp.ContentTypeError):
             log.error(
-                f"{self.__class__.__name__}: Error decoding mappings from URL $$'{url}'$$"
+                f"{self.__class__.__name__}: Error decoding mappings from URL "
+                f"$$'{url}'$$"
             )
         except Exception:
             log.error(
-                f"{self.__class__.__name__}: Unexpected error fetching mappings from URL $$'{url}'$$",
+                f"{self.__class__.__name__}: Unexpected error fetching mappings from "
+                f"URL $$'{url}'$$",
                 exc_info=True,
             )
 
@@ -270,8 +293,8 @@ class MappingsClient:
                     mappings = tomlkit.loads(mappings_raw)
                 case _:
                     log.warning(
-                        f"{self.__class__.__name__}: Unknown file type for URL $$'{url}'$$, "
-                        "defaulting to JSON parsing"
+                        f"{self.__class__.__name__}: Unknown file type for URL "
+                        f"$$'{url}'$$, defaulting to JSON parsing"
                     )
                     mappings = json.loads(mappings_raw)
         except (json.JSONDecodeError, yaml.YAMLError, TOMLKitError):
@@ -303,17 +326,20 @@ class MappingsClient:
         )
 
     async def _load_mappings(
-        self, src: str, loaded_chain: set[str] = set()
+        self, src: str, loaded_chain: set[str] | None = None
     ) -> AniMapDict:
         """Load mappings from a file or URL.
 
         Args:
             src (str): Path to the file or URL to load mappings from
-            loaded_chain (set[str]): Set of already loaded includes to prevent circular includes (default: empty set)
+            loaded_chain (set[str]): Set of already loaded includes to prevent
+                                     circular includes (default: empty set)
 
         Returns:
             AniMapDict: Mappings loaded from the file or URL
         """
+        if loaded_chain is None:
+            loaded_chain = set()
         loaded_chain = loaded_chain | {src}
 
         if self._is_file(src):
@@ -328,7 +354,8 @@ class MappingsClient:
             return await self._load_mappings_url(src, loaded_chain)
         else:
             log.warning(
-                f"{self.__class__.__name__}: Invalid mappings source: $$'{src}'$$, skipping"
+                f"{self.__class__.__name__}: Invalid mappings source: $$'{src}'$$, "
+                f"skipping"
             )
             return {}
 
@@ -383,8 +410,9 @@ class MappingsClient:
 
         if len(existing_custom_mapping_files) > 1:
             log.warning(
-                f"{self.__class__.__name__}: Found multiple custom mappings files: {existing_custom_mapping_files}. "
-                f"Only one mappings file can be used at a time. Defaulting to $$'{custom_mappings_path}'$$"
+                f"{self.__class__.__name__}: Found multiple custom mappings files: "
+                f"{existing_custom_mapping_files}. Only one mappings file can be used "
+                f"at a time. Defaulting to $$'{custom_mappings_path}'$$"
             )
 
         db_mappings = await self._load_mappings(self.CDN_URL)

@@ -1,6 +1,9 @@
+"""Plex Client Module."""
+
+from collections.abc import Iterator
 from datetime import datetime, timedelta, timezone
 from math import isnan
-from typing import Iterator, TypeAlias
+from typing import TypeAlias
 from urllib.parse import urlparse
 from xml.etree import ElementTree
 
@@ -36,19 +39,24 @@ Section: TypeAlias = MovieSection | ShowSection
 class PlexClient:
     """Client for interacting with Plex Media Server and Plex API.
 
-    This client provides methods to interact with both the Plex Media Server and Plex API,
-    including accessing media sections, retrieving watch history, and managing user-specific
-    features like watchlists and continue watching states.
+    This client provides methods to interact with both the Plex Media Server and Plex
+    API, including accessing media sections, retrieving watch history, and managing
+    user-specific features like watchlists and continue watching states.
 
     Attributes:
-        plex_token (str): Authentication token for Plex
-        plex_user (str): Username or email of the Plex user
-        plex_url (str): Base URL of the Plex server
-        plex_sections (list[str]): List of enabled Plex library section names
-        admin_client (PlexServer): PlexServer instance with admin privileges
-        user_client (PlexServer): PlexServer instance for the specified user
-        is_admin_user (bool): Whether the specified user has admin privileges
-        user_account_id (int): Unique identifier for the user account
+        plex_token: Authentication token for Plex.
+        plex_user: Username or email of the Plex user.
+        plex_url: Base URL of the Plex server.
+        plex_sections: List of enabled Plex library section names.
+        plex_genres: List of genres to filter media items.
+        plex_metadata_source: Source of metadata for Plex.
+        admin_client: PlexServer instance with admin privileges.
+        user_client: PlexServer instance for the specified user.
+        online_client: PlexMetadataServer instance for online metadata, if applicable.
+        community_client: PlexCommunityClient instance for community API interactions.
+        is_admin_user: Whether the specified user has admin privileges.
+        user_account_id: Unique identifier for the user account.
+        on_deck_window: Time delta for the cutoff duration of Continue Watching items.
     """
 
     def __init__(
@@ -60,6 +68,7 @@ class PlexClient:
         plex_genres: list[str],
         plex_metadata_source: PlexMetadataSource,
     ) -> None:
+        """Initialize the Plex client with user credentials and server details."""
         self.plex_token = plex_token
         self.plex_user = plex_user
         self.plex_url = plex_url
@@ -84,10 +93,22 @@ class PlexClient:
         if hasattr(self, "community_client"):
             await self.community_client.close()
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> "PlexClient":
+        """Context manager enter method.
+
+        Returns:
+            PlexClient: The initialized Plex client instance.
+        """
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        """Context manager exit method.
+
+        Args:
+            exc_type: Exception type if an exception occurred.
+            exc_val: Exception value if an exception occurred.
+            exc_tb: Traceback object if an exception occurred.
+        """
         await self.close()
 
     def clear_cache(self) -> None:
@@ -150,9 +171,9 @@ class PlexClient:
         else:
             if self.plex_metadata_source == PlexMetadataSource.ONLINE:
                 log.warning(
-                    f"{self.__class__.__name__}: PLEX_METADATA_SOURCE=online was configured "
-                    f"but the user $$'{self.plex_user}'$$ is not an admin user. Online data "
-                    "will not be available for this user."
+                    f"{self.__class__.__name__}: PLEX_METADATA_SOURCE=online was "
+                    f"configured but the user $$'{self.plex_user}'$$ is not an admin "
+                    f"user. Online data will not be available for this user."
                 )
 
             try:
@@ -162,7 +183,8 @@ class PlexClient:
                 ).id
             except Exception as e:
                 raise ValueError(
-                    f"{self.__class__.__name__}: Failed to switch to user $$'{self.plex_user}'$$"
+                    f"{self.__class__.__name__}: Failed to switch to user "
+                    f"$$'{self.plex_user}'$$"
                 ) from e
 
         log.debug(
@@ -215,7 +237,7 @@ class PlexClient:
     def _get_on_deck_window(self) -> timedelta:
         """Gets the configured cutoff time for Continue Watching items on Plex.
 
-        This setting is server-wide and can only be configured by the admin of the server.
+        This setting is server-wide and can only be configured by an admin user.
 
         Returns:
             timedelta: Time delta for the cutoff duration
@@ -270,23 +292,26 @@ class PlexClient:
         require_watched: bool = False,
         **kwargs,
     ) -> Iterator[Media]:
-        """Retrieves items from a specified Plex library section with optional filtering.
+        """Retrieve items from a specified Plex library section with optional filtering.
 
         Args:
-            section (Section): The library section to query
-            min_last_modified (datetime | None): If provided, only returns items modified, viewed, or rated after this timestamp
-            require_watched (bool): If True, only returns items that have been watched at least once. Defaults to False
-            **kwargs: Additional keyword arguments passed to the section.search() method
+            section: The library section to query.
+            min_last_modified: If provided, only returns items modified, viewed, or
+                rated after this timestamp.
+            require_watched: If True, only returns items that have been watched at
+                least once.
+            **kwargs: Additional keyword arguments passed to section.search().
 
-        Returns:
-            Iterator[Media]: Iterator of media items matching the criteria
+        Yields:
+            Media: Media items matching the criteria
         """
         filters: dict[str, list] = {"and": []}
 
         if min_last_modified:
             log.debug(
-                f"{self.__class__.__name__}: Filtering section $$'{section.title}'$$ by "
-                f"items last updated, viewed, or rated after {min_last_modified.astimezone(get_localzone())}"
+                f"{self.__class__.__name__}: Filtering section $$'{section.title}'$$ "
+                f"by items last updated, viewed, or rated after "
+                f"{min_last_modified.astimezone(get_localzone())}"
             )
 
             if section.TYPE == "movie":
@@ -330,8 +355,8 @@ class PlexClient:
 
         if require_watched:
             log.debug(
-                f"{self.__class__.__name__}: Filtering section $$'{section.title}'$$ by "
-                f"items that have been watched"
+                f"{self.__class__.__name__}: Filtering section $$'{section.title}'$$ "
+                f"by items that have been watched"
             )
 
             epoch = datetime.fromtimestamp(0, tz=timezone.utc)
@@ -372,13 +397,12 @@ class PlexClient:
 
         if self.plex_genres:
             log.debug(
-                f"{self.__class__.__name__}: Filtering section $$'{section.title}'$$ by "
-                f"genres: {self.plex_genres}"
+                f"{self.__class__.__name__}: Filtering section $$'{section.title}'$$ "
+                f"by genres: {self.plex_genres}"
             )
             filters["and"].append({"genre": self.plex_genres})
 
-        for item in section.search(filters=filters, **kwargs):
-            yield item
+        yield from section.search(filters=filters, **kwargs)
 
     @alru_cache(maxsize=1024, ttl=30)
     async def get_user_review(self, item: Media) -> str | None:

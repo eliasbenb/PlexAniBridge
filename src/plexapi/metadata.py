@@ -1,8 +1,11 @@
+"""Plex Metadata API Module."""
+
 from collections import defaultdict
+from collections.abc import Callable
 from functools import cached_property, wraps
 from itertools import chain
 from time import sleep
-from typing import Any, Callable
+from typing import Any
 from xml.etree import ElementTree
 
 import requests
@@ -57,7 +60,8 @@ def discover_server(func: Callable[..., Any]) -> Callable[..., Any]:
         func (Callable): The function to wrap
 
     Returns:
-        Callable: The wrapped function that will execute with the Discover server context
+        Callable: The wrapped function that will execute with the Discover server
+                context
     """
 
     @wraps(func)
@@ -82,7 +86,8 @@ def metadata_server(func: Callable[..., Any]) -> Callable[..., Any]:
         func (Callable): The function to wrap
 
     Returns:
-        Callable: The wrapped function that will execute with the Metadata server context
+        Callable: The wrapped function that will execute with the Metadata server
+                  context
     """
 
     @wraps(func)
@@ -107,7 +112,8 @@ class PlexMetadataObject(PlexObject):
     from different Plex endpoints based on the source of the object.
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
+        """Initialize the PlexMetadataObject with a reference to the server."""
         super().__init__(*args, **kwargs)
         self._source: str = self._server._baseurl
 
@@ -128,12 +134,16 @@ class PlexMetadataObject(PlexObject):
 
 
 class VideoMetadataMixin:
+    """Mixin class for video objects to handle rating keys and user states."""
+
     def _loadData(self, data):
         super()._loadData(data)  # type: ignore
         self.ratingKey = data.attrib.get("ratingKey")
 
 
 class EpisodeMetadataMixin:
+    """Mixin class for episode objects to handle parent and grandparent rating keys."""
+
     def _loadData(self, data):
         super()._loadData(data)  # type: ignore
         self.parentRatingKey = data.attrib.get("parentRatingKey")
@@ -141,17 +151,22 @@ class EpisodeMetadataMixin:
 
 
 class SeasonMetadataMixin:
+    """Mixin class for season objects to handle parent rating keys."""
+
     def _loadData(self, data):
         super()._loadData(data)  # type: ignore
         self.parentRatingKey = data.attrib.get("parentRatingKey")
 
     @metadata_server
     def episodes(self, **kwargs):
+        """Fetch episodes for the season from the Metadata API."""
         key = f"{self.key}/children?includeUserState=1&episodeOrder=tvdbAiring"  # type: ignore
         return self.fetchItems(key, MetadataEpisode, **kwargs)  # type: ignore
 
 
 class ShowMetadataMixin:
+    """Mixin class for show objects to handle user states and seasons."""
+
     @discover_server
     def __loadUserStates(self, seasons):
         if not seasons:
@@ -181,7 +196,8 @@ class ShowMetadataMixin:
 
     @metadata_server
     def seasons(self, **kwargs):
-        key = f"{self.key}/children?excludeAllLeaves=1&episodeOrder=tvdbAiring"  # &includeUserState=1 # type: ignore
+        """Fetch seasons for the show from the Metadata API."""
+        key = f"{self.key}/children?excludeAllLeaves=1&episodeOrder=tvdbAiring"  # type: ignore
         return self.__loadUserStates(
             self.fetchItems(  # type: ignore
                 key,
@@ -192,12 +208,15 @@ class ShowMetadataMixin:
         )
 
     def episodes(self, **kwargs):
+        """Fetch all episodes for the show from the Metadata API."""
         return list(
             chain.from_iterable(season.episodes(**kwargs) for season in self.seasons())
         )
 
 
 class LibrarySectionMetadataMixin:
+    """Mixin class for library section objects to handle search and item fetching."""
+
     @original_server
     def _search(self, *args, **kwargs):
         return super().search(*args, **kwargs)  # type: ignore
@@ -243,52 +262,72 @@ class LibrarySectionMetadataMixin:
 
 
 class MetadataVideo(VideoMetadataMixin, PlexMetadataObject, Video):
+    """Extends PlexObject with video metadata capabilities."""
+
     pass
 
 
 class MetadataMovie(VideoMetadataMixin, PlexMetadataObject, Movie):
+    """Extends PlexObject with movie metadata capabilities."""
+
     pass
 
 
 class MetadataEpisode(
     EpisodeMetadataMixin, VideoMetadataMixin, PlexMetadataObject, Episode
 ):
+    """Extends PlexObject with episode metadata capabilities."""
+
     pass
 
 
 class MetadataSeason(
     SeasonMetadataMixin, VideoMetadataMixin, PlexMetadataObject, Season
 ):
+    """Extends PlexObject with season metadata capabilities."""
+
     pass
 
 
 class MetadataShow(ShowMetadataMixin, VideoMetadataMixin, PlexMetadataObject, Show):
+    """Extends PlexObject with show metadata capabilities."""
+
     pass
 
 
 class MetadataLibrarySection(
     LibrarySectionMetadataMixin, PlexMetadataObject, LibrarySection
 ):
+    """Extends PlexObject with library section metadata capabilities."""
+
     pass
 
 
 class MetadataMovieSection(
     LibrarySectionMetadataMixin, PlexMetadataObject, MovieSection
 ):
+    """Extends PlexObject with movie section metadata capabilities."""
+
     def search(self, *args, **kwargs):
+        """Search for movies in the movie section."""
         return LibrarySectionMetadataMixin.search(
-            self, cls=MetadataMovie, *args, **kwargs
+            self, *args, cls=MetadataMovie, **kwargs
         )
 
 
 class MetadataShowSection(LibrarySectionMetadataMixin, PlexMetadataObject, ShowSection):
+    """Extends PlexObject with show section metadata capabilities."""
+
     def search(self, *args, **kwargs):
+        """Search for shows in the show section."""
         return LibrarySectionMetadataMixin.search(
-            self, cls=MetadataShow, *args, **kwargs
+            self, *args, cls=MetadataShow, **kwargs
         )
 
 
 class MetadataLibrary(PlexMetadataObject, Library):
+    """Extends PlexObject with library metadata capabilities."""
+
     @cached_data_property
     def _loadSections(self):
         key = "/library/sections"
@@ -310,7 +349,10 @@ class MetadataLibrary(PlexMetadataObject, Library):
 
 
 class PlexMetadataServer(PlexServer):
+    """Extends PlexObject with metadata capabilities."""
+
     def __init__(self, *args, **kwargs):
+        """Initialize the PlexMetadataServer with a reference to the original server."""
         super().__init__(*args, **kwargs)
 
         self._original_baseurl = self._baseurl
@@ -318,6 +360,7 @@ class PlexMetadataServer(PlexServer):
 
     @cached_property
     def library(self):
+        """Fetch the library metadata from the Plex server."""
         try:
             data = self.query(MetadataLibrary.key)
         except BadRequest:
@@ -355,7 +398,8 @@ class PlexMetadataServer(PlexServer):
         if response.status_code == 429:  # Handle rate limit retries
             retry_after = int(response.headers.get("Retry-After", 60))
             log.warning(
-                f"{self.__class__.__name__}: Rate limit exceeded, waiting {retry_after} seconds"
+                f"{self.__class__.__name__}: Rate limit exceeded, waiting "
+                f"{retry_after} seconds"
             )
             sleep(retry_after + 1)
             return self.query(
@@ -372,7 +416,10 @@ class PlexMetadataServer(PlexServer):
 
         if response.status_code not in (200, 201, 204):
             errtext = response.text.replace("\n", " ")
-            message = f"({response.status_code}) {response.status_code}; {response.url} {errtext}"
+            message = (
+                f"({response.status_code}) {response.status_code}; {response.url} "
+                f"{errtext}"
+            )
             if response.status_code == 401:
                 raise Unauthorized(message)
             elif response.status_code == 404:

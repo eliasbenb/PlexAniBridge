@@ -1,3 +1,5 @@
+"""PlexAniBridge Initialization Module."""
+
 import os
 import uuid
 
@@ -50,8 +52,8 @@ else:
 
 log: Logger = get_logger(
     log_name="PlexAniBridge",
-    log_level=config.LOG_LEVEL,
-    log_dir=str(config.DATA_PATH / "logs"),
+    log_level=config.log_level,
+    log_dir=str(config.data_path / "logs"),
 )
 
 # The below environment variables are consumed by the python-plexapi library

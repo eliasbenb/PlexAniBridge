@@ -46,7 +46,7 @@ Below is an example mappings file. You can use [the JSON schema](https://github.
 
 ## Local Custom Mappings
 
-PlexAniBridge will look for a custom mappings file with the name `mappings.custom.(json|yaml|yml)` in the `DATA_PATH` directory. The file extension determines the format of the file (JSON or YAMLL).
+PlexAniBridge will look for a custom mappings file with the name `mappings.custom.(json|yaml|yml)` in the `PAB_DATA_PATH` directory. The file extension determines the format of the file (JSON or YAML).
 
 ## Community Custom Mappings
 

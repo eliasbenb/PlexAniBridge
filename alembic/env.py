@@ -1,4 +1,4 @@
-from __future__ import with_statement
+"""Alembic environment script for managing database migrations."""
 
 import pathlib
 import sys
@@ -20,11 +20,11 @@ if config.config_file_name is not None:
 
 target_metadata = src.models.Base.metadata
 
-db_url = f"sqlite:///{app_config.DATA_PATH / 'plexanibridge.db'}"
+db_url = f"sqlite:///{app_config.data_path / 'plexanibridge.db'}"
 config.set_main_option("sqlalchemy.url", db_url)
 
 
-def run_migrations_offline():
+def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode."""
     context.configure(
         url=db_url,
@@ -38,7 +38,8 @@ def run_migrations_offline():
         context.run_migrations()
 
 
-def run_migrations_online():
+def run_migrations_online() -> None:
+    """Run migrations in 'online' mode."""
     connectable = create_engine(
         db_url,
         echo=False,

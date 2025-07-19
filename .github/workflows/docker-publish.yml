@@ -2,7 +2,7 @@ name: Docker Build and Publish
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, develop, experimental ]
     tags: [ "v*" ]
   workflow_dispatch:
     inputs:
@@ -81,7 +81,7 @@ jobs:
             # alpha, beta
             type=raw,value=alpha,enable=${{ env.IS_ALPHA }}
             type=raw,value=beta,enable=${{ env.IS_BETA }}
-            # main, develop
+            # main, develop, experimental
             type=ref,event=branch
             # latest
             type=raw,value=latest,enable=${{ env.IS_STABLE }}

@@ -1,3 +1,5 @@
+"""Plex Community Client Module."""
+
 import asyncio
 from typing import Any
 
@@ -10,9 +12,16 @@ plex_community_limiter = Limiter(rate=300 / 60, capacity=30, jitter=True)
 
 
 class PlexCommunityClient:
+    """Client for interacting with the Plex Community API."""
+
     API_URL = "https://community.plex.tv/api"
 
-    def __init__(self, plex_token: str):
+    def __init__(self, plex_token: str) -> None:
+        """Initialize the PlexCommunityClient with a Plex token.
+
+        Args:
+            plex_token (str): The Plex token for authentication.
+        """
         self.plex_token = plex_token
         self._session: aiohttp.ClientSession | None = None
 
@@ -33,14 +42,29 @@ class PlexCommunityClient:
         if self._session and not self._session.closed:
             await self._session.close()
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> "PlexCommunityClient":
+        """Context manager enter method.
+
+        Returns:
+            PlexCommunityClient: The client instance
+        """
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        """Context manager exit method.
+
+        Args:
+            exc_type: Exception type
+            exc_val: Exception value
+            exc_tb: Exception traceback
+        """
         await self.close()
 
     async def get_watch_activity(self, metadata_id: str) -> list:
-        """Fetches only watch activity for a given metadata ID and returns a list of PlexAPI EpisodeHistory or MovieHistory objects.
+        """Get watch activity from the Plex Community API.
+
+        Fetches only watch activity for a given metadata ID and returns a list of
+        PlexAPI EpisodeHistory or MovieHistory objects.
 
         Args:
             metadata_id (str): The metadata ID to fetch watch activity for.
@@ -49,7 +73,9 @@ class PlexCommunityClient:
             list: A list of PlexAPI EpisodeHistory or MovieHistory objects.
         """
         query = """
-        query GetWatchActivity($first: PaginationInt!, $after: String, $metadataID: ID) {
+        query GetWatchActivity(
+            $first: PaginationInt!, $after: String, $metadataID: ID
+        ) {
             activityFeed(
                 first: $first
                 after: $after
@@ -166,7 +192,8 @@ class PlexCommunityClient:
             dict: JSON response from the API
 
         Raises:
-            aiohttp.ClientError: If the request fails for any reason other than rate limiting
+            aiohttp.ClientError: If the request fails for any reason other than rate
+                                 limiting.
         """
         if retry_count >= 3:
             raise aiohttp.ClientError("Failed to make request after 3 tries")
@@ -185,7 +212,8 @@ class PlexCommunityClient:
                 if response.status == 429:  # Handle rate limit retries
                     retry_after = int(response.headers.get("Retry-After", 60))
                     log.warning(
-                        f"{self.__class__.__name__}: Rate limit exceeded, waiting {retry_after} seconds"
+                        f"{self.__class__.__name__}: Rate limit exceeded, waiting "
+                        f"{retry_after} seconds"
                     )
                     await asyncio.sleep(retry_after + 1)
                     return await self._make_request(
@@ -210,7 +238,8 @@ class PlexCommunityClient:
                     response.raise_for_status()
                 except aiohttp.ClientResponseError as e:
                     log.error(
-                        f"{self.__class__.__name__}: Failed to make request to the Plex Community API"
+                        f"{self.__class__.__name__}: Failed to make request to the "
+                        f"Plex Community API"
                     )
                     response_text = await response.text()
                     log.error(f"\t\t{response_text}")
@@ -220,7 +249,8 @@ class PlexCommunityClient:
 
         except (aiohttp.ClientError, asyncio.TimeoutError):
             log.error(
-                f"{self.__class__.__name__}: Connection error while making request to the Plex Community API"
+                f"{self.__class__.__name__}: Connection error while making request to "
+                f"the Plex Community API"
             )
             await asyncio.sleep(1)
             return await self._make_request(

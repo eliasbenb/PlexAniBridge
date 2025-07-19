@@ -1,3 +1,5 @@
+"""AniMap Model."""
+
 from functools import cached_property
 
 from sqlalchemy import JSON, Index, Integer
@@ -59,10 +61,20 @@ class AniMap(Base):
 
     @cached_property
     def length(self) -> int:
+        """Calculate the total length of all TVDB mappings.
+
+        Returns:
+            int: Total length of all TVDB mappings
+        """
         return sum(m.length for m in self.parsed_tvdb_mappings)
 
     @cached_property
     def parsed_tvdb_mappings(self) -> list[TVDBMapping]:
+        """Parse TVDB mappings into a list of TVDBMapping objects.
+
+        Returns:
+            list[TVDBMapping]: List of parsed TVDBMapping objects
+        """
         res: list[TVDBMapping] = []
 
         if not self.tvdb_mappings:
@@ -77,7 +89,23 @@ class AniMap(Base):
         return res
 
     def __hash__(self) -> int:
+        """Generate a hash for the AniMap instance.
+
+        Returns:
+            int: Hash value of the instance
+        """
         return hash(self.__repr__())
 
     def __repr__(self):
-        return f"<{':'.join(f'{k}={v}' for k, v in self.__dict__.items() if v is not None and not k.startswith('_'))}>"
+        """Generate a string representation of the AniMap instance.
+
+        Returns:
+            str: String representation of the instance
+        """
+        return f"<{
+            ':'.join(
+                f'{k}={v}'
+                for k, v in self.__dict__.items()
+                if v is not None and not k.startswith('_')
+            )
+        }>"

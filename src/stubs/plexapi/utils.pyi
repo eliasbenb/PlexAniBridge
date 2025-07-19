@@ -1,9 +1,9 @@
 import io
 import logging
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from datetime import datetime
 from logging import Logger
-from typing import Any, Callable
+from typing import Any
 from xml.etree.ElementTree import Element, ElementTree
 
 from _typeshed import Incomplete

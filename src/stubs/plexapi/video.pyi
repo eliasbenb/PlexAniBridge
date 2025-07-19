@@ -1,6 +1,6 @@
+from collections.abc import Iterator
 from datetime import datetime
 from functools import cached_property
-from typing import Iterator
 
 from typing_extensions import Self
 
