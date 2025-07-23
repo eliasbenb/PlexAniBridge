@@ -1,6 +1,14 @@
 #!/usr/bin/env python3
 
-"""AniList Restore Script."""
+"""AniList Restore Script.
+
+This script restores AniList media list entries from a backup JSON file. You can use it
+to recover your AniList data exactly as it was at the time of the backup. To test the
+restore process without making any changes, use the `--dry-run` option.
+
+Usage:
+    python anilist_restore.py <backup_file> --token <anilist_token> [--dry-run]
+"""
 
 import argparse
 import json
