@@ -15,8 +15,8 @@ The smart way to keep your AniList profile perfectly synchronized with your Plex
 - **⚡ Optimized Performance**: Intelligent batch processing, rate limiting, and caching to minimize API usage while maximizing sync speed.
 - **👥 Multi-User & Multi-Profile**: Supports multiple Plex users (including Home users) with individual AniList accounts and configurable sync profiles.
 - **🔧 Flexible Configuration**: Filter by library sections or genres and configure scanning modes (polling or periodic).
-- **🛡️ Safe & Reliable**: Built-in dry run mode for testing, automatic AniList backups with rotation, and optional destructive sync for perfect two-way synchronization.
-- **🐳 Easy Deployment**: Docker-ready with comprehensive environment variable configuration and graceful shutdown handling.
+- **🛡️ Safe & Reliable**: Built-in dry run mode for testing and automatic AniList backups with a [restore script](./scripts/anilist_restore.py) for easy recovery.
+- **🐳 Easy Deployment**: Docker-ready with easy and comprehensive environment variable configuration.
 
 ![Flowchart Diagram](https://mermaid.ink/img/pako:eNqdVGtr2zAU_StCgZKCE_xMbTEKyfJlkEBpKYMl_aBEsi3iWEaS81iT_z5JVkg29igTxuheXZ1z7z2S3uGaEwoRzCu-X5dYKDB7XtZAj1dJRX9h_m_3neepoodF3_zBnBKGwQsVOyru39zyeLIwi-OaTQQjBXX-8WzR174Zk-oSOsdNw-pi0XcTMMUKr7CkLqCLku2qELgpwRLqr_NdMgODwePpK1brkkqAa7aln1bi8RmrW3NMiLOA4qBiK4HF8WTr6NBoTT7AZys2fF3VrM65QbfsoNRlcXF07LoWCe6AoDtG9_JkevI7pr-RjSeW67UhtphG8JxVtpyXY722jkJQKa8eQRuK1a3j10SuS1IZje9MPsASnLQ-Nyn-oxMuuRnnGwnaxjX3y1TDOCmvwRdtzYYnwXeM6HLcQei2_Lk7Lg11rKgl1S2oUC9OcEAyTyrBNxT1oihy88GeEVWisDl4a15xgXp5nv-EYSTsQGiCfZ_8D8h45iCCJAyj8OMQ0INbKraYEX3T3g3kEqqSbukSIj0lWGxMl886DreKG6UgUqKlHhS8LUqIclxJbbX2UEwZ1upsLyENrr9xfmtC9A4PEAVxOgzSh3iUxWkYh0GaevAIURSGwzDK0lEajGJ_FCZnD363AP4wfUh8PaIgTbIs8fWGQpisXTJaJyo-87ZWEIWZB_V90Id_3j0h9iU5_wBX-1zo?type=png)
 
