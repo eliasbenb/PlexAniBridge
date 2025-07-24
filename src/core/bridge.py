@@ -13,7 +13,7 @@ from src.core.sync import (
     ShowSyncClient,
 )
 from src.models.housekeeping import Housekeeping
-from src.models.sync import ParsedGuids, SyncOutcome, SyncStats
+from src.models.sync import ParsedGuids, SyncStats
 
 __all__ = ["BridgeClient"]
 
@@ -228,23 +228,12 @@ class BridgeClient:
 
             log.info(
                 f"{self.__class__.__name__}: [{self.profile_name}] Sync completed: "
-                f"{sync_stats.synced} synced, {sync_stats.deleted} deleted, "
+                f"{sync_stats.synced} synced,  {sync_stats.deleted} deleted, "
                 f"{sync_stats.skipped} skipped, {sync_stats.not_found} not found, "
                 f"{sync_stats.failed} failed. Success rate: "
                 f"{sync_stats.success_rate:.2%} ({sync_stats.total_processed} total) "
                 f"in {duration.total_seconds():.2f} seconds"
             )
-
-            failed_or_not_found = sync_stats.get_items_by_outcome(
-                SyncOutcome.UNPROCESSED, SyncOutcome.FAILED, SyncOutcome.NOT_FOUND
-            )
-            if failed_or_not_found:
-                log.debug(
-                    f"{self.__class__.__name__}: [{self.profile_name}] "
-                    f"Failed or not found items: {
-                        ', '.join(repr(item) for item in failed_or_not_found)
-                    }"
-                )
 
         except Exception as e:
             end_time = datetime.now(timezone.utc)

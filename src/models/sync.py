@@ -12,7 +12,6 @@ from plexapi.video import Episode, Movie, Season, Show
 class SyncOutcome(StrEnum):
     """Enumeration of possible synchronization outcomes for media items."""
 
-    UNPROCESSED = "unprocessed"  # Item has not been processed yet
     SYNCED = "synced"  # Successfully synchronized to AniList
     SKIPPED = "skipped"  # Item already up to date, no changes needed
     FAILED = "failed"  # Failed to process due to error
