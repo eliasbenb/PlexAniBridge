@@ -29,9 +29,10 @@ class ItemIdentifier(BaseModel):
     rating_key: str
     title: str
     item_type: str  # 'movie', 'show', 'season', 'episode'
-    parent_title: str | None = None  # For episodes/seasons
-    season_index: int | None = None  # For episodes
-    episode_index: int | None = None  # For episodes
+    parent_title: str | None = None
+    season_index: int | None = None
+    episode_index: int | None = None
+    repr: str | None = None  # Cached string representation
 
     @classmethod
     def from_media(cls, item: Movie | Show | Season | Episode) -> "ItemIdentifier":
@@ -43,33 +44,29 @@ class ItemIdentifier(BaseModel):
         Returns:
             ItemIdentifier: New identifier for the media item
         """
-        if isinstance(item, Movie):
-            return cls(
-                rating_key=str(item.ratingKey), title=item.title, item_type="movie"
-            )
-        elif isinstance(item, Show):
-            return cls(
-                rating_key=str(item.ratingKey), title=item.title, item_type="show"
-            )
+        kwargs = {
+            "rating_key": str(item.ratingKey),
+            "title": item.title,
+            "item_type": item.type,
+            "parent_title": None,
+            "season_index": None,
+            "episode_index": None,
+            "repr": item.__repr__(),
+        }
+
+        if isinstance(item, Episode):
+            kwargs["parent_title"] = item.grandparentTitle
+            kwargs["season_index"] = item.parentIndex
+            kwargs["episode_index"] = item.index
         elif isinstance(item, Season):
-            return cls(
-                rating_key=str(item.ratingKey),
-                title=item.title,
-                item_type="season",
-                parent_title=item.parentTitle,
-                season_index=item.index,
-            )
-        elif isinstance(item, Episode):
-            return cls(
-                rating_key=str(item.ratingKey),
-                title=item.title,
-                item_type="episode",
-                parent_title=item.grandparentTitle,
-                season_index=item.parentIndex,
-                episode_index=item.index,
-            )
+            kwargs["parent_title"] = item.parentTitle
+            kwargs["season_index"] = item.index
+        elif isinstance(item, Movie | Show):
+            pass
         else:
             raise ValueError(f"Unsupported media type: {type(item)}")
+
+        return cls(**kwargs)
 
     @classmethod
     def from_items(cls, items: list[Movie] | list[Episode]) -> list["ItemIdentifier"]:
@@ -91,21 +88,15 @@ class ItemIdentifier(BaseModel):
         """
         return hash((self.rating_key, self.item_type))
 
-    def __str__(self) -> str:
-        """Generate a string representation of the ItemIdentifier.
+    def __repr__(self) -> str:
+        """Generate a string representation of the ItemIdentifier instance.
 
         Returns:
-            str: String representation in format 'ItemType: Title (RatingKey)'
+            str: String representation of the instance
         """
-        if self.item_type == "episode":
-            return (
-                f"{self.parent_title} S{self.season_index:02d}E"
-                f"{self.episode_index:02d} - {self.title}"
-            )
-        elif self.item_type == "season":
-            return f"{self.parent_title} - Season {self.season_index}"
-        else:
-            return self.title
+        if self.repr:
+            return self.repr
+        return super().__repr__()
 
 
 class SyncStats(BaseModel):
@@ -154,13 +145,7 @@ class SyncStats(BaseModel):
     @property
     def synced(self) -> int:
         """Number of successfully synced items (including deleted)."""
-        return len(
-            [
-                item
-                for item, outcome in self._item_outcomes.items()
-                if outcome in (SyncOutcome.SYNCED, SyncOutcome.DELETED)
-            ]
-        )
+        return len(self.get_items_by_outcome(SyncOutcome.SYNCED))
 
     @property
     def deleted(self) -> int:
@@ -192,13 +177,8 @@ class SyncStats(BaseModel):
         """Percentage of items successfully processed (synced + skipped)."""
         if self.total_processed == 0:
             return 1.0
-        successful = self.synced + self.skipped
+        successful = self.synced + self.deleted + self.skipped
         return successful / self.total_processed
-
-    @property
-    def coverage(self) -> float:
-        """Alias for success_rate to maintain backward compatibility."""
-        return self.success_rate
 
     def get_summary(self) -> dict[str, int]:
         """Get a summary of all outcomes.
@@ -213,17 +193,6 @@ class SyncStats(BaseModel):
             "not_found": self.not_found,
             "failed": self.failed,
             "total": self.total_processed,
-        }
-
-    def get_detailed_report(self) -> dict[str, list[str]]:
-        """Get a detailed report showing which items had each outcome.
-
-        Returns:
-            dict: Mapping of outcome names to lists of item descriptions
-        """
-        return {
-            outcome.value: [str(item) for item in self.get_items_by_outcome(outcome)]
-            for outcome in SyncOutcome
         }
 
     def combine(self, other: "SyncStats") -> "SyncStats":
