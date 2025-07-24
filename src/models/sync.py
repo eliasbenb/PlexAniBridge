@@ -38,7 +38,7 @@ class ItemIdentifier(BaseModel):
         """Create an ItemIdentifier from a Plex media object.
 
         Args:
-            item: Plex media object (Movie, Show, Season, or Episode)
+            item (Movie | Show | Season | Episode): Plex media object
 
         Returns:
             ItemIdentifier: New identifier for the media item
@@ -121,8 +121,8 @@ class SyncStats(BaseModel):
         """Track the outcome for a specific item.
 
         Args:
-            item_id: Identifier for the media item
-            outcome: The synchronization outcome for this item
+            item_id (ItemIdentifier): Identifier for the media item
+            outcome (SyncOutcome): The synchronization outcome for this item
         """
         self._item_outcomes[item_id] = outcome
 
@@ -130,25 +130,25 @@ class SyncStats(BaseModel):
         """Track the same outcome for multiple items.
 
         Args:
-            item_ids: List of identifiers for media items
-            outcome: The synchronization outcome for these items
+            item_ids (list[ItemIdentifier]): List of item identifiers
+            outcome (SyncOutcome): The synchronization outcome for these items
         """
         for item_id in item_ids:
             self.track_item(item_id, outcome)
 
-    def get_items_by_outcome(self, outcome: SyncOutcome) -> list[ItemIdentifier]:
+    def get_items_by_outcome(self, *outcomes: SyncOutcome) -> list[ItemIdentifier]:
         """Get all items that had a specific outcome.
 
         Args:
-            outcome: The outcome to filter by
+            outcomes (SyncOutcome): One or more outcomes to filter by
 
         Returns:
-            list[ItemIdentifier]: Items with the specified outcome
+            list[ItemIdentifier]: Items with the specified outcome(s)
         """
         return [
             item_id
             for item_id, item_outcome in self._item_outcomes.items()
-            if item_outcome == outcome
+            if item_outcome in outcomes
         ]
 
     @property
@@ -230,7 +230,7 @@ class SyncStats(BaseModel):
         """Combine this stats instance with another.
 
         Args:
-            other: Another SyncStats instance to combine with
+            other (SyncStats): Another SyncStats instance to combine with
 
         Returns:
             SyncStats: New instance with combined statistics
