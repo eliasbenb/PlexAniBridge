@@ -1,7 +1,6 @@
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from datetime import datetime
 from functools import cached_property
-from typing import Callable
 from xml.etree.ElementTree import Element
 
 import requests

@@ -1,3 +1,5 @@
+"""Core Module Initialization."""
+
 from src.core.anilist import AniListClient
 from src.core.animap import AniMapClient
 from src.core.plex import PlexClient

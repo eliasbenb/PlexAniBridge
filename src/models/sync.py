@@ -1,3 +1,5 @@
+"""Synchronization Models Module."""
+
 from enum import StrEnum
 from typing import Any, Protocol
 
@@ -82,11 +84,24 @@ class ItemIdentifier(BaseModel):
         return [cls.from_media(item) for item in items]
 
     def __hash__(self) -> int:
+        """Generate a hash for the ItemIdentifier instance.
+
+        Returns:
+            int: Hash value of the instance
+        """
         return hash((self.rating_key, self.item_type))
 
     def __str__(self) -> str:
+        """Generate a string representation of the ItemIdentifier.
+
+        Returns:
+            str: String representation in format 'ItemType: Title (RatingKey)'
+        """
         if self.item_type == "episode":
-            return f"{self.parent_title} S{self.season_index:02d}E{self.episode_index:02d} - {self.title}"
+            return (
+                f"{self.parent_title} S{self.season_index:02d}E"
+                f"{self.episode_index:02d} - {self.title}"
+            )
         elif self.item_type == "season":
             return f"{self.parent_title} - Season {self.season_index}"
         else:
@@ -286,7 +301,8 @@ class ParsedGuids(BaseModel):
         """Creates a string representation of the parsed IDs.
 
         Returns:
-            str: String representation of the parsed IDs in a format like "id: xxx, id: xxx, id: xxx"
+            str: String representation of the parsed IDs in a format like
+                 "id: xxx, id: xxx, id: xxx"
         """
         return ", ".join(
             f"{field}: {getattr(self, field)}"
@@ -298,7 +314,18 @@ class ParsedGuids(BaseModel):
 class Comparable(Protocol):
     """Protocol for objects that can be compared using <, >, <=, >= operators."""
 
-    def __lt__(self, other: Any) -> bool: ...
-    def __gt__(self, other: Any) -> bool: ...
-    def __le__(self, other: Any) -> bool: ...
-    def __ge__(self, other: Any) -> bool: ...
+    def __lt__(self, other: Any) -> bool:
+        """Return True if this object is less than other."""
+        ...
+
+    def __gt__(self, other: Any) -> bool:
+        """Return True if this object is greater than other."""
+        ...
+
+    def __le__(self, other: Any) -> bool:
+        """Return True if this object is less than or equal to other."""
+        ...
+
+    def __ge__(self, other: Any) -> bool:
+        """Return True if this object is greater than or equal to other."""
+        ...

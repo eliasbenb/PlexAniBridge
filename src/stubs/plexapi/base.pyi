@@ -1,7 +1,7 @@
-from collections.abc import Generator
+from collections.abc import Generator, Iterable
 from datetime import datetime
 from functools import cached_property
-from typing import Any, Generic, Iterable, Type, TypeVar
+from typing import Any, Generic, TypeVar
 from xml.etree.ElementTree import Element
 
 import requests
@@ -37,7 +37,7 @@ class PlexObject:
     def fetchItems(
         self,
         ekey,
-        cls: Type[PlexObjectT] | None = None,
+        cls: type[PlexObjectT] | None = None,
         container_start: int | None = None,
         container_size: int | None = None,
         maxresults: int | None = None,
@@ -45,12 +45,12 @@ class PlexObject:
         **kwargs,
     ) -> list[PlexObjectT]: ...
     def fetchItem(
-        self, ekey: str, cls: Type[PlexObjectT] | None = None, **kwargs
+        self, ekey: str, cls: type[PlexObjectT] | None = None, **kwargs
     ) -> PlexObjectT: ...
     def findItems(
         self,
         data: Element,
-        cls: Type[PlexObjectT] | None = None,
+        cls: type[PlexObjectT] | None = None,
         initpath: str | None = None,
         rtag: str | None = None,
         **kwargs,
@@ -58,7 +58,7 @@ class PlexObject:
     def findItem(
         self,
         data: Element,
-        cls: Type[PlexObjectT] | None = None,
+        cls: type[PlexObjectT] | None = None,
         initpath: str | None = None,
         rtag: str | None = None,
         **kwargs,

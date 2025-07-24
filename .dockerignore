@@ -12,6 +12,7 @@ pip-delete-this-directory.txt
 
 # Docs
 /docs
+/mkdocs.yml
 
 # Environments
 .env
@@ -36,6 +37,9 @@ venv.bak/
 
 # GitHub
 /.github
+
+# Ruff
+/.ruff_cache
 
 # Python
 __pycache__

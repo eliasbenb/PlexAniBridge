@@ -5,26 +5,42 @@ icon: material/cog
 
 ## Example
 
-Below is an example `.env` file for PlexAniBridge with example values. Optional environment variables are commented out.
+Below is an example `.env` file for PlexAniBridge:
 
 ```dosini title=".env"
 --8<-- ".env.example"
 ```
 
+!!! tip "Single Profile"
+
+    If you only need a single profile, you can use the global settings directly without the `PAB_PROFILES__{PROFILE_NAME}__` prefix and this will automatically create a profile named `default` for you. Example:
+
+    ```dosini title=".env"
+    PAB_ANILIST_TOKEN=eyJ...
+    PAB_PLEX_TOKEN=2Sb...
+    PAB_PLEX_USER=username
+    PAB_PLEX_URL=http://localhost:32400
+    ```
+
+## Configuration Hierarchy
+
+Settings are applied in the following order:
+
+1. **Profile-specific settings** (highest priority)
+2. **Global default settings** (medium priority)
+3. **Built-in defaults** (lowest priority)
+
+For example, if you set `PAB_SYNC_INTERVAL=900` globally and `PAB_PROFILES__personal__SYNC_INTERVAL=1800` for a specific profile, the personal profile will use 1800 seconds while other profiles use 900 seconds. If you don't set `PAB_PROFILES__personal__SYNC_INTERVAL`, it will fall back to the application's built-in default of 3600 seconds.
+
 ## Configuration Options
 
 ### `ANILIST_TOKEN`
 
-`str | list[str]` (Required)
+`str` (Required)
 
-AniList API access token.
+AniList API access token for this profile.
 
-[:simple-anilist: Generate AniList Token](https://anilist.co/login?apiVersion=v2&client_id=23079&response_type=token){: .md-button .md-button--primary}
-
-??? info "Multiple Users"
-
-    - Provide a list of tokens: `["token1", "token2", "token3"]`
-    - Each token must have a corresponding Plex user in `PLEX_USER`.
+[:simple-anilist: Generate AniList Token](https://anilist.co/login?apiVersion=v2&client_id=23079&response_type=token){: .md-button style="background-color: #02a9ff; color: white;"}
 
 ---
 
@@ -34,7 +50,7 @@ AniList API access token.
 
 Plex API access token.
 
-[:material-plex: Finding the Plex Token](https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/){: .md-button .md-button--primary}
+[:material-plex: Finding the Plex Token](https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/){: .md-button style="background-color: #e5a00d; color: white;"}
 
 !!! note
 
@@ -44,20 +60,15 @@ Plex API access token.
 
 ### `PLEX_USER`
 
-`str | list[str]` (Required)
+`str` (Required)
 
-Plex user(s) to sync. Can be identified by:
+Plex user to sync for this profile. Can be identified by:
 
 - Plex account username: `"username"`
 - Plex account email: `"user@email.com"`
 - Plex Home user name: `"Home User"`
 
-??? info "Multiple Users"
-
-    - Provide a list of users: `["user1", "user2@email.com", "Home User"]`
-    - Each user must have a corresponding AniList token in `ANILIST_TOKEN`.
-
-??? note "Multi-User Limitations"
+??? note "Admin User Limitations"
 
     Due to limitations in the Plex API, only the **admin user** can sync reviews and watch lists. All other features are available for all users.
 
@@ -79,7 +90,7 @@ URL to your Plex server that the PlexAniBridge host can access.
 
 `list[str]` (Optional, default: `[]`)
 
-List of Plex library sections to consider, specified in Python list syntax:
+List of Plex library sections to consider for this profile:
 
 ```python
 ["Anime", "Anime Movies"]
@@ -88,10 +99,6 @@ List of Plex library sections to consider, specified in Python list syntax:
 !!! tip "Allowing All Sections"
 
     To sync all sections, set this to an empty list: `[]` or don't set it at all. This is the default behavior.
-
-??? note "Multi-User Considerations"
-
-    Every section will be synced for every user. If a user doesn't have access to a section, it will be skipped.
 
 ---
 
@@ -107,13 +114,9 @@ An optional list of Plex genres to filter by. If specified, only items with thes
 
 This is useful for syncing only Anime content in a mixed library.
 
-!!! tip "Allowing All Genres"
+!!! tip "Finding Possible Genres"
 
-    To sync all genres, set this to an empty list: `[]` or don't set it at all.
-
-??? tip "Finding Possible Genres"
-
-    Genres are sources from the metdata you use (typically TheMovieDB or TheTVDB). You can find the possible genres below:
+    Genres are sourced from the metadata you use (typically TheMovieDB or TheTVDB). You can find the possible genres below:
 
     - [TheTVDB Genres](https://thetvdb.com/genres)
     - [TheMovieDB Genres](https://www.themoviedb.org/talk/644a4b69f794ad04fe3cf1b9)
@@ -148,7 +151,7 @@ Determines the source of metadata for Plex content:
 
 `int` (Optional, default: `3600`)
 
-Interval in seconds between sync jobs. Set to `-1` to run once and exit.
+Interval in seconds between sync jobs for this profile. Set to `-1` to run once and exit.
 
 ??? note "Sync Interval with Polling Scan"
 
@@ -207,7 +210,7 @@ Allows regressive updates and deletions, which **can cause data loss**.
 
 ### `EXCLUDED_SYNC_FIELDS`
 
-`list[Enum("status", "score", "progress", "repeat", "notes", "started_at", "completed_at")]` (Optional, default: `["notes", "score]`)
+`list[Enum("status", "score", "progress", "repeat", "notes", "started_at", "completed_at")]` (Optional, default: `["notes", "score"]`)
 
 Specifies which fields should **not** be synced. Available fields:
 
@@ -221,30 +224,7 @@ Specifies which fields should **not** be synced. Available fields:
 
 !!! tip "Allowing All Fields"
 
-    To sync all fields, set this to an empty list: `[]` or don't set it at all.
-
----
-
-### `LOG_LEVEL`
-
-`str` (Optional, default: `INFO`)
-
-Sets logging verbosity. Available levels:
-
-- `DEBUG`
-- `INFO`
-- `SUCCESS`
-- `WARNING`
-- `ERROR`
-- `CRITICAL`
-
-!!! tip "Minimal Logging"
-
-    For minimal logging, set the verbosity to `SUCCESS` which only logs successful operations like syncing entries.
-
-!!! tip "Debugging"
-
-    For the most detailed logs, set this to `DEBUG`.
+    To sync all fields, set this to an empty list: `[]`.
 
 ---
 
@@ -252,7 +232,7 @@ Sets logging verbosity. Available levels:
 
 `bool` (Optional, default: `False`)
 
-When enabled:
+When enabled for this profile:
 
 - AniList data **is not modified**.
 - Logs show what changes **would** have been made.
@@ -287,7 +267,7 @@ For example, if a sync job finds 10 items to update with `BATCH_REQUESTS` enable
 
 Determines how similar (as a percentage) a title must be to the search query to be considered a match.
 
-The default behavior is to disable searching completely and only relying on the [community and local mappings database](./advanced/custom-mappings.md).
+The default behavior is to disable searching completely and only rely on the [community and local mappings database](./advanced/custom-mappings.md).
 
 ??? tip "Enabling Search Fallback"
 
@@ -295,16 +275,83 @@ The default behavior is to disable searching completely and only relying on the 
 
     A value of `100` requires an exact match, while `0` will match the first result returned by AniList, regardless of similarity.
 
----
+## Global Configuration Options
 
-### `DATA_PATH`
+These global settings cannot be overridden on the profile level and apply to all profiles.
+
+### `PAB_DATA_PATH`
 
 `str` (Optional, default: `./data`)
 
-Path to store the database, backups, and custom mappings.
+Path to store the database, backups, and custom mappings. This is shared across all profiles.
 
 ??? note "Docker"
 
     If running in Docker, **do not change this path** unless properly mapped in your Docker volume/mount.
 
 ---
+
+### `PAB_LOG_LEVEL`
+
+`Enum("DEBUG", "INFO", "SUCCESS", "WARNING", "ERROR", "CRITICAL")` (Optional, default: `INFO`)
+
+Sets logging verbosity for the entire application.
+
+!!! tip "Minimal Logging"
+
+    For minimal logging, set the verbosity to `SUCCESS` which only logs successful operations like syncing entries.
+
+!!! tip "Debugging"
+
+    For the most detailed logs, set this to `DEBUG`.
+
+
+## Advanced Examples
+
+### Multiple Users
+
+This example demonstrates configuring three distinct profiles, each with their own AniList accounts, Plex users, and customized sync preferences.
+
+```dosini
+# Global defaults shared by all profiles
+PAB_PLEX_TOKEN=admin_plex_token
+PAB_PLEX_URL=http://localhost:32400
+PAB_POLLING_SCAN=True
+
+# Admin user - aggressive sync with full features
+PAB_PROFILES__admin__ANILIST_TOKEN=admin_anilist_token
+PAB_PROFILES__admin__PLEX_USER=admin_plex_user
+PAB_PROFILES__admin__DESTRUCTIVE_SYNC=True
+PAB_PROFILES__admin__EXCLUDED_SYNC_FIELDS=[]
+
+# Family member - typical sync
+PAB_PROFILES__family__ANILIST_TOKEN=family_anilist_token
+PAB_PROFILES__family__PLEX_USER=family_plex_user
+
+# Guest user - minimal sync
+PAB_PROFILES__guest__ANILIST_TOKEN=guest_anilist_token
+PAB_PROFILES__guest__PLEX_USER=guest_plex_user
+PAB_PROFILES__guest__EXCLUDED_SYNC_FIELDS=["notes", "score", "repeat", "started_at", "completed_at"]
+```
+
+### Per-Library Profiles
+
+This example shows how to create seperate profiles for different Plex libraries, allowing for tailored sync settings based on content type.
+
+```dosini
+# Global defaults shared by all profiles
+PAB_ANILIST_TOKEN=global_anilist_token
+PAB_PLEX_TOKEN=admin_plex_token
+PAB_PLEX_USER=admin_plex_user
+PAB_PLEX_URL=http://localhost:32400
+
+# Movies library - aggressive sync with full features
+PAB_PROFILES__movies__PLEX_SECTIONS=["Anime Movies"]
+PAB_PROFILES__movies__FULL_SCAN=True
+PAB_PROFILES__movies__SYNC_INTERVAL=1800
+PAB_PROFILES__movies__EXCLUDED_SYNC_FIELDS=[]
+
+# TV Shows library - more conservative with updates
+PAB_PROFILES__tvshows__PLEX_SECTIONS=["Anime"]
+PAB_PROFILES__tvshows__POLLING_SCAN=True
+```

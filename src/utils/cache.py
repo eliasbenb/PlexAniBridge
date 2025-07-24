@@ -1,3 +1,5 @@
+"""Cache Utilities Module."""
+
 from functools import wraps
 from typing import Any
 
@@ -18,7 +20,6 @@ def glru_cache(maxsize: int | None = 128):
     Returns:
         Callable: Decorator function that caches the decorated function's results
     """
-
     if maxsize is None:
         maxsize = 2**32  # 'infinitely' large cache
 
@@ -59,7 +60,7 @@ def gttl_cache(maxsize: int | None = 128, ttl: int = 600):
 
 
 def gattl_cache(ttl: int = 60):
-    """Decorator for async functions to cache results using a generic, async-aware TTL cache.
+    """Decorator for functions to cache results using a generic, async-aware TTL cache.
 
     This decorator can be used with any object, even if it's unhashable,
     because it uses the generic_hash function to compute the cache key.
@@ -122,7 +123,7 @@ def _generic_hash(obj: Any, _visited_ids: set[int]) -> int:
     try:
         h = hash(obj)
     except TypeError:
-        if isinstance(obj, (list, tuple)):
+        if isinstance(obj, list | tuple):
             h = hash(tuple(_generic_hash(item, _visited_ids) for item in obj))
         elif isinstance(obj, set):
             h = hash(frozenset(_generic_hash(item, _visited_ids) for item in obj))

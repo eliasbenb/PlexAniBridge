@@ -1,3 +1,5 @@
+"""Logging Utilities Module."""
+
 import logging
 import re
 import sys
@@ -49,7 +51,10 @@ class ColorFormatter(logging.Formatter):
         """
         orig_msg = record.msg
         orig_levelname = record.levelname
-        record.levelname = f"{self.COLORS.get(record.levelname, '')}{record.levelname}{Style.RESET_ALL}"
+        record.levelname = (
+            f"{self.COLORS.get(record.levelname, '')}{record.levelname}"
+            f"{Style.RESET_ALL}"
+        )
 
         if isinstance(record.msg, str):
             # Color strings in quotes
@@ -168,7 +173,8 @@ class Logger(logging.Logger):
             self.removeHandler(handler)
 
         log_format = (
-            "%(asctime)s - %(name)s - %(levelname)s\t%(filename)s:%(lineno)d\t%(message)s"
+            "%(asctime)s - %(name)s - %(levelname)s\t%(filename)s:%(lineno)d\t"
+            "%(message)s"
             if log_level_literal <= logging.DEBUG
             else "%(asctime)s - %(name)s - %(levelname)s\t%(message)s"
         )

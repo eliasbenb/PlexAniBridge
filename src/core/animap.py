@@ -1,7 +1,10 @@
+"""AniMap Client."""
+
 import json
+from collections.abc import Iterator
 from hashlib import md5
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 from pydantic import ValidationError
 from sqlalchemy import and_, column, delete, exists, false, func, or_, select
@@ -20,9 +23,9 @@ __all__ = ["AniMapClient"]
 class AniMapClient:
     """Client for managing the AniMap database.
 
-    This client manages a local SQLite database that maps anime IDs between different services
-    (AniList, TVDB, IMDB, etc.). It handles synchronization with the mapping source and
-    provides query capabilities for ID mapping lookups.
+    This client manages a local SQLite database that maps anime IDs between different
+    services (AniList, TVDB, IMDB, etc.). It handles synchronization with the mapping
+    source and provides query capabilities for ID mapping lookups.
 
     The database is automatically synchronized on client initialization and maintains
     a hash of the CDN data to minimize unnecessary updates.
@@ -35,7 +38,8 @@ class AniMapClient:
         """Initializes the AniMapClient.
 
         Args:
-            data_path (Path): Path to the data directory for storing mappings and cache files.
+            data_path (Path): Path to the data directory for storing mappings and cache
+                              files.
         """
         self.mappings_client = MappingsClient(data_path)
         self.data_path = data_path
@@ -62,9 +66,17 @@ class AniMapClient:
         await self.mappings_client.close()
 
     async def __aenter__(self):
+        """Context manager enter method."""
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit method.
+
+        Args:
+            exc_type: Exception type if an exception occurred.
+            exc_val: Exception value if an exception occurred.
+            exc_tb: Traceback object if an exception occurred.
+        """
         await self.close()
 
     def _entries_are_equal(self, existing_entry: AniMap, new_entry: AniMap) -> bool:
@@ -146,8 +158,9 @@ class AniMapClient:
                 return
 
             log.debug(
-                f"{self.__class__.__name__}: Anime mapping changes detected, syncing database. "
-                f"Validated {valid_count} entries, removed {invalid_count} invalid entries"
+                f"{self.__class__.__name__}: Anime mapping changes detected, syncing "
+                f"database.  Validated {valid_count} entries, removed {invalid_count} "
+                f"invalid entries"
             )
 
             existing_entries_query = ctx.session.execute(select(AniMap))
@@ -199,7 +212,8 @@ class AniMapClient:
             else:
                 log.debug(
                     f"{self.__class__.__name__}: Syncing database with upstream: "
-                    f"{len(to_delete)} deletions, {len(to_insert)} insertions, {len(to_update)} updates"
+                    f"{len(to_delete)} deletions, {len(to_insert)} insertions, "
+                    f"{len(to_update)} updates"
                 )
 
             if to_delete:
@@ -233,20 +247,22 @@ class AniMapClient:
         season: int | None = None,
         is_movie: bool = True,
     ) -> Iterator[AniMap]:
-        """Retrieves anime ID mappings based on provided criteria.
+        """Retrieve anime ID mappings based on provided criteria.
 
-        Performs a complex database query to find entries that match the given identifiers
-        and metadata. The search logic differs between movies and TV shows.
+        Performs a complex database query to find entries that match the given
+        identifiers and metadata. The search logic differs between movies and TV
+        shows, with movies using IMDB/TMDB and shows using TVDB with optional
+        season filtering.
 
         Args:
-            imdb (str | list[str] | None): IMDB ID(s) to match (can be partial match within array)
-            tmdb (int | list[int] | None): TMDB ID(s) to match (movies and TV shows)
-            tvdb (int | list[int] | None): TVDB ID(s) to match (TV shows only)
-            season (int | None): TVDB season number for exact matching (TV shows only)
-            is_movie (bool): Whether the search is for a movie or TV show
+            imdb: IMDB ID(s) to match. Can be partial match within array.
+            tmdb: TMDB ID(s) to match for movies and TV shows.
+            tvdb: TVDB ID(s) to match for TV shows only.
+            season: TVDB season number for exact matching on TV shows only.
+            is_movie: Whether the search is for a movie or TV show.
 
-        Returns:
-            Iterator[AniMap]: Iterator of matching anime mapping entries
+        Yields:
+            Matching anime mapping entries.
         """
         if not imdb and not tmdb and not tvdb:
             return iter([])
@@ -274,9 +290,9 @@ class AniMapClient:
                 values (list[Any]): List of values to search for within the JSON array
 
             Returns:
-                ColumnElement[bool]: SQL condition that evaluates to True if any value is found
+                ColumnElement[bool]: SQL condition that evaluates to True if any value
+                                     is found
             """
-
             if not values:
                 return false()
 
@@ -298,7 +314,7 @@ class AniMapClient:
             in a JSON object field.
 
             Args:
-                field (Mapped): SQLAlchemy mapped field representing a JSON object column
+                field (Mapped): SQLAlchemy mapped field representing a JSON column
                 key (str): JSON object key to search for (e.g., "s1" for season 1)
 
             Returns:
@@ -344,5 +360,4 @@ class AniMapClient:
 
             query = select(AniMap).where(where_clause)
 
-            for result in ctx.session.execute(query).scalars():
-                yield result
+            yield from ctx.session.execute(query).scalars()
