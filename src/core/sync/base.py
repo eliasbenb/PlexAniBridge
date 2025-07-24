@@ -13,12 +13,12 @@ from src.core import AniListClient, AniMapClient, PlexClient
 from src.models.anilist import FuzzyDate, Media, MediaList, MediaListStatus, ScoreFormat
 from src.models.animap import AniMap
 from src.models.sync import (
-    Comparable,
     ItemIdentifier,
     ParsedGuids,
     SyncOutcome,
     SyncStats,
 )
+from src.utils.types import Comparable
 
 T = TypeVar("T", bound=Movie | Show)  # Section item
 S = TypeVar("S", bound=Movie | Season)  # Item child (season)
