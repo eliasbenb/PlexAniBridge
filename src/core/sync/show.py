@@ -12,6 +12,7 @@ from src import log
 from src.core.sync.base import BaseSyncClient, ParsedGuids
 from src.models.anilist import FuzzyDate, Media, MediaListStatus
 from src.models.animap import AniMap
+from src.models.sync import ItemIdentifier, SyncOutcome
 from src.utils.cache import gattl_cache, glru_cache
 
 
@@ -61,15 +62,15 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         if not seasons:
             return
 
-        # Pre-fetch all episodes of the show. Instead of fetching episodes for each
-        # season individually, we can fetch all episodes at once and filter them later.
-        episodes_by_season: dict[int, list[Episode]] = {}
-        for season_index in seasons:
-            episodes_by_season[season_index] = []
-
+        # Pre-fetch all episodes of the show and group them by season index.
+        episodes_by_season: dict[int, list[Episode]] = {idx: [] for idx in seasons}
         for episode in item.episodes():
-            if episode.parentIndex in seasons:
-                episodes_by_season.setdefault(episode.parentIndex, []).append(episode)
+            if episode.parentIndex in episodes_by_season:
+                episodes_by_season[episode.parentIndex].append(episode)
+                self.sync_stats.track_item(
+                    ItemIdentifier.from_media(episode),
+                    SyncOutcome.UNPROCESSED,
+                )
 
         processed_seasons: set[int] = set()
 
@@ -227,7 +228,18 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
                 tvdb_mappings={f"s{index}": ""},
             )
 
+            unprocessed_seasons.remove(index)  # Remove from unprocessed seasons
+
             yield season, episodes, animapping, anilist_media
+
+        # Anything still in unprocessed_seasons means we couldn't find a match
+        self.sync_stats.track_items(
+            [
+                ItemIdentifier.from_media(seasons[index])
+                for index in unprocessed_seasons
+            ],
+            SyncOutcome.NOT_FOUND,
+        )
 
     async def search_media(self, item: Show, child_item: Season) -> Media | None:
         """Searches for matching AniList entry by title.
