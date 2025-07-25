@@ -53,13 +53,11 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
 
         # Pre-fetch all episodes of the show. Instead of fetching episodes for each
         # season individually, we can fetch all episodes at once and filter them later.
-        episodes_by_season: dict[int, list[Episode]] = {}
-        for season_index in seasons:
-            episodes_by_season[season_index] = []
-
-        for episode in item.episodes():
-            if episode.parentIndex in seasons:
-                episodes_by_season.setdefault(episode.parentIndex, []).append(episode)
+        episodes_by_season: dict[int, list[Episode]] = {idx: [] for idx in seasons}
+        _wanted_episodes = self.__get_wanted_episodes(item)
+        for episode in _wanted_episodes:
+            if episode.parentIndex in episodes_by_season:
+                episodes_by_season[episode.parentIndex].append(episode)
 
         processed_seasons: set[int] = set()
 
