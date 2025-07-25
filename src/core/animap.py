@@ -14,8 +14,8 @@ from sqlalchemy.sql.elements import BinaryExpression, ColumnElement
 from src import log
 from src.config.database import db
 from src.core.mappings import MappingsClient
-from src.models.animap import AniMap
-from src.models.housekeeping import Housekeeping
+from src.models.db.animap import AniMap
+from src.models.db.housekeeping import Housekeeping
 
 __all__ = ["AniMapClient"]
 

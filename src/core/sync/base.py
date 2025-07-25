@@ -4,25 +4,99 @@ from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator, Callable
 from typing import Generic, TypeVar
 
+from pydantic import BaseModel
 from rapidfuzz import fuzz
 
+from plexapi.media import Guid
 from plexapi.video import Episode, Movie, Season, Show
 from src import log
 from src.config.settings import SyncField
 from src.core import AniListClient, AniMapClient, PlexClient
-from src.models.anilist import FuzzyDate, Media, MediaList, MediaListStatus, ScoreFormat
-from src.models.animap import AniMap
-from src.models.sync import (
+from src.core.sync.stats import (
     ItemIdentifier,
-    ParsedGuids,
     SyncOutcome,
     SyncStats,
+)
+from src.models.db.animap import AniMap
+from src.models.schemas.anilist import (
+    FuzzyDate,
+    Media,
+    MediaList,
+    MediaListStatus,
+    ScoreFormat,
 )
 from src.utils.types import Comparable
 
 T = TypeVar("T", bound=Movie | Show)  # Section item
 S = TypeVar("S", bound=Movie | Season)  # Item child (season)
 E = TypeVar("E", bound=list[Movie] | list[Episode])  # Item grandchild (episode)
+
+
+class ParsedGuids(BaseModel):
+    """Container for parsed media identifiers from different services.
+
+    Handles parsing and storage of media IDs from various services (TVDB, TMDB, IMDB)
+    from Plex's GUID format into a structured format. Provides iteration and string
+    representation for debugging.
+
+    Attributes:
+        tvdb (int | None): TVDB ID if available
+        tmdb (int | None): TMDB ID if available
+        imdb (str | None): IMDB ID if available
+
+    Note:
+        GUID formats expected from Plex:
+        - TVDB: "tvdb://123456"
+        - TMDB: "tmdb://123456"
+        - IMDB: "imdb://tt1234567"
+    """
+
+    tvdb: int | None = None
+    tmdb: int | None = None
+    imdb: str | None = None
+
+    @staticmethod
+    def from_guids(guids: list[Guid]) -> "ParsedGuids":
+        """Creates a ParsedGuids instance from a list of Plex GUIDs.
+
+        Args:
+            guids (list[Guid]): List of Plex GUID objects
+
+        Returns:
+            ParsedGuids: New instance with parsed IDs
+        """
+        parsed_guids = ParsedGuids()
+        for guid in guids:
+            if not guid.id:
+                continue
+
+            split_guid = guid.id.split("://")
+            if len(split_guid) != 2:
+                continue
+
+            attr = split_guid[0]
+            if not hasattr(parsed_guids, attr):
+                continue
+
+            try:
+                setattr(parsed_guids, attr, int(split_guid[1]))
+            except ValueError:
+                setattr(parsed_guids, attr, str(split_guid[1]))
+
+        return parsed_guids
+
+    def __str__(self) -> str:
+        """Creates a string representation of the parsed IDs.
+
+        Returns:
+            str: String representation of the parsed IDs in a format like
+                 "id: xxx, id: xxx, id: xxx"
+        """
+        return ", ".join(
+            f"{field}: {getattr(self, field)}"
+            for field in self.__class__.model_fields
+            if getattr(self, field) is not None
+        )
 
 
 class BaseSyncClient(ABC, Generic[T, S, E]):

@@ -12,8 +12,9 @@ from src.core.sync import (
     MovieSyncClient,
     ShowSyncClient,
 )
-from src.models.housekeeping import Housekeeping
-from src.models.sync import ParsedGuids, SyncOutcome, SyncStats
+from src.core.sync.base import ParsedGuids
+from src.core.sync.stats import SyncOutcome, SyncStats
+from src.models.db.housekeeping import Housekeeping
 
 __all__ = ["BridgeClient"]
 

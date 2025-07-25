@@ -3,7 +3,7 @@
 from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column
 
-from src.models.base import Base
+from src.models.db.base import Base
 
 
 class Housekeeping(Base):
