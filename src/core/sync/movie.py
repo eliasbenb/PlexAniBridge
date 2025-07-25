@@ -81,7 +81,7 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
             return
 
         if not anilist_media:
-            log.debug(
+            log.warning(
                 f"No AniList entry could be found for {self._debug_log_title(item)} "
                 f"{self._debug_log_ids(item.ratingKey, item.guid, guids)}"
             )

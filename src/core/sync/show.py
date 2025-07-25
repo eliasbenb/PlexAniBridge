@@ -113,6 +113,11 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
                 continue
 
             if not anilist_media:
+                log.warning(
+                    f"No AniList entry could be found for "
+                    f"{self._debug_log_title(item, animapping)} "
+                    f"{self._debug_log_ids(item.ratingKey, item.guid, guids)}"
+                )
                 continue
 
             # It might be that the mapping has multiple seasons.
@@ -177,7 +182,11 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             try:
                 _anilist_media = await self.search_media(item, season)
                 if not _anilist_media:
-                    continue
+                    log.warning(
+                        f"No AniList entry could be found for "
+                        f"{self._debug_log_title(item)} "
+                        f"{self._debug_log_ids(item.ratingKey, season.guid, guids)}"
+                    )
                 anilist_media = _anilist_media
             except Exception:
                 log.error(
@@ -197,7 +206,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
                     tvdb_id=None,
                     tvdb_mappings={f"s{index}": ""},
                 )
-                log.debug(
+                log.warning(
                     f"No AniList entry could be found for "
                     f"{self._debug_log_title(item, _animapping)}"
                     f"{self._debug_log_ids(item.ratingKey, season.guid, guids)}"
