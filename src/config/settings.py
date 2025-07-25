@@ -3,7 +3,7 @@
 from enum import StrEnum
 from pathlib import Path
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from pydantic.alias_generators import to_camel
 from pydantic.fields import _Unset
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -108,7 +108,7 @@ class SyncField(BaseStrEnum):
         return to_camel(self.value)
 
 
-class PlexAnibridgeProfileConfig(BaseSettings):
+class PlexAnibridgeProfileConfig(BaseModel):
     """Configuration for a single PlexAniBridge profile.
 
     Represents one sync profile with one Plex user and one AniList account.
@@ -242,7 +242,7 @@ class PlexAnibridgeProfileConfig(BaseSettings):
             ]
         )
 
-    model_config = SettingsConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid")
 
 
 class PlexAnibridgeConfig(BaseSettings):
