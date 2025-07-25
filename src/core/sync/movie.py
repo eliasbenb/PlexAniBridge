@@ -9,6 +9,7 @@ from src import log
 from src.core.sync.base import BaseSyncClient, ParsedGuids
 from src.models.anilist import FuzzyDate, Media, MediaListStatus
 from src.models.animap import AniMap
+from src.models.sync import ItemIdentifier
 
 
 class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
@@ -158,6 +159,19 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
         if is_partially_viewed:
             return MediaListStatus.DROPPED
         return None
+
+    async def _get_all_trackable_items(self, item: Movie) -> list[ItemIdentifier]:
+        """Get all trackable items for a movie.
+
+        For movies, this returns the movie itself as it is a single-episode item.
+
+        Args:
+            item (Movie): Plex movie item.
+
+        Returns:
+            list[ItemIdentifier]: List of all trackable items (the movie itself).
+        """
+        return [ItemIdentifier.from_item(item)]
 
     async def _calculate_score(
         self,

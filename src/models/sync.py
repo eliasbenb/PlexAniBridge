@@ -17,6 +17,7 @@ class SyncOutcome(StrEnum):
     FAILED = "failed"  # Failed to process due to error
     NOT_FOUND = "not_found"  # No matching AniList entry could be found
     DELETED = "deleted"  # Item was deleted from AniList (destructive sync)
+    PENDING = "pending"  # Item was identified for processing but not yet processed
 
 
 class ItemIdentifier(BaseModel):
@@ -35,7 +36,7 @@ class ItemIdentifier(BaseModel):
     repr: str | None = None  # Cached string representation
 
     @classmethod
-    def from_media(cls, item: Movie | Show | Season | Episode) -> "ItemIdentifier":
+    def from_item(cls, item: Movie | Show | Season | Episode) -> "ItemIdentifier":
         """Create an ItemIdentifier from a Plex media object.
 
         Args:
@@ -69,16 +70,19 @@ class ItemIdentifier(BaseModel):
         return cls(**kwargs)
 
     @classmethod
-    def from_items(cls, items: list[Movie] | list[Episode]) -> list["ItemIdentifier"]:
+    def from_items(
+        cls, items: list[Movie] | list[Show] | list[Season] | list[Episode]
+    ) -> list["ItemIdentifier"]:
         """Create ItemIdentifiers from a list of Plex media objects.
 
         Args:
-            items: List of Plex media objects
+            items (list[Movie] | list[Show] | list[Season] | list[Episode]): List of
+                Plex media objects
 
         Returns:
             list[ItemIdentifier]: List of identifiers for the media items
         """
-        return [cls.from_media(item) for item in items]
+        return [cls.from_item(item) for item in items]
 
     def __hash__(self) -> int:
         """Generate a hash for the ItemIdentifier instance.
@@ -127,6 +131,19 @@ class SyncStats(BaseModel):
         for item_id in item_ids:
             self.track_item(item_id, outcome)
 
+    def register_pending_items(self, item_ids: list[ItemIdentifier]) -> None:
+        """Register items as pending processing.
+
+        This should be called at the start of processing to ensure all items
+        that should be processed are tracked.
+
+        Args:
+            item_ids (list[ItemIdentifier]): List of item identifiers to register
+        """
+        for item_id in item_ids:
+            if item_id not in self._item_outcomes:
+                self._item_outcomes[item_id] = SyncOutcome.PENDING
+
     def get_items_by_outcome(self, *outcomes: SyncOutcome) -> list[ItemIdentifier]:
         """Get all items that had a specific outcome.
 
@@ -136,10 +153,39 @@ class SyncStats(BaseModel):
         Returns:
             list[ItemIdentifier]: Items with the specified outcome(s)
         """
+        if not outcomes:
+            return [
+                item_id
+                for item_id in self._item_outcomes
+                if item_id.item_type in ("show", "movie")
+            ]
         return [
             item_id
             for item_id, item_outcome in self._item_outcomes.items()
-            if item_outcome in outcomes
+            if item_outcome in outcomes and item_id.item_type in ("show", "movie")
+        ]
+
+    def get_grandchild_items_by_outcome(
+        self, *outcome: SyncOutcome
+    ) -> list[ItemIdentifier]:
+        """Get all grandchild items (episodes/movies) that had a specific outcome.
+
+        Args:
+            outcome (SyncOutcome): One or more outcomes to filter by
+
+        Returns:
+            list[ItemIdentifier]: Grandchild items with the specified outcome(s)
+        """
+        if not outcome:
+            return [
+                item_id
+                for item_id in self._item_outcomes
+                if item_id.item_type in ("episode", "movie")
+            ]
+        return [
+            item_id
+            for item_id, item_outcome in self._item_outcomes.items()
+            if item_outcome in outcome and item_id.item_type in ("episode", "movie")
         ]
 
     @property
@@ -168,32 +214,46 @@ class SyncStats(BaseModel):
         return len(self.get_items_by_outcome(SyncOutcome.FAILED))
 
     @property
-    def total_processed(self) -> int:
-        """Total number of items processed."""
-        return len(self._item_outcomes)
+    def pending(self) -> int:
+        """Number of items that are still pending processing."""
+        return len(self.get_items_by_outcome(SyncOutcome.PENDING))
 
     @property
-    def success_rate(self) -> float:
-        """Percentage of items successfully processed (synced + skipped)."""
-        if self.total_processed == 0:
+    def total_processed(self) -> int:
+        """Total number of items processed (excluding pending)."""
+        return len(
+            self.get_items_by_outcome(
+                SyncOutcome.SYNCED,
+                SyncOutcome.SKIPPED,
+                SyncOutcome.FAILED,
+                SyncOutcome.NOT_FOUND,
+                SyncOutcome.DELETED,
+            )
+        )
+
+    @property
+    def total_items(self) -> int:
+        """Total number of items tracked (including unprocessed)."""
+        return len(self.get_items_by_outcome())
+
+    @property
+    def coverage(self) -> float:
+        """Percentage of grandchild items that were successfully processed."""
+        total = len(self.get_grandchild_items_by_outcome())
+        if not total:
             return 1.0
-        successful = self.synced + self.deleted + self.skipped
-        return successful / self.total_processed
 
-    def get_summary(self) -> dict[str, int]:
-        """Get a summary of all outcomes.
+        processed = len(
+            self.get_grandchild_items_by_outcome(
+                SyncOutcome.SYNCED,
+                SyncOutcome.SKIPPED,
+                SyncOutcome.FAILED,
+                SyncOutcome.NOT_FOUND,
+                SyncOutcome.DELETED,
+            )
+        )
 
-        Returns:
-            dict: Mapping of outcome names to counts
-        """
-        return {
-            "synced": self.synced,
-            "deleted": self.deleted,
-            "skipped": self.skipped,
-            "not_found": self.not_found,
-            "failed": self.failed,
-            "total": self.total_processed,
-        }
+        return processed / total
 
     def combine(self, other: "SyncStats") -> "SyncStats":
         """Combine this stats instance with another.

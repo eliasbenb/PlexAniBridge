@@ -12,6 +12,7 @@ from src import log
 from src.core.sync.base import BaseSyncClient, ParsedGuids
 from src.models.anilist import FuzzyDate, Media, MediaListStatus
 from src.models.animap import AniMap
+from src.models.sync import ItemIdentifier
 from src.utils.cache import gattl_cache, glru_cache
 
 
@@ -46,18 +47,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         """
         guids = ParsedGuids.from_guids(item.guids)
 
-        seasons: dict[int, Season] = {
-            s.index: s
-            for s in item.seasons() or []
-            if s is not None
-            and s.leafCount  # Skip empty seasons
-            and (
-                self.full_scan  # We need to either be using `FULL_SCAN`
-                or s.viewedLeafCount  # OR the season has been viewed
-                or (item.viewedLeafCount and self.plex_client.is_online_user)
-            )
-        }
-
+        seasons = self.__get_wanted_seasons(item)
         if not seasons:
             return
 
@@ -256,6 +246,63 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             )
         ]
         return self._best_search_result(item.title, results)
+
+    async def _get_all_trackable_items(self, item: Show) -> list[ItemIdentifier]:
+        """Get all trackable items (episodes) for a show.
+
+        This method collects all episodes that would potentially be processed
+        during sync, following the same filtering logic as map_media() but
+        without the actual mapping.
+
+        Args:
+            item (Show): Plex show item.
+
+        Returns:
+            list[ItemIdentifier]: All episode identifiers that should be tracked.
+        """
+        episodes = self.__get_wanted_episodes(item)
+        if not episodes:
+            return []
+
+        return ItemIdentifier.from_items(episodes)
+
+    @glru_cache(maxsize=1)
+    def __get_wanted_seasons(self, item: Show) -> dict[int, Season]:
+        """Get seasons that are wanted for syncing.
+
+        Args:
+            item (Show): Plex show item.
+
+        Returns:
+            dict[int, Season]: Dictionary of seasons to process.
+        """
+        return {
+            s.index: s
+            for s in item.seasons() or []
+            if s is not None
+            and s.leafCount  # Skip empty seasons
+            and (
+                self.full_scan  # We need to either be using `FULL_SCAN`
+                or s.viewedLeafCount  # OR the season has been viewed
+                or (item.viewedLeafCount and self.plex_client.is_online_user)
+            )
+        }
+
+    @glru_cache(maxsize=1)
+    def __get_wanted_episodes(self, item: Show) -> list[Episode]:
+        """Get episodes that are wanted for syncing.
+
+        Args:
+            item (Show): Plex show item.
+
+        Returns:
+            list[Episode]: List of episodes to process.
+        """
+        seasons = self.__get_wanted_seasons(item)
+        if not seasons:
+            return []
+
+        return [e for e in item.episodes() if e.parentIndex in seasons]
 
     async def _calculate_status(
         self,

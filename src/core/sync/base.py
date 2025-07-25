@@ -127,9 +127,12 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             f"{debug_log_title} {debug_log_ids}"
         )
 
-        # Track all items that we attempt to process
-        item_id = ItemIdentifier.from_media(item)
-        found_any_match = False
+        item_id = ItemIdentifier.from_item(item)
+
+        all_trackable_items = await self._get_all_trackable_items(item)
+        if all_trackable_items:
+            self.sync_stats.register_pending_items(all_trackable_items)
+        self.sync_stats.track_item(item_id, SyncOutcome.PENDING)
 
         async for (
             child_item,
@@ -137,7 +140,6 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             animapping,
             anilist_media,
         ) in self.map_media(item):
-            found_any_match = True
             grandchild_ids = ItemIdentifier.from_items(grandchild_items)
 
             debug_log_title = self._debug_log_title(item=item, animapping=animapping)
@@ -161,9 +163,8 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
                     anilist_media=anilist_media,
                     animapping=animapping,
                 )
-
-                # Track the outcome for all grandchild items
                 self.sync_stats.track_items(grandchild_ids, outcome)
+                self.sync_stats.track_item(item_id, outcome)
 
             except Exception:
                 log.error(
@@ -172,10 +173,22 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
                     exc_info=True,
                 )
                 self.sync_stats.track_items(grandchild_ids, SyncOutcome.FAILED)
+                self.sync_stats.track_item(item_id, SyncOutcome.FAILED)
 
-        # If no matches were found for any mapping, mark the main item as not found
-        if not found_any_match:
-            self.sync_stats.track_item(item_id, SyncOutcome.NOT_FOUND)
+    @abstractmethod
+    async def _get_all_trackable_items(self, item: T) -> list[ItemIdentifier]:
+        """Get all trackable items (episodes/movies) for a given parent item.
+
+        This method should return all episodes or movies that should be tracked
+        for synchronization purposes, even if they might not ultimately be processed.
+
+        Args:
+            item (T): Grandparent Plex media item.
+
+        Returns:
+            list[ItemIdentifier]: List of all trackable items for this parent.
+        """
+        pass
 
     @abstractmethod
     def map_media(self, item: T) -> AsyncIterator[tuple[S, E, AniMap, Media]]:

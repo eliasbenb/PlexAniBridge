@@ -13,7 +13,7 @@ from src.core.sync import (
     ShowSyncClient,
 )
 from src.models.housekeeping import Housekeeping
-from src.models.sync import ParsedGuids, SyncStats
+from src.models.sync import ParsedGuids, SyncOutcome, SyncStats
 
 __all__ = ["BridgeClient"]
 
@@ -228,11 +228,19 @@ class BridgeClient:
 
             log.info(
                 f"{self.__class__.__name__}: [{self.profile_name}] Sync completed: "
-                f"{sync_stats.synced} synced,  {sync_stats.deleted} deleted, "
+                f"{sync_stats.synced} synced, {sync_stats.deleted} deleted, "
                 f"{sync_stats.skipped} skipped, {sync_stats.not_found} not found, "
-                f"{sync_stats.failed} failed. Success rate: "
-                f"{sync_stats.success_rate:.2%} ({sync_stats.total_processed} total) "
+                f"{sync_stats.failed} failed. Coverage: {sync_stats.coverage:.2%} "
+                f"({len(sync_stats.get_grandchild_items_by_outcome())} total) "
                 f"in {duration.total_seconds():.2f} seconds"
+            )
+
+            unprocessed_items = sync_stats.get_grandchild_items_by_outcome(
+                SyncOutcome.PENDING
+            )
+            log.debug(
+                f"{self.__class__.__name__}: [{self.profile_name}] "
+                f"Unprocessed items: {', '.join([repr(i) for i in unprocessed_items])}"
             )
 
         except Exception as e:
