@@ -3,24 +3,21 @@
 PUID=${PUID:-1000}
 PGID=${PGID:-1000}
 
-CURRENT_UID=$(id -u abc)
-CURRENT_GID=$(id -g abc)
-
 log() {
     printf "%s - init - INFO\t%s\n" "$(date '+%Y-%m-%d %H:%M:%S')" "$1"
 }
 
-if [ "$PGID" != "$CURRENT_GID" ]; then
-    groupmod -g "$PGID" abc
+if ! getent group abc >/dev/null 2>&1; then
+    addgroup -g "$PGID" abc
 fi
 
-if [ "$PUID" != "$CURRENT_UID" ]; then
-    usermod -u "$PUID" abc
+if ! getent passwd abc >/dev/null 2>&1; then
+    adduser -u "$PUID" -G abc -s /bin/sh -D abc
 fi
 
-chown -R abc:abc /app
+chown -R "$PUID:$PGID" /app
 if [ -d "/config" ]; then
-    chown -R abc:abc /config
+    chown -R "$PUID:$PGID" /config
 fi
 
 umask 022

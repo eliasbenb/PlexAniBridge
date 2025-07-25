@@ -22,9 +22,6 @@ FROM python:3.13-alpine
 
 RUN apk add --no-cache shadow su-exec
 
-RUN addgroup -g 1000 abc && \
-    adduser -u 1000 -G abc -s /bin/sh -D abc
-
 COPY --from=builder /opt/venv /opt/venv
 
 LABEL maintainer="Elias Benbourenane <eliasbenbourenane@gmail.com>" \
@@ -44,11 +41,10 @@ ENV PYTHONPATH=/opt/venv/lib/python3.13/site-packages \
 
 WORKDIR /app
 
-COPY --chown=abc:abc . /app
-COPY --chown=abc:abc ./scripts/docker_init.sh /init
+COPY . /app
+COPY ./scripts/docker_init.sh /init
 
-RUN mkdir -p /config && \
-    chown abc:abc /config
+RUN mkdir -p /config
 
 VOLUME ["/config"]
 
