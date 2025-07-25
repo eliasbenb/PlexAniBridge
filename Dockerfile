@@ -40,7 +40,7 @@ ENV PYTHONPATH=/opt/venv/lib/python3.13/site-packages \
     PYTHONUNBUFFERED=1 \
     PUID=1000 \
     PGID=1000 \
-    DATA_PATH=/config
+    PAB_DATA_PATH=/config
 
 WORKDIR /app
 
