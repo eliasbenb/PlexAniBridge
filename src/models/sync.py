@@ -131,6 +131,27 @@ class SyncStats(BaseModel):
         for item_id in item_ids:
             self.track_item(item_id, outcome)
 
+    def untrack_item(self, item_id: ItemIdentifier) -> None:
+        """Remove an item from tracking.
+
+        This is useful if an item was registered but later determined to be
+        irrelevant or not part of the sync process.
+
+        Args:
+            item_id (ItemIdentifier): Identifier for the media item to untrack
+        """
+        if item_id in self._item_outcomes:
+            del self._item_outcomes[item_id]
+
+    def untrack_items(self, item_ids: list[ItemIdentifier]) -> None:
+        """Remove multiple items from tracking.
+
+        Args:
+            item_ids (list[ItemIdentifier]): List of item identifiers to untrack
+        """
+        for item_id in item_ids:
+            self.untrack_item(item_id)
+
     def register_pending_items(self, item_ids: list[ItemIdentifier]) -> None:
         """Register items as pending processing.
 

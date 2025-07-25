@@ -77,7 +77,9 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
 
             if not relevant_seasons:
                 continue
-            elif not self.destructive_sync:
+            # Unless we're doing a full scan or destructive sync, we only want to
+            # process seasons that have watched episodes
+            elif not self.destructive_sync and not self.full_scan:
                 any_relevant_episodes = False
                 for mapping in animapping.parsed_tvdb_mappings:
                     mapping_episodes = episodes_by_season.get(mapping.season, [])
@@ -88,7 +90,10 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
                         for e in mapping_episodes
                     ):
                         any_relevant_episodes = True
-                        break
+                    else:  # No relevant episodes, remove from tracking
+                        self.sync_stats.untrack_items(
+                            ItemIdentifier.from_items(mapping_episodes)
+                        )
                 if not any_relevant_episodes:
                     continue
 
@@ -290,6 +295,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             and s.leafCount  # Skip empty seasons
             and (
                 self.full_scan  # We need to either be using `FULL_SCAN`
+                or self.destructive_sync  # OR destructive sync
                 or s.viewedLeafCount  # OR the season has been viewed
                 or (item.viewedLeafCount and self.plex_client.is_online_user)
             )
