@@ -33,7 +33,7 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
             item (Movie): Plex movie to map.
 
         Yields:
-            tuple: A tuple containing:
+            tuple[Movie, list[Movie], AniMap, Media]: A tuple containing:
                 - Movie: The movie itself.
                 - list[Movie]: List containing the movie.
                 - AniMap: AniMap entry with ID mappings.

@@ -35,14 +35,14 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         with watched content unless full_scan is enabled.
 
         Args:
-            item: Plex show to map.
+            item (Show): Plex show to map.
 
         Yields:
-            Mapping matches as tuples containing:
-                - child: Primary season for this mapping
-                - grandchild: List of episodes from mapped season(s)
-                - animapping: AniMap entry with TVDB season mappings
-                - anilist_media: Matched AniList media entry
+            tuple[Season, list[Episode], AniMap, Media]: Mapping matches with:
+                - Season: Primary season for this mapping
+                - list[Episode]: List of episodes from mapped season(s)
+                - AniMap: AniMap entry with TVDB season mappings
+                - Media: Matched AniList media entry
         """
         guids = ParsedGuids.from_guids(item.guids)
 
@@ -236,11 +236,11 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         similar titles (fuzzy search).
 
         Args:
-            item: Grandparent Plex media item.
-            child_item: Target child item to sync.
+            item (Show): Grandparent Plex media item.
+            child_item (Season): Target child item to sync.
 
         Returns:
-            Matching AniList entry or None if not found.
+            Media | None: Matching AniList entry or None if not found.
         """
         if self.search_fallback_threshold == -1:
             return None
@@ -268,14 +268,14 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         """Calculates the watch status for a media item.
 
         Args:
-            item: Main Plex media item.
-            child_item: Season being processed.
-            grandchild_items: List of relevant episodes.
-            anilist_media: Matched AniList entry.
-            animapping: AniMap entry with ID mappings.
+            item (Show): Main Plex media item.
+            child_item (Season): Season being processed.
+            grandchild_items (list[Episode]): List of relevant episodes.
+            anilist_media (Media): Matched AniList entry.
+            animapping (AniMap): AniMap entry with ID mappings.
 
         Returns:
-            Watch status for the media item.
+            MediaListStatus | None: Watch status for the media item.
         """
         all_episodes = grandchild_items
         is_all_available = len(all_episodes) >= (anilist_media.episodes or sys.maxsize)
@@ -346,14 +346,14 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         """Calculates the user rating for a media item.
 
         Args:
-            item: Main Plex media item.
-            child_item: Specific item to sync.
-            grandchild_items: List of relevant episodes.
-            anilist_media: Matched AniList entry.
-            animapping: Matched AniMap entry.
+            item (Show): Main Plex media item.
+            child_item (Season): Specific item to sync.
+            grandchild_items (list[Episode]): List of relevant episodes.
+            anilist_media (Media): Matched AniList entry.
+            animapping (AniMap): Matched AniMap entry.
 
         Returns:
-            User rating for the media item.
+            int | float | None: User rating for the media item.
         """
         if all(e.userRating for e in grandchild_items):
             score = sum(e.userRating for e in grandchild_items) / len(grandchild_items)
@@ -379,14 +379,14 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         """Calculates the progress for a media item.
 
         Args:
-            item: Main Plex media item.
-            child_item: Season being processed.
-            grandchild_items: List of relevant episodes.
-            anilist_media: Matched AniList entry.
-            animapping: AniMap entry with ID mappings.
+            item (Show): Main Plex media item.
+            child_item (Season): Season being processed.
+            grandchild_items (list[Episode]): List of relevant episodes.
+            anilist_media (Media): Matched AniList entry.
+            animapping (AniMap): AniMap entry with ID mappings.
 
         Returns:
-            Progress for the media item.
+            int | None: Progress for the media item.
         """
         watched_episodes = len(self._filter_watched_episodes(grandchild_items))
         return min(watched_episodes, anilist_media.episodes or watched_episodes)
@@ -402,14 +402,14 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         """Calculates the number of repeats for a media item.
 
         Args:
-            item: Main Plex media item.
-            child_item: Season being processed.
-            grandchild_items: List of relevant episodes.
-            anilist_media: Matched AniList entry.
-            animapping: AniMap entry with ID mappings.
+            item (Show): Main Plex media item.
+            child_item (Season): Season being processed.
+            grandchild_items (list[Episode]): List of relevant episodes.
+            anilist_media (Media): Matched AniList entry.
+            animapping (AniMap): AniMap entry with ID mappings.
 
         Returns:
-            Number of repeats for the media item.
+            int | None: Number of repeats for the media item.
         """
         least_views = min(
             (e.viewCount for e in self._filter_watched_episodes(grandchild_items)),
@@ -428,14 +428,14 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         """Calculates the start date for a media item.
 
         Args:
-            item: Grandparent Plex media item.
-            child_item: Season being processed.
-            grandchild_items: List of relevant episodes.
-            anilist_media: Matched AniList entry.
-            animapping: AniMap entry with ID mappings.
+            item (Show): Grandparent Plex media item.
+            child_item (Season): Season being processed.
+            grandchild_items (list[Episode]): List of relevant episodes.
+            anilist_media (Media): Matched AniList entry.
+            animapping (AniMap): AniMap entry with ID mappings.
 
         Returns:
-            Start date for the media item.
+            FuzzyDate | None: Start date for the media item.
         """
         history = await self._filter_history_by_episodes(item, grandchild_items)
         first_history = min(history, key=lambda h: h.viewedAt) if history else None
@@ -475,14 +475,14 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         """Calculates the completion date for a media item.
 
         Args:
-            item: Grandparent Plex media item.
-            child_item: Season being processed.
-            grandchild_items: List of relevant episodes.
-            anilist_media: Matched AniList entry.
-            animapping: AniMap entry with ID mappings.
+            item (Show): Grandparent Plex media item.
+            child_item (Season): Season being processed.
+            grandchild_items (list[Episode]): List of relevant episodes.
+            anilist_media (Media): Matched AniList entry.
+            animapping (AniMap): AniMap entry with ID mappings.
 
         Returns:
-            Completion date for the media item.
+            FuzzyDate | None: Completion date for the media item.
         """
         history = await self._filter_history_by_episodes(item, grandchild_items)
         last_history = max(history, key=lambda h: h.viewedAt) if history else None
@@ -519,21 +519,19 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         child_item: Season,
         grandchild_items: list[Episode],
         anilist_media: Media,
-        *_,
-        **__,
+        animapping: AniMap,
     ) -> str | None:
         """Chooses the most relevant user notes for a media item.
 
         Args:
-            item: Grandparent Plex media item.
-            child_item: Parent Plex media item.
-            grandchild_items: List of relevant episodes.
-            anilist_media: Matched AniList entry.
-            *_: Additional positional arguments (ignored).
-            **__: Additional keyword arguments (ignored).
+            item (Show): Grandparent Plex media item.
+            child_item (Season): Parent Plex media item.
+            grandchild_items (list[Episode]): List of relevant episodes.
+            anilist_media (Media): Matched AniList entry.
+            animapping (AniMap): AniMap entry with ID mappings.
 
         Returns:
-            User notes for the media item.
+            str | None: User notes for the media item.
         """
         if len(grandchild_items) == anilist_media.episodes == 1:
             return await self.plex_client.get_user_review(grandchild_items[0])
@@ -552,8 +550,8 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         The outputted string uses color formatting syntax with the `$$` delimiters.
 
         Args:
-            item: Grandparent Plex media item.
-            animapping: AniMap entry for the media.
+            item (Show): Grandparent Plex media item.
+            animapping (AniMap | None): AniMap entry for the media.
 
         Returns:
             Debug-friendly string of media titles.
@@ -581,13 +579,13 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         The outputted string uses color formatting syntax with the `$$` delimiters.
 
         Args:
-            key: Plex rating key.
-            plex_id: Plex identifier.
-            guids: Plex GUIDs.
-            anilist_id: AniList ID.
+            key (int | str): Plex rating key.
+            plex_id (str | None): Plex identifier.
+            guids (ParsedGuids): Plex GUIDs.
+            anilist_id (int | None): AniList ID.
 
         Returns:
-            Debug-friendly string of media identifiers.
+            str: Debug-friendly string of media identifiers.
         """
         return (
             f"$${{key: {key}, plex_id: {plex_id}, {guids}"
@@ -601,11 +599,11 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         """Filters out history entries that don't exist in the grandchild items.
 
         Args:
-            item: Main Plex media item.
-            grandchild_items: List of relevant episodes.
+            item (Show): Main Plex media item.
+            grandchild_items (list[Episode]): List of relevant episodes.
 
         Returns:
-            Filtered history entries.
+            list[EpisodeHistory | MovieHistory]: Filtered history entries.
         """
         grandchild_rating_keys = {e.ratingKey for e in grandchild_items}
         episode_map = {e.ratingKey: e for e in grandchild_items}
@@ -639,9 +637,9 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         """Filters watched episodes based on AniList entry.
 
         Args:
-            episodes: Episodes to filter.
+            episodes (list[Episode]): Episodes to filter.
 
         Returns:
-            Filtered episodes.
+            list[Episode]: Filtered episodes.
         """
         return [e for e in episodes if e.viewCount]

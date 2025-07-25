@@ -32,10 +32,9 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
     for different media types through abstract methods.
 
     Type Parameters:
-        T (Movie | Show): Main media type (Movie or Show).
-        S (Movie | Season): Child item type (Movie or Season).
-        E (list[Movie] | list[Episode]): Grandchild item type
-                                         (list[Movie] or list[Episode]).
+        T: Main media type (Movie or Show).
+        S: Child item type (Movie or Season).
+        E: Grandchild item type (list[Movie] or list[Episode]).
     """
 
     def __init__(
