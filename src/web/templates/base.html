@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}PlexAniBridge Dashboard{% endblock %}</title>
+
+    <link rel="icon" href="{{ url_for('static', path='favicon.ico') }}" type="image/x-icon">
+
+    <script src="https://unpkg.com/htmx.org@2.0.6/dist/htmx.min.js"></script>
+    <script src="https://unpkg.com/@heroicons/vue@2.2.0/24/outline/index.js" type="module"></script>
+    <script src="https://unpkg.com/@tailwindcss/browser@4.1.11/dist/index.global.js"></script>
+
+    {% block head %}{% endblock %}
+</head>
+
+<body class="h-full bg-gray-50 dark:bg-gray-900">
+    <div class="min-h-full">
+        <!-- Navigation -->
+        <nav class="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
+            <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between h-16">
+                    <div class="flex items-center">
+                        <a href="/" class="flex items-center space-x-3">
+                            <img src="{{ url_for('static', path='img/logo.png') }}" alt="Logo" class="h-8 w-8">
+                            <span class="text-xl font-semibold text-gray-900 dark:text-white">
+                                PlexAniBridge
+                            </span>
+                        </a>
+                    </div>
+
+                    <div class="flex items-center space-x-4">
+                        <a href="/logs"
+                            class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 px-3 py-2 rounded-md text-sm font-medium transition-colors">
+                            Logs
+                        </a>
+
+                        <!-- Status indicator -->
+                        <div class="flex items-center space-x-2">
+                            <div class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                            <span class="text-sm text-gray-600 dark:text-gray-300">Running</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main content -->
+        <main class="flex-1">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+
+    <!-- Toast notifications container -->
+    <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2"></div>
+
+    {% block scripts %}{% endblock %}
+</body>
+
+</html>

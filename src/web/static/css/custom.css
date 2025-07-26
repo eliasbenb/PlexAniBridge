@@ -1,0 +1,65 @@
+/* Styles for PlexAniBridge dashboard */
+
+:root {
+  --plex-orange: #E5A00D;
+  --anilist-blue: #02A9FF;
+  --success-green: #10B981;
+  --error-red: #EF4444;
+  --warning-yellow: #F59E0B;
+  --gradient-primary: linear-gradient(135deg, var(--plex-orange), var(--anilist-blue));
+}
+
+/* Toast notifications */
+.toast {
+  @apply fixed top-4 right-4 max-w-sm bg-white dark:bg-gray-800 shadow-lg rounded-lg p-4 mb-4 border border-gray-200 dark:border-gray-700;
+  z-index: 1000;
+  transform: translateX(100%);
+  opacity: 0;
+}
+
+.toast.success {
+  @apply border-green-200 dark:border-green-700;
+}
+
+.toast.error {
+  @apply border-red-200 dark:border-red-700;
+}
+
+.toast.warning {
+  @apply border-yellow-200 dark:border-yellow-700;
+}
+
+.toast.info {
+  @apply border-blue-200 dark:border-blue-700;
+}
+
+/* Animation classes */
+.fade-in {
+  animation: slideInFade 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.fade-out {
+  animation: slideOutFade 0.3s cubic-bezier(0.7, 0, 0.84, 0) forwards;
+}
+
+@keyframes slideInFade {
+  from {
+    opacity: 0;
+    transform: translateX(100%) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes slideOutFade {
+  from {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(100%) scale(0.95);
+  }
+}
