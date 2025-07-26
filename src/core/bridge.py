@@ -239,10 +239,11 @@ class BridgeClient:
             unprocessed_items = sync_stats.get_grandchild_items_by_outcome(
                 SyncOutcome.PENDING
             )
-            log.debug(
-                f"{self.__class__.__name__}: [{self.profile_name}] "
-                f"Unprocessed items: {', '.join([repr(i) for i in unprocessed_items])}"
-            )
+            if unprocessed_items:
+                log.debug(
+                    f"{self.__class__.__name__}: [{self.profile_name}] "
+                    f"Unprocessed items: {', '.join([repr(i) for i in unprocessed_items])}"
+                )
 
         except Exception as e:
             end_time = datetime.now(timezone.utc)
