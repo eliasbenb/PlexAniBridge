@@ -1,6 +1,17 @@
 {
+    "[javascript]": {
+        "editor.defaultFormatter": "vscode.typescript-language-features"
+    },
     "[python]": {
         "editor.defaultFormatter": "charliermarsh.ruff"
+    },
+    "[tailwindcss]": {
+        "editor.defaultFormatter": "numso.prettier-standard-vscode"
+    },
+    "editor.tabSize": 4,
+    "editor.detectIndentation": false,
+    "files.associations": {
+        "*.css": "tailwindcss"
     },
     "python.defaultInterpreterPath": ".venv/bin/python",
     "python.envFile": "",
