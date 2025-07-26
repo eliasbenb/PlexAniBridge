@@ -1,14 +1,17 @@
 """PlexAniBridge Main Application."""
 
 import asyncio
+import contextlib
 import signal
 import sys
 
+import uvicorn
 from pydantic import ValidationError
 
 from src import PLEXANIBDRIGE_HEADER, log
 from src.config import config
 from src.core.sched import SchedulerClient
+from src.web.app import create_app
 
 
 class GracefulShutdownHandler:
@@ -17,6 +20,8 @@ class GracefulShutdownHandler:
     def __init__(self) -> None:
         """Initialize the shutdown handler."""
         self.shutdown_event = asyncio.Event()
+        self.scheduler: SchedulerClient | None = None
+        self.server: uvicorn.Server | None = None
         self._setup_signal_handlers()
 
     def _setup_signal_handlers(self):
@@ -67,45 +72,17 @@ def validate_configuration():
                     f"interval {profile_config.sync_interval}s, "
                     f"{'polling' if profile_config.polling_scan else 'periodic'} mode"
                 )
-            except KeyError as e:
-                log.error(f"PlexAniBridge: Profile $$'{profile_name}'$$ not found: {e}")
-                return False
-            except ValidationError as e:
-                log.error(
-                    f"PlexAniBridge: Invalid configuration for profile "
-                    f"$$'{profile_name}'$$: {e}"
-                )
-                return False
-            except ValueError as e:
-                log.error(
-                    f"PlexAniBridge: Configuration error for profile "
-                    f"$$'{profile_name}'$$: {e}"
-                )
-                return False
-            except (AttributeError, TypeError) as e:
-                log.error(
-                    f"PlexAniBridge: Configuration structure error for profile "
-                    f"$$'{profile_name}'$$: {e}"
-                )
+            except Exception as e:
+                log.error(f"PlexAniBridge: Profile $$'{profile_name}'$$ error: {e}")
                 return False
 
         return True
-
-    except ValidationError as e:
-        log.error(f"PlexAniBridge: Global configuration validation failed: {e}")
-        return False
-    except ValueError as e:
-        log.error(f"PlexAniBridge: Configuration value error: {e}")
-        return False
-    except (OSError, PermissionError) as e:
-        log.error(f"PlexAniBridge: File system error during configuration: {e}")
-        return False
     except Exception as e:
         log.error(f"PlexAniBridge: Unexpected configuration error: {e}", exc_info=True)
         return False
 
 
-async def run():
+async def run() -> int:
     """Main application entry point.
 
     Initializes and runs the application scheduler until shutdown.
@@ -113,8 +90,9 @@ async def run():
     Returns:
         int: Exit code (0 for success, 1 for error)
     """
-    app_scheduler = None
     shutdown_handler = None
+    scheduler = None
+    server = None
 
     try:
         log.info("\n" + PLEXANIBDRIGE_HEADER)
@@ -124,14 +102,51 @@ async def run():
 
         shutdown_handler = GracefulShutdownHandler()
 
-        app_scheduler = SchedulerClient(config)
-        await app_scheduler.initialize()
-        await app_scheduler.start()
+        # Initialize scheduler
+        scheduler = SchedulerClient(config)
+        await scheduler.initialize()
+        await scheduler.start()
 
-        await shutdown_handler.wait_for_shutdown()
+        shutdown_handler.scheduler = scheduler
+
+        if config.web_server_enabled:
+            app = create_app(config, scheduler)
+            uvicorn_config = uvicorn.Config(
+                app=app,
+                host=config.web_server_host,
+                port=config.web_server_port,
+                log_level="info",
+                access_log=False,
+            )
+            server = uvicorn.Server(uvicorn_config)
+            shutdown_handler.server = server
+
+            log.info(
+                f"PlexAniBridge: Starting web server on http://{config.web_server_host}:{config.web_server_port}"
+            )
+
+            # Start server in a task
+            server_task = asyncio.create_task(server.serve())
+            shutdown_task = asyncio.create_task(shutdown_handler.wait_for_shutdown())
+
+            # Wait for either server completion or shutdown signal
+            _, pending = await asyncio.wait(
+                [server_task, shutdown_task], return_when=asyncio.FIRST_COMPLETED
+            )
+
+            # Cancel any remaining tasks
+            for task in pending:
+                task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await task
+        else:
+            await shutdown_handler.wait_for_shutdown()
+
+        return 0
 
     except KeyboardInterrupt:
         log.info("PlexAniBridge: Keyboard interrupt received, shutting down...")
+        return 0
     except ValidationError as e:
         log.error(f"PlexAniBridge: Configuration validation error: {e}")
         return 1
@@ -148,19 +163,24 @@ async def run():
         log.error(f"PlexAniBridge: Unexpected application error: {e}", exc_info=True)
         return 1
     finally:
-        if app_scheduler:
-            log.info("PlexAniBridge: Shutting down application...")
+        if scheduler:
+            log.info("PlexAniBridge: Shutting down scheduler...")
             try:
-                await app_scheduler.stop()
-                log.success("PlexAniBridge: Application shutdown complete")
+                await scheduler.stop()
+                log.success("PlexAniBridge: Scheduler shutdown complete")
             except asyncio.CancelledError:
                 log.info("PlexAniBridge: Shutdown cancelled")
                 return 1
             except Exception as e:
-                log.error(f"PlexAniBridge: Error during shutdown: {e}", exc_info=True)
-                return 1
+                log.error(f"PlexAniBridge: Error during scheduler shutdown: {e}")
 
-    return 0
+        if server:
+            log.info("PlexAniBridge: Shutting down web server...")
+            try:
+                server.should_exit = True
+                log.success("PlexAniBridge: Web server shutdown complete")
+            except Exception as e:
+                log.error(f"PlexAniBridge: Error during server shutdown: {e}")
 
 
 def main():
