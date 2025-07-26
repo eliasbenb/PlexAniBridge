@@ -360,6 +360,18 @@ class PlexAnibridgeConfig(BaseSettings):
         le=100,
         description="Global default search fallback threshold",
     )
+    web_server_enabled: bool = Field(
+        default=True,
+        description="Enable or disable PlexAniBridge web server",
+    )
+    web_server_host: str = Field(
+        default="0.0.0.0",
+        description="Host to bind the PlexAniBridge web server to",
+    )
+    web_server_port: int = Field(
+        default=8080,
+        description="Port to bind the PlexAniBridge web server to",
+    )
 
     def _apply_global_defaults(self) -> None:
         """Apply global defaults to all configs and set parent references."""
