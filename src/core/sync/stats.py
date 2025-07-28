@@ -1,21 +1,9 @@
 """Synchronization statistics and tracking module."""
 
-from enum import StrEnum
-
 from pydantic import BaseModel
 
 from plexapi.video import Episode, Movie, Season, Show
-
-
-class SyncOutcome(StrEnum):
-    """Enumeration of possible synchronization outcomes for media items."""
-
-    SYNCED = "synced"  # Successfully synchronized to AniList
-    SKIPPED = "skipped"  # Item already up to date, no changes needed
-    FAILED = "failed"  # Failed to process due to error
-    NOT_FOUND = "not_found"  # No matching AniList entry could be found
-    DELETED = "deleted"  # Item was deleted from AniList (destructive sync)
-    PENDING = "pending"  # Item was identified for processing but not yet processed
+from src.models.db.sync_history import SyncOutcome
 
 
 class ItemIdentifier(BaseModel):

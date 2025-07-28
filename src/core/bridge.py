@@ -13,8 +13,9 @@ from src.core.sync import (
     ShowSyncClient,
 )
 from src.core.sync.base import ParsedGuids
-from src.core.sync.stats import SyncOutcome, SyncStats
+from src.core.sync.stats import SyncStats
 from src.models.db.housekeeping import Housekeeping
+from src.models.db.sync_history import SyncOutcome
 
 __all__ = ["BridgeClient"]
 
@@ -242,7 +243,9 @@ class BridgeClient:
             if unprocessed_items:
                 log.debug(
                     f"{self.__class__.__name__}: [{self.profile_name}] "
-                    f"Unprocessed items: {', '.join([repr(i) for i in unprocessed_items])}"
+                    f"Unprocessed items: {
+                        ', '.join([repr(i) for i in unprocessed_items])
+                    }"
                 )
 
         except Exception as e:
