@@ -10,7 +10,7 @@ from alembic import context
 
 sys.path.append(str(pathlib.Path(__file__).resolve().parent.parent))
 
-import src.models.db  # noqa: F401
+from src.models.db import Base  # noqa: F401 # isort:skip
 from src import config as app_config
 
 config = context.config
@@ -18,7 +18,7 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-target_metadata = src.models.db.Base.metadata
+target_metadata = Base.metadata
 
 db_url = f"sqlite:///{app_config.data_path / 'plexanibridge.db'}"
 config.set_main_option("sqlalchemy.url", db_url)
