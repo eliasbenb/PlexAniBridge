@@ -36,7 +36,7 @@ class PlexObject:
     def __setattr__(self, attr: str, value: Any) -> None: ...
     def fetchItems(
         self,
-        ekey,
+        ekey: str | list[int],
         cls: type[PlexObjectT] | None = None,
         container_start: int | None = None,
         container_size: int | None = None,
@@ -45,7 +45,7 @@ class PlexObject:
         **kwargs,
     ) -> list[PlexObjectT]: ...
     def fetchItem(
-        self, ekey: str, cls: type[PlexObjectT] | None = None, **kwargs
+        self, ekey: str | int, cls: type[PlexObjectT] | None = None, **kwargs
     ) -> PlexObjectT: ...
     def findItems(
         self,
