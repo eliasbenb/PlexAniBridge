@@ -63,6 +63,8 @@ def validate_configuration():
             log.error("PlexAniBridge: No sync profiles configured")
             return False
 
+        log.info(f"PlexAniBridge: Found {profile_count} configured profile(s)")
+
         for profile_name in profile_names:
             try:
                 profile_config = config.get_profile(profile_name)
@@ -103,6 +105,7 @@ async def run() -> int:
         shutdown_handler = GracefulShutdownHandler()
 
         # Initialize scheduler
+        log.info("PlexAniBridge: Initializing application scheduler...")
         scheduler = SchedulerClient(config)
         await scheduler.initialize()
         await scheduler.start()
@@ -110,27 +113,25 @@ async def run() -> int:
         shutdown_handler.scheduler = scheduler
 
         if config.web_server_enabled:
+            log.info("PlexAniBridge: Creating web application...")
             app = create_app(config, scheduler)
+
             uvicorn_config = uvicorn.Config(
                 app=app,
                 host=config.web_server_host,
                 port=config.web_server_port,
-                log_level="info",
+                log_level="warning",
                 access_log=False,
             )
             server = uvicorn.Server(uvicorn_config)
             shutdown_handler.server = server
-
-            log.info(
-                f"PlexAniBridge: Starting web server on http://{config.web_server_host}:{config.web_server_port}"
-            )
 
             # Start server in a task
             server_task = asyncio.create_task(server.serve())
             shutdown_task = asyncio.create_task(shutdown_handler.wait_for_shutdown())
 
             # Wait for either server completion or shutdown signal
-            _, pending = await asyncio.wait(
+            done, pending = await asyncio.wait(
                 [server_task, shutdown_task], return_when=asyncio.FIRST_COMPLETED
             )
 
@@ -139,7 +140,14 @@ async def run() -> int:
                 task.cancel()
                 with contextlib.suppress(asyncio.CancelledError):
                     await task
+
+            # Check for exceptions in completed tasks
+            for task in done:
+                if task.exception():
+                    log.error(f"PlexAniBridge: Task failed: {task.exception()}")
+                    return 1
         else:
+            log.info("PlexAniBridge: Web server disabled, running in headless mode")
             await shutdown_handler.wait_for_shutdown()
 
         return 0
@@ -178,6 +186,8 @@ async def run() -> int:
             log.info("PlexAniBridge: Shutting down web server...")
             try:
                 server.should_exit = True
+                # Give the server a moment to shut down gracefully
+                await asyncio.sleep(0.1)
                 log.success("PlexAniBridge: Web server shutdown complete")
             except Exception as e:
                 log.error(f"PlexAniBridge: Error during server shutdown: {e}")
