@@ -1,0 +1,370 @@
+/* Custom scrollbar for webkit browsers */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgb(30 41 59); /* slate-800 */
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgb(71 85 105); /* slate-600 */
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(100 116 139); /* slate-500 */
+}
+
+/* Hide elements with x-cloak until Alpine.js loads */
+[x-cloak] {
+  display: none !important;
+}
+
+/* Custom animations */
+@keyframes pulse-blue {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.pulse-blue {
+  animation: pulse-blue 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOutRight {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+.slide-in-right {
+  animation: slideInRight 0.3s ease-out;
+}
+
+.slide-out-right {
+  animation: slideOutRight 0.3s ease-in;
+}
+
+/* HTMX indicators */
+.htmx-indicator {
+  opacity: 0;
+  transition: opacity 200ms ease-in;
+}
+
+.htmx-request .htmx-indicator {
+  opacity: 1;
+}
+
+.htmx-request.htmx-indicator {
+  opacity: 1;
+}
+
+/* Loading states */
+.loading-skeleton {
+  background: linear-gradient(
+    90deg,
+    rgb(51 65 85) 25%,
+    rgb(71 85 105) 50%,
+    rgb(51 65 85) 75%
+  );
+  background-size: 200% 100%;
+  animation: loading 1.5s infinite;
+}
+
+@keyframes loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Status indicators */
+.status-dot {
+  position: relative;
+}
+
+.status-dot::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: 50%;
+  animation: ping 1s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+.status-dot.online::before {
+  background-color: rgb(34 197 94); /* green-500 */
+}
+
+.status-dot.offline::before {
+  background-color: rgb(239 68 68); /* red-500 */
+}
+
+@keyframes ping {
+  75%,
+  100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
+/* Custom focus styles */
+.focus-ring {
+  @apply focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 focus:ring-offset-slate-900;
+}
+
+/* Log viewer specific styles */
+.log-viewer {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.log-line {
+  padding: 2px 8px;
+  border-left: 3px solid transparent;
+  transition: all 0.1s ease;
+}
+
+.log-line:hover {
+  background-color: rgb(30 41 59); /* slate-800 */
+  border-left-color: rgb(59 130 246); /* blue-500 */
+}
+
+.log-line.debug {
+  color: rgb(148 163 184); /* slate-400 */
+}
+
+.log-line.info {
+  color: rgb(96 165 250); /* blue-400 */
+}
+
+.log-line.success {
+  color: rgb(74 222 128); /* green-400 */
+}
+
+.log-line.warning {
+  color: rgb(251 191 36); /* amber-400 */
+  border-left-color: rgb(251 191 36);
+}
+
+.log-line.error {
+  color: rgb(248 113 113); /* red-400 */
+  border-left-color: rgb(248 113 113);
+}
+
+.log-line.critical {
+  color: rgb(239 68 68); /* red-500 */
+  background-color: rgba(239, 68, 68, 0.1);
+  border-left-color: rgb(239 68 68);
+}
+
+/* Timeline styles */
+.timeline-item {
+  position: relative;
+}
+
+.timeline-item::before {
+  content: '';
+  position: absolute;
+  left: 16px;
+  top: 32px;
+  bottom: -8px;
+  width: 2px;
+  background-color: rgb(71 85 105); /* slate-600 */
+}
+
+.timeline-item:last-child::before {
+  display: none;
+}
+
+/* Card hover effects */
+.card-hover {
+  transition: all 0.2s ease;
+}
+
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2),
+    0 10px 10px -5px rgba(0, 0, 0, 0.1);
+}
+
+/* Button loading state */
+.btn-loading {
+  position: relative;
+  pointer-events: none;
+}
+
+.btn-loading::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  margin-left: -8px;
+  margin-top: -8px;
+  width: 16px;
+  height: 16px;
+  border: 2px solid transparent;
+  border-top: 2px solid currentColor;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Progress bars */
+.progress-bar {
+  height: 4px;
+  background-color: rgb(51 65 85); /* slate-700 */
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    rgb(59 130 246),
+    rgb(147 197 253)
+  ); /* blue-500 to blue-300 */
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+/* Notification styles */
+.notification {
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.notification.success {
+  background-color: rgba(34, 197, 94, 0.1);
+  border-color: rgb(34 197 94);
+}
+
+.notification.error {
+  background-color: rgba(239, 68, 68, 0.1);
+  border-color: rgb(239 68 68);
+}
+
+.notification.warning {
+  background-color: rgba(251, 191, 36, 0.1);
+  border-color: rgb(251 191 36);
+}
+
+.notification.info {
+  background-color: rgba(59, 130, 246, 0.1);
+  border-color: rgb(59 130 246);
+}
+
+/* Badge styles */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.badge.primary {
+  background-color: rgb(59 130 246);
+  color: white;
+}
+
+.badge.success {
+  background-color: rgb(34 197 94);
+  color: white;
+}
+
+.badge.warning {
+  background-color: rgb(251 191 36);
+  color: rgb(7 10 15);
+}
+
+.badge.error {
+  background-color: rgb(239 68 68);
+  color: white;
+}
+
+.badge.secondary {
+  background-color: rgb(71 85 105);
+  color: rgb(203 213 225);
+}
+
+/* Responsive utilities */
+@media (max-width: 640px) {
+  .mobile-full {
+    width: 100%;
+  }
+
+  .mobile-hidden {
+    display: none;
+  }
+}
+
+/* Dark mode specific overrides */
+.dark {
+  color-scheme: dark;
+}
+
+.dark input[type='checkbox'] {
+  background-color: rgb(51 65 85);
+  border-color: rgb(71 85 105);
+}
+
+.dark input[type='checkbox']:checked {
+  background-color: rgb(59 130 246);
+  border-color: rgb(59 130 246);
+}
+
+/* Print styles */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  .bg-slate-800,
+  .bg-slate-900 {
+    background: white !important;
+    color: black !important;
+  }
+}
