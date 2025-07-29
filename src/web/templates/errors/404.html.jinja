@@ -1,0 +1,49 @@
+{% extends "base.html.jinja" %}
+
+{% block content %}
+<div class="min-h-screen flex items-center justify-center p-6">
+    <div class="max-w-md w-full text-center">
+        <div class="mb-8">
+            <div class="mx-auto h-24 w-24 bg-slate-800 rounded-full flex items-center justify-center">
+                <svg class="h-12 w-12 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M9.172 16.172a4 4 0 015.656 0M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+            </div>
+        </div>
+
+        <h1 class="text-6xl font-bold text-slate-100 mb-4">404</h1>
+        <h2 class="text-2xl font-semibold text-slate-100 mb-4">Page Not Found</h2>
+        <p class="text-slate-400 mb-8">
+            The page you're looking for doesn't exist or has been moved.
+        </p>
+
+        <div class="space-y-4">
+            <a href="/dashboard/"
+                class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors duration-200">
+                <svg class="mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M8 5a2 2 0 012-2h4a2 2 0 012 2v2H8V5z" />
+                </svg>
+                Go to Dashboard
+            </a>
+
+            <div class="text-sm text-slate-500">
+                or try one of these links:
+            </div>
+
+            <div class="flex justify-center space-x-4">
+                <a href="/logs/" class="text-primary-400 hover:text-primary-300 transition-colors duration-200">
+                    Logs
+                </a>
+                <span class="text-slate-600">|</span>
+                <a href="/api/docs" class="text-primary-400 hover:text-primary-300 transition-colors duration-200">
+                    API Docs
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
