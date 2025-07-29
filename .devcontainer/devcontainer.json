@@ -24,6 +24,7 @@
 				"rafaelha.vscode-flamegraph",
 				"eamodio.gitlens",
 				"bradlc.vscode-tailwindcss",
+				"samuelcolvin.jinjahtml",
 				"numso.prettier-standard-vscode"
 			]
 		}
