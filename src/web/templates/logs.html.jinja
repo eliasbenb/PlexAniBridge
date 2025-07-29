@@ -1,0 +1,274 @@
+{% extends "base.html.jinja" %} {% block content %}
+<div class="p-6 space-y-6" x-data="logsData()" x-init="init()">
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-3xl font-bold text-slate-100">Logs</h1>
+            <p class="mt-2 text-slate-400">
+                View and monitor PlexAniBridge application logs
+            </p>
+        </div>
+
+        <!-- Log controls -->
+        <div class="flex items-center space-x-4">
+            <!-- Log file selector -->
+            <div class="flex items-center space-x-2">
+                <label class="text-sm text-slate-400">File:</label>
+                <select x-model="selectedLogFile" @change="loadLogFile()"
+                    class="bg-slate-800 border border-slate-600 text-slate-100 text-sm rounded-lg focus:ring-primary-500 focus:border-primary-500 p-2">
+                    {% for log_file in log_files %}
+                    <option value="{{ log_file.name }}">{{ log_file.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Auto-refresh toggle -->
+            <label class="flex items-center space-x-2 cursor-pointer">
+                <input type="checkbox" x-model="autoRefresh" @change="toggleAutoRefresh()"
+                    class="rounded border-slate-600 text-primary-600 focus:ring-primary-500 focus:ring-offset-slate-900" />
+                <span class="text-sm text-slate-400">Auto-refresh</span>
+            </label>
+
+            <!-- Clear logs button -->
+            <button @click="clearLogs()"
+                class="inline-flex items-center px-3 py-2 border border-slate-600 text-sm font-medium rounded-md text-slate-300 bg-slate-800 hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors duration-200">
+                <svg class="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1-1H8a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                Clear
+            </button>
+
+            <!-- Refresh button -->
+            <button @click="loadLogFile()"
+                class="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors duration-200">
+                <svg class="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Refresh
+            </button>
+        </div>
+    </div>
+
+    <!-- Log files info -->
+    {% if log_files %}
+    <div class="bg-slate-800 border border-slate-700 rounded-lg p-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="text-center">
+                <div class="text-2xl font-bold text-slate-100">
+                    {{ log_files | length }}
+                </div>
+                <div class="text-sm text-slate-400">Log Files</div>
+            </div>
+            <div class="text-center">
+                <div class="text-2xl font-bold text-slate-100">{{ log_dir }}</div>
+                <div class="text-sm text-slate-400 truncate">Log Directory</div>
+            </div>
+            <div class="text-center" x-show="selectedLogInfo">
+                <div class="text-2xl font-bold text-slate-100" x-text="selectedLogInfo.size || 0"></div>
+                <div class="text-sm text-slate-400">File Size (bytes)</div>
+            </div>
+            <div class="text-center" x-show="selectedLogInfo">
+                <div class="text-2xl font-bold text-slate-100"
+                    x-text="selectedLogInfo.modified ? new Date(selectedLogInfo.modified * 1000).toLocaleTimeString() : 'Unknown'">
+                </div>
+                <div class="text-sm text-slate-400">Last Modified</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Log viewer -->
+    <div class="bg-slate-900 border border-slate-700 rounded-lg overflow-hidden">
+        <!-- Log header -->
+        <div class="bg-slate-800 border-b border-slate-700 px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center space-x-4">
+                <h3 class="text-sm font-medium text-slate-100">Log Output</h3>
+                <div class="flex items-center space-x-2">
+                    <div class="h-2 w-2 rounded-full"
+                        :class="{ 'bg-green-500 pulse-blue': autoRefresh, 'bg-slate-500': !autoRefresh }"></div>
+                    <span class="text-xs text-slate-400" x-text="autoRefresh ? 'Live' : 'Paused'"></span>
+                </div>
+            </div>
+
+            <div class="flex items-center space-x-2">
+                <span class="text-xs text-slate-400" x-text="`${logLines.length} lines`"></span>
+
+                <!-- Scroll to bottom button -->
+                <button @click="scrollToBottom()"
+                    class="text-slate-400 hover:text-slate-200 transition-colors duration-200">
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- Log content -->
+        <div id="log-container" class="h-96 overflow-y-auto bg-slate-900 p-4 font-mono text-sm" x-ref="logContainer">
+            <div x-show="loading" class="flex items-center justify-center h-full">
+                <div class="animate-spin h-8 w-8 border-2 border-primary-500 border-t-transparent rounded-full"></div>
+            </div>
+
+            <div x-show="!loading && logLines.length === 0" class="flex items-center justify-center h-full">
+                <div class="text-center">
+                    <svg class="mx-auto h-12 w-12 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <h3 class="mt-2 text-sm font-medium text-slate-100">No logs found</h3>
+                    <p class="mt-1 text-sm text-slate-400">
+                        The selected log file is empty or doesn't exist.
+                    </p>
+                </div>
+            </div>
+
+            <div x-show="!loading && logLines.length > 0" class="space-y-1">
+                <template x-for="(line, index) in logLines" :key="index">
+                    <div class="flex items-start space-x-2 hover:bg-slate-800 px-2 py-1 rounded" :class="{
+                            'text-red-400': line.includes('ERROR') || line.includes('CRITICAL'),
+                            'text-yellow-400': line.includes('WARNING'),
+                            'text-blue-400': line.includes('INFO'),
+                            'text-green-400': line.includes('SUCCESS'),
+                            'text-slate-400': line.includes('DEBUG'),
+                            'text-slate-300': !line.includes('ERROR') && !line.includes('CRITICAL') && !line.includes('WARNING') && !line.includes('INFO') && !line.includes('SUCCESS') && !line.includes('DEBUG')
+                         }">
+                        <span class="text-slate-500 text-xs font-mono min-w-0 flex-shrink-0"
+                            x-text="(index + 1).toString().padStart(4, ' ')"></span>
+                        <span class="flex-1 break-all" x-text="line"></span>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search and filter -->
+    <div class="bg-slate-800 border border-slate-700 rounded-lg p-4">
+        <div class="flex items-center space-x-4">
+            <div class="flex-1">
+                <label class="block text-sm font-medium text-slate-400 mb-2">Search logs</label>
+                <input type="text" x-model="searchTerm" @input="filterLogs()"
+                    placeholder="Search for specific log entries..."
+                    class="w-full bg-slate-900 border border-slate-600 text-slate-100 text-sm rounded-lg focus:ring-primary-500 focus:border-primary-500 p-3" />
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-slate-400 mb-2">Level</label>
+                <select x-model="logLevel" @change="filterLogs()"
+                    class="bg-slate-900 border border-slate-600 text-slate-100 text-sm rounded-lg focus:ring-primary-500 focus:border-primary-500 p-3">
+                    <option value="">All Levels</option>
+                    <option value="DEBUG">Debug</option>
+                    <option value="INFO">Info</option>
+                    <option value="SUCCESS">Success</option>
+                    <option value="WARNING">Warning</option>
+                    <option value="ERROR">Error</option>
+                    <option value="CRITICAL">Critical</option>
+                </select>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function logsData() {
+        return {
+            selectedLogFile: '{{ log_files[0].name if log_files else "" }}',
+            autoRefresh: false,
+            loading: false,
+            logLines: [],
+            allLogLines: [],
+            searchTerm: '',
+            logLevel: '',
+            refreshInterval: null,
+            selectedLogInfo: null,
+
+            init() {
+                this.selectedLogInfo = {{ log_files[0] | tojson if log_files else 'null' }};
+                if (this.selectedLogFile) {
+                    this.loadLogFile();
+                }
+            },
+
+            async loadLogFile() {
+                if (!this.selectedLogFile) return;
+
+                this.loading = true;
+
+                try {
+                    const response = await fetch(`/logs/tail/${this.selectedLogFile}?lines=200`);
+                    const data = await response.json();
+
+                    if (data.error) {
+                        console.error('Error loading log file:', data.error);
+                        this.logLines = [];
+                        this.allLogLines = [];
+                    } else {
+                        this.allLogLines = data.lines || [];
+                        this.filterLogs();
+                        this.scrollToBottom();
+                    }
+
+                    // Update selected log info
+                    const logFiles = {{ log_files | tojson }};
+                    this.selectedLogInfo = logFiles.find(f => f.name === this.selectedLogFile);
+
+                } catch (error) {
+                    console.error('Failed to load log file:', error);
+                    this.logLines = [];
+                    this.allLogLines = [];
+                } finally {
+                    this.loading = false;
+                }
+            },
+
+            toggleAutoRefresh() {
+                if (this.autoRefresh) {
+                    this.refreshInterval = setInterval(() => {
+                        this.loadLogFile();
+                    }, 2000);
+                } else {
+                    if (this.refreshInterval) {
+                        clearInterval(this.refreshInterval);
+                        this.refreshInterval = null;
+                    }
+                }
+            },
+
+            filterLogs() {
+                let filtered = this.allLogLines;
+
+                if (this.searchTerm) {
+                    const searchLower = this.searchTerm.toLowerCase();
+                    filtered = filtered.filter(line =>
+                        line.toLowerCase().includes(searchLower)
+                    );
+                }
+
+                if (this.logLevel) {
+                    filtered = filtered.filter(line =>
+                        line.includes(this.logLevel)
+                    );
+                }
+
+                this.logLines = filtered;
+            },
+
+            clearLogs() {
+                this.logLines = [];
+                this.allLogLines = [];
+                this.searchTerm = '';
+                this.logLevel = '';
+            },
+
+            scrollToBottom() {
+                this.$nextTick(() => {
+                    const container = this.$refs.logContainer;
+                    container.scrollTop = container.scrollHeight;
+                });
+            }
+        }
+    }
+</script>
+{% endblock %}
