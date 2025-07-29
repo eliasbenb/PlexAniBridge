@@ -1,0 +1,123 @@
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Total Syncs -->
+    <div class="bg-slate-800 border border-slate-700 rounded-lg p-6">
+        <div class="flex items-center">
+            <div class="flex-shrink-0">
+                <div class="p-3 bg-primary-600 rounded-lg">
+                    <svg class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                </div>
+            </div>
+            <div class="ml-5 flex-1">
+                <div class="text-sm font-medium text-slate-400">Total Syncs</div>
+                <div class="text-2xl font-bold text-slate-100">{{ total_syncs }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Activity -->
+    <div class="bg-slate-800 border border-slate-700 rounded-lg p-6">
+        <div class="flex items-center">
+            <div class="flex-shrink-0">
+                <div class="p-3 bg-blue-600 rounded-lg">
+                    <svg class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                </div>
+            </div>
+            <div class="ml-5 flex-1">
+                <div class="text-sm font-medium text-slate-400">Last 24h</div>
+                <div class="text-2xl font-bold text-slate-100">
+                    {% set recent_count = sync_activity[-1].value if sync_activity else 0
+                    %}
+                    {{ recent_count }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Failed Syncs -->
+    <div class="bg-slate-800 border border-slate-700 rounded-lg p-6">
+        <div class="flex items-center">
+            <div class="flex-shrink-0">
+                <div class="p-3 bg-red-600 rounded-lg">
+                    <svg class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+            </div>
+            <div class="ml-5 flex-1">
+                <div class="text-sm font-medium text-slate-400">Failed</div>
+                <div class="text-2xl font-bold text-slate-100">
+                    {{ outcome_distribution.get('failed', 0) }}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Activity Chart -->
+{% if sync_activity %}
+<div class="mt-6 bg-slate-800 border border-slate-700 rounded-lg p-6">
+    <h3 class="text-lg font-medium text-slate-100 mb-4">
+        Sync Activity (Last 7 Days)
+    </h3>
+    <div class="space-y-2">
+        <!-- Chart with numbers and bars -->
+        <div class="h-64 flex items-end space-x-2">
+            {% for point in sync_activity %} 
+            {% set max_value = sync_activity|map(attribute='value')|max %} 
+            {% set height_percent = (point.value / max_value * 100) if max_value > 0 else 0 %}
+            <div class="flex-1 flex flex-col justify-end items-center h-full">
+                <!-- Number above bar -->
+                <div class="text-xs text-slate-300 mb-1">{{ point.value }}</div>
+                <!-- Bar -->
+                <div class="w-full bg-primary-600 hover:bg-primary-500 rounded-t min-h-[4px] cursor-pointer transition-colors duration-200" 
+                     style="height: {{ height_percent }}%" 
+                     title="{{ point.value }} syncs on {{ point.timestamp.strftime('%m/%d/%Y') }}">
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        
+        <!-- Day labels -->
+        <div class="flex space-x-2">
+            {% for point in sync_activity %}
+            <div class="flex-1 text-center">
+                <span class="text-xs text-slate-400">{{ point.timestamp.strftime('%m/%d') }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Outcome Distribution -->
+{% if outcome_distribution %}
+<div class="mt-6 bg-slate-800 border border-slate-700 rounded-lg p-6">
+    <h3 class="text-lg font-medium text-slate-100 mb-4">Sync Outcomes</h3>
+    <div class="space-y-3">
+        {% for outcome, count in outcome_distribution.items() %} {% if count > 0 %}
+        {% set percentage = (count / total_syncs * 100) if total_syncs > 0 else 0 %}
+        <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div
+                    class="w-4 h-4 rounded-full {% if outcome == 'synced' %}bg-green-500 {% elif outcome == 'skipped' %}bg-yellow-500 {% elif outcome == 'failed' %}bg-red-500 {% elif outcome == 'not_found' %}bg-orange-500 {% elif outcome == 'deleted' %}bg-purple-500 {% else %}bg-slate-500 {% endif %}">
+                </div>
+                <span class="text-sm text-slate-300 capitalize">{{
+                    outcome.replace('_', ' ')
+                    }}</span>
+            </div>
+            <div class="flex items-center space-x-2">
+                <span class="text-sm text-slate-400">{{ count }}</span>
+                <span class="text-xs text-slate-500">({{ percentage|round(1) }}%)</span>
+            </div>
+        </div>
+        {% endif %} {% endfor %}
+    </div>
+</div>
+{% endif %}

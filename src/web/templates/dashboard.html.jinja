@@ -1,0 +1,259 @@
+{% extends "base.html.jinja" %}
+
+{% block content %}
+<div class="p-6 space-y-6" x-data="dashboardData()" x-init="init()">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+        <div>
+            <h1 class="text-3xl font-bold text-slate-100">Dashboard</h1>
+            <p class="mt-2 text-slate-400">Monitor your PlexAniBridge synchronization profiles</p>
+        </div>
+
+        <!-- Global sync controls -->
+        <div class="mt-4 sm:mt-0 flex space-x-3">
+            <button @click="triggerSync(false)" :disabled="syncing"
+                class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200">
+                <svg x-show="!syncing" class="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                <svg x-show="syncing" x-cloak class="mr-2 h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"
+                    stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                <span x-text="syncing ? 'Syncing...' : 'Sync All'"></span>
+            </button>
+
+            <button @click="triggerSync(true)" :disabled="syncing"
+                class="inline-flex items-center px-4 py-2 border border-slate-600 text-sm font-medium rounded-md text-slate-300 bg-slate-800 hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200">
+                <svg class="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                Poll Sync All
+            </button>
+        </div>
+    </div>
+
+    <!-- Stats Overview -->
+    <div id="stats-overview" hx-get="/dashboard/metrics-card" hx-trigger="load, every 30s" hx-target="#stats-overview"
+        hx-swap="innerHTML">
+        <!-- Loading state -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 loading-skeleton">
+                <div class="h-4 bg-slate-700 rounded w-1/2 mb-2"></div>
+                <div class="h-8 bg-slate-700 rounded w-3/4"></div>
+            </div>
+            <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 loading-skeleton">
+                <div class="h-4 bg-slate-700 rounded w-1/2 mb-2"></div>
+                <div class="h-8 bg-slate-700 rounded w-3/4"></div>
+            </div>
+            <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 loading-skeleton">
+                <div class="h-4 bg-slate-700 rounded w-1/2 mb-2"></div>
+                <div class="h-8 bg-slate-700 rounded w-3/4"></div>
+            </div>
+            <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 loading-skeleton">
+                <div class="h-4 bg-slate-700 rounded w-1/2 mb-2"></div>
+                <div class="h-8 bg-slate-700 rounded w-3/4"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Profiles Section -->
+    <div class="space-y-6">
+        <div class="flex items-center justify-between">
+            <h2 class="text-xl font-semibold text-slate-100">Sync Profiles</h2>
+            <span class="text-sm text-slate-400">{{ profiles|length }} profile{{ 's' if profiles|length != 1 else ''
+                }}</span>
+        </div>
+
+        <!-- Profiles Grid -->
+        <div id="profiles-grid" class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6"
+            hx-get="/dashboard/status-card" hx-trigger="load, every 10s, refresh from:body" hx-target="#profiles-grid"
+            hx-swap="innerHTML">
+
+            {% for profile_name, profile_data in profiles.items() %}
+            <div class="bg-slate-800 border border-slate-700 rounded-lg p-6 hover:border-slate-600 transition-colors duration-200"
+                x-data="profileCard('{{ profile_name }}')">
+                <!-- Profile Header -->
+                <div class="flex items-start justify-between mb-4">
+                    <div class="flex-1">
+                        <h3 class="text-lg font-medium text-slate-100">{{ profile_name }}</h3>
+                        <p class="text-sm text-slate-400 mt-1">
+                            {{ profile_data.config.plex_user }} → {{ profile_data.config.anilist_user }}
+                        </p>
+                    </div>
+
+                    <!-- Status indicator -->
+                    <div class="flex items-center space-x-2">
+                        {% if profile_data.status.running %}
+                        <div class="h-2 w-2 bg-green-500 rounded-full pulse-blue"></div>
+                        <span class="text-xs text-green-400">Running</span>
+                        {% else %}
+                        <div class="h-2 w-2 bg-slate-500 rounded-full"></div>
+                        <span class="text-xs text-slate-400">Stopped</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Profile Info -->
+                <div class="space-y-3 mb-4">
+                    <div class="flex justify-between text-sm">
+                        <span class="text-slate-400">Sync Interval:</span>
+                        <span class="text-slate-300">
+                            {% if profile_data.config.sync_interval == -1 %}
+                            Run Once
+                            {% else %}
+                            {{ profile_data.config.sync_interval }}s
+                            {% endif %}
+                        </span>
+                    </div>
+
+                    <div class="flex justify-between text-sm">
+                        <span class="text-slate-400">Mode:</span>
+                        <span class="text-slate-300">
+                            {{ 'Polling' if profile_data.config.polling_scan else 'Periodic' }}
+                        </span>
+                    </div>
+
+                    <div class="flex justify-between text-sm">
+                        <span class="text-slate-400">Last Synced:</span>
+                        <span class="text-slate-300">
+                            {% if profile_data.status.last_synced %}
+                            <span x-data="{ time: '{{ profile_data.status.last_synced }}' }"
+                                x-text="formatRelativeTime(time)"></span>
+                            {% else %}
+                            Never
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Settings badges -->
+                <div class="flex flex-wrap gap-2 mb-4">
+                    {% if profile_data.config.full_scan %}
+                    <span
+                        class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-900 text-blue-200">
+                        Full Scan
+                    </span>
+                    {% endif %}
+
+                    {% if profile_data.config.destructive_sync %}
+                    <span
+                        class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-900 text-red-200">
+                        Destructive
+                    </span>
+                    {% endif %}
+                </div>
+
+                <!-- Actions -->
+                <div class="flex space-x-2">
+                    <button @click="triggerProfileSync('{{ profile_name }}', false)" :disabled="syncing"
+                        class="flex-1 inline-flex items-center justify-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200">
+                        <svg class="mr-1 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        Sync
+                    </button>
+
+                    <a href="/profiles/{{ profile_name }}"
+                        class="inline-flex items-center justify-center px-3 py-2 border border-slate-600 text-sm font-medium rounded-md text-slate-300 bg-slate-700 hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors duration-200">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+</div>
+
+<script>
+    function dashboardData() {
+        return {
+            syncing: false,
+
+            init() {
+                // Initialize any dashboard-specific functionality
+                // Listen to WebSocket events
+                if (window.PlexAniBridge && window.PlexAniBridge.ws) {
+                    PlexAniBridge.ws.on('sync_event', (data) => {
+                        // Refresh the dashboard when sync events occur
+                        htmx.trigger('#profiles-grid', 'refresh');
+                        htmx.trigger('#stats-overview', 'refresh');
+                    });
+                }
+            },
+
+            async triggerSync(poll) {
+                this.syncing = true;
+
+                try {
+                    const result = await PlexAniBridge.api.post('/api/sync/trigger', { poll });
+
+                    this.showNotification(result.message, 'success');
+                    // Refresh profiles after sync
+                    setTimeout(() => {
+                        htmx.trigger('#profiles-grid', 'refresh');
+                    }, 2000);
+
+                } catch (error) {
+                    this.showNotification(error.message || 'Failed to trigger sync', 'error');
+                } finally {
+                    this.syncing = false;
+                }
+            },
+
+            showNotification(message, type = 'info') {
+                PlexAniBridge.utils.showToast(message, type);
+            }
+        }
+    }
+
+    function profileCard(profileName) {
+        return {
+            syncing: false,
+
+            async triggerProfileSync(profileName, poll) {
+                this.syncing = true;
+
+                try {
+                    const result = await PlexAniBridge.api.post(`/api/sync/${profileName}/trigger`, { poll });
+
+                    PlexAniBridge.utils.showToast(result.message, 'success');
+                    // Refresh this profile's data
+                    setTimeout(() => {
+                        htmx.trigger('#profiles-grid', 'refresh');
+                    }, 2000);
+
+                } catch (error) {
+                    PlexAniBridge.utils.showToast(error.message || 'Failed to trigger sync', 'error');
+                } finally {
+                    this.syncing = false;
+                }
+            }
+        }
+    }
+
+    // Utility function for formatting relative time
+    function formatRelativeTime(dateString) {
+        const date = new Date(dateString);
+        const now = new Date();
+        const diffMs = now - date;
+        const diffSecs = Math.floor(diffMs / 1000);
+        const diffMins = Math.floor(diffSecs / 60);
+        const diffHours = Math.floor(diffMins / 60);
+        const diffDays = Math.floor(diffHours / 24);
+
+        if (diffSecs < 60) return 'just now';
+        if (diffMins < 60) return `${diffMins}m ago`;
+        if (diffHours < 24) return `${diffHours}h ago`;
+        return `${diffDays}d ago`;
+    }
+</script>
+{% endblock %}
