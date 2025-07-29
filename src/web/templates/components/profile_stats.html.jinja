@@ -1,0 +1,40 @@
+<div class="space-y-4">
+    <div class="flex justify-between">
+        <span class="text-slate-400">Total Syncs:</span>
+        <span class="text-slate-100 font-medium">{{ total_syncs }}</span>
+    </div>
+
+    <div class="flex justify-between">
+        <span class="text-slate-400">Successful:</span>
+        <span class="text-green-400 font-medium">{{ synced }}</span>
+    </div>
+
+    <div class="flex justify-between">
+        <span class="text-slate-400">Skipped:</span>
+        <span class="text-yellow-400 font-medium">{{ skipped }}</span>
+    </div>
+
+    <div class="flex justify-between">
+        <span class="text-slate-400">Failed:</span>
+        <span class="text-red-400 font-medium">{{ failed }}</span>
+    </div>
+
+    <div class="flex justify-between">
+        <span class="text-slate-400">Not Found:</span>
+        <span class="text-orange-400 font-medium">{{ not_found }}</span>
+    </div>
+
+    {% if deleted > 0 %}
+    <div class="flex justify-between">
+        <span class="text-slate-400">Deleted:</span>
+        <span class="text-purple-400 font-medium">{{ deleted }}</span>
+    </div>
+    {% endif %}
+
+    <hr class="border-slate-600" />
+
+    <div class="flex justify-between">
+        <span class="text-slate-400">Recent Activity (24h):</span>
+        <span class="text-primary-400 font-medium">{{ recent_activity }}</span>
+    </div>
+</div>

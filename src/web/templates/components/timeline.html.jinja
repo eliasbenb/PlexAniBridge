@@ -1,0 +1,157 @@
+{% if sync_history %}
+<div class="flow-root">
+    <ul class="-mb-8">
+        {% for item in sync_history %}
+        <li>
+            <div class="relative pb-8">
+                {% if not loop.last %}
+                <span class="absolute top-4 left-4 -ml-px h-full w-0.5 bg-slate-600" aria-hidden="true"></span>
+                {% endif %}
+
+                <div class="relative flex space-x-3">
+                    <!-- Icon based on outcome -->
+                    <div
+                        class="flex h-8 w-8 items-center justify-center rounded-full {% if item.outcome == 'synced' %}bg-green-600 {% elif item.outcome == 'skipped' %}bg-yellow-600 {% elif item.outcome == 'failed' %}bg-red-600 {% elif item.outcome == 'not_found' %}bg-orange-600 {% elif item.outcome == 'deleted' %}bg-purple-600 {% else %}bg-slate-600 {% endif %}">
+                        {% if item.outcome == 'synced' %}
+                        <svg class="h-5 w-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd"
+                                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                clip-rule="evenodd" />
+                        </svg>
+                        {% elif item.outcome == 'skipped' %}
+                        <svg class="h-5 w-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd"
+                                d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z"
+                                clip-rule="evenodd" />
+                        </svg>
+                        {% elif item.outcome == 'failed' %}
+                        <svg class="h-5 w-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd"
+                                d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                                clip-rule="evenodd" />
+                        </svg>
+                        {% elif item.outcome == 'not_found' %}
+                        <svg class="h-5 w-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd"
+                                d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
+                                clip-rule="evenodd" />
+                        </svg>
+                        {% elif item.outcome == 'deleted' %}
+                        <svg class="h-5 w-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" clip-rule="evenodd" />
+                            <path fill-rule="evenodd"
+                                d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 012 0v4a1 1 0 11-2 0V7zM12 7a1 1 0 012 0v4a1 1 0 11-2 0V7z"
+                                clip-rule="evenodd" />
+                        </svg>
+                        {% else %}
+                        <svg class="h-5 w-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd"
+                                d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                                clip-rule="evenodd" />
+                        </svg>
+                        {% endif %}
+                    </div>
+
+                    <!-- Content -->
+                    <div class="flex min-w-0 flex-1 justify-between space-x-4 pt-1.5">
+                        <div class="flex-1">
+                            <p class="text-sm text-slate-100">
+                                {% if item.plex_type == 'movie' %}
+                                <span class="font-medium">Movie</span>
+                                {% elif item.plex_type == 'show' %}
+                                <span class="font-medium">Show</span>
+                                {% elif item.plex_type == 'season' %}
+                                <span class="font-medium">Season</span>
+                                {% elif item.plex_type == 'episode' %}
+                                <span class="font-medium">Episode</span>
+                                {% endif %} sync
+                                <span
+                                    class="capitalize {% if item.outcome == 'synced' %}text-green-400 {% elif item.outcome == 'skipped' %}text-yellow-400 {% elif item.outcome == 'failed' %}text-red-400 {% elif item.outcome == 'not_found' %}text-orange-400 {% elif item.outcome == 'deleted' %}text-purple-400 {% else %}text-slate-400 {% endif %}">
+                                    {{ item.outcome.replace('_', ' ') }}
+                                </span>
+                            </p>
+
+                            {% if item.anilist_id %}
+                            <p class="mt-1 text-xs text-slate-400">
+                                AniList ID: {{ item.anilist_id }}
+                            </p>
+                            {% endif %} 
+                            
+                            {% if item.error_message %}
+                            <p class="mt-1 text-xs text-red-400">
+                                Error: {{ item.error_message[:100] }}{% if item.error_message|length > 100 %}...{% endif %}
+                            </p>
+                            {% endif %}
+
+                            <!-- Show state changes for successful syncs -->
+                            {% if item.outcome == 'synced' and item.before_state and item.after_state %}
+                            <div class="mt-3 text-xs">
+                                <details class="group cursor-pointer">
+                                    <summary class="flex items-center gap-1 text-slate-400 hover:text-slate-300 transition-colors duration-150">
+                                        <svg class="h-3 w-3 transform transition-transform duration-150 group-open:rotate-90" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
+                                        </svg>
+                                        View changes
+                                    </summary>
+                                    <div class="mt-2 ml-4 space-y-2 border-l-2 border-slate-700 pl-3">
+                                        {% for key in ['status', 'progress', 'score', 'repeat'] %}
+                                        {% if item.before_state.get(key) != item.after_state.get(key) %}
+                                        <div class="bg-slate-800/50 rounded-md p-2">
+                                            <div class="flex items-center gap-3">
+                                                <span class="font-medium text-slate-300 capitalize text-xs">{{ key }}:</span>
+                                                <div class="flex items-center gap-2 text-xs">
+                                                    <span class="px-2 py-1 rounded bg-slate-700 text-slate-300">
+                                                        {% if item.before_state.get(key) %}{{ item.before_state.get(key) }}{% else %}—{% endif %}
+                                                    </span>
+                                                    <svg class="h-3 w-3 text-slate-500" fill="currentColor" viewBox="0 0 20 20">
+                                                        <path fill-rule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                                                    </svg>
+                                                    <span class="px-2 py-1 rounded bg-green-600/20 text-green-400 font-medium">
+                                                        {% if item.after_state.get(key) %}{{ item.after_state.get(key) }}{% else %}—{% endif %}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {% endif %}
+                                        {% endfor %}
+                                    </div>
+                                </details>
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="whitespace-nowrap text-right text-sm text-slate-400">
+                            <time datetime="{{ item.timestamp.isoformat() }}"
+                                x-data="{ time: '{{ item.timestamp.isoformat() }}' }" x-text="formatRelativeTime(time)">
+                                {{ item.timestamp.strftime('%H:%M') }}
+                            </time>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+{% else %}
+<div class="text-center py-12">
+    <svg class="mx-auto h-12 w-12 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+    </svg>
+    <h3 class="mt-2 text-sm font-medium text-slate-100">No sync history</h3>
+    <p class="mt-1 text-sm text-slate-400">
+        This profile hasn't performed any syncs yet.
+    </p>
+    <div class="mt-6">
+        <button type="button" onclick="document.querySelector('[data-sync-trigger]').click()"
+            class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
+            <svg class="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Start First Sync
+        </button>
+    </div>
+</div>
+{% endif %}
