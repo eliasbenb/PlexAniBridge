@@ -115,19 +115,19 @@ class PlexAnibridgeProfileConfig(BaseModel):
     """
 
     anilist_token: str = Field(
-        _Unset,
+        "",
         description="AniList API token for authentication",
     )
     plex_token: str = Field(
-        _Unset,
+        "",
         description="Plex API token for authentication",
     )
     plex_user: str = Field(
-        _Unset,
+        "",
         description="Plex username of target user",
     )
     plex_url: str = Field(
-        _Unset,
+        "",
         description="Plex server URL",
     )
     plex_sections: list[str] = Field(
@@ -206,7 +206,6 @@ class PlexAnibridgeProfileConfig(BaseModel):
         """Get the global log level from parent config."""
         return self.parent.log_level
 
-    @model_validator(mode="after")
     def validate_required_fields(self) -> "PlexAnibridgeProfileConfig":
         """Validates that required fields are provided.
 
@@ -216,11 +215,11 @@ class PlexAnibridgeProfileConfig(BaseModel):
         Raises:
             ValueError: If required fields are missing or empty
         """
-        if not self.anilist_token or self.anilist_token == _Unset:
+        if not self.anilist_token:
             raise ValueError("ANILIST_TOKEN is required for each profile")
-        if not self.plex_token or self.plex_token == _Unset:
+        if not self.plex_token:
             raise ValueError("PLEX_TOKEN is required for each profile")
-        if not self.plex_user or self.plex_user == _Unset:
+        if not self.plex_user:
             raise ValueError("PLEX_USER is required for each profile")
         return self
 
@@ -385,6 +384,8 @@ class PlexAnibridgeConfig(BaseSettings):
                     == PlexAnibridgeProfileConfig.model_fields[field_name].default
                 ):
                     setattr(config, field_name, global_value)
+
+            config.validate_required_fields()
 
     @field_validator("profiles", mode="before")
     @classmethod
