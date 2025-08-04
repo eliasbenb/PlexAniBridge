@@ -1,12 +1,20 @@
 """PlexAniBridge Configuration Settings."""
 
+import os
 from enum import StrEnum
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from pydantic.alias_generators import to_camel
 from pydantic.fields import _Unset
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import (
+    BaseSettings,
+    DotEnvSettingsSource,
+    EnvSettingsSource,
+    PydanticBaseSettingsSource,
+    SettingsConfigDict,
+    YamlConfigSettingsSource,
+)
 
 from src.utils.logging import get_logger
 
@@ -19,6 +27,23 @@ __all__ = [
 ]
 
 _log = get_logger(log_name="PlexAniBridge", log_level="INFO")
+
+
+def find_yaml_config_file() -> Path | None:
+    """Find the YAML configuration file in the data path.
+
+    Returns:
+        Path | None: The path to the YAML configuration file
+    """
+    data_path = Path(os.getenv("PAB_DATA_PATH", "./data")).resolve()
+
+    for location in [data_path, Path(".")]:
+        for ext in ["yaml", "yml"]:
+            yaml_file = location / f"config.{ext}"
+            if yaml_file.exists():
+                _log.debug(f"Using YAML config file: {yaml_file.resolve()}")
+                return yaml_file.resolve()
+    return None
 
 
 class BaseStrEnum(StrEnum):
@@ -115,19 +140,19 @@ class PlexAnibridgeProfileConfig(BaseModel):
     """
 
     anilist_token: str = Field(
-        "",
+        _Unset,
         description="AniList API token for authentication",
     )
     plex_token: str = Field(
-        "",
+        _Unset,
         description="Plex API token for authentication",
     )
     plex_user: str = Field(
-        "",
+        _Unset,
         description="Plex username of target user",
     )
     plex_url: str = Field(
-        "",
+        _Unset,
         description="Plex server URL",
     )
     plex_sections: list[str] = Field(
@@ -206,22 +231,18 @@ class PlexAnibridgeProfileConfig(BaseModel):
         """Get the global log level from parent config."""
         return self.parent.log_level
 
-    def validate_required_fields(self) -> "PlexAnibridgeProfileConfig":
+    def validate_required_fields(self) -> None:
         """Validates that required fields are provided.
-
-        Returns:
-            PlexAnibridgeProfileConfig: Self with validated fields
 
         Raises:
             ValueError: If required fields are missing or empty
         """
-        if not self.anilist_token:
+        if not self.anilist_token or self.anilist_token == _Unset:
             raise ValueError("ANILIST_TOKEN is required for each profile")
-        if not self.plex_token:
+        if not self.plex_token or self.plex_token == _Unset:
             raise ValueError("PLEX_TOKEN is required for each profile")
-        if not self.plex_user:
+        if not self.plex_user or self.plex_user == _Unset:
             raise ValueError("PLEX_USER is required for each profile")
-        return self
 
     def __str__(self) -> str:
         """Creates a human-readable representation of the configuration.
@@ -281,6 +302,14 @@ class PlexAnibridgeConfig(BaseSettings):
         """Initialize the configuration with provided data."""
         super().__init__(**data)
         self._apply_global_defaults()
+        self._validate_profile_requirements()
+
+    # Store raw profile data until after global defaults are applied
+    raw_profiles: dict[str, dict] = Field(
+        default_factory=dict,
+        description="Raw profile data before instantiation",
+        exclude=True,
+    )
 
     profiles: dict[str, PlexAnibridgeProfileConfig] = Field(
         default_factory=dict,
@@ -361,53 +390,71 @@ class PlexAnibridgeConfig(BaseSettings):
     )
 
     def _apply_global_defaults(self) -> None:
-        """Apply global defaults to all configs and set parent references."""
+        """Apply global defaults and create profile instances."""
         # Get all field names that exist in both configs (excluding multi-config fields)
         config_fields = set(PlexAnibridgeProfileConfig.model_fields.keys())
         multi_config_fields = set(self.__class__.model_fields.keys())
         shared_fields = config_fields.intersection(multi_config_fields)
 
-        for config in self.profiles.values():
-            config._parent = self
+        # Create profile instances from raw data with global defaults applied
+        for profile_name, raw_config_data in self.raw_profiles.items():
+            # Start with a copy of the raw data
+            config_data = raw_config_data.copy()
 
-            # Apply global defaults where profile values are not set
+            # Apply global defaults for fields not present in profile data
             for field_name in shared_fields:
                 global_value = getattr(self, field_name)
-                config_value = getattr(config, field_name)
 
                 # Apply global default if:
                 # 1. Global value is not None
-                # 2. Config value is the default or unset
-                if global_value is not None and (
-                    config_value == _Unset
-                    or config_value
-                    == PlexAnibridgeProfileConfig.model_fields[field_name].default
-                ):
-                    setattr(config, field_name, global_value)
+                # 2. Field is not set in profile data or is set to default
+                if global_value is not None and field_name not in config_data:
+                    config_data[field_name] = global_value
 
-            config.validate_required_fields()
+            try:
+                config = PlexAnibridgeProfileConfig(**config_data)
+                config._parent = self
+                self.profiles[profile_name] = config
+            except Exception as e:
+                _log.error(
+                    f"{self.__class__.__name__}: Failed to create profile "
+                    f"$$'{profile_name}'$$: {e}"
+                )
+                raise ValueError(
+                    f"Invalid configuration for profile '{profile_name}': {e}"
+                ) from e
+
+    def _validate_profile_requirements(self) -> None:
+        """Validate all profiles after global defaults are applied."""
+        for profile_name, config in self.profiles.items():
+            try:
+                config.validate_required_fields()
+            except ValueError as e:
+                raise ValueError(
+                    f"Invalid configuration for profile '{profile_name}': {e}"
+                ) from e
 
     @field_validator("profiles", mode="before")
     @classmethod
-    def validate_profiles(cls, v):
-        """Validate and convert instantiate PlexAnibridgeProfileConfig instances."""
+    def validate_profiles(cls, v, values=None):
+        """Store raw profile data for later instantiation."""
         if isinstance(v, dict):
-            validated_profiles = {}
-            for profile_name, config_data in v.items():
-                if isinstance(config_data, dict):
-                    try:
-                        config = PlexAnibridgeProfileConfig(**config_data)
-                        validated_profiles[profile_name] = config
-                    except Exception as e:
-                        _log.error(f"Failed to load profile $$'{profile_name}'$$: {e}")
-                        raise ValueError(
-                            f"Invalid configuration for profile '{profile_name}': {e}"
-                        ) from e
-                elif isinstance(config_data, PlexAnibridgeProfileConfig):
-                    validated_profiles[profile_name] = config_data
-                    _log.info(f"Loaded profile configuration: $$'{profile_name}'$$")
-            return validated_profiles
+            # Don't create instances yet, just store the raw data
+            # This will be processed in _apply_global_defaults
+            return {}  # Return empty dict, we'll populate it later
         return v
+
+    @model_validator(mode="before")
+    @classmethod
+    def extract_raw_profiles(cls, values):
+        """Extract raw profile data before main validation."""
+        if isinstance(values, dict) and "profiles" in values:
+            raw_profiles = values.get("profiles", {})
+            if isinstance(raw_profiles, dict):
+                # Store raw profile data and clear the profiles field
+                values["raw_profiles"] = raw_profiles
+                values["profiles"] = {}
+        return values
 
     @model_validator(mode="after")
     def validate_global_config(self) -> "PlexAnibridgeConfig":
@@ -423,7 +470,7 @@ class PlexAnibridgeConfig(BaseSettings):
 
         # If no profiles are provided, try to create a default config from global
         # settings
-        if not self.profiles:
+        if not self.raw_profiles and not self.profiles:
             if (
                 self.anilist_token
                 and self.anilist_token != _Unset
@@ -448,28 +495,15 @@ class PlexAnibridgeConfig(BaseSettings):
                     if global_value is not None:
                         default_config_data[field_name] = global_value
 
-                try:
-                    default_config = PlexAnibridgeProfileConfig(**default_config_data)
-                    self.profiles["default"] = default_config
-                    _log.info(
-                        f"{self.__class__.__name__}: Created default profile "
-                        "configuration from global settings"
-                    )
-                except Exception as e:
-                    _log.error(
-                        f"{self.__class__.__name__}: Failed to create default profile "
-                        f"from global settings: {e}"
-                    )
-                    raise ValueError(
-                        f"Invalid global configuration for default profile: {e}"
-                    ) from e
+                # Store as raw data so it gets processed normally
+                self.raw_profiles["default"] = default_config_data
             else:
                 raise ValueError(
                     "No sync profiles configured and insufficient global settings for "
                     "default profile. Please either:\n1. Set up at least one profile "
                     "using PAB_PROFILES__${PROFILE_NAME}__ANILIST_TOKEN, "
                     "PAB_PROFILES__${PROFILE_NAME}__PLEX_TOKEN, and "
-                    "PAB_PROFILES__${PROFILE_NAME}__PLEX_USER, or\n. Provide global "
+                    "PAB_PROFILES__${PROFILE_NAME}__PLEX_USER, or\n2. Provide global "
                     "defaults using PAB_ANILIST_TOKEN, PAB_PLEX_TOKEN, and "
                     "PAB_PLEX_USER"
                 )
@@ -517,10 +551,41 @@ class PlexAnibridgeConfig(BaseSettings):
             f"DATA_PATH: {self.data_path}, LOG_LEVEL: {self.log_level}"
         )
 
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
+        """Customizes the settings sources for the configuration.
+
+        Order of precedence:
+        1. Environment variables
+        2. .env file in the CWD
+        3. YAML configuration file in the data path
+        """
+        return (
+            EnvSettingsSource(
+                settings_cls,
+                env_prefix="PAB_",
+                env_nested_delimiter="__",
+            ),
+            DotEnvSettingsSource(
+                settings_cls,
+                env_file=".env",
+                env_prefix="PAB_",
+                env_nested_delimiter="__",
+            ),
+            YamlConfigSettingsSource(
+                settings_cls,
+                yaml_file=find_yaml_config_file(),
+            ),
+        )
+
     model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        env_prefix="PAB_",
-        env_nested_delimiter="__",
+        case_sensitive=False,
         extra="forbid",
     )

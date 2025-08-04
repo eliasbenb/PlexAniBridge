@@ -11,16 +11,19 @@ Below is an example `.env` file for PlexAniBridge:
 --8<-- ".env.example"
 ```
 
-!!! tip "Single Profile"
+??? tip "YAML Configuration"
 
-    If you only need a single profile, you can use the global settings directly without the `PAB_PROFILES__{PROFILE_NAME}__` prefix and this will automatically create a profile named `default` for you. Example:
+    If you prefer YAML configuration, you can create a `config.yaml` file in the data directory. The settings will be automatically loaded from there. Example:
 
-    ```dosini title=".env"
-    PAB_ANILIST_TOKEN=eyJ...
-    PAB_PLEX_TOKEN=2Sb...
-    PAB_PLEX_USER=username
-    PAB_PLEX_URL=http://localhost:32400
+    ```yaml title="config.yaml"
+    --8<-- "data/config.example.yaml"
     ```
+
+    The order of precedence when loading settings is:
+
+    1. Environment variables
+    2. `.env` file in the current working directory
+    3. `config.yaml` file in the data directory
 
 ## Configuration Hierarchy
 

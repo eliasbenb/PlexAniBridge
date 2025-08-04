@@ -1,0 +1,36 @@
+#== Replace {PROFILE_NAME} with your profile name (e.g., personal, family, etc.) ==#
+#== You can create multiple profiles for different configurations. ==#
+#== You can define global defaults that apply to all profiles (e.g. plex_url, sync_interval, etc.) ==#
+
+#= Global Defaults (optional) =#
+# Set common values here to avoid repeating them in each profile
+# plex_url: http://localhost:32400
+# plex_token: 2Sb...
+# ... other global settings
+
+profiles:
+  {PROFILE_NAME}:
+    #= Required =#
+    anilist_token: eyJ...
+    plex_token: 2Sb...
+    plex_user: username
+    plex_url: http://localhost:32400
+    #= Optional =#
+    #== Plex Config ==#
+    # plex_sections: []
+    # plex_genres: []
+    # plex_metadata_source: local
+    #== Sync Options ==#
+    # sync_interval: 3600
+    # polling_scan: false
+    # full_scan: false
+    # destructive_sync: false
+    # excluded_sync_fields: ["notes", "score"]
+    #== Advanced Settings ==#
+    # dry_run: false
+    # batch_requests: false
+    # search_fallback_threshold: -1
+
+#= Global =#
+# data_path: ./data
+# log_level: INFO
