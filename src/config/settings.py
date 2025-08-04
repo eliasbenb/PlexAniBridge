@@ -1,12 +1,20 @@
 """PlexAniBridge Configuration Settings."""
 
+import os
 from enum import StrEnum
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from pydantic.alias_generators import to_camel
 from pydantic.fields import _Unset
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import (
+    BaseSettings,
+    DotEnvSettingsSource,
+    EnvSettingsSource,
+    PydanticBaseSettingsSource,
+    SettingsConfigDict,
+    YamlConfigSettingsSource,
+)
 
 from src.utils.logging import get_logger
 
@@ -19,6 +27,23 @@ __all__ = [
 ]
 
 _log = get_logger(log_name="PlexAniBridge", log_level="INFO")
+
+
+def find_yaml_config_file() -> Path | None:
+    """Find the YAML configuration file in the data path.
+
+    Returns:
+        Path | None: The path to the YAML configuration file
+    """
+    data_path = Path(os.getenv("PAB_DATA_PATH", "./data")).resolve()
+
+    for location in [data_path, Path(".")]:
+        for ext in ["yaml", "yml"]:
+            yaml_file = location / f"config.{ext}"
+            if yaml_file.exists():
+                _log.debug(f"Using YAML config file: {yaml_file.resolve()}")
+                return yaml_file.resolve()
+    return None
 
 
 class BaseStrEnum(StrEnum):
@@ -526,10 +551,41 @@ class PlexAnibridgeConfig(BaseSettings):
             f"DATA_PATH: {self.data_path}, LOG_LEVEL: {self.log_level}"
         )
 
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
+        """Customizes the settings sources for the configuration.
+
+        Order of precedence:
+        1. Environment variables
+        2. .env file in the CWD
+        3. YAML configuration file in the data path
+        """
+        return (
+            EnvSettingsSource(
+                settings_cls,
+                env_prefix="PAB_",
+                env_nested_delimiter="__",
+            ),
+            DotEnvSettingsSource(
+                settings_cls,
+                env_file=".env",
+                env_prefix="PAB_",
+                env_nested_delimiter="__",
+            ),
+            YamlConfigSettingsSource(
+                settings_cls,
+                yaml_file=find_yaml_config_file(),
+            ),
+        )
+
     model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        env_prefix="PAB_",
-        env_nested_delimiter="__",
+        case_sensitive=False,
         extra="forbid",
     )
