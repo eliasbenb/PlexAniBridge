@@ -206,8 +206,10 @@
                                                     class="px-2 py-1 text-[11px] rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200">
                                                 Edit
                                             </button>
-                                            <button @click="remove(m)"
-                                                    class="px-2 py-1 text-[11px] rounded-md bg-red-600/80 hover:bg-red-600 text-white">
+                                            <button @click="m.custom && remove(m)"
+                                                    :disabled="!m.custom"
+                                                    :title="!m.custom ? 'Not deletable: not in your custom mappings' : 'Delete mapping'"
+                                                    class="px-2 py-1 text-[11px] rounded-md text-white disabled:opacity-35 disabled:cursor-not-allowed bg-red-600/80 hover:bg-red-600 disabled:hover:bg-red-600/80">
                                                 Del
                                             </button>
                                         </div>

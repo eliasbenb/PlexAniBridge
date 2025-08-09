@@ -8,6 +8,7 @@ from sqlalchemy import and_, column, exists, func, or_, select
 from src.config.database import db
 from src.models.db.animap import AniMap
 from src.web.services.mappings_store import get_mappings_store
+from src.web.state import app_state
 
 __all__ = ["router"]
 
@@ -102,7 +103,10 @@ async def list_mappings(
         ov = store.get(item["anilist_id"])
         if ov:
             merged = {**item, **{k: v for k, v in ov.items() if k != "anilist_id"}}
+            merged["custom"] = True
             items[i] = merged
+        else:
+            item["custom"] = False
 
     return {
         "items": items,
@@ -173,4 +177,7 @@ async def delete_mapping(mapping_id: int) -> dict[str, Any]:
     store = get_mappings_store()
     if not store.delete(mapping_id):
         raise HTTPException(404, "Not found")
+    if not app_state.scheduler:
+        raise HTTPException(503, "Scheduler not available")
+    await app_state.scheduler.shared_animap_client._sync_db()
     return {"ok": True}
