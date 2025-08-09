@@ -29,6 +29,15 @@
             ]
         }
     },
+    "forwardPorts": [
+        4848
+    ],
+    "portsAttributes": {
+        "4848": {
+            "label": "PlexAniBridge Web",
+            "onAutoForward": "notify"
+        }
+    },
     "postCreateCommand": "uv sync --all-groups --all-packages",
     "containerEnv": {
         "UV_LINK_MODE": "copy"
