@@ -22,6 +22,9 @@ services:
       # PAB_SEARCH_FALLBACK_THRESHOLD=-1
       # PAB_DATA_PATH: /config
       # PAB_LOG_LEVEL: INFO
+      # PAB_WEB_ENABLED: False
+      # PAB_WEB_HOST: 0.0.0.0
+      # PAB_WEB_PORT: 8080
     volumes:
       - /path/to/plexanibridge/data:/config
     restart: unless-stopped
