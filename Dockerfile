@@ -48,5 +48,7 @@ RUN mkdir -p /config
 
 VOLUME ["/config"]
 
+EXPOSE 8080
+
 ENTRYPOINT ["/init"]
 CMD ["python", "/app/main.py"]

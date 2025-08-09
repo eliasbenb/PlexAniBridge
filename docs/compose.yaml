@@ -27,4 +27,6 @@ services:
       # PAB_WEB_PORT: 8080
     volumes:
       - /path/to/plexanibridge/data:/config
+    # ports:
+    #  - 8080:8080
     restart: unless-stopped
