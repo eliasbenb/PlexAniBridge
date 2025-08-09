@@ -15,18 +15,40 @@
         <!-- Stats -->
         <div class="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
             <template x-for="(v,k) in orderedStats()" :key="k">
-                <div class="relative rounded-md border border-slate-800 bg-gradient-to-br from-slate-900/70 to-slate-800/30 p-3 overflow-hidden group">
+                <div @click="toggleOutcomeFilter(k)"
+                     :class="[ 'relative rounded-md p-3 overflow-hidden group cursor-pointer select-none transition', outcomeFilter===k ? 'border-sky-500 ring-1 ring-sky-400/60 bg-sky-950/40' : 'border border-slate-800 hover:border-slate-700 bg-gradient-to-br from-slate-900/70 to-slate-800/30' ]"
+                     :title="outcomeFilter===k ? 'Click to remove filter' : 'Filter by ' + outcomeLabel(k)">
                     <div class="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-[radial-gradient(circle_at_30%_30%,rgba(255,255,255,0.05),transparent)]">
                     </div>
                     <div class="text-[10px] uppercase tracking-wide text-slate-400 font-medium"
                          x-text="outcomeLabel(k)"></div>
                     <div class="mt-1 text-2xl font-semibold tabular-nums" x-text="v"></div>
+                    <div x-show="outcomeFilter===k" class="absolute top-1 right-1">
+                        <span class="inline-flex items-center gap-0.5 mr-1 px-1 py-0.5 rounded bg-sky-600/70 text-[9px] font-semibold text-white">
+                            <iconify-icon icon="lucide:filter" inline></iconify-icon>
+                            Active
+                        </span>
+                    </div>
                 </div>
             </template>
         </div>
+        <!-- Active Filter Notice -->
+        <div x-show="outcomeFilter"
+             class="text-[11px] text-slate-400 flex items-center gap-2">
+            <div>
+                Filtering by
+                <span class="font-semibold text-slate-200"
+                      x-text="outcomeLabel(outcomeFilter)"></span>
+            </div>
+            <button @click="outcomeFilter=null"
+                    class="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-sky-300 text-[10px] font-medium flex items-center gap-1">
+                <iconify-icon icon="lucide:x" inline></iconify-icon>
+                Clear
+            </button>
+        </div>
         <!-- Timeline Items -->
-        <div class="space-y-4" x-show="items.length">
-            <template x-for="item in items" :key="item.id">
+        <div class="space-y-4" x-show="filteredItems().length">
+            <template x-for="item in filteredItems()" :key="item.id">
                 <div x-data="{ open:false }"
                      class="rounded-md border border-slate-800 bg-slate-900/60 backdrop-blur-sm overflow-hidden shadow-sm hover:shadow-md transition-shadow">
                     <div class="flex gap-4 p-4">
@@ -265,6 +287,7 @@
                 stats: {},
                 media: {},
                 plexMedia: {},
+                outcomeFilter: null,
                 ws: null,
                 init() {
                     this.reload();
@@ -282,6 +305,14 @@
                         this.stats = d.stats;
                         this.fetchMedia();
                     });
+                },
+                filteredItems() {
+                    if (!this.outcomeFilter) return this.items;
+                    return this.items.filter(i => i.outcome === this.outcomeFilter);
+                },
+                toggleOutcomeFilter(o) {
+                    if (this.outcomeFilter === o) this.outcomeFilter = null;
+                    else this.outcomeFilter = o;
                 },
                 openWs() {
                     const url = getWsBase() + `/ws/history/${profile}`;
