@@ -131,36 +131,119 @@
                     <!-- Diff Section -->
                     <div x-show="open && item.outcome==='synced' && (item.before_state || item.after_state)"
                          x-transition.opacity
-                         class="border-t border-slate-800 bg-slate-950/70">
-                        <div class="p-4 grid md:grid-cols-2 gap-4">
-                            <div class="space-y-2">
-                                <h4 class="text-xs font-semibold uppercase tracking-wide text-slate-400">Before</h4>
-                                <pre class="text-[11px] leading-tight bg-slate-900/80 border border-slate-800 rounded-md p-2 overflow-auto max-h-64"
-                                     x-text="formatState(item.before_state)"></pre>
+                         class="border-t border-slate-800 bg-slate-950/80">
+                        <div class="p-4" x-data="diffViewer(item)">
+                            <!-- Toolbar / Tabs -->
+                            <div class="flex flex-wrap items-center gap-3 mb-3">
+                                <div class="flex items-center rounded-md overflow-hidden border border-slate-700/70 bg-slate-900/60 text-[11px]">
+                                    <button @click="tab='changes'"
+                                            :class="tab==='changes' ? 'bg-slate-700/70 text-slate-100' : 'text-slate-400 hover:text-slate-200'"
+                                            class="px-2 py-1 font-medium">Changes</button>
+                                    <button @click="tab='before'"
+                                            :class="tab==='before' ? 'bg-slate-700/70 text-slate-100' : 'text-slate-400 hover:text-slate-200'"
+                                            class="px-2 py-1 font-medium">Before</button>
+                                    <button @click="tab='after'"
+                                            :class="tab==='after' ? 'bg-slate-700/70 text-slate-100' : 'text-slate-400 hover:text-slate-200'"
+                                            class="px-2 py-1 font-medium">After</button>
+                                    <button @click="tab='side'"
+                                            :class="tab==='side' ? 'bg-slate-700/70 text-slate-100' : 'text-slate-400 hover:text-slate-200'"
+                                            class="px-2 py-1 font-medium hidden md:inline-flex">Side‑by‑Side</button>
+                                </div>
+                                <div class="flex items-center gap-2 text-[11px] grow min-w-[12rem]"
+                                     x-show="tab==='changes'">
+                                    <div class="relative flex-1">
+                                        <iconify-icon icon="lucide:search" class="w-3.5 h-3.5 text-slate-500 absolute left-1.5 top-1/2 -translate-y-1/2"></iconify-icon>
+                                        <input x-model="filter"
+                                               placeholder="Filter path…"
+                                               class="w-full pl-6 pr-2 py-1 rounded-md bg-slate-900/60 border border-slate-700/70 focus:border-sky-500 focus:outline-none placeholder:text-slate-600" />
+                                    </div>
+                                    <label class="inline-flex items-center gap-1 cursor-pointer select-none">
+                                        <input type="checkbox"
+                                               x-model="showUnchanged"
+                                               class="w-3.5 h-3.5 rounded border-slate-600 bg-slate-800 text-sky-500 focus:ring-0" />
+                                        <span class="text-slate-400">Unchanged</span>
+                                    </label>
+                                </div>
+                                <div class="flex items-center gap-1 ml-auto">
+                                    <button @click="copyJson(item.before_state)"
+                                            class="px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-[11px] text-slate-300 flex items-center gap-1"
+                                            title="Copy Before JSON">
+                                        <iconify-icon icon="lucide:copy" class="w-3.5 h-3.5"></iconify-icon><span>Before</span>
+                                    </button>
+                                    <button @click="copyJson(item.after_state)"
+                                            class="px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-[11px] text-slate-300 flex items-center gap-1"
+                                            title="Copy After JSON">
+                                        <iconify-icon icon="lucide:copy" class="w-3.5 h-3.5"></iconify-icon><span>After</span>
+                                    </button>
+                                </div>
                             </div>
-                            <div class="space-y-2">
-                                <h4 class="text-xs font-semibold uppercase tracking-wide text-slate-400">After</h4>
-                                <pre class="text-[11px] leading-tight bg-slate-900/80 border border-slate-800 rounded-md p-2 overflow-auto max-h-64"
-                                     x-text="formatState(item.after_state)"></pre>
-                            </div>
-                            <div class="md:col-span-2">
-                                <h4 class="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Changed Fields</h4>
-                                <template x-if="diffState(item).length">
-                                    <ul class="text-[11px] space-y-1">
-                                        <template x-for="d in diffState(item)" :key="d.path">
-                                            <li class="flex items-start gap-2">
-                                                <span class="px-1.5 py-0.5 rounded-md bg-slate-800 text-slate-300 font-mono text-[10px]"
-                                                      x-text="d.path"></span>
-                                                <div class="flex-1">
-                                                    <span class="text-red-400 line-through" x-text="truncateValue(d.before)"></span>
-                                                    <iconify-icon icon="lucide:arrow-right" class="inline w-3 h-3 mx-1 text-slate-500"></iconify-icon>
-                                                    <span class="text-emerald-400" x-text="truncateValue(d.after)"></span>
-                                                </div>
-                                            </li>
-                                        </template>
-                                    </ul>
-                                </template>
-                                <p x-show="!diffState(item).length" class="text-[11px] text-slate-500">No differences detected.</p>
+                            <!-- Panels -->
+                            <div class="space-y-3">
+                                <div class="overflow-auto" :class="tab==='side' ? '' : 'space-y-3'">
+                                    <!-- Changes Tab -->
+                                    <template x-if="tab==='changes'">
+                                        <div>
+                                            <template x-if="filteredChanges.length">
+                                                <ul class="text-[11px] divide-y divide-slate-800/60">
+                                                    <template x-for="d in filteredChanges" :key="d.path">
+                                                        <li class="py-1.5 px-1 group">
+                                                            <div class="flex flex-wrap items-start gap-2">
+                                                                <span class="px-1.5 py-0.5 rounded bg-slate-800/80 group-hover:bg-slate-700/80 text-slate-300 font-mono text-[10px] max-w-full break-all"
+                                                                      x-text="d.path"></span>
+                                                                <div class="flex items-start gap-1.5 flex-1 min-w-[10rem]">
+                                                                    <span class="min-w-0 break-all"
+                                                                          :class="d.status==='removed' ? 'text-red-400' : d.status==='changed' ? 'text-red-300' : 'text-slate-500'"
+                                                                          x-text="truncateValue(d.before)"></span>
+                                                                    <iconify-icon icon="lucide:arrow-right" class="w-3 h-3 mt-0.5 text-slate-600 shrink-0"></iconify-icon>
+                                                                    <span class="min-w-0 break-all"
+                                                                          :class="d.status==='added' ? 'text-emerald-400' : d.status==='changed' ? 'text-emerald-300' : 'text-slate-500'"
+                                                                          x-text="truncateValue(d.after)"></span>
+                                                                </div>
+                                                            </div>
+                                                        </li>
+                                                    </template>
+                                                </ul>
+                                            </template>
+                                            <p x-show="!filteredChanges.length"
+                                               class="text-[11px] text-slate-500 italic">No differences.</p>
+                                        </div>
+                                    </template>
+                                    <!-- Before Tab -->
+                                    <template x-if="tab==='before'">
+                                        <div class="space-y-2">
+                                            <h5 class="text-xs font-semibold uppercase tracking-wider text-slate-400">State Before</h5>
+                                            <pre class="text-[11px] leading-tight bg-slate-900/80 border border-slate-800 rounded-md p-2 overflow-auto max-h-72"
+                                                 x-html="highlightJson(item.before_state)"></pre>
+                                        </div>
+                                    </template>
+                                    <!-- After Tab -->
+                                    <template x-if="tab==='after'">
+                                        <div class="space-y-2">
+                                            <h5 class="text-xs font-semibold uppercase tracking-wider text-slate-400">State After</h5>
+                                            <pre class="text-[11px] leading-tight bg-slate-900/80 border border-slate-800 rounded-md p-2 overflow-auto max-h-72"
+                                                 x-html="highlightJson(item.after_state)"></pre>
+                                        </div>
+                                    </template>
+                                    <!-- Side-by-Side Tab -->
+                                    <template x-if="tab==='side'">
+                                        <div class="grid md:grid-cols-2 gap-2 md:gap-3 items-start">
+                                            <div class="space-y-1.5">
+                                                <h5 class="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1">
+                                                    Before <span class="text-[10px] font-normal text-slate-600" x-text="beforeSize"></span>
+                                                </h5>
+                                                <pre class="text-[11px] leading-tight bg-slate-900/80 border border-slate-800 rounded-md p-2 overflow-auto max-h-64"
+                                                     x-html="highlightJson(item.before_state)"></pre>
+                                            </div>
+                                            <div class="space-y-1.5">
+                                                <h5 class="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1">
+                                                    After <span class="text-[10px] font-normal text-slate-600" x-text="afterSize"></span>
+                                                </h5>
+                                                <pre class="text-[11px] leading-tight bg-slate-900/80 border border-slate-800 rounded-md p-2 overflow-auto max-h-64"
+                                                     x-html="highlightJson(item.after_state)"></pre>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -330,6 +413,108 @@
                 _getPath(obj, path) {
                     return path.split('.').reduce((o, k) => (o && k in o) ? o[k] : undefined, obj);
                 }
+            }
+        }
+
+        function diffViewer(item) {
+            return {
+                item,
+                tab: 'changes',
+                filter: '',
+                showUnchanged: false,
+                // expanded view removed
+                get changes() {
+                    // derive full list with status (added/removed/changed/unchanged)
+                    const before = this.item.before_state || {};
+                    const after = this.item.after_state || {};
+                    const paths = new Set();
+                    const walk = (obj, base = '') => {
+                        if (obj && typeof obj === 'object') {
+                            Object.keys(obj).forEach(k => {
+                                const val = obj[k];
+                                const path = base ? base + '.' + k : k;
+                                if (val && typeof val === 'object' && !Array.isArray(val)) {
+                                    walk(val, path);
+                                } else {
+                                    paths.add(path);
+                                }
+                            });
+                        }
+                    };
+                    walk(before);
+                    walk(after);
+                    const out = [];
+                    paths.forEach(p => {
+                        const bv = p.split('.').reduce((o, k) => (o && k in o) ? o[k] : undefined, before);
+                        const av = p.split('.').reduce((o, k) => (o && k in o) ? o[k] : undefined, after);
+                        let status = 'unchanged';
+                        if (bv === undefined && av !== undefined) status = 'added';
+                        else if (bv !== undefined && av === undefined) status = 'removed';
+                        else if (JSON.stringify(bv) !== JSON.stringify(av)) status = 'changed';
+                        out.push({
+                            path: p,
+                            before: bv,
+                            after: av,
+                            status
+                        });
+                    });
+                    // sort: changed, added, removed, unchanged
+                    const order = {
+                        changed: 0,
+                        added: 1,
+                        removed: 2,
+                        unchanged: 3
+                    };
+                    out.sort((a, b) => order[a.status] - order[b.status] || a.path.localeCompare(b.path));
+                    return out;
+                },
+                get filteredChanges() {
+                    return this.changes.filter(c => {
+                        if (!this.showUnchanged && c.status === 'unchanged') return false;
+                        if (this.filter && !c.path.toLowerCase().includes(this.filter.toLowerCase())) return false;
+                        return true;
+                    });
+                },
+                get beforeSize() {
+                    return this.sizeLabel(this.item.before_state);
+                },
+                get afterSize() {
+                    return this.sizeLabel(this.item.after_state);
+                },
+                sizeLabel(obj) {
+                    if (!obj) return '0 keys';
+                    let count = 0;
+                    const scan = o => {
+                        if (o && typeof o === 'object') Object.keys(o).forEach(k => {
+                            count++;
+                            if (o[k] && typeof o[k] === 'object' && !Array.isArray(o[k])) scan(o[k]);
+                        });
+                    };
+                    scan(obj);
+                    return count + ' keys';
+                },
+                truncateValue(v) {
+                    if (v === null || v === undefined) return 'null';
+                    const s = typeof v === 'string' ? v : JSON.stringify(v);
+                    return s.length > 120 ? s.slice(0, 117) + '…' : s;
+                },
+                highlightJson(obj) {
+                    if (!obj) return '<span class="text-slate-600">—</span>';
+                    const json = JSON.stringify(obj, null, 2);
+                    return json.replace(/(&|<)/g, c => c === '&' ? '&amp;' : '&lt;').replace(/("(\\.|[^"])*"\s*:)|("(\\.|[^"])*")|\b(true|false|null)\b|-?\b\d+(?:\.\d+)?\b/g, m => {
+                        if (/^".*":$/.test(m)) return `<span class='text-sky-300'>${m}</span>`;
+                        if (/^"/.test(m)) return `<span class='text-emerald-300'>${m}</span>`;
+                        if (/true|false/.test(m)) return `<span class='text-indigo-300'>${m}</span>`;
+                        if (/null/.test(m)) return `<span class='text-pink-300'>${m}</span>`;
+                        return `<span class='text-amber-300'>${m}</span>`;
+                    });
+                },
+                copyJson(obj) {
+                    try {
+                        navigator.clipboard.writeText(JSON.stringify(obj, null, 2));
+                    } catch {}
+                },
+                init() {}
             }
         }
     </script>
