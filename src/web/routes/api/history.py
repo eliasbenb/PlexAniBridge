@@ -16,22 +16,6 @@ __all__ = ["router"]
 router = APIRouter()
 
 
-def _serialize(record: SyncHistory) -> dict[str, Any]:
-    return {
-        "id": record.id,
-        "timestamp": record.timestamp.isoformat(),
-        "plex_type": record.plex_type.value,
-        "outcome": record.outcome.value,
-        "anilist_id": record.anilist_id,
-        "plex_rating_key": record.plex_rating_key,
-        "plex_child_rating_key": record.plex_child_rating_key,
-        "error_message": record.error_message,
-        "before_state": record.before_state,
-        "after_state": record.after_state,
-        "plex_guid": record.plex_guid,
-    }
-
-
 @router.get("/{profile}")
 async def history(profile: str, page: int = 1, per_page: int = 50) -> dict[str, Any]:
     """Return paginated sync history for a profile with aggregate stats.
@@ -71,7 +55,7 @@ async def history(profile: str, page: int = 1, per_page: int = 50) -> dict[str, 
     for o in SyncOutcome:
         stats.setdefault(o.value, 0)
     return {
-        "items": [_serialize(r) for r in items],
+        "items": [r.model_dump(mode="json") for r in items],
         "total": total,
         "page": page,
         "per_page": per_page,
@@ -110,4 +94,4 @@ async def latest_history(
         if since_dt:
             q = q.filter(SyncHistory.timestamp > since_dt)
         items = q.limit(limit).all()
-    return {"items": [_serialize(r) for r in items]}
+    return {"items": [r.model_dump(mode="json") for r in items]}
