@@ -18,10 +18,20 @@
               href="{{ url_for('static', path='favicon.ico') }}" />
         <link rel="stylesheet"
               href="{{ url_for('static', path='css/globals.css') }}" />
-        <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4" crossorigin></script>
-        <script src="https://cdn.jsdelivr.net/npm/iconify-icon@3/dist/iconify-icon.min.js"></script>
-        <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js"></script>
-        <script src="https://cdn.jsdelivr.net/npm/htmx.org@2/dist/htmx.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.1.11/dist/index.global.js"
+                integrity="sha256-eTPiE7OfNDSwTrJNIZ8nlZapx9n3gz9+Oo2zzr5+adM="
+                crossorigin="anonymous"></script>
+        <script src="https://cdn.jsdelivr.net/npm/iconify-icon@3.0.0/dist/iconify-icon.min.js"
+                integrity="sha256-Kso6QVCIsLDWJW8DfknlsSFRaYbjZRzYrVLs7DeugxI="
+                crossorigin="anonymous"
+                defer></script>
+        <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js"
+                integrity="sha256-PtHu0lJIiSHfZeNj1nFd6wTX+Squ255SGZ/fc8seCtM="
+                crossorigin="anonymous"
+                defer></script>
+        <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.6/dist/htmx.min.js"
+                integrity="sha256-tnaO7U86+Ftzp1BUcBvWDhfKxxiu8rf2slTl4OIEVhY="
+                crossorigin="anonymous"></script>
         <script src="{{ url_for('static', path='js/anilist.js') }}"></script>
         <script src="{{ url_for('static', path='js/ws.js') }}"></script>
         {% block head_extra %}
@@ -47,10 +57,10 @@
                      alt="Logo"
                      width="32"
                      height="32" />
-                <div>
+                <a href="{{ url_for('dashboard') }}">
                     <h1 class="text-base font-semibold tracking-tight text-white">PlexAniBridge</h1>
                     <p class="text-[11px] uppercase tracking-wide text-slate-500">Sync Dashboard</p>
-                </div>
+                </a>
             </div>
             <nav class="flex flex-col flex-1 gap-1 font-medium text-sm"
                  hx-boost="true">
