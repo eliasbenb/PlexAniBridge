@@ -9,7 +9,6 @@ from src.web.routes.dashboard import router as dashboard_router
 from src.web.routes.logs import router as logs_router
 from src.web.routes.mappings import router as mappings_router
 from src.web.routes.system import router as system_router
-from src.web.routes.webhook import router as webhook_router
 
 __all__ = ["router"]
 
@@ -20,7 +19,6 @@ page_router.include_router(dashboard_router, tags=["dashboard"])
 page_router.include_router(logs_router, tags=["logs"])
 page_router.include_router(mappings_router, tags=["mappings"])
 page_router.include_router(system_router, tags=["system"])
-page_router.include_router(webhook_router, tags=["webhook"])
 
 router.include_router(api_router, prefix="/api", tags=["api"])
 router.include_router(ws_router, prefix="/ws", tags=["ws"])
