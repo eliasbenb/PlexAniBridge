@@ -24,9 +24,9 @@ services:
       # PAB_LOG_LEVEL: INFO
       # PAB_WEB_ENABLED: False
       # PAB_WEB_HOST: 0.0.0.0
-      # PAB_WEB_PORT: 8080
+      # PAB_WEB_PORT: 4848
     volumes:
       - /path/to/plexanibridge/data:/config
     # ports:
-    #  - 8080:8080
+    #  - 4848:4848
     restart: unless-stopped

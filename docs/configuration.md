@@ -328,7 +328,7 @@ The host address for the web interface.
 
 ### `PAB_WEB_PORT`
 
-`int` (Optional, default: `8080`)
+`int` (Optional, default: `4848`)
 
 The port for the web interface.
 

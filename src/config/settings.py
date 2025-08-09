@@ -397,7 +397,7 @@ class PlexAnibridgeConfig(BaseSettings):
         description="Web server listen host",
     )
     web_port: int = Field(
-        default=8080,
+        default=4848,
         description="Web server listen port",
     )
 
