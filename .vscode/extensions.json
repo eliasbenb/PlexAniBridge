@@ -1,0 +1,14 @@
+{
+    "recommendations": [
+        "charliermarsh.ruff",
+        "eamodio.gitlens",
+        "monosans.djlint",
+        "ms-python.python",
+        "rafaelha.vscode-flamegraph",
+        "redhat.vscode-yaml",
+        "samuelcolvin.jinjahtml",
+        "tamasfe.even-better-toml",
+        "yy0931.vscode-sqlite3-editor",
+        "yzhang.markdown-all-in-one"
+    ]
+}
