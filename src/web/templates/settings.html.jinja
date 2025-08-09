@@ -3,4 +3,79 @@
     PlexAniBridge - Settings
 {% endblock title %}
 {% block content %}
+    <div class="space-y-8">
+        <div class="space-y-4">
+            <h2 class="text-xl font-semibold tracking-tight flex items-center gap-2">
+                <iconify-icon icon="lucide:settings" class="w-5 h-5 text-slate-400"></iconify-icon>
+                <span>Settings</span>
+            </h2>
+            <p class="text-sm text-slate-300 max-w-prose">
+                Read-only view of the currently loaded configuration. To change settings,
+                edit your environment variables or configuration file and restart the application.
+            </p>
+        </div>
+        <div class="grid gap-6 md:grid-cols-3">
+            <div class="md:col-span-1 space-y-2">
+                <h3 class="font-medium text-slate-200">Global</h3>
+                <ul class="surface p-4 rounded-md text-xs space-y-1">
+                    {% for key, value in global_config.items() %}
+                        <li class="flex gap-2">
+                            <span class="text-slate-500 min-w-40 break-all">{{ key }}</span>
+                            <span class="break-all text-slate-300">
+                                {% if value is none %}
+                                    <span class="text-slate-600 italic">(unset)</span>
+                                {% else %}
+                                    {% if value is string %}
+                                        {{ value }}
+                                    {% else %}
+                                        {{ value | tojson }}
+                                    {% endif %}
+                                {% endif %}
+                            </span>
+                        </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            <div class="md:col-span-2 space-y-4">
+                <div class="flex items-center gap-2">
+                    <h3 class="font-medium text-slate-200">Profiles</h3>
+                    <span class="text-xs text-slate-500">({{ profiles | length }})</span>
+                </div>
+                {% if profiles %}
+                    <div class="space-y-6">
+                        {% for profile in profiles %}
+                            <div class="surface rounded-md border border-slate-800/60">
+                                <div class="px-4 py-2 border-b border-slate-800/60 flex items-center gap-2">
+                                    <iconify-icon icon="lucide:user" class="w-4 h-4 text-slate-400"></iconify-icon>
+                                    <span class="font-medium text-slate-200">{{ profile.name }}</span>
+                                </div>
+                                <div class="p-4">
+                                    <ul class="text-xs space-y-1">
+                                        {% for key, value in profile.settings.items() %}
+                                            <li class="flex gap-2">
+                                                <span class="text-slate-500 min-w-40 break-all">{{ key }}</span>
+                                                <span class="break-all text-slate-300">
+                                                    {% if value is none %}
+                                                        <span class="text-slate-600 italic">(unset)</span>
+                                                    {% else %}
+                                                        {% if value is string %}
+                                                            {{ value }}
+                                                        {% else %}
+                                                            {{ value | tojson }}
+                                                        {% endif %}
+                                                    {% endif %}
+                                                </span>
+                                            </li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-xs text-slate-500">No profiles loaded.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
 {% endblock content %}
