@@ -49,10 +49,32 @@
                                 </div>
                             </template>
                         </div>
+                        <!-- Plex Cover (fallback when no AniList) -->
+                        <div class="w-14 shrink-0 flex items-start"
+                             x-show="!item.anilist_id && item.plex_guid">
+                            <template x-if="plexMedia[item.plex_guid] && !plexMedia[item.plex_guid]._error && plexMedia[item.plex_guid].thumb">
+                                <a :href="plexUrl(item)" target="_blank" rel="noopener">
+                                    <img :src="plexMedia[item.plex_guid].thumb"
+                                         class="w-14 h-20 object-cover rounded-md ring-1 ring-slate-700/50 cursor-pointer"
+                                         :alt="displayTitle(item)"
+                                         width="56"
+                                         height="80" />
+                                </a>
+                            </template>
+                            <template x-if="!plexMedia[item.plex_guid] || plexMedia[item.plex_guid]._error || !plexMedia[item.plex_guid].thumb">
+                                <div class="w-14 h-20 flex items-center justify-center rounded-md bg-slate-800 text-slate-500 text-[10px] text-center leading-tight px-1">
+                                    <span x-text="plexMedia[item.plex_guid]?._error ? 'Plex\nError' : 'No\nCover'"></span>
+                                </div>
+                            </template>
+                        </div>
                         <!-- Main Content -->
                         <div class="flex-1 min-w-0">
                             <div class="flex flex-wrap items-center gap-2">
                                 <span class="font-medium truncate" x-text="displayTitle(item)"></span>
+                                <!-- Title Source Badge -->
+                                <span class="inline-flex items-center gap-1 px-1 py-0.5 rounded-md text-[9px] font-semibold tracking-wide border"
+                                      :class="titleSource(item)==='AniList' ? 'bg-sky-700/40 text-sky-100 border-sky-600/50' : titleSource(item)==='Plex' ? 'bg-amber-700/40 text-amber-100 border-amber-600/50' : 'bg-slate-700/40 text-slate-200 border-slate-600/50'"
+                                      x-text="titleSource(item)"></span>
                                 <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium tracking-wide"
                                       :class="badgeColor(item.outcome)">
                                     <iconify-icon :icon="`lucide:${outcomeIcon(item.outcome)}`" inline></iconify-icon>
@@ -62,7 +84,7 @@
                                     <span x-text="new Date(item.timestamp).toLocaleString()"></span>
                                 </span>
                             </div>
-                            <div class="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-400">
+                            <div class="mt-1 flex flex-wrap gap-x-1.5 gap-y-1 text-[11px] text-slate-400">
                                 <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md border border-slate-700 bg-slate-800/70 text-slate-300 font-medium uppercase tracking-wide"
                                       x-text="item.plex_type"></span>
                                 <!-- AniList Chip -->
@@ -242,6 +264,7 @@
                 items: [],
                 stats: {},
                 media: {},
+                plexMedia: {},
                 ws: null,
                 init() {
                     this.reload();
@@ -286,7 +309,6 @@
                             ...data
                         };
                     }).catch(err => {
-                        // Mark all as errored so UI can display fallback
                         missing.forEach(id => {
                             this.media[id] = {
                                 _error: true,
@@ -294,6 +316,25 @@
                             };
                         });
                     });
+
+                    // Plex GUID metadata
+                    const plexGuids = [...new Set(this.items.filter(i => i.plex_guid).map(i => i.plex_guid))];
+                    const missingPlex = plexGuids.filter(g => !this.plexMedia[g]);
+                    if (missingPlex.length && window.Plex && typeof Plex.fetch === 'function') {
+                        Plex.fetch(missingPlex).then(data => {
+                            this.plexMedia = {
+                                ...this.plexMedia,
+                                ...data
+                            };
+                        }).catch(err => {
+                            missingPlex.forEach(g => {
+                                this.plexMedia[g] = {
+                                    _error: true,
+                                    message: String(err)
+                                };
+                            });
+                        });
+                    }
                 },
                 anilistUrl(item) {
                     return item.anilist_id ? `https://anilist.co/anime/${item.anilist_id}` : null;
@@ -323,16 +364,44 @@
                     } catch {}
                 },
                 displayTitle(item) {
-                    if (!item.anilist_id) return 'Unmapped Item';
-                    const m = this.media[item.anilist_id];
-                    if (!m) return 'Loading…';
-                    if (m._error) return `AniList ${item.anilist_id}`;
-                    try {
-                        const t = (window.AniList && typeof AniList.getTitle === 'function') ? AniList.getTitle(m, null) : null;
-                        return t || `AniList ${item.anilist_id}`;
-                    } catch {
+                    // Prefer AniList title if available
+                    if (item.anilist_id) {
+                        const m = this.media[item.anilist_id];
+                        if (!m) return 'Loading…';
+                        if (m._error) return `AniList ${item.anilist_id}`;
+                        try {
+                            const t = (window.AniList && typeof AniList.getTitle === 'function') ? AniList.getTitle(m, null) : null;
+                            if (t) return t;
+                        } catch {}
                         return `AniList ${item.anilist_id}`;
                     }
+                    // Fallback to Plex metadata
+                    if (item.plex_guid) {
+                        const p = this.plexMedia[item.plex_guid];
+                        if (!p) return 'Loading…';
+                        if (p._error) return `Plex ${this.shortGuid(item.plex_guid)}`;
+                        if (p.title) return p.title;
+                        return `Plex ${this.shortGuid(item.plex_guid)}`;
+                    }
+                    return 'Unmapped Item';
+                },
+                titleSource(item) {
+                    if (item.anilist_id) {
+                        const m = this.media[item.anilist_id];
+                        if (m && !m._error) return 'AniList';
+                        // If AniList id exists but errored AND we have Plex fallback, show Plex
+                        if (item.plex_guid) {
+                            const p = this.plexMedia[item.plex_guid];
+                            if (p && !p._error) return 'Plex';
+                        }
+                        return 'AniList';
+                    }
+                    if (item.plex_guid) {
+                        const p = this.plexMedia[item.plex_guid];
+                        if (p && !p._error) return 'Plex';
+                        return 'Plex';
+                    }
+                    return 'Unknown';
                 },
                 badgeColor(o) {
                     return {
