@@ -1,24 +1,33 @@
 [project]
 name = "PlexAniBridge"
 version = "1.0.2"
-description = "Synchronize your Plex watch history, ratings, and reviews with AniList"
+description = "The smart way to keep your AniList profile perfectly synchronized with your Plex library."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 
 authors = [
-    { name = "Elias Benbourenane", email = "eliasbenbourenane@gmail.com" }
+    { name = "Elias Benbourenane", email = "eliasbenbourenane@gmail.com" },
 ]
 maintainers = [
-    { name = "Elias Benbourenane", email = "eliasbenbourenane@gmail.com" }
+    { name = "Elias Benbourenane", email = "eliasbenbourenane@gmail.com" },
 ]
 
-keywords = ["plex", "anilist", "sync", "anime", "syncronization", "scrobble", "docker", "plexanibridge"]
+keywords = [
+    "plex",
+    "anilist",
+    "sync",
+    "anime",
+    "syncronization",
+    "scrobble",
+    "docker",
+    "plexanibridge",
+]
 classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "License :: OSI Approved :: MIT License",
-    "Operating System :: OS Independent"
+    "Operating System :: OS Independent",
 ]
 dependencies = [
     "aiocache>=0.12.3",
@@ -41,24 +50,37 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://plexanibridge.elias.eu.org"
 Documentation = "https://plexanibridge.elias.eu.org"
-Source = "https://github.com/eliasbenb/PlexAniBridge"
+Homepage = "https://plexanibridge.elias.eu.org"
 Issues = "https://github.com/eliasbenb/PlexAniBridge/issues"
+Source = "https://github.com/eliasbenb/PlexAniBridge"
+
+[tool.djlint]
+extension = ".html.jinja"
+format_css = true
+format_js = true
+indent = 4
+profile = "jinja"
+
+[tool.djlint.css]
+indent_size = 4
+
+[tool.djlint.js]
+indent_size = 4
 
 [tool.pyright]
-include = ["main.py", "src"]
 extraPaths = ["./src/stubs"]
+include = ["main.py", "src"]
 
 [tool.ruff]
 include = ["pyproject.toml", "src/**/*.py", "scripts/**/*.py"]
-line-length = 88
 indent-width = 4
+line-length = 88
 
 [tool.ruff.format]
-quote-style = "double"
-indent-style = "space"
 docstring-code-format = true
+indent-style = "space"
+quote-style = "double"
 
 [tool.ruff.lint]
 select = ["E", "F", "UP", "B", "SIM", "I", "D"]
@@ -70,8 +92,4 @@ convention = "google"
 members = ["docs"]
 
 [dependency-groups]
-dev = [
-    "djlint>=1.36.4",
-    "py-spy>=0.4.0",
-    "ruff>=0.12.0",
-]
+dev = ["djlint>=1.36.4", "py-spy>=0.4.0", "ruff>=0.12.0"]

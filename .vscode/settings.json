@@ -6,8 +6,6 @@
         "djlint.enableLinting": true,
         "editor.defaultFormatter": "monosans.djlint"
     },
-    "djlint.formatCss": true,
-    "djlint.formatJs": true,
     "editor.detectIndentation": false,
     "editor.formatOnSave": true,
     "editor.insertSpaces": true,
