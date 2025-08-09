@@ -14,13 +14,15 @@ maintainers = [
 ]
 
 keywords = [
+    "docker",
+    "sync",
+    "scrobble",
+    "synchronization",
+    "monitoring",
+    "anime",
     "plex",
     "anilist",
-    "sync",
-    "anime",
-    "syncronization",
-    "scrobble",
-    "docker",
+    "plexpy",
     "plexanibridge",
 ]
 classifiers = [
