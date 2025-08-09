@@ -97,13 +97,16 @@ class AniListService {
                         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
                         body: JSON.stringify({ query, variables: { ids: chunk } })
                     });
-                    if (!res.ok) continue;
+                    if (!res.ok) {
+                        this._dispatch('anilist-error', { status: res.status, message: 'AniList request failed', ids: chunk });
+                        continue;
+                    }
                     const json = await res.json();
                     const media = json?.data?.Page?.media || [];
                     const now = Date.now();
                     for (const m of media) this.cache.set(m.id, { m, t: now });
                     this._saveCache();
-                } catch { }
+                } catch (e) { this._dispatch('anilist-error', { error: String(e), ids: chunk }); }
             }
         }
         const out = {};

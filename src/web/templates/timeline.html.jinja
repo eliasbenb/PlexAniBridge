@@ -385,6 +385,9 @@
                         })
                         .catch(e => {
                             this.error = String(e);
+                            try {
+                                if (window.notify && notify.toast) notify.toast('Failed to load history: ' + (e?.message || e), 'error');
+                            } catch (_) {}
                         })
                         .finally(() => {
                             this.loadingInitial = false;
@@ -413,6 +416,9 @@
                         })
                         .catch(e => {
                             this.error = String(e);
+                            try {
+                                if (window.notify && notify.toast) notify.toast('Failed to load more: ' + (e?.message || e), 'error');
+                            } catch (_) {}
                         })
                         .finally(() => {
                             this.loadingMore = false;
@@ -495,8 +501,19 @@
                 },
                 sync(poll) {
                     fetch(`/api/sync/${this.profile}?poll=${poll}`, {
-                        method: 'POST'
-                    });
+                            method: 'POST'
+                        })
+                        .then(r => {
+                            if (!r.ok) throw new Error('HTTP ' + r.status);
+                            try {
+                                if (window.notify && notify.toast) notify.toast('Sync started', 'info');
+                            } catch (_) {}
+                        })
+                        .catch(e => {
+                            try {
+                                if (window.notify && notify.toast) notify.toast('Sync failed: ' + (e?.message || e), 'error');
+                            } catch (_) {}
+                        });
                 },
                 fetchMedia() {
                     // AniList

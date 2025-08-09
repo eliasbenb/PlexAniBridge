@@ -146,10 +146,10 @@ class PlexService {
             if (!token) throw new Error('no token');
             this._token = { token, t: Date.now() };
             this._saveToken();
-            this._dispatch('plex-token-refreshed', { ok: true });
             return token;
         } catch (e) {
             this._dispatch('plex-token-refreshed', { ok: false, error: String(e) });
+            this._dispatch('plex-error', { error: 'Token fetch failed: ' + String(e) });
             return null;
         }
     }
@@ -221,7 +221,7 @@ class PlexService {
                 if (!newToken) return;
                 return await this._fetchChunkMetadata(chunk, newToken);
             }
-            if (!res.ok) return;
+            if (!res.ok) { this._dispatch('plex-error', { status: res.status, message: 'Metadata request failed', chunk }); return; }
             const ct = res.headers.get('Content-Type') || '';
             let items = [];
             if (ct.includes('json')) {
@@ -249,7 +249,7 @@ class PlexService {
                     this.cache.set(original, { m: { guid: original, _error: true }, t: now });
                 }
             }
-        } catch { }
+        } catch (e) { this._dispatch('plex-error', { error: String(e), chunk }); }
     }
 
     _parseMetadataXml(xmlText) {

@@ -322,6 +322,11 @@
                     this.loadPrefs();
                     this.load();
                 },
+                toast(msg, level = 'error') {
+                    try {
+                        if (window.notify && notify.toast) notify.toast(msg, level);
+                    } catch (_) {}
+                },
                 load() {
                     const p = new URLSearchParams({
                         page: this.page,
@@ -329,13 +334,16 @@
                     });
                     if (this.search) p.set('search', this.search);
                     if (this.custom_only) p.set('custom_only', 'true');
-                    fetch('/api/mappings?' + p).then(r => r.json()).then(d => {
-                        this.items = d.items;
-                        this.pages = d.pages;
-                        this.page = d.page;
-                        // Only fetch AniList data if title column is visible
-                        if (this.columns.title) this.fetchAni();
-                    });
+                    fetch('/api/mappings?' + p)
+                        .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
+                        .then(d => {
+                            this.items = d.items;
+                            this.pages = d.pages;
+                            this.page = d.page;
+                            // Only fetch AniList data if title column is visible
+                            if (this.columns.title) this.fetchAni();
+                        })
+                        .catch(e => this.toast('Failed to load mappings: ' + (e?.message || e)));
                 },
                 savePrefs() {
                     try {
@@ -415,7 +423,7 @@
                                 this.modal = false;
                                 this.load();
                             })
-                            .catch(() => alert('Save failed'));
+                            .catch(() => this.toast('Save failed'));
                     } catch {
                         alert('Invalid JSON');
                     }
@@ -423,8 +431,13 @@
                 remove(m) {
                     if (!confirm('Delete override for AniList ' + m.anilist_id + '?')) return;
                     fetch('/api/mappings/' + m.anilist_id, {
-                        method: 'DELETE'
-                    }).then(() => this.load());
+                            method: 'DELETE'
+                        })
+                        .then(r => {
+                            if (!r.ok) throw new Error('HTTP ' + r.status);
+                        })
+                        .then(() => this.load())
+                        .catch(e => this.toast('Delete failed: ' + (e?.message || e)));
                 },
                 extractAniId(m) {
                     return m.anilist_id || null;

@@ -92,6 +92,11 @@
                 isLoading: true,
                 isWsOpen: false,
                 lastRefreshed: null,
+                toast(msg, level = 'error') {
+                    try {
+                        if (window.notify && notify.toast) notify.toast(msg, level);
+                    } catch (_) {}
+                },
                 init() {
                     this.refresh();
                     this.openWs();
@@ -128,25 +133,29 @@
                 },
                 refresh() {
                     fetch('/api/status')
-                        .then(r => r.ok ? r.json() : Promise.reject())
+                        .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
                         .then(d => {
                             this.profiles = d?.profiles || {};
                             this.isLoading = false;
                             this.lastRefreshed = Date.now();
                         })
-                        .catch(() => {});
+                        .catch(e => {
+                            this.toast('Failed to load status: ' + (e && e.message ? e.message : String(e)));
+                        });
                 },
                 syncAll(poll) {
                     fetch('/api/sync?poll=' + poll, {
                             method: 'POST'
                         })
-                        .then(() => this.refresh());
+                        .then(() => this.refresh())
+                        .catch(e => this.toast('Sync all failed: ' + (e && e.message ? e.message : String(e))));
                 },
                 sync(name, poll) {
                     fetch('/api/sync/' + name + '?poll=' + poll, {
                             method: 'POST'
                         })
-                        .then(() => this.refresh());
+                        .then(() => this.refresh())
+                        .catch(e => this.toast('Sync ' + name + ' failed: ' + (e && e.message ? e.message : String(e))));
                 },
                 goTimeline(name) {
                     if (!name) return;

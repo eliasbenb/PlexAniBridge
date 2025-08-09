@@ -35,11 +35,15 @@
         <script src="{{ url_for('static', path='js/anilist.js') }}"></script>
         <script src="{{ url_for('static', path='js/plex.js') }}"></script>
         <script src="{{ url_for('static', path='js/ws.js') }}"></script>
+        <script src="{{ url_for('static', path='js/notifier.js') }}" defer></script>
         {% block head_extra %}
         {% endblock head_extra %}
     </head>
     <body x-data="{ sidebarOpen: false }"
           class="min-h-dvh bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-950 via-slate-950 to-slate-900 text-slate-100 selection:bg-blue-600/40 selection:text-white antialiased">
+        <!-- Toast root -->
+        <div id="toast-root"
+             class="pointer-events-none fixed top-16 right-4 z-[60] flex w-80 max-w-[90vw] flex-col gap-2"></div>
         <a href="#main"
            class="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white shadow-lg">Skip to content</a>
         <!-- Mobile overlay -->
@@ -115,31 +119,6 @@
             </header>
             <!-- Page content area -->
             <main id="main" hx-boost="true" class="flex-1 p-4 sm:p-6">
-                <!-- Flash / alerts placeholder -->
-                {% if get_flashed_messages is defined %}
-                    {% with msgs = get_flashed_messages(with_categories=true) %}
-                        {% if msgs %}
-                            <div class="mb-4 space-y-2">
-                                {% for category, message in msgs %}
-                                    {% set color = "blue" %}
-                                    {% if category in ['error','danger'] %}
-                                        {% set color = "red" %}
-                                    {% elif category in ['warning'] %}
-                                        {% set color = "amber" %}
-                                    {% elif category in ['success'] %}
-                                        {% set color = "green" %}
-                                    {% endif %}
-                                    <div class="surface border-l-4 p-3 pr-4 {{ 'border-l-red-500' if color=='red' else '' }} {{ 'border-l-amber-500' if color=='amber' else '' }} {{ 'border-l-green-500' if color=='green' else '' }} {{ 'border-l-blue-500' if color=='blue' else '' }}">
-                                        <div class="flex items-start gap-3">
-                                            <iconify-icon icon="lucide:info" class="text-{{ color }}-400" inline></iconify-icon>
-                                            <p class="text-sm text-slate-200">{{ message|safe }}</p>
-                                        </div>
-                                    </div>
-                                {% endfor %}
-                            </div>
-                        {% endif %}
-                    {% endwith %}
-                {% endif %}
                 <div class="fade-in space-y-8">
                     {% block pre_content %}
                     {% endblock pre_content %}
