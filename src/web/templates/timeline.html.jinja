@@ -1,35 +1,16 @@
 {% extends "base.html.jinja" %}
+{% from "components/ui.html.jinja" import button, section_heading %}
 {% block title %}
     PlexAniBridge - {{ profile }}
 {% endblock title %}
 {% block content %}
     <div x-data="timeline('{{ profile }}')" x-init="init()" class="space-y-6">
         <!-- Header / Actions -->
-        <div class="flex flex-wrap items-center gap-3">
-            <div>
-                <h2 class="text-xl font-semibold tracking-tight flex items-center gap-2">
-                    <iconify-icon icon="lucide:history" class="w-5 h-5 text-slate-400"></iconify-icon>
-                    <span>Sync Timeline</span>
-                </h2>
-                <p class="text-xs text-slate-400 mt-0.5">
-                    Profile: <span class="font-medium text-slate-300" x-text="profile"></span>
-                </p>
-            </div>
-            <div class="grow"></div>
-            <div class="flex gap-2">
-                <button @click="sync(false)"
-                        class="text-xs px-3 py-1.5 rounded-md bg-emerald-600/90 hover:bg-emerald-500 text-white font-medium shadow-sm">
-                    Full Sync
-                </button>
-                <button @click="sync(true)"
-                        class="text-xs px-3 py-1.5 rounded-md bg-blue-600/90 hover:bg-blue-500 text-white font-medium shadow-sm">
-                    Poll Sync
-                </button>
-                <button @click="reload()"
-                        class="text-xs px-3 py-1.5 rounded-md bg-slate-700/80 hover:bg-slate-600 text-slate-100 font-medium shadow-sm">
-                    Reload
-                </button>
-            </div>
+        <div>
+            {{ section_heading('lucide:history','Sync Timeline','Profile: <span class="font-medium text-slate-300" x-text="profile"></span>',
+                        button('Full Sync','success','sm',None,None,False,'','@click="sync(false)"') ~
+            button('Poll Sync','primary','sm',None,None,False,'','@click="sync(true)"') ~
+            button('Reload','neutral','sm',None,None,False,'','@click="reload()"') ) }}
         </div>
         <!-- Stats -->
         <div class="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
@@ -72,7 +53,7 @@
                                 <span class="font-medium truncate" x-text="displayTitle(item)"></span>
                                 <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium tracking-wide"
                                       :class="badgeColor(item.outcome)">
-                                    <iconify-icon :icon="`lucide:${outcomeIcon(item.outcome)}`" class="w-3 h-3"></iconify-icon>
+                                    <iconify-icon :icon="`lucide:${outcomeIcon(item.outcome)}`" inline></iconify-icon>
                                     <span x-text="outcomeLabel(item.outcome)"></span>
                                 </span>
                                 <span class="text-xs text-slate-400">
@@ -88,7 +69,7 @@
                                        target="_blank"
                                        rel="noopener"
                                        class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md border border-slate-700 bg-slate-800/70 hover:bg-slate-700 text-slate-300 transition-colors">
-                                        <iconify-icon icon="lucide:external-link" class="w-3 h-3"></iconify-icon>
+                                        <iconify-icon icon="lucide:external-link" inline></iconify-icon>
                                         <span class="font-medium" x-text="'AniList ' + item.anilist_id"></span>
                                     </a>
                                 </template>
@@ -99,13 +80,13 @@
                                            target="_blank"
                                            rel="noopener"
                                            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md border border-slate-700 bg-slate-800/70 hover:bg-slate-700 text-slate-300 transition-colors truncate max-w-[12rem]">
-                                            <iconify-icon icon="lucide:external-link" class="w-3 h-3"></iconify-icon>
+                                            <iconify-icon icon="lucide:external-link" inline></iconify-icon>
                                             <span class="font-medium" x-text="'Plex ' + shortGuid(item.plex_guid)"></span>
                                         </a>
                                     </template>
                                     <template x-if="!plexUrl(item)">
                                         <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md border border-slate-800 bg-slate-900/40 text-slate-500 truncate max-w-[12rem]">
-                                            <iconify-icon icon="lucide:link" class="w-3 h-3"></iconify-icon>
+                                            <iconify-icon icon="lucide:link" inline></iconify-icon>
                                             <span class="font-medium" x-text="'Plex ' + shortGuid(item.plex_guid)"></span>
                                         </span>
                                     </template>
@@ -118,14 +99,14 @@
                                  x-show="item.outcome==='synced' && (item.before_state || item.after_state)">
                                 <button @click.stop="open=!open"
                                         class="text-xs text-sky-400 hover:text-sky-300 flex items-center gap-1">
-                                    <iconify-icon :icon="open ? 'lucide:minus-square' : 'lucide:plus-square'" class="w-4 h-4"></iconify-icon>
+                                    <iconify-icon :icon="open ? 'lucide:minus-square' : 'lucide:plus-square'" inline></iconify-icon>
                                     <span x-text="open ? 'Hide diff' : 'Show diff'"></span>
                                 </button>
                             </div>
                         </div>
                         <div class="flex items-start"
                              x-show="item.outcome==='synced' && (item.before_state || item.after_state)">
-                            <iconify-icon :icon="open ? 'lucide:chevron-up' : 'lucide:chevron-down'" @click.stop="open = !open" class="w-4 h-4 text-slate-500 cursor-pointer"></iconify-icon>
+                            <iconify-icon :icon="open ? 'lucide:chevron-up' : 'lucide:chevron-down'" @click.stop="open = !open" class="text-slate-500 cursor-pointer" inline></iconify-icon>
                         </div>
                     </div>
                     <!-- Diff Section -->
@@ -147,12 +128,12 @@
                                             class="px-2 py-1 font-medium">After</button>
                                     <button @click="tab='side'"
                                             :class="tab==='side' ? 'bg-slate-700/70 text-slate-100' : 'text-slate-400 hover:text-slate-200'"
-                                            class="px-2 py-1 font-medium hidden md:inline-flex">Side‑by‑Side</button>
+                                            class="px-2 py-1 font-medium hidden md:inline-flex">Side-by-Side</button>
                                 </div>
                                 <div class="flex items-center gap-2 text-[11px] grow min-w-[12rem]"
                                      x-show="tab==='changes'">
                                     <div class="relative flex-1">
-                                        <iconify-icon icon="lucide:search" class="w-3.5 h-3.5 text-slate-500 absolute left-1.5 top-1/2 -translate-y-1/2"></iconify-icon>
+                                        <iconify-icon icon="lucide:search" class="text-slate-500 absolute left-1.5 top-1/2 -translate-y-1/2" inline></iconify-icon>
                                         <input x-model="filter"
                                                placeholder="Filter path…"
                                                class="w-full pl-6 pr-2 py-1 rounded-md bg-slate-900/60 border border-slate-700/70 focus:border-sky-500 focus:outline-none placeholder:text-slate-600" />
@@ -168,12 +149,12 @@
                                     <button @click="copyJson(item.before_state)"
                                             class="px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-[11px] text-slate-300 flex items-center gap-1"
                                             title="Copy Before JSON">
-                                        <iconify-icon icon="lucide:copy" class="w-3.5 h-3.5"></iconify-icon><span>Before</span>
+                                        <iconify-icon icon="lucide:copy" inline></iconify-icon><span>Before</span>
                                     </button>
                                     <button @click="copyJson(item.after_state)"
                                             class="px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-[11px] text-slate-300 flex items-center gap-1"
                                             title="Copy After JSON">
-                                        <iconify-icon icon="lucide:copy" class="w-3.5 h-3.5"></iconify-icon><span>After</span>
+                                        <iconify-icon icon="lucide:copy" inline></iconify-icon><span>After</span>
                                     </button>
                                 </div>
                             </div>
@@ -194,7 +175,7 @@
                                                                     <span class="min-w-0 break-all"
                                                                           :class="d.status==='removed' ? 'text-red-400' : d.status==='changed' ? 'text-red-300' : 'text-slate-500'"
                                                                           x-text="truncateValue(d.before)"></span>
-                                                                    <iconify-icon icon="lucide:arrow-right" class="w-3 h-3 mt-0.5 text-slate-600 shrink-0"></iconify-icon>
+                                                                    <iconify-icon icon="lucide:arrow-right" class="mt-0.5 text-slate-600 shrink-0" inline></iconify-icon>
                                                                     <span class="min-w-0 break-all"
                                                                           :class="d.status==='added' ? 'text-emerald-400' : d.status==='changed' ? 'text-emerald-300' : 'text-slate-500'"
                                                                           x-text="truncateValue(d.after)"></span>

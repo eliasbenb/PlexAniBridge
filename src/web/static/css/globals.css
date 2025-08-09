@@ -166,3 +166,9 @@
         animation: fade-in .35s ease-out;
     }
 }
+
+iconify-icon {
+    display: inline-block;
+    width: 1em;
+    height: 1em;
+}

@@ -1,35 +1,19 @@
 {% extends "base.html.jinja" %}
+{% from "components/ui.html.jinja" import button, badge, section_heading %}
 {% block content %}
     <div x-data="statusFeed()" x-init="init()" class="space-y-6">
         <!-- Header / Controls -->
-        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div class="flex items-center gap-3">
-                <h2 class="text-xl font-semibold tracking-tight flex items-center gap-2">
-                    <iconify-icon icon="lucide:users" class="w-5 h-5 text-slate-400"></iconify-icon>
-                    <span>Profiles</span>
-                </h2>
-                <span class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-md ring-1"
+        <div class="space-y-2">
+            {{ section_heading('lucide:users','Profiles',
+                        '<span class="hidden sm:inline"><span x-text="profileCount()"></span> total <template x-if="lastRefreshed">• updated <span x-text="formatTimeAgo(lastRefreshed)"></span></template></span>',
+                        button('Full Sync All','success','sm',None,None,False,'','@click="syncAll(false)"') ~ button('Poll Sync All','primary','sm',None,None,False,'','@click="syncAll(true)"') ) }}
+            <div class="flex items-center gap-2 text-xs">
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-medium ring-1"
                       :class="isWsOpen ? 'bg-emerald-900/30 text-emerald-300 ring-emerald-700/40' : 'bg-amber-900/30 text-amber-300 ring-amber-700/40'">
                     <span class="w-1.5 h-1.5 rounded-md"
                           :class="isWsOpen ? 'bg-emerald-400' : 'bg-amber-400'"></span>
                     <span x-text="isWsOpen ? 'Live' : 'Reconnecting…'"></span>
                 </span>
-                <span class="hidden sm:inline text-xs text-slate-400">
-                    <span x-text="profileCount()"></span> total
-                    <template x-if="lastRefreshed">
-                        <span>• updated <span x-text="formatTimeAgo(lastRefreshed)"></span></span>
-                    </template>
-                </span>
-            </div>
-            <div class="flex items-center gap-2">
-                <button @click="syncAll(false)"
-                        class="text-sm px-3 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-500 ring-1 ring-emerald-500/30">
-                    Full Sync All
-                </button>
-                <button @click="syncAll(true)"
-                        class="text-sm px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-500 ring-1 ring-blue-500/30">
-                    Poll Sync All
-                </button>
             </div>
         </div>
         <!-- Grid / Cards -->
@@ -50,7 +34,7 @@
             </template>
             <!-- Profile cards -->
             <template x-for="([name, p], idx) in profileEntries()" :key="name">
-                <div class="group border border-slate-800/80 rounded-md p-4 bg-slate-900/40 hover:bg-slate-900/60 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-fuchsia-500/50"
+                <div class="group border border-slate-800/80 rounded-md p-4 bg-slate-900/40 hover:bg-slate-900/60 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
                      @click="goTimeline(name)"
                      @keydown.enter.prevent="goTimeline(name)"
                      @keydown.space.prevent="goTimeline(name)"
@@ -73,21 +57,16 @@
                         <div class="flex shrink-0 gap-1 items-start">
                             <a :href="'/timeline/'+name"
                                @click.stop
-                               class="text-xs px-2 py-1 rounded-md bg-fuchsia-600/90 hover:bg-fuchsia-500 ring-1 ring-fuchsia-500/40 font-medium flex items-center gap-1 shadow-sm">
+                               class="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-md bg-indigo-600/90 hover:bg-indigo-500 text-white shadow-sm">
                                 <span>Timeline</span>
-                                <svg xmlns="http://www.w3.org/2000/svg"
-                                     viewBox="0 0 20 20"
-                                     fill="currentColor"
-                                     class="w-3.5 h-3.5">
-                                    <path fill-rule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l5 5a.997.997 0 01.083 1.32l-.083.094-5 5a1 1 0 01-1.497-1.32l.083-.094L13.585 11H4a1 1 0 01-.117-1.993L4 9h9.585l-3.292-3.293a1 1 0 010-1.414z" clip-rule="evenodd" />
-                                </svg>
+                                <iconify-icon icon="lucide:chevron-right" inline></iconify-icon>
                             </a>
                             <button @click.stop="sync(name,false)"
-                                    class="text-xs px-2 py-1 rounded-md bg-emerald-600 hover:bg-emerald-500 ring-1 ring-emerald-500/30">
+                                    class="text-[11px] px-2 py-1 rounded-md bg-emerald-600/90 hover:bg-emerald-500 text-white">
                                 Full
                             </button>
                             <button @click.stop="sync(name,true)"
-                                    class="text-xs px-2 py-1 rounded-md bg-blue-600 hover:bg-blue-500 ring-1 ring-blue-500/30">
+                                    class="text-[11px] px-2 py-1 rounded-md bg-blue-600/90 hover:bg-blue-500 text-white">
                                 Poll
                             </button>
                         </div>

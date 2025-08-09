@@ -10,7 +10,7 @@
             <!-- Title + Primary Action -->
             <div class="flex items-center justify-between gap-4">
                 <h2 class="text-xl font-semibold tracking-tight flex items-center gap-2">
-                    <iconify-icon icon="lucide:list" class="w-5 h-5 text-slate-400"></iconify-icon>
+                    <iconify-icon icon="lucide:list" class="text-slate-400" inline></iconify-icon>
                     <span>Mappings</span>
                 </h2>
                 <div class="flex items-center gap-2">
@@ -18,7 +18,7 @@
                             title="New Override"
                             aria-label="New Override"
                             class="h-9 w-24 inline-flex items-center justify-center rounded-md bg-emerald-600/90 hover:bg-emerald-500 ring-1 ring-emerald-500/40 shadow-sm">
-                        <iconify-icon icon="lucide:plus" class="w-4 h-4 text-white"></iconify-icon>
+                        <iconify-icon icon="lucide:plus" class="text-white" inline></iconify-icon>
                     </button>
                 </div>
             </div>
@@ -34,14 +34,14 @@
                             title="Run search"
                             aria-label="Search"
                             class="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 inline-flex items-center justify-center rounded-md bg-slate-800 hover:bg-slate-700 ring-1 ring-slate-700/60">
-                        <iconify-icon icon="lucide:search" class="w-4 h-4 text-slate-300"></iconify-icon>
+                        <iconify-icon icon="lucide:search" class="text-slate-300"></iconify-icon>
                     </button>
                 </div>
                 <!-- Display Dropdown (Per Page + Columns) -->
                 <div class="relative" @keydown.escape.stop="displayOpen=false">
                     <button @click="displayOpen=!displayOpen"
                             class="text-sm h-9 w-24 px-3 rounded-md bg-slate-800 hover:bg-slate-700 ring-1 ring-slate-700/60 flex items-center gap-1">
-                        <iconify-icon icon="lucide:layout-grid" class="w-4 h-4 text-slate-400"></iconify-icon>
+                        <iconify-icon icon="lucide:layout-grid" class="text-slate-400" width="14" height="14" inline></iconify-icon>
                         <span class="hidden sm:inline">Display</span>
                         <span class="sm:hidden">Cols</span>
                     </button>
@@ -257,11 +257,11 @@
                 <div class="p-4 space-y-3">
                     <div class="flex items-start justify-between gap-4">
                         <h3 class="text-sm font-semibold tracking-wide flex items-center gap-2">
-                            <iconify-icon icon="lucide:edit-3" class="w-4 h-4 text-slate-400"></iconify-icon>
+                            <iconify-icon icon="lucide:edit-3" class="text-slate-400" inline></iconify-icon>
                             <span x-text="form.anilist_id ? 'Edit Override #'+form.anilist_id : 'New Override'"></span>
                         </h3>
                         <button @click="modal=false" class="text-slate-400 hover:text-slate-200">
-                            <iconify-icon icon="lucide:x" class="w-4 h-4"></iconify-icon>
+                            <iconify-icon icon="lucide:x" class="text-slate-400"></iconify-icon>
                         </button>
                     </div>
                     <textarea x-model="formRaw"

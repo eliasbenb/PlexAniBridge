@@ -1,4 +1,5 @@
 {% extends "base.html.jinja" %}
+{% from "components/ui.html.jinja" import section_heading, button %}
 {% block title %}
     PlexAniBridge - Logs
 {% endblock title %}
@@ -6,39 +7,11 @@
     <div x-data="logViewer()" x-init="init()" class="space-y-6">
         <!-- Header + Compact Toolbar -->
         <div class="space-y-3">
-            <div class="flex flex-wrap items-center gap-3 justify-between">
-                <div class="flex items-center gap-3">
-                    <h2 class="text-xl font-semibold tracking-tight flex items-center gap-2">
-                        <iconify-icon icon="lucide:terminal" class="w-5 h-5 text-slate-400"></iconify-icon>
-                        <span>Live Logs</span>
-                    </h2>
-                    <span class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md ring-1"
-                          :class="isWsOpen ? 'bg-emerald-900/30 text-emerald-300 ring-emerald-700/40' : 'bg-amber-900/30 text-amber-300 ring-amber-700/40'">
-                        <span class="w-1.5 h-1.5 rounded-md"
-                              :class="isWsOpen ? 'bg-emerald-400' : 'bg-amber-400'"></span>
-                        <span x-text="isWsOpen ? 'Connected' : 'Reconnecting…'"></span>
-                    </span>
-                    <span class="hidden sm:inline text-xs text-slate-400" x-show="lastReceived">
-                        Updated <span x-text="formatTimeAgo(lastReceived)"></span>
-                    </span>
-                </div>
-                <div class="flex items-center gap-2">
-                    <!-- Download -->
-                    <button @click="download()"
-                            title="Download logs"
-                            aria-label="Download logs"
-                            class="h-9 w-9 inline-flex items-center justify-center rounded-md bg-blue-600/90 hover:bg-blue-500 ring-1 ring-blue-500/40 text-white">
-                        <iconify-icon icon="lucide:download" class="w-4 h-4"></iconify-icon>
-                    </button>
-                    <!-- Clear -->
-                    <button @click="clear()"
-                            title="Clear logs"
-                            aria-label="Clear logs"
-                            class="h-9 w-9 inline-flex items-center justify-center rounded-md bg-slate-800 hover:bg-slate-700 ring-1 ring-slate-700/60 text-slate-200">
-                        <iconify-icon icon="lucide:trash-2" class="w-4 h-4"></iconify-icon>
-                    </button>
-                </div>
-            </div>
+            {{ section_heading('lucide:terminal','Live Logs', '<span class="text-xs text-slate-400 flex items-center gap-2"><span class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md ring-1"
+                  :class="isWsOpen ? \'bg-emerald-900/30 text-emerald-300 ring-emerald-700/40\' : \'bg-amber-900/30 text-amber-300 ring-amber-700/40\'"><span class="w-1.5 h-1.5 rounded-md"
+                  :class="isWsOpen ? \'bg-emerald-400\' : \'bg-amber-400\'"></span><span x-text="isWsOpen ? \'Connected\' : \'Reconnecting…\'"></span></span><span class="hidden sm:inline" x-show="lastReceived">Updated <span x-text="formatTimeAgo(lastReceived)"></span></span></span>',
+                        button('', 'primary','sm','lucide:download', None, False,'h-9 w-9','@click="download()" title="Download logs" aria-label="Download logs"') ~
+            button('', 'neutral','sm','lucide:trash-2', None, False,'h-9 w-9','@click="clear()" title="Clear logs" aria-label="Clear logs"') ) }}
             <div class="flex flex-wrap items-center gap-2">
                 <!-- Level -->
                 <div class="relative">
@@ -60,13 +33,13 @@
                            placeholder="Search logs..."
                            aria-label="Search logs"
                            class="w-full h-9 bg-slate-900/70 focus:bg-slate-900 border border-slate-700/70 focus:border-slate-600 rounded-md pl-9 pr-9 text-xs placeholder:text-slate-500 shadow-sm" />
-                    <iconify-icon icon="lucide:search" class="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500"></iconify-icon>
+                    <iconify-icon icon="lucide:search" class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"></iconify-icon>
                     <button x-show="search"
                             @click="search=''; applyFilter()"
                             title="Clear search"
                             aria-label="Clear search"
                             class="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 inline-flex items-center justify-center rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300">
-                        <iconify-icon icon="lucide:x" class="w-4 h-4"></iconify-icon>
+                        <iconify-icon icon="lucide:x"></iconify-icon>
                     </button>
                 </div>
                 <!-- Auto Scroll -->
@@ -75,7 +48,7 @@
                         aria-label="Toggle auto scroll"
                         class="h-9 w-9 inline-flex items-center justify-center rounded-md ring-1 ring-slate-700/60"
                         :class="autoScroll ? 'bg-emerald-600/90 hover:bg-emerald-500 text-white' : 'bg-slate-800 hover:bg-slate-700 text-slate-300'">
-                    <iconify-icon :icon="autoScroll ? 'lucide:chevrons-down' : 'lucide:pause'" class="w-4 h-4"></iconify-icon>
+                    <iconify-icon :icon="autoScroll ? 'lucide:chevrons-down' : 'lucide:pause'"></iconify-icon>
                 </button>
                 <!-- Wrap Toggle -->
                 <button @click="wrap=!wrap; persistPrefs()"
@@ -83,7 +56,7 @@
                         aria-label="Toggle wrap"
                         class="h-9 w-9 inline-flex items-center justify-center rounded-md bg-slate-800 hover:bg-slate-700 ring-1 ring-slate-700/60 text-slate-300"
                         :class="wrap ? 'bg-slate-700/80 text-slate-100' : ''">
-                    <iconify-icon :icon="wrap ? 'lucide:wrap-text' : 'lucide:align-left'" class="w-4 h-4"></iconify-icon>
+                    <iconify-icon :icon="wrap ? 'lucide:wrap-text' : 'lucide:align-left'"></iconify-icon>
                 </button>
             </div>
         </div>
