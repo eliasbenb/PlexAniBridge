@@ -35,11 +35,13 @@
                         <!-- Cover -->
                         <div class="w-14 shrink-0 flex items-start" x-show="item.anilist_id">
                             <template x-if="media[item.anilist_id] && !media[item.anilist_id]._error">
-                                <img :src="media[item.anilist_id]?.coverImage?.medium"
-                                     class="w-14 h-20 object-cover rounded-md ring-1 ring-slate-700/50"
-                                     :alt="displayTitle(item)"
-                                     width="56"
-                                     height="80" />
+                                <a :href="anilistUrl(item)" target="_blank" rel="noopener">
+                                    <img :src="media[item.anilist_id]?.coverImage?.medium"
+                                         class="w-14 h-20 object-cover rounded-md ring-1 ring-slate-700/50 cursor-pointer"
+                                         :alt="displayTitle(item)"
+                                         width="56"
+                                         height="80" />
+                                </a>
                             </template>
                             <template x-if="!media[item.anilist_id] || media[item.anilist_id]._error">
                                 <div class="w-14 h-20 flex items-center justify-center rounded-md bg-slate-800 text-slate-500 text-[10px] text-center leading-tight px-1">

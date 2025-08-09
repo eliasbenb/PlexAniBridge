@@ -139,12 +139,16 @@
                                     <div class="flex items-start gap-2">
                                         <div class="w-12 shrink-0" x-show="m.anilist_id">
                                             <template x-if="mappingAni(m) && !mappingAni(m)._error && mappingAni(m)?.coverImage?.medium">
-                                                <img :src="mappingAni(m)?.coverImage?.medium"
-                                                     :alt="aniTitle(mappingAni(m))"
-                                                     width="48"
-                                                     height="68"
-                                                     loading="lazy"
-                                                     class="w-12 h-16 object-cover rounded-md ring-1 ring-slate-700/50" />
+                                                <a :href="linkFor('anilist', m.anilist_id)"
+                                                   target="_blank"
+                                                   rel="noopener">
+                                                    <img :src="mappingAni(m)?.coverImage?.medium"
+                                                         :alt="aniTitle(mappingAni(m))"
+                                                         width="48"
+                                                         height="68"
+                                                         loading="lazy"
+                                                         class="w-12 h-16 object-cover rounded-md ring-1 ring-slate-700/50" />
+                                                </a>
                                             </template>
                                             <template x-if="!mappingAni(m) || mappingAni(m)._error || !mappingAni(m)?.coverImage?.medium">
                                                 <div class="w-12 h-16 flex items-center justify-center rounded-md bg-slate-800 text-[9px] leading-tight text-slate-500 text-center px-1 select-none">
