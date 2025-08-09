@@ -3,4 +3,334 @@
     PlexAniBridge - {{ profile }}
 {% endblock title %}
 {% block content %}
+    <div x-data="timeline('{{ profile }}')" x-init="init()" class="space-y-6">
+        <!-- Header / Actions -->
+        <div class="flex flex-wrap items-center gap-3">
+            <div>
+                <h2 class="text-xl font-semibold tracking-tight flex items-center gap-2">
+                    <iconify-icon icon="lucide:history" class="w-5 h-5 text-slate-400"></iconify-icon>
+                    <span>Sync Timeline</span>
+                </h2>
+                <p class="text-xs text-slate-400 mt-0.5">
+                    Profile: <span class="font-medium text-slate-300" x-text="profile"></span>
+                </p>
+            </div>
+            <div class="grow"></div>
+            <div class="flex gap-2">
+                <button @click="sync(false)"
+                        class="text-xs px-3 py-1.5 rounded-md bg-emerald-600/90 hover:bg-emerald-500 text-white font-medium shadow-sm">
+                    Full Sync
+                </button>
+                <button @click="sync(true)"
+                        class="text-xs px-3 py-1.5 rounded-md bg-blue-600/90 hover:bg-blue-500 text-white font-medium shadow-sm">
+                    Poll Sync
+                </button>
+                <button @click="reload()"
+                        class="text-xs px-3 py-1.5 rounded-md bg-slate-700/80 hover:bg-slate-600 text-slate-100 font-medium shadow-sm">
+                    Reload
+                </button>
+            </div>
+        </div>
+        <!-- Stats -->
+        <div class="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+            <template x-for="(v,k) in orderedStats()" :key="k">
+                <div class="relative rounded-md border border-slate-800 bg-gradient-to-br from-slate-900/70 to-slate-800/30 p-3 overflow-hidden group">
+                    <div class="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-[radial-gradient(circle_at_30%_30%,rgba(255,255,255,0.05),transparent)]">
+                    </div>
+                    <div class="text-[10px] uppercase tracking-wide text-slate-400 font-medium"
+                         x-text="outcomeLabel(k)"></div>
+                    <div class="mt-1 text-2xl font-semibold tabular-nums" x-text="v"></div>
+                </div>
+            </template>
+        </div>
+        <!-- Timeline Items -->
+        <div class="space-y-4" x-show="items.length">
+            <template x-for="item in items" :key="item.id">
+                <div x-data="{ open:false }"
+                     class="rounded-md border border-slate-800 bg-slate-900/60 backdrop-blur-sm overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                    <div class="flex gap-4 p-4">
+                        <!-- Outcome Bar -->
+                        <div class="w-1 rounded-md" :class="badgeColor(item.outcome)"></div>
+                        <!-- Cover -->
+                        <div class="w-14 shrink-0 flex items-start" x-show="item.anilist_id">
+                            <template x-if="media[item.anilist_id] && !media[item.anilist_id]._error">
+                                <img :src="media[item.anilist_id]?.coverImage?.medium"
+                                     class="w-14 h-20 object-cover rounded-md ring-1 ring-slate-700/50"
+                                     :alt="displayTitle(item)"
+                                     width="56"
+                                     height="80" />
+                            </template>
+                            <template x-if="!media[item.anilist_id] || media[item.anilist_id]._error">
+                                <div class="w-14 h-20 flex items-center justify-center rounded-md bg-slate-800 text-slate-500 text-[10px] text-center leading-tight px-1">
+                                    <span x-text="media[item.anilist_id]?._error ? 'AniList\nError' : 'No\nCover'"></span>
+                                </div>
+                            </template>
+                        </div>
+                        <!-- Main Content -->
+                        <div class="flex-1 min-w-0">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <span class="font-medium truncate" x-text="displayTitle(item)"></span>
+                                <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium tracking-wide"
+                                      :class="badgeColor(item.outcome)">
+                                    <iconify-icon :icon="`lucide:${outcomeIcon(item.outcome)}`" class="w-3 h-3"></iconify-icon>
+                                    <span x-text="outcomeLabel(item.outcome)"></span>
+                                </span>
+                                <span class="text-xs text-slate-400">
+                                    <span x-text="new Date(item.timestamp).toLocaleString()"></span>
+                                </span>
+                            </div>
+                            <div class="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-400">
+                                <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md border border-slate-700 bg-slate-800/70 text-slate-300 font-medium uppercase tracking-wide"
+                                      x-text="item.plex_type"></span>
+                                <!-- AniList Chip -->
+                                <template x-if="item.anilist_id">
+                                    <a :href="anilistUrl(item)"
+                                       target="_blank"
+                                       rel="noopener"
+                                       class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md border border-slate-700 bg-slate-800/70 hover:bg-slate-700 text-slate-300 transition-colors">
+                                        <iconify-icon icon="lucide:external-link" class="w-3 h-3"></iconify-icon>
+                                        <span class="font-medium" x-text="'AniList ' + item.anilist_id"></span>
+                                    </a>
+                                </template>
+                                <!-- Plex Chip (uses rating key link if available) -->
+                                <template x-if="item.plex_guid">
+                                    <template x-if="plexUrl(item)">
+                                        <a :href="plexUrl(item)"
+                                           target="_blank"
+                                           rel="noopener"
+                                           class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md border border-slate-700 bg-slate-800/70 hover:bg-slate-700 text-slate-300 transition-colors truncate max-w-[12rem]">
+                                            <iconify-icon icon="lucide:external-link" class="w-3 h-3"></iconify-icon>
+                                            <span class="font-medium" x-text="'Plex ' + shortGuid(item.plex_guid)"></span>
+                                        </a>
+                                    </template>
+                                    <template x-if="!plexUrl(item)">
+                                        <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md border border-slate-800 bg-slate-900/40 text-slate-500 truncate max-w-[12rem]">
+                                            <iconify-icon icon="lucide:link" class="w-3 h-3"></iconify-icon>
+                                            <span class="font-medium" x-text="'Plex ' + shortGuid(item.plex_guid)"></span>
+                                        </span>
+                                    </template>
+                                </template>
+                            </div>
+                            <div class="mt-1 text-[11px] text-red-400"
+                                 x-show="item.error_message"
+                                 x-text="item.error_message"></div>
+                            <div class="mt-2"
+                                 x-show="item.outcome==='synced' && (item.before_state || item.after_state)">
+                                <button @click.stop="open=!open"
+                                        class="text-xs text-sky-400 hover:text-sky-300 flex items-center gap-1">
+                                    <iconify-icon :icon="open ? 'lucide:minus-square' : 'lucide:plus-square'" class="w-4 h-4"></iconify-icon>
+                                    <span x-text="open ? 'Hide diff' : 'Show diff'"></span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="flex items-start"
+                             x-show="item.outcome==='synced' && (item.before_state || item.after_state)">
+                            <iconify-icon :icon="open ? 'lucide:chevron-up' : 'lucide:chevron-down'" @click.stop="open = !open" class="w-4 h-4 text-slate-500 cursor-pointer"></iconify-icon>
+                        </div>
+                    </div>
+                    <!-- Diff Section -->
+                    <div x-show="open && item.outcome==='synced' && (item.before_state || item.after_state)"
+                         x-transition.opacity
+                         class="border-t border-slate-800 bg-slate-950/70">
+                        <div class="p-4 grid md:grid-cols-2 gap-4">
+                            <div class="space-y-2">
+                                <h4 class="text-xs font-semibold uppercase tracking-wide text-slate-400">Before</h4>
+                                <pre class="text-[11px] leading-tight bg-slate-900/80 border border-slate-800 rounded-md p-2 overflow-auto max-h-64"
+                                     x-text="formatState(item.before_state)"></pre>
+                            </div>
+                            <div class="space-y-2">
+                                <h4 class="text-xs font-semibold uppercase tracking-wide text-slate-400">After</h4>
+                                <pre class="text-[11px] leading-tight bg-slate-900/80 border border-slate-800 rounded-md p-2 overflow-auto max-h-64"
+                                     x-text="formatState(item.after_state)"></pre>
+                            </div>
+                            <div class="md:col-span-2">
+                                <h4 class="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Changed Fields</h4>
+                                <template x-if="diffState(item).length">
+                                    <ul class="text-[11px] space-y-1">
+                                        <template x-for="d in diffState(item)" :key="d.path">
+                                            <li class="flex items-start gap-2">
+                                                <span class="px-1.5 py-0.5 rounded-md bg-slate-800 text-slate-300 font-mono text-[10px]"
+                                                      x-text="d.path"></span>
+                                                <div class="flex-1">
+                                                    <span class="text-red-400 line-through" x-text="truncateValue(d.before)"></span>
+                                                    <iconify-icon icon="lucide:arrow-right" class="inline w-3 h-3 mx-1 text-slate-500"></iconify-icon>
+                                                    <span class="text-emerald-400" x-text="truncateValue(d.after)"></span>
+                                                </div>
+                                            </li>
+                                        </template>
+                                    </ul>
+                                </template>
+                                <p x-show="!diffState(item).length" class="text-[11px] text-slate-500">No differences detected.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </template>
+        </div>
+        <p x-show="!items.length" class="text-sm text-slate-500">No history yet.</p>
+    </div>
+    <script>
+        function timeline(profile) {
+            return {
+                profile,
+                items: [],
+                stats: {},
+                media: {},
+                ws: null,
+                init() {
+                    this.reload();
+                    this.openWs();
+                },
+                orderedStats() {
+                    const order = ['synced', 'failed', 'not_found', 'deleted', 'pending', 'skipped'];
+                    const entries = Object.entries(this.stats);
+                    entries.sort((a, b) => order.indexOf(a[0]) - order.indexOf(b[0]));
+                    return Object.fromEntries(entries);
+                },
+                reload() {
+                    fetch(`/api/history/${profile}?per_page=100`).then(r => r.json()).then(d => {
+                        this.items = d.items;
+                        this.stats = d.stats;
+                        this.fetchMedia();
+                    });
+                },
+                openWs() {
+                    const url = getWsBase() + `/ws/history/${profile}`;
+                    this.ws = new WebSocket(url);
+                    this.ws.onmessage = ev => {
+                        const d = JSON.parse(ev.data);
+                        this.items = d.items;
+                        this.stats = d.stats;
+                        this.fetchMedia();
+                    };
+                    this.ws.onclose = () => setTimeout(() => this.openWs(), 3000);
+                },
+                sync(poll) {
+                    fetch(`/api/sync/${profile}?poll=${poll}`, {
+                        method: 'POST'
+                    });
+                },
+                fetchMedia() {
+                    const ids = [...new Set(this.items.filter(i => i.anilist_id).map(i => i.anilist_id))];
+                    const missing = ids.filter(id => !this.media[id]);
+                    if (!missing.length) return;
+                    batchFetchAniList(missing).then(data => {
+                        this.media = {
+                            ...this.media,
+                            ...data
+                        };
+                    }).catch(err => {
+                        // Mark all as errored so UI can display fallback
+                        missing.forEach(id => {
+                            this.media[id] = {
+                                _error: true,
+                                message: String(err)
+                            };
+                        });
+                    });
+                },
+                anilistUrl(item) {
+                    return item.anilist_id ? `https://anilist.co/anime/${item.anilist_id}` : null;
+                },
+                plexUrl(item) {
+                    try {
+                        if (!window.PLEX_SERVER_MACHINE_ID) {
+                            if (!item.plex_guid) return null;
+                            const key = encodeURIComponent(`/library/metadata/${this.shortGuid(item.plex_guid)}`);
+                            return `https://app.plex.tv/desktop/#!/provider/tv.plex.provider.discover/details?key=${key}`;
+                        } else {
+                            if (!item.plex_rating_key) return null;
+                            const key = encodeURIComponent(`/library/metadata/${item.plex_rating_key}`);
+                            return `https://app.plex.tv/desktop#!/server/${window.PLEX_SERVER_MACHINE_ID}/details?key=${key}`;
+                        }
+                    } catch {
+                        return null;
+                    }
+                },
+                shortGuid(g) {
+                    if (!g) return '';
+                    return g.split('/').pop();
+                },
+                copy(text) {
+                    try {
+                        navigator.clipboard.writeText(text);
+                    } catch {}
+                },
+                displayTitle(item) {
+                    if (!item.anilist_id) return 'Unmapped Item';
+                    const m = this.media[item.anilist_id];
+                    if (!m) return 'Loading…';
+                    if (m._error) return `AniList ${item.anilist_id}`;
+                    return m.title?.romaji || m.title?.english || m.title?.native || `AniList ${item.anilist_id}`;
+                },
+                badgeColor(o) {
+                    return {
+                        failed: 'bg-red-600 text-white',
+                        synced: 'bg-emerald-600 text-white',
+                        not_found: 'bg-amber-600 text-white',
+                        deleted: 'bg-fuchsia-600 text-white',
+                        pending: 'bg-slate-600 text-white',
+                        skipped: 'bg-slate-700 text-white'
+                    } [o] || 'bg-slate-700 text-white';
+                },
+                outcomeIcon(o) {
+                    return {
+                        failed: 'x-circle',
+                        synced: 'check-circle-2',
+                        not_found: 'search-x',
+                        deleted: 'trash-2',
+                        pending: 'clock',
+                        skipped: 'skip-forward'
+                    } [o] || 'circle';
+                },
+                outcomeLabel(o) {
+                    if (!o) return '';
+                    return o.replace(/_/g, ' ').toUpperCase();
+                },
+                formatState(obj) {
+                    return obj ? JSON.stringify(obj, null, 2) : '—';
+                },
+                truncateValue(v) {
+                    if (v === null || v === undefined) return 'null';
+                    const s = typeof v === 'string' ? v : JSON.stringify(v);
+                    return s.length > 60 ? s.slice(0, 57) + '…' : s;
+                },
+                diffState(item) {
+                    // Produce flat diff list of changed leaf values
+                    const before = item.before_state || {};
+                    const after = item.after_state || {};
+                    const paths = new Set([...this._walkPaths(before), ...this._walkPaths(after)]);
+                    const diffs = [];
+                    paths.forEach(p => {
+                        const bv = this._getPath(before, p);
+                        const av = this._getPath(after, p);
+                        if (JSON.stringify(bv) !== JSON.stringify(av)) diffs.push({
+                            path: p,
+                            before: bv,
+                            after: av
+                        });
+                    });
+                    return diffs;
+                },
+                _walkPaths(obj, base = '') {
+                    const paths = [];
+                    if (obj && typeof obj === 'object') {
+                        Object.keys(obj).forEach(k => {
+                            const val = obj[k];
+                            const path = base ? base + '.' + k : k;
+                            if (val && typeof val === 'object' && !Array.isArray(val)) {
+                                paths.push(...this._walkPaths(val, path));
+                            } else {
+                                paths.push(path);
+                            }
+                        });
+                    }
+                    return paths;
+                },
+                _getPath(obj, path) {
+                    return path.split('.').reduce((o, k) => (o && k in o) ? o[k] : undefined, obj);
+                }
+            }
+        }
+    </script>
 {% endblock content %}
