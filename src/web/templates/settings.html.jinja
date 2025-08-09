@@ -27,6 +27,31 @@
                         </li>
                     {% endfor %}
                 </ul>
+                <div class="mt-6 space-y-2">
+                    <h4 class="font-medium text-slate-200 text-sm tracking-wide flex items-center gap-2">
+                        <iconify-icon icon="lucide:languages" inline class="text-slate-400"></iconify-icon>
+                        <span>AniList Title Language</span>
+                    </h4>
+                    <p class="text-[11px] text-slate-500 leading-relaxed">
+                        Choose which title language (Romaji, English, or Native script) to prefer when displaying AniList media. This is stored only in your browser.
+                    </p>
+                    <div x-data="{ pref: (window.AniList ? AniList.getLanguage() : 'romaji'), saving:false }"
+                         class="space-y-2">
+                        <div class="flex gap-2">
+                            <template x-for="opt in ['romaji','english','native']" :key="opt">
+                                <button type="button"
+                                        @click="AniList.setLanguage(opt); pref = opt"
+                                        class="px-3 py-1.5 rounded-md border text-[11px] font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                                        :class="pref===opt ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-800/60 border-slate-700 text-slate-300 hover:bg-slate-700/60'">
+                                    <span x-text="opt.charAt(0).toUpperCase()+opt.slice(1)"></span>
+                                </button>
+                            </template>
+                        </div>
+                        <p class="text-[10px] text-slate-500">
+                            Current preference: <span class="text-slate-300 font-medium" x-text="pref"></span>
+                        </p>
+                    </div>
+                </div>
             </div>
             <div class="md:col-span-2 space-y-4">
                 <div class="flex items-center gap-2">

@@ -280,7 +280,7 @@
                     const ids = [...new Set(this.items.filter(i => i.anilist_id).map(i => i.anilist_id))];
                     const missing = ids.filter(id => !this.media[id]);
                     if (!missing.length) return;
-                    batchFetchAniList(missing).then(data => {
+                    AniList.fetch(missing).then(data => {
                         this.media = {
                             ...this.media,
                             ...data
@@ -327,7 +327,12 @@
                     const m = this.media[item.anilist_id];
                     if (!m) return 'Loading…';
                     if (m._error) return `AniList ${item.anilist_id}`;
-                    return m.title?.romaji || m.title?.english || m.title?.native || `AniList ${item.anilist_id}`;
+                    try {
+                        const t = (window.AniList && typeof AniList.getTitle === 'function') ? AniList.getTitle(m, null) : null;
+                        return t || `AniList ${item.anilist_id}`;
+                    } catch {
+                        return `AniList ${item.anilist_id}`;
+                    }
                 },
                 badgeColor(o) {
                     return {

@@ -419,7 +419,7 @@
                     const ids = [...new Set(this.items.map(m => this.extractAniId(m)).filter(Boolean))];
                     const missing = ids.filter(id => !this.media[id]);
                     if (!missing.length) return;
-                    batchFetchAniList(missing).then(data => {
+                    AniList.fetch(missing).then(data => {
                         this.media = {
                             ...this.media,
                             ...data
@@ -431,7 +431,12 @@
                     return id ? this.media[id] : null;
                 },
                 aniTitle(a) {
-                    return a.title?.romaji || a.title?.english || a.title?.native || ('#' + a.id);
+                    try {
+                        const t = (window.AniList && typeof AniList.getTitle === 'function') ? AniList.getTitle(a, null) : null;
+                        return t || ('#' + a.id);
+                    } catch {
+                        return '#' + a.id;
+                    }
                 },
                 linkFor(type, id) {
                     if (id === null || id === undefined || id === '') return null;
