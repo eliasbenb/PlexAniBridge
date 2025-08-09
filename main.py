@@ -9,6 +9,12 @@ from pydantic import ValidationError
 from src import PLEXANIBDRIGE_HEADER, log
 from src.config import config
 from src.core.sched import SchedulerClient
+from src.web.app import create_app
+
+try:
+    import uvicorn
+except Exception:
+    uvicorn = None
 
 
 class GracefulShutdownHandler:
@@ -105,7 +111,7 @@ def validate_configuration():
         return False
 
 
-async def run():
+async def run() -> int:
     """Main application entry point.
 
     Initializes and runs the application scheduler until shutdown.
@@ -113,8 +119,9 @@ async def run():
     Returns:
         int: Exit code (0 for success, 1 for error)
     """
-    app_scheduler = None
-    shutdown_handler = None
+    app_scheduler: SchedulerClient | None = None
+    shutdown_handler: GracefulShutdownHandler | None = None
+    server_task: asyncio.Task | None = None
 
     try:
         log.info("\n" + PLEXANIBDRIGE_HEADER)
@@ -128,7 +135,30 @@ async def run():
         await app_scheduler.initialize()
         await app_scheduler.start()
 
+        if config.web_enabled:
+            if uvicorn is None:
+                log.error("PlexAniBridge: uvicorn not installed; cannot start web UI")
+                return 1
+            app = create_app(app_scheduler)
+            uv_config = uvicorn.Config(
+                app,
+                host=config.web_host,
+                port=config.web_port,
+                log_config=None,
+                loop="asyncio",
+            )
+            server = uvicorn.Server(uv_config)
+            server_task = asyncio.create_task(server.serve())
+            log.success(
+                "PlexAniBridge: Web UI started at "
+                f"http://{config.web_host}:{config.web_port} "
+                "(ctrl+c to stop)"
+            )
+
         await shutdown_handler.wait_for_shutdown()
+        if server_task:
+            server.should_exit = True  # type: ignore
+            await server_task
 
     except KeyboardInterrupt:
         log.info("PlexAniBridge: Keyboard interrupt received, shutting down...")
@@ -163,8 +193,17 @@ async def run():
     return 0
 
 
-def main():
-    """Main entry point."""
+def main(argv: list[str] | None = None) -> int:
+    """Main entry point.
+
+    Initializes the application and runs the main event loop.
+
+    Args:
+        argv (list[str] | None): Command-line arguments (unused).
+
+    Returns:
+        int: Exit code (0 for success, 1 for error)
+    """
     try:
         return asyncio.run(run())
     except KeyboardInterrupt:
