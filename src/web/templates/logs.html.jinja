@@ -101,7 +101,7 @@
                               x-text="entry.level"></span>
                         <span class="flex-1 text-slate-200 min-w-0"
                               :class="wrap ? 'whitespace-pre-wrap break-words' : 'whitespace-pre'"
-                              x-text="entry.message"></span>
+                              x-html="formatMessage(entry.message)"></span>
                     </div>
                 </template>
                 <p x-show="!filtered.length" class="text-slate-500 text-xs p-2">No log entries.</p>
@@ -210,6 +210,25 @@
                     if (m < 60) return m + 'm ago';
                     const h = Math.floor(m / 60);
                     return h + 'h ago';
+                },
+                formatMessage(msg) {
+                    if (msg === null || msg === undefined) return '';
+                    // Ensure we work with a string
+                    let safe = String(msg);
+                    // Escape HTML to prevent injection before adding our spans
+                    safe = safe
+                        .replace(/&/g, '&amp;')
+                        .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    // Highlight $$'...'<span> pattern -> blue with quotes preserved
+                    // Pattern mirrors server-side formatter logic (non-greedy, allow internal single quotes not followed by $$)
+                    safe = safe.replace(/\$\$'((?:[^']|'(?!\$\$))*)'\$\$/g, (m, inner) => {
+                        return `<span class="text-sky-300">'${inner}'</span>`;
+                    });
+                    // Highlight $${...}$$ pattern -> dim / gray braces retained
+                    safe = safe.replace(/\$\$\{(.*?)\}\$\$/g, (m, inner) => {
+                        return `<span class="text-slate-400">{${inner}}</span>`;
+                    });
+                    return safe;
                 },
                 download() {
                     if (!this.logs.length) return;
