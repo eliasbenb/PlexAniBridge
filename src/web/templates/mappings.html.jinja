@@ -256,6 +256,7 @@
         <!-- Modal -->
         <div x-show="modal"
              x-transition.opacity
+             @click.self="modal=false"
              class="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
             <div class="relative w-full max-w-lg bg-slate-900/95 border border-slate-700/70 rounded-md shadow-xl ring-1 ring-slate-700/40 overflow-hidden">
                 <div class="p-4 space-y-3">
