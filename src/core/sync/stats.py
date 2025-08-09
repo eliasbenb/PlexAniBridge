@@ -1,23 +1,9 @@
-"""Synchronization Models Module."""
-
-from enum import StrEnum
-from typing import Any, Protocol
+"""Synchronization statistics and tracking module."""
 
 from pydantic import BaseModel
 
-from plexapi.media import Guid
 from plexapi.video import Episode, Movie, Season, Show
-
-
-class SyncOutcome(StrEnum):
-    """Enumeration of possible synchronization outcomes for media items."""
-
-    SYNCED = "synced"  # Successfully synchronized to AniList
-    SKIPPED = "skipped"  # Item already up to date, no changes needed
-    FAILED = "failed"  # Failed to process due to error
-    NOT_FOUND = "not_found"  # No matching AniList entry could be found
-    DELETED = "deleted"  # Item was deleted from AniList (destructive sync)
-    PENDING = "pending"  # Item was identified for processing but not yet processed
+from src.models.db.sync_history import SyncOutcome
 
 
 class ItemIdentifier(BaseModel):
@@ -292,90 +278,3 @@ class SyncStats(BaseModel):
     def __add__(self, other: "SyncStats") -> "SyncStats":
         """Combine statistics using the + operator."""
         return self.combine(other)
-
-
-class ParsedGuids(BaseModel):
-    """Container for parsed media identifiers from different services.
-
-    Handles parsing and storage of media IDs from various services (TVDB, TMDB, IMDB)
-    from Plex's GUID format into a structured format. Provides iteration and string
-    representation for debugging.
-
-    Attributes:
-        tvdb (int | None): TVDB ID if available
-        tmdb (int | None): TMDB ID if available
-        imdb (str | None): IMDB ID if available
-
-    Note:
-        GUID formats expected from Plex:
-        - TVDB: "tvdb://123456"
-        - TMDB: "tmdb://123456"
-        - IMDB: "imdb://tt1234567"
-    """
-
-    tvdb: int | None = None
-    tmdb: int | None = None
-    imdb: str | None = None
-
-    @staticmethod
-    def from_guids(guids: list[Guid]) -> "ParsedGuids":
-        """Creates a ParsedGuids instance from a list of Plex GUIDs.
-
-        Args:
-            guids (list[Guid]): List of Plex GUID objects
-
-        Returns:
-            ParsedGuids: New instance with parsed IDs
-        """
-        parsed_guids = ParsedGuids()
-        for guid in guids:
-            if not guid.id:
-                continue
-
-            split_guid = guid.id.split("://")
-            if len(split_guid) != 2:
-                continue
-
-            attr = split_guid[0]
-            if not hasattr(parsed_guids, attr):
-                continue
-
-            try:
-                setattr(parsed_guids, attr, int(split_guid[1]))
-            except ValueError:
-                setattr(parsed_guids, attr, str(split_guid[1]))
-
-        return parsed_guids
-
-    def __str__(self) -> str:
-        """Creates a string representation of the parsed IDs.
-
-        Returns:
-            str: String representation of the parsed IDs in a format like
-                 "id: xxx, id: xxx, id: xxx"
-        """
-        return ", ".join(
-            f"{field}: {getattr(self, field)}"
-            for field in self.__class__.model_fields
-            if getattr(self, field) is not None
-        )
-
-
-class Comparable(Protocol):
-    """Protocol for objects that can be compared using <, >, <=, >= operators."""
-
-    def __lt__(self, other: Any) -> bool:
-        """Return True if this object is less than other."""
-        ...
-
-    def __gt__(self, other: Any) -> bool:
-        """Return True if this object is greater than other."""
-        ...
-
-    def __le__(self, other: Any) -> bool:
-        """Return True if this object is less than or equal to other."""
-        ...
-
-    def __ge__(self, other: Any) -> bool:
-        """Return True if this object is greater than or equal to other."""
-        ...

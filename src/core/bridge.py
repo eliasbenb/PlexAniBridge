@@ -12,8 +12,10 @@ from src.core.sync import (
     MovieSyncClient,
     ShowSyncClient,
 )
-from src.models.housekeeping import Housekeeping
-from src.models.sync import ParsedGuids, SyncOutcome, SyncStats
+from src.core.sync.base import ParsedGuids
+from src.core.sync.stats import SyncStats
+from src.models.db.housekeeping import Housekeeping
+from src.models.db.sync_history import SyncOutcome
 
 __all__ = ["BridgeClient"]
 
@@ -86,7 +88,7 @@ class BridgeClient:
         """
         log.info(
             f"{self.__class__.__name__}: [{self.profile_name}] Initializing bridge "
-            f"client"
+            "client"
         )
 
         self.plex_client.clear_cache()
@@ -238,10 +240,13 @@ class BridgeClient:
             unprocessed_items = sync_stats.get_grandchild_items_by_outcome(
                 SyncOutcome.PENDING
             )
-            log.debug(
-                f"{self.__class__.__name__}: [{self.profile_name}] "
-                f"Unprocessed items: {', '.join([repr(i) for i in unprocessed_items])}"
-            )
+            if unprocessed_items:
+                log.debug(
+                    f"{self.__class__.__name__}: [{self.profile_name}] "
+                    f"Unprocessed items: {
+                        ', '.join([repr(i) for i in unprocessed_items])
+                    }"
+                )
 
         except Exception as e:
             end_time = datetime.now(timezone.utc)

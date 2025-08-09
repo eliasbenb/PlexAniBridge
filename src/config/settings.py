@@ -388,6 +388,18 @@ class PlexAnibridgeConfig(BaseSettings):
         le=100,
         description="Global default search fallback threshold",
     )
+    web_enabled: bool = Field(
+        default=False,
+        description="Enable embedded FastAPI web UI server",
+    )
+    web_host: str = Field(
+        default="0.0.0.0",
+        description="Web server listen host",
+    )
+    web_port: int = Field(
+        default=8080,
+        description="Web server listen port",
+    )
 
     def _apply_global_defaults(self) -> None:
         """Apply global defaults and create profile instances."""
