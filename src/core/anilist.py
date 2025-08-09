@@ -13,7 +13,7 @@ from async_lru import alru_cache
 from limiter import Limiter
 
 from src import __version__, log
-from src.models.anilist import (
+from src.models.schemas.anilist import (
     Media,
     MediaFormat,
     MediaList,
