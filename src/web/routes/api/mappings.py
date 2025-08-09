@@ -17,7 +17,10 @@ router = APIRouter()
 
 @router.get("")
 async def list_mappings(
-    page: int = 1, per_page: int = 25, search: str | None = None
+    page: int = 1,
+    per_page: int = 25,
+    search: str | None = None,
+    custom_only: bool = False,
 ) -> dict[str, Any]:
     """List mappings from AniMap database with optional search and pagination.
 
@@ -67,6 +70,21 @@ async def list_mappings(
         if or_parts:
             where_clauses.append(or_(*or_parts))
 
+    store = get_mappings_store()
+    custom_ids: set[int] | None = None
+    if custom_only:
+        # Preload custom override IDs for filtering query.
+        custom_ids = set(store.keys())
+        if not custom_ids:
+            return {
+                "items": [],
+                "total": 0,
+                "page": page,
+                "per_page": per_page,
+                "pages": 0,
+            }
+        where_clauses.append(AniMap.anilist_id.in_(custom_ids))
+
     with db as ctx:
         base_query = select(AniMap)
         count_query = select(func.count()).select_from(AniMap)
@@ -98,7 +116,6 @@ async def list_mappings(
     items = [row_to_dict(r) for r in rows]
 
     # Merge overrides from store
-    store = get_mappings_store()
     for i, item in enumerate(items):
         ov = store.get(item["anilist_id"])
         if ov:

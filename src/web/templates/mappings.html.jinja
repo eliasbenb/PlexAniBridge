@@ -37,6 +37,13 @@
                         <iconify-icon icon="lucide:search" class="text-slate-300"></iconify-icon>
                     </button>
                 </div>
+                <!-- Custom Only Toggle -->
+                <button @click="custom_only=!custom_only; page=1; load(); savePrefs()"
+                        :class="custom_only ? 'bg-emerald-600/80 hover:bg-emerald-600 ring-emerald-500/40 text-white' : 'bg-slate-800 hover:bg-slate-700 ring-slate-700/60 text-slate-200'"
+                        class="h-9 px-3 rounded-md text-sm inline-flex items-center gap-1 ring-1 transition-colors">
+                    <iconify-icon :icon="custom_only ? 'lucide:check-square' : 'lucide:square'" inline class="text-current"></iconify-icon>
+                    <span>Custom Only</span>
+                </button>
                 <!-- Display Dropdown (Per Page + Columns) -->
                 <div class="relative" @keydown.escape.stop="displayOpen=false">
                     <button @click="displayOpen=!displayOpen"
@@ -293,6 +300,7 @@
                 pages: 1,
                 per_page: 25,
                 search: "{{ search or '' }}",
+                custom_only: false,
                 modal: false,
                 columnsOpen: false,
                 form: {},
@@ -320,6 +328,7 @@
                         per_page: this.per_page
                     });
                     if (this.search) p.set('search', this.search);
+                    if (this.custom_only) p.set('custom_only', 'true');
                     fetch('/api/mappings?' + p).then(r => r.json()).then(d => {
                         this.items = d.items;
                         this.pages = d.pages;
@@ -333,6 +342,7 @@
                         localStorage.setItem('mappings.columns', JSON.stringify(this.columns));
                         localStorage.setItem('mappings.per_page', String(this.per_page));
                         localStorage.setItem('mappings.search', this.search || '');
+                        localStorage.setItem('mappings.custom_only', this.custom_only ? '1' : '0');
                     } catch (_) {}
                 },
                 loadPrefs() {
@@ -346,6 +356,8 @@
                         if (pp) this.per_page = pp;
                         const s = localStorage.getItem('mappings.search');
                         if (typeof s === 'string') this.search = s;
+                        const co = localStorage.getItem('mappings.custom_only');
+                        if (co === '1') this.custom_only = true;
                     } catch (_) {}
                 },
                 setAllColumns(v) {

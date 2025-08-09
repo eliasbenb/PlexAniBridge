@@ -180,6 +180,14 @@ class MappingsStore:
             return None
         return {"anilist_id": int(k), **v}
 
+    def keys(self) -> list[int]:
+        """Return list of AniList IDs that have custom overrides.
+
+        Returns:
+            list[int]: The list of AniList IDs present in the custom store.
+        """
+        return [int(k) for k in self._cache]
+
 
 _mappings_store: MappingsStore | None = None
 
