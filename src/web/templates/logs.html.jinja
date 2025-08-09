@@ -3,4 +3,277 @@
     PlexAniBridge - Logs
 {% endblock title %}
 {% block content %}
+    <div x-data="logViewer()" x-init="init()" class="space-y-6">
+        <!-- Header + Compact Toolbar -->
+        <div class="space-y-3">
+            <div class="flex flex-wrap items-center gap-3 justify-between">
+                <div class="flex items-center gap-3">
+                    <h2 class="text-xl font-semibold tracking-tight flex items-center gap-2">
+                        <iconify-icon icon="lucide:terminal" class="w-5 h-5 text-slate-400"></iconify-icon>
+                        <span>Live Logs</span>
+                    </h2>
+                    <span class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md ring-1"
+                          :class="isWsOpen ? 'bg-emerald-900/30 text-emerald-300 ring-emerald-700/40' : 'bg-amber-900/30 text-amber-300 ring-amber-700/40'">
+                        <span class="w-1.5 h-1.5 rounded-md"
+                              :class="isWsOpen ? 'bg-emerald-400' : 'bg-amber-400'"></span>
+                        <span x-text="isWsOpen ? 'Connected' : 'Reconnecting…'"></span>
+                    </span>
+                    <span class="hidden sm:inline text-xs text-slate-400" x-show="lastReceived">
+                        Updated <span x-text="formatTimeAgo(lastReceived)"></span>
+                    </span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <!-- Download -->
+                    <button @click="download()"
+                            title="Download logs"
+                            aria-label="Download logs"
+                            class="h-9 w-9 inline-flex items-center justify-center rounded-md bg-blue-600/90 hover:bg-blue-500 ring-1 ring-blue-500/40 text-white">
+                        <iconify-icon icon="lucide:download" class="w-4 h-4"></iconify-icon>
+                    </button>
+                    <!-- Clear -->
+                    <button @click="clear()"
+                            title="Clear logs"
+                            aria-label="Clear logs"
+                            class="h-9 w-9 inline-flex items-center justify-center rounded-md bg-slate-800 hover:bg-slate-700 ring-1 ring-slate-700/60 text-slate-200">
+                        <iconify-icon icon="lucide:trash-2" class="w-4 h-4"></iconify-icon>
+                    </button>
+                </div>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+                <!-- Level -->
+                <div class="relative">
+                    <select x-model="level"
+                            @change="persistPrefs(); applyFilter()"
+                            title="Minimum log level"
+                            aria-label="Minimum log level"
+                            class="h-9 bg-slate-900/70 focus:bg-slate-900 border border-slate-700/70 focus:border-slate-600 rounded-md px-2 pr-7 text-xs shadow-sm">
+                        <option>DEBUG</option>
+                        <option>INFO</option>
+                        <option>WARNING</option>
+                        <option>ERROR</option>
+                    </select>
+                </div>
+                <!-- Search -->
+                <div class="relative flex-1 min-w-60">
+                    <input x-model.trim="search"
+                           @input.debounce.300ms="applyFilter()"
+                           placeholder="Search logs..."
+                           aria-label="Search logs"
+                           class="w-full h-9 bg-slate-900/70 focus:bg-slate-900 border border-slate-700/70 focus:border-slate-600 rounded-md pl-9 pr-9 text-xs placeholder:text-slate-500 shadow-sm" />
+                    <iconify-icon icon="lucide:search" class="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500"></iconify-icon>
+                    <button x-show="search"
+                            @click="search=''; applyFilter()"
+                            title="Clear search"
+                            aria-label="Clear search"
+                            class="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 inline-flex items-center justify-center rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300">
+                        <iconify-icon icon="lucide:x" class="w-4 h-4"></iconify-icon>
+                    </button>
+                </div>
+                <!-- Auto Scroll -->
+                <button @click="autoScroll=!autoScroll; persistPrefs()"
+                        :title="autoScroll ? 'Auto-scroll enabled' : 'Auto-scroll paused'"
+                        aria-label="Toggle auto scroll"
+                        class="h-9 w-9 inline-flex items-center justify-center rounded-md ring-1 ring-slate-700/60"
+                        :class="autoScroll ? 'bg-emerald-600/90 hover:bg-emerald-500 text-white' : 'bg-slate-800 hover:bg-slate-700 text-slate-300'">
+                    <iconify-icon :icon="autoScroll ? 'lucide:chevrons-down' : 'lucide:pause'" class="w-4 h-4"></iconify-icon>
+                </button>
+                <!-- Wrap Toggle -->
+                <button @click="wrap=!wrap; persistPrefs()"
+                        :title="wrap ? 'Disable wrap' : 'Enable wrap'"
+                        aria-label="Toggle wrap"
+                        class="h-9 w-9 inline-flex items-center justify-center rounded-md bg-slate-800 hover:bg-slate-700 ring-1 ring-slate-700/60 text-slate-300"
+                        :class="wrap ? 'bg-slate-700/80 text-slate-100' : ''">
+                    <iconify-icon :icon="wrap ? 'lucide:wrap-text' : 'lucide:align-left'" class="w-4 h-4"></iconify-icon>
+                </button>
+            </div>
+        </div>
+        <!-- Log Stats -->
+        <div class="flex flex-wrap gap-2 text-[11px] text-slate-400"
+             x-show="logs.length">
+            <span>Total: <span class="text-slate-200 font-medium" x-text="logs.length"></span></span>
+            <template x-for="lvl in ['DEBUG','INFO','SUCCESS','WARNING','ERROR']"
+                      :key="lvl">
+                <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-slate-800/70 border border-slate-700/60"
+                      :class="lvl===level ? 'ring-1 ring-emerald-500/40' : ''">
+                    <span x-text="lvl"></span>
+                    <span class="text-slate-500" x-text="countLevel(lvl)"></span>
+                </span>
+            </template>
+        </div>
+        <!-- Log Viewer -->
+        <div class="relative rounded-md border border-slate-800/70 bg-slate-900/50 backdrop-blur-sm h-[70vh] flex flex-col overflow-hidden shadow-sm">
+            <div class="flex items-center justify-between gap-3 px-3 py-2 text-[11px] border-b border-slate-800/60 bg-slate-950/60">
+                <div class="flex items-center gap-2">
+                    <span class="text-slate-400">Showing</span>
+                    <span class="font-medium text-slate-200" x-text="filtered.length"></span>
+                    <span class="text-slate-500">/</span>
+                    <span class="text-slate-500" x-text="logs.length"></span>
+                </div>
+                <div class="flex items-center gap-2 text-slate-500">
+                    <span class="hidden sm:inline"
+                          x-text="autoScroll ? 'Auto-scroll on' : 'Auto-scroll off'"></span>
+                    <span class="w-1.5 h-1.5 rounded-md"
+                          :class="isWsOpen ? 'bg-emerald-400' : 'bg-amber-400'"></span>
+                </div>
+            </div>
+            <div class="flex-1 overflow-auto font-mono text-[11px] leading-normal p-1 scrollbar-thin"
+                 x-ref="scroller">
+                <template x-for="(entry, idx) in filtered" :key="idx">
+                    <div class="flex items-start gap-2 px-2 py-0.5 border-l-2 pr-3 group"
+                         :class="entryClass(entry.level)">
+                        <span class="w-[54px] shrink-0 text-[10px] text-slate-500 tabular-nums text-right"
+                              x-text="formatTime(entry)"></span>
+                        <span class="shrink-0 font-semibold tracking-wide text-[10px] px-1 rounded-md bg-slate-800/70 text-slate-300 h-5 flex items-center"
+                              :class="badgeClass(entry.level)"
+                              x-text="entry.level"></span>
+                        <span class="flex-1 text-slate-200 min-w-0"
+                              :class="wrap ? 'whitespace-pre-wrap break-words' : 'whitespace-pre'"
+                              x-text="entry.message"></span>
+                    </div>
+                </template>
+                <p x-show="!filtered.length" class="text-slate-500 text-xs p-2">No log entries.</p>
+            </div>
+        </div>
+    </div>
+    <script>
+        function logViewer() {
+            return {
+                logs: [],
+                filtered: [],
+                level: 'INFO',
+                search: '',
+                autoScroll: true,
+                wrap: false,
+                ws: null,
+                isWsOpen: false,
+                lastReceived: null,
+                init() {
+                    this.loadPrefs();
+                    this.open();
+                },
+                open() {
+                    const url = getWsBase() + '/ws/logs';
+                    this.ws = new WebSocket(url);
+                    this.ws.onopen = () => {
+                        this.isWsOpen = true;
+                    };
+                    this.ws.onmessage = (ev) => {
+                        try {
+                            const d = JSON.parse(ev.data);
+                            if (d) {
+                                this.logs.push(d);
+                                this.lastReceived = Date.now();
+                                this.applyFilter();
+                                if (this.autoScroll) this.$nextTick(() => this.scrollToBottom());
+                            }
+                        } catch {}
+                    };
+                    this.ws.onclose = () => {
+                        this.isWsOpen = false;
+                        setTimeout(() => this.open(), 2000);
+                    };
+                },
+                scrollToBottom() {
+                    const el = this.$refs.scroller;
+                    if (!el) return;
+                    el.scrollTop = el.scrollHeight;
+                },
+                applyFilter() {
+                    const minRank = this.levelRank(this.level);
+                    const q = this.search?.toLowerCase() || '';
+                    this.filtered = this.logs.filter(l => this.levelRank(l.level) >= minRank && (!q || (l.message || '').toLowerCase().includes(q)));
+                },
+                levelRank(l) {
+                    return {
+                        DEBUG: 10,
+                        INFO: 20,
+                        SUCCESS: 25,
+                        WARNING: 30,
+                        ERROR: 40
+                    } [l] || 0;
+                },
+                entryClass(lvl) {
+                    return {
+                        DEBUG: 'border-l-slate-700/60',
+                        INFO: 'border-l-slate-600/60',
+                        SUCCESS: 'border-l-emerald-600/70',
+                        WARNING: 'border-l-amber-500/80',
+                        ERROR: 'border-l-red-600/80'
+                    } [lvl] || 'border-l-slate-700/60';
+                },
+                badgeClass(lvl) {
+                    return {
+                        DEBUG: 'bg-slate-800/70 text-slate-400',
+                        INFO: 'bg-slate-800/70 text-slate-300',
+                        SUCCESS: 'bg-emerald-700/30 text-emerald-300 border border-emerald-700/40',
+                        WARNING: 'bg-amber-700/30 text-amber-300 border border-amber-700/40',
+                        ERROR: 'bg-red-700/30 text-red-300 border border-red-700/40'
+                    } [lvl] || 'bg-slate-800/70 text-slate-300';
+                },
+                clear() {
+                    this.logs = [];
+                    this.filtered = [];
+                },
+                countLevel(lvl) {
+                    return this.logs.filter(l => l.level === lvl).length;
+                },
+                formatTime(entry) {
+                    if (entry.timestamp) {
+                        // Expecting ISO or epoch
+                        try {
+                            const d = typeof entry.timestamp === 'number' ? new Date(entry.timestamp) : new Date(entry.timestamp);
+                            return d.toLocaleTimeString([], {
+                                hour12: false
+                            });
+                        } catch {}
+                    }
+                    return '';
+                },
+                formatTimeAgo(ts) {
+                    if (!ts) return '';
+                    const diff = Math.floor((Date.now() - ts) / 1000);
+                    if (diff < 60) return diff + 's ago';
+                    const m = Math.floor(diff / 60);
+                    if (m < 60) return m + 'm ago';
+                    const h = Math.floor(m / 60);
+                    return h + 'h ago';
+                },
+                download() {
+                    if (!this.logs.length) return;
+                    const lines = this.logs.map(l => `[${l.level}] ${l.message}`);
+                    const blob = new Blob([lines.join('\n')], {
+                        type: 'text/plain'
+                    });
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(blob);
+                    a.download = 'logs-' + new Date().toISOString().replace(/[:T]/g, '-').slice(0, 19) + '.txt';
+                    document.body.appendChild(a);
+                    a.click();
+                    setTimeout(() => {
+                        URL.revokeObjectURL(a.href);
+                        a.remove();
+                    }, 100);
+                },
+                persistPrefs() {
+                    try {
+                        localStorage.setItem('logs.prefs', JSON.stringify({
+                            level: this.level,
+                            autoScroll: this.autoScroll,
+                            wrap: this.wrap
+                        }));
+                    } catch {}
+                },
+                loadPrefs() {
+                    try {
+                        const p = JSON.parse(localStorage.getItem('logs.prefs') || 'null');
+                        if (p) {
+                            this.level = p.level || this.level;
+                            this.autoScroll = !!p.autoScroll;
+                            this.wrap = !!p.wrap;
+                        }
+                    } catch {}
+                }
+            }
+        }
+    </script>
 {% endblock content %}
