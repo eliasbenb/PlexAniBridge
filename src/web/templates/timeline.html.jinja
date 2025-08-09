@@ -46,6 +46,13 @@
                 Clear
             </button>
         </div>
+        <!-- Infinite Scroll Notice -->
+        <div class="flex items-center gap-2 text-[11px] text-slate-500"
+             x-show="items.length">
+            <span class="inline-flex items-center gap-1"><iconify-icon icon="lucide:infinity" inline></iconify-icon> Scroll to load older history</span>
+            <template x-if="loadingMore"><span class="inline-flex items-center gap-1 text-sky-300"><iconify-icon icon="lucide:loader-2" class="animate-spin" inline></iconify-icon> Loading…</span></template>
+            <template x-if="allLoaded && !loadingMore"><span class="inline-flex items-center gap-1 text-emerald-400"><iconify-icon icon="lucide:check" inline></iconify-icon> All loaded</span></template>
+        </div>
         <!-- Timeline Items -->
         <div class="space-y-4" x-show="filteredItems().length">
             <template x-for="item in filteredItems()" :key="item.id">
@@ -277,7 +284,41 @@
                 </div>
             </template>
         </div>
-        <p x-show="!items.length" class="text-sm text-slate-500">No history yet.</p>
+        <p x-show="!items.length && !loadingInitial"
+           class="text-sm text-slate-500">No history yet.</p>
+        <div class="flex justify-center mt-4"
+             x-show="!allLoaded && !loadingInitial">
+            <button @click="loadMore()"
+                    :disabled="loadingMore"
+                    class="px-3 py-1.5 rounded-md text-[12px] font-medium bg-slate-800 hover:bg-slate-700 disabled:opacity-40 border border-slate-700 text-slate-200 flex items-center gap-2">
+                <iconify-icon :icon="loadingMore ? 'lucide:loader-2' : 'lucide:download'" :class="loadingMore ? 'animate-spin' : ''" inline></iconify-icon>
+                <span x-text="loadingMore ? 'Loading…' : 'Load More'"></span>
+            </button>
+        </div>
+        <div x-ref="sentinel" class="h-4"></div>
+        <!-- Jump to Latest Floating Button -->
+        <div x-show="showJump"
+             x-transition:enter="transition ease-out duration-200"
+             x-transition:enter-start="opacity-0 translate-y-2 scale-95"
+             x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+             x-transition:leave="transition ease-in duration-150"
+             x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+             x-transition:leave-end="opacity-0 translate-y-2 scale-95"
+             class="fixed right-6 bottom-6 md:right-8 md:bottom-8 z-40 pointer-events-none">
+            <button @click="jumpToLatest()"
+                    :class="['group relative pointer-events-auto flex items-center gap-2 pl-3 pr-3 py-2 text-sm font-medium rounded-md border shadow-md shadow-slate-950/40 backdrop-blur-md focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 transition', newItemsCount>0 ? 'border-sky-500/60 bg-gradient-to-r from-sky-600 to-sky-500 text-white hover:from-sky-500 hover:to-sky-400' : 'border-slate-600/60 bg-slate-800/70 hover:bg-slate-700/70 text-slate-100']"
+                    aria-label="Jump to latest"
+                    title="Jump to latest">
+                <iconify-icon icon="lucide:arrow-up" class="opacity-90 group-hover:opacity-100" inline></iconify-icon>
+                <span class="hidden sm:inline" x-text="newItemsCount>0 ? 'Latest' : 'Top'"></span>
+                <span x-show="newItemsCount>0"
+                      x-transition
+                      class="text-[10px] font-semibold inline-flex items-center justify-center leading-none h-5 min-w-5 px-1 rounded-md bg-slate-900/70 border border-white/20 text-white shadow ring-1 ring-sky-300/40">
+                    <span x-text="newItemsCount"></span>
+                </span>
+                <span class="absolute inset-0 rounded-md ring-1 ring-inset ring-white/5 group-hover:ring-white/15"></span>
+            </button>
+        </div>
     </div>
     <script>
         function timeline(profile) {
@@ -288,10 +329,25 @@
                 media: {},
                 plexMedia: {},
                 outcomeFilter: null,
+                page: 1,
+                perPage: 50,
+                pages: 1,
+                total: 0,
+                loadingInitial: false,
+                loadingMore: false,
+                error: null,
+                newItemsCount: 0,
+                showJump: false,
+                _knownIds: new Set(),
                 ws: null,
                 init() {
-                    this.reload();
+                    this.loadFirst();
                     this.openWs();
+                    this.setupInfiniteScroll();
+                    this.onScroll = this.onScroll.bind(this);
+                    window.addEventListener('scroll', this.onScroll, {
+                        passive: true
+                    });
                 },
                 orderedStats() {
                     const order = ['synced', 'failed', 'not_found', 'deleted', 'pending', 'skipped'];
@@ -300,11 +356,85 @@
                     return Object.fromEntries(entries);
                 },
                 reload() {
-                    fetch(`/api/history/${profile}?per_page=100`).then(r => r.json()).then(d => {
-                        this.items = d.items;
-                        this.stats = d.stats;
-                        this.fetchMedia();
+                    this.loadFirst();
+                },
+                loadFirst() {
+                    this.page = 1;
+                    this.items = [];
+                    this.pages = 1;
+                    this.total = 0;
+                    this.error = null;
+                    this.loadingInitial = true;
+                    fetch(`/api/history/${profile}?page=1&per_page=${this.perPage}`)
+                        .then(r => {
+                            if (!r.ok) throw new Error(r.status + ' ' + r.statusText);
+                            return r.json();
+                        })
+                        .then(d => {
+                            this.items = d.items;
+                            this.stats = d.stats;
+                            this.total = d.total;
+                            this.pages = d.pages;
+                            this.page = d.page;
+                            this.perPage = d.per_page;
+                            this.fetchMedia();
+                            this._knownIds = new Set(this.items.map(i => i.id));
+                            this.newItemsCount = 0;
+                        })
+                        .catch(e => {
+                            this.error = String(e);
+                        })
+                        .finally(() => {
+                            this.loadingInitial = false;
+                        });
+                },
+                loadMore() {
+                    if (this.loadingMore || this.page >= this.pages) return;
+                    this.loadingMore = true;
+                    const next = this.page + 1;
+                    fetch(`/api/history/${profile}?page=${next}&per_page=${this.perPage}`)
+                        .then(r => {
+                            if (!r.ok) throw new Error(r.status + ' ' + r.statusText);
+                            return r.json();
+                        })
+                        .then(d => {
+                            const existing = new Set(this.items.map(i => i.id));
+                            const newOnes = d.items.filter(i => !existing.has(i.id));
+                            this.items = [...this.items, ...newOnes];
+                            this.stats = d.stats;
+                            this.total = d.total;
+                            this.pages = d.pages;
+                            this.page = d.page;
+                            this.perPage = d.per_page;
+                            this.fetchMedia();
+                            newOnes.forEach(i => this._knownIds.add(i.id));
+                        })
+                        .catch(e => {
+                            this.error = String(e);
+                        })
+                        .finally(() => {
+                            this.loadingMore = false;
+                        });
+                },
+                setupInfiniteScroll() {
+                    this.$nextTick(() => {
+                        const el = this.$refs.sentinel;
+                        if (!el) return;
+                        const obs = new IntersectionObserver(entries => {
+                            entries.forEach(en => {
+                                if (en.isIntersecting) this.loadMore();
+                            });
+                        }, {
+                            root: null,
+                            rootMargin: '0px 0px 300px 0px',
+                            threshold: 0
+                        });
+                        obs.observe(el);
+                        this._sentinelObserver = obs;
                     });
+                },
+                get allLoaded() {
+                    return this.page >= this.pages;
                 },
                 filteredItems() {
                     if (!this.outcomeFilter) return this.items;
@@ -319,11 +449,50 @@
                     this.ws = new WebSocket(url);
                     this.ws.onmessage = ev => {
                         const d = JSON.parse(ev.data);
-                        this.items = d.items;
+                        // Merge latest items at top, preserve older loaded pages.
+                        const latest = d.items || [];
+                        if (!latest.length) return;
+                        const latestIds = new Set(latest.map(i => i.id));
+                        const rest = this.items.filter(i => !latestIds.has(i.id));
+                        // Keep order: latest are already desc by timestamp
+                        this.items = [...latest, ...rest];
                         this.stats = d.stats;
                         this.fetchMedia();
+
+                        let added = 0;
+                        latest.forEach(i => {
+                            if (!this._knownIds.has(i.id)) {
+                                this._knownIds.add(i.id);
+                                added++;
+                            }
+                        });
+                        if (added && !this.isNearTop()) {
+                            this.newItemsCount += added;
+                            this.showJump = true;
+                        } else if (this.isNearTop()) {
+                            this.newItemsCount = 0;
+                        }
                     };
                     this.ws.onclose = () => setTimeout(() => this.openWs(), 3000);
+                },
+                isNearTop() {
+                    return window.scrollY < 120;
+                },
+                onScroll() {
+                    const nearTop = this.isNearTop();
+                    if (nearTop) this.newItemsCount = 0; // viewing latest
+                    this.showJump = !nearTop || this.newItemsCount > 0;
+                },
+                jumpToLatest() {
+                    window.scrollTo({
+                        top: 0,
+                        behavior: 'smooth'
+                    });
+                    // After short delay clear new count (post-scroll)
+                    setTimeout(() => {
+                        this.newItemsCount = 0;
+                        this.onScroll();
+                    }, 400);
                 },
                 sync(poll) {
                     fetch(`/api/sync/${profile}?poll=${poll}`, {
@@ -348,7 +517,6 @@
                         });
                     });
 
-                    // Plex GUID metadata
                     const plexGuids = [...new Set(this.items.filter(i => i.plex_guid).map(i => i.plex_guid))];
                     const missingPlex = plexGuids.filter(g => !this.plexMedia[g]);
                     if (missingPlex.length && window.Plex && typeof Plex.fetch === 'function') {
