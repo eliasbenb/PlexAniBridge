@@ -128,7 +128,11 @@ async def create_mapping(mapping: dict[str, Any]) -> dict[str, Any]:
         dict[str, Any]: The created mapping.
     """
     store = get_mappings_store()
-    return store.upsert(mapping)
+    res = store.upsert(mapping)
+    if not app_state.scheduler:
+        raise HTTPException(503, "Scheduler not available")
+    await app_state.scheduler.shared_animap_client._sync_db()
+    return res
 
 
 @router.put("/{mapping_id}")
@@ -144,7 +148,11 @@ async def update_mapping(mapping_id: int, mapping: dict[str, Any]) -> dict[str, 
     """
     store = get_mappings_store()
     mapping["anilist_id"] = mapping_id
-    return store.upsert(mapping)
+    res = store.upsert(mapping)
+    if not app_state.scheduler:
+        raise HTTPException(503, "Scheduler not available")
+    await app_state.scheduler.shared_animap_client._sync_db()
+    return res
 
 
 @router.get("/{mapping_id}")
