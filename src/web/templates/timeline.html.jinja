@@ -323,14 +323,15 @@
     <script>
         function timeline(profile) {
             return {
+                // State
                 profile,
                 items: [],
                 stats: {},
                 media: {},
                 plexMedia: {},
                 outcomeFilter: null,
-                page: 1,
                 perPage: 50,
+                page: 1,
                 pages: 1,
                 total: 0,
                 loadingInitial: false,
@@ -340,14 +341,14 @@
                 showJump: false,
                 _knownIds: new Set(),
                 ws: null,
-                init() {
-                    this.loadFirst();
-                    this.openWs();
-                    this.setupInfiniteScroll();
-                    this.onScroll = this.onScroll.bind(this);
-                    window.addEventListener('scroll', this.onScroll, {
-                        passive: true
+                // Helpers
+                buildQuery(page) {
+                    const params = new URLSearchParams({
+                        page: String(page),
+                        per_page: String(this.perPage)
                     });
+                    if (this.outcomeFilter) params.set('outcome', this.outcomeFilter);
+                    return `/api/history/${this.profile}?${params.toString()}`;
                 },
                 orderedStats() {
                     const order = ['synced', 'failed', 'not_found', 'deleted', 'pending', 'skipped'];
@@ -358,6 +359,7 @@
                 reload() {
                     this.loadFirst();
                 },
+                // Data loading
                 loadFirst() {
                     this.page = 1;
                     this.items = [];
@@ -365,21 +367,21 @@
                     this.total = 0;
                     this.error = null;
                     this.loadingInitial = true;
-                    fetch(`/api/history/${profile}?page=1&per_page=${this.perPage}`)
+                    fetch(this.buildQuery(1))
                         .then(r => {
                             if (!r.ok) throw new Error(r.status + ' ' + r.statusText);
                             return r.json();
                         })
                         .then(d => {
-                            this.items = d.items;
-                            this.stats = d.stats;
-                            this.total = d.total;
-                            this.pages = d.pages;
-                            this.page = d.page;
-                            this.perPage = d.per_page;
-                            this.fetchMedia();
+                            this.items = d.items || [];
+                            this.stats = d.stats || {};
+                            this.total = d.total || 0;
+                            this.pages = d.pages || 1;
+                            this.page = d.page || 1;
+                            this.perPage = d.per_page || this.perPage;
                             this._knownIds = new Set(this.items.map(i => i.id));
                             this.newItemsCount = 0;
+                            this.fetchMedia();
                         })
                         .catch(e => {
                             this.error = String(e);
@@ -392,22 +394,22 @@
                     if (this.loadingMore || this.page >= this.pages) return;
                     this.loadingMore = true;
                     const next = this.page + 1;
-                    fetch(`/api/history/${profile}?page=${next}&per_page=${this.perPage}`)
+                    fetch(this.buildQuery(next))
                         .then(r => {
                             if (!r.ok) throw new Error(r.status + ' ' + r.statusText);
                             return r.json();
                         })
                         .then(d => {
                             const existing = new Set(this.items.map(i => i.id));
-                            const newOnes = d.items.filter(i => !existing.has(i.id));
+                            const newOnes = (d.items || []).filter(i => !existing.has(i.id));
                             this.items = [...this.items, ...newOnes];
-                            this.stats = d.stats;
-                            this.total = d.total;
-                            this.pages = d.pages;
-                            this.page = d.page;
-                            this.perPage = d.per_page;
-                            this.fetchMedia();
+                            this.stats = d.stats || this.stats;
+                            this.total = d.total || this.total;
+                            this.pages = d.pages || this.pages;
+                            this.page = d.page || next;
+                            this.perPage = d.per_page || this.perPage;
                             newOnes.forEach(i => this._knownIds.add(i.id));
+                            this.fetchMedia();
                         })
                         .catch(e => {
                             this.error = String(e);
@@ -437,28 +439,25 @@
                     return this.page >= this.pages;
                 },
                 filteredItems() {
-                    if (!this.outcomeFilter) return this.items;
-                    return this.items.filter(i => i.outcome === this.outcomeFilter);
+                    return this.items;
                 },
                 toggleOutcomeFilter(o) {
-                    if (this.outcomeFilter === o) this.outcomeFilter = null;
-                    else this.outcomeFilter = o;
+                    this.outcomeFilter = this.outcomeFilter === o ? null : o;
+                    this.loadFirst();
                 },
+                // WebSocket for live updates (unfiltered baseline)
                 openWs() {
-                    const url = getWsBase() + `/ws/history/${profile}`;
+                    const url = getWsBase() + `/ws/history/${this.profile}`;
                     this.ws = new WebSocket(url);
                     this.ws.onmessage = ev => {
+                        if (this.outcomeFilter) return; // ignore live merges when filtered server-side
                         const d = JSON.parse(ev.data);
-                        // Merge latest items at top, preserve older loaded pages.
                         const latest = d.items || [];
                         if (!latest.length) return;
                         const latestIds = new Set(latest.map(i => i.id));
                         const rest = this.items.filter(i => !latestIds.has(i.id));
-                        // Keep order: latest are already desc by timestamp
                         this.items = [...latest, ...rest];
-                        this.stats = d.stats;
-                        this.fetchMedia();
-
+                        this.stats = d.stats || this.stats;
                         let added = 0;
                         latest.forEach(i => {
                             if (!this._knownIds.has(i.id)) {
@@ -472,6 +471,7 @@
                         } else if (this.isNearTop()) {
                             this.newItemsCount = 0;
                         }
+                        this.fetchMedia();
                     };
                     this.ws.onclose = () => setTimeout(() => this.openWs(), 3000);
                 },
@@ -480,7 +480,7 @@
                 },
                 onScroll() {
                     const nearTop = this.isNearTop();
-                    if (nearTop) this.newItemsCount = 0; // viewing latest
+                    if (nearTop) this.newItemsCount = 0;
                     this.showJump = !nearTop || this.newItemsCount > 0;
                 },
                 jumpToLatest() {
@@ -488,51 +488,54 @@
                         top: 0,
                         behavior: 'smooth'
                     });
-                    // After short delay clear new count (post-scroll)
                     setTimeout(() => {
                         this.newItemsCount = 0;
                         this.onScroll();
                     }, 400);
                 },
                 sync(poll) {
-                    fetch(`/api/sync/${profile}?poll=${poll}`, {
+                    fetch(`/api/sync/${this.profile}?poll=${poll}`, {
                         method: 'POST'
                     });
                 },
                 fetchMedia() {
+                    // AniList
                     const ids = [...new Set(this.items.filter(i => i.anilist_id).map(i => i.anilist_id))];
                     const missing = ids.filter(id => !this.media[id]);
-                    if (!missing.length) return;
-                    AniList.fetch(missing).then(data => {
-                        this.media = {
-                            ...this.media,
-                            ...data
-                        };
-                    }).catch(err => {
-                        missing.forEach(id => {
-                            this.media[id] = {
-                                _error: true,
-                                message: String(err)
-                            };
-                        });
-                    });
-
+                    if (missing.length && window.AniList && typeof AniList.fetch === 'function') {
+                        AniList.fetch(missing).then(data => {
+                                this.media = {
+                                    ...this.media,
+                                    ...data
+                                };
+                            })
+                            .catch(err => {
+                                missing.forEach(id => {
+                                    this.media[id] = {
+                                        _error: true,
+                                        message: String(err)
+                                    };
+                                });
+                            });
+                    }
+                    // Plex
                     const plexGuids = [...new Set(this.items.filter(i => i.plex_guid).map(i => i.plex_guid))];
                     const missingPlex = plexGuids.filter(g => !this.plexMedia[g]);
                     if (missingPlex.length && window.Plex && typeof Plex.fetch === 'function') {
                         Plex.fetch(missingPlex).then(data => {
-                            this.plexMedia = {
-                                ...this.plexMedia,
-                                ...data
-                            };
-                        }).catch(err => {
-                            missingPlex.forEach(g => {
-                                this.plexMedia[g] = {
-                                    _error: true,
-                                    message: String(err)
+                                this.plexMedia = {
+                                    ...this.plexMedia,
+                                    ...data
                                 };
+                            })
+                            .catch(err => {
+                                missingPlex.forEach(g => {
+                                    this.plexMedia[g] = {
+                                        _error: true,
+                                        message: String(err)
+                                    };
+                                });
                             });
-                        });
                     }
                 },
                 anilistUrl(item) {
@@ -563,7 +566,6 @@
                     } catch {}
                 },
                 displayTitle(item) {
-                    // Prefer AniList title if available
                     if (item.anilist_id) {
                         const m = this.media[item.anilist_id];
                         if (!m) return 'Loading…';
@@ -574,7 +576,6 @@
                         } catch {}
                         return `AniList ${item.anilist_id}`;
                     }
-                    // Fallback to Plex metadata
                     if (item.plex_guid) {
                         const p = this.plexMedia[item.plex_guid];
                         if (!p) return 'Loading…';
@@ -588,7 +589,6 @@
                     if (item.anilist_id) {
                         const m = this.media[item.anilist_id];
                         if (m && !m._error) return 'AniList';
-                        // If AniList id exists but errored AND we have Plex fallback, show Plex
                         if (item.plex_guid) {
                             const p = this.plexMedia[item.plex_guid];
                             if (p && !p._error) return 'Plex';
@@ -635,7 +635,6 @@
                     return s.length > 60 ? s.slice(0, 57) + '…' : s;
                 },
                 diffState(item) {
-                    // Produce flat diff list of changed leaf values
                     const before = item.before_state || {};
                     const after = item.after_state || {};
                     const paths = new Set([...this._walkPaths(before), ...this._walkPaths(after)]);
@@ -657,17 +656,24 @@
                         Object.keys(obj).forEach(k => {
                             const val = obj[k];
                             const path = base ? base + '.' + k : k;
-                            if (val && typeof val === 'object' && !Array.isArray(val)) {
-                                paths.push(...this._walkPaths(val, path));
-                            } else {
-                                paths.push(path);
-                            }
+                            if (val && typeof val === 'object' && !Array.isArray(val)) paths.push(...this._walkPaths(val, path));
+                            else paths.push(path);
                         });
                     }
                     return paths;
                 },
                 _getPath(obj, path) {
                     return path.split('.').reduce((o, k) => (o && k in o) ? o[k] : undefined, obj);
+                },
+                // Lifecycle
+                init() {
+                    this.loadFirst();
+                    this.openWs();
+                    this.setupInfiniteScroll();
+                    this.onScroll = this.onScroll.bind(this);
+                    window.addEventListener('scroll', this.onScroll, {
+                        passive: true
+                    });
                 }
             }
         }
