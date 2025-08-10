@@ -292,6 +292,7 @@ class PlexClient:
         section: Section,
         min_last_modified: datetime | None = None,
         require_watched: bool = False,
+        rating_keys: list[str] | None = None,
         **kwargs,
     ) -> Iterator[Media]:
         """Retrieve items from a specified Plex library section with optional filtering.
@@ -304,8 +305,13 @@ class PlexClient:
                 least once.
             **kwargs: Additional keyword arguments passed to section.search().
 
+        Args (extended):
+            rating_keys: Optional list of rating keys to restrict results to. If
+                provided, only items whose ratingKey matches one of the values will
+                be yielded. (Strings or ints coerced to string)
+
         Yields:
-            Media: Media items matching the criteria
+            Media: Media items matching the criteria.
         """
         filters: dict[str, list] = {"and": []}
 
@@ -404,7 +410,14 @@ class PlexClient:
             )
             filters["and"].append({"genre": self.plex_genres})
 
-        yield from section.search(filters=filters, **kwargs)
+        # Perform base search
+        items = section.search(filters=filters, **kwargs)
+
+        if rating_keys:
+            rk_set = {str(rk) for rk in rating_keys}
+            yield from (i for i in items if str(i.ratingKey) in rk_set)
+        else:
+            yield from items
 
     @alru_cache(maxsize=1024, ttl=30)
     async def get_user_review(self, item: Media) -> str | None:

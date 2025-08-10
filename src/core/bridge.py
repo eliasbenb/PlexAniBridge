@@ -170,7 +170,9 @@ class BridgeClient:
             )
             ctx.session.commit()
 
-    async def sync(self, poll: bool = False) -> None:
+    async def sync(
+        self, poll: bool = False, rating_keys: list[str] | None = None
+    ) -> None:
         """Initiates the synchronization process for this profile.
 
         This is the main entry point for the sync process. It:
@@ -180,6 +182,8 @@ class BridgeClient:
 
         Args:
             poll (bool): Flag to enable polling scan mode, default False
+            rating_keys (list[str] | None): Optional list of Plex rating keys to
+                restrict the sync to.
         """
         log.info(
             f"{self.__class__.__name__}: [{self.profile_name}] Starting "
@@ -221,7 +225,7 @@ class BridgeClient:
         try:
             for section in plex_sections:
                 section_stats = await self._sync_section(
-                    section, poll, movie_sync, show_sync
+                    section, poll, movie_sync, show_sync, rating_keys=rating_keys
                 )
                 sync_stats = sync_stats.combine(section_stats)
 
@@ -267,6 +271,7 @@ class BridgeClient:
         poll: bool,
         movie_sync: MovieSyncClient,
         show_sync: ShowSyncClient,
+        rating_keys: list[str] | None = None,
     ) -> SyncStats:
         """Synchronizes a single Plex library section.
 
@@ -275,6 +280,8 @@ class BridgeClient:
             poll (bool): Flag to enable polling scan mode
             movie_sync (MovieSyncClient): Movie sync client
             show_sync (ShowSyncClient): Show sync client
+            rating_keys (list[str] | None): Optional list of Plex rating keys to
+                restrict sync to for this section.
 
         Returns:
             SyncStats: Statistics about the sync operation for the section
@@ -293,6 +300,7 @@ class BridgeClient:
                 section,
                 min_last_modified=min_last_modified if poll else None,
                 require_watched=not self.profile_config.full_scan,
+                rating_keys=rating_keys,
             )
         )
 

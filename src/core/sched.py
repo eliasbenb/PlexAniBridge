@@ -51,16 +51,20 @@ class ProfileScheduler:
         self._sync_lock = asyncio.Lock()
         self._current_task: asyncio.Task | None = None
 
-    async def sync(self, poll: bool = False) -> None:
+    async def sync(
+        self, poll: bool = False, rating_keys: list[str] | None = None
+    ) -> None:
         """Execute a single synchronization cycle with error handling.
 
         Args:
             poll: Flag to enable polling-based sync
+            rating_keys: Optional list of Plex rating keys to restrict the sync
+                to. When provided, only those items will be processed.
         """
         async with self._sync_lock:
             try:
                 self._current_task = asyncio.create_task(
-                    self.bridge_client.sync(poll=poll)
+                    self.bridge_client.sync(poll=poll, rating_keys=rating_keys)
                 )
                 await self._current_task
             except asyncio.CancelledError:
@@ -348,13 +352,18 @@ class SchedulerClient:
             raise
 
     async def trigger_sync(
-        self, profile_name: str | None = None, poll: bool = False
+        self,
+        profile_name: str | None = None,
+        poll: bool = False,
+        rating_keys: list[str] | None = None,
     ) -> None:
         """Manually trigger a sync for one or all profiles.
 
         Args:
             profile_name: Specific profile to sync, or None for all profiles
             poll: Whether to use polling mode for the sync
+            rating_keys: Optional list of Plex rating keys to restrict the sync
+                scope for each profile.
 
         Raises:
             KeyError: If the specified profile doesn't exist
@@ -368,7 +377,7 @@ class SchedulerClient:
                 f"(poll={poll})"
             )
             scheduler = self.profile_schedulers[profile_name]
-            await scheduler.sync(poll=poll)
+            await scheduler.sync(poll=poll, rating_keys=rating_keys)
         else:
             log.info(
                 f"{self.__class__.__name__}: Manually triggering sync for all profiles "
@@ -377,7 +386,7 @@ class SchedulerClient:
             sync_tasks = []
             for name, scheduler in self.profile_schedulers.items():
                 log.info(f"{self.__class__.__name__}: [{name}] Triggering sync")
-                sync_tasks.append(scheduler.sync(poll=poll))
+                sync_tasks.append(scheduler.sync(poll=poll, rating_keys=rating_keys))
 
             if sync_tasks:
                 await asyncio.gather(*sync_tasks, return_exceptions=True)
