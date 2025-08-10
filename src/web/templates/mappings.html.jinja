@@ -1,102 +1,101 @@
 {% extends "base.html.jinja" %}
+{% from "components/ui.html.jinja" import section_heading, button %}
 {% block title %}
     PlexAniBridge - Mappings
 {% endblock title %}
 {% block content %}
     <div x-data="mappingsCrud()" x-init="init()" class="space-y-6">
-        <!-- Header -->
-        <!-- Simplified Header + Toolbar -->
-        <div class="flex flex-col gap-3">
-            <!-- Title + Primary Action -->
-            <div class="flex items-center justify-between gap-4">
-                <h2 class="text-xl font-semibold tracking-tight flex items-center gap-2">
-                    <iconify-icon icon="lucide:list" class="text-slate-400" inline></iconify-icon>
-                    <span>Mappings</span>
-                </h2>
-                <div class="flex items-center gap-2">
-                    <button @click="openNew()"
-                            title="New Override"
-                            aria-label="New Override"
-                            class="h-9 w-24 inline-flex items-center justify-center rounded-md bg-emerald-600/90 hover:bg-emerald-500 ring-1 ring-emerald-500/40 shadow-sm">
-                        <iconify-icon icon="lucide:plus" class="text-white" inline></iconify-icon>
-                    </button>
-                </div>
-            </div>
-            <!-- Compact Toolbar -->
-            <div class="flex flex-wrap items-center gap-2">
-                <!-- Search -->
-                <div class="relative flex-1 min-w-64">
-                    <input x-model="search"
-                           @keydown.enter.prevent="page=1; load()"
-                           placeholder="Search any field (AniList, TMDB, IMDB, etc)"
-                           class="w-full bg-slate-900/70 focus:bg-slate-900 border border-slate-700/70 focus:border-slate-600 rounded-md pl-3 pr-10 py-2 text-sm placeholder:text-slate-500 shadow-sm" />
-                    <button @click="page=1; load()"
-                            title="Run search"
-                            aria-label="Search"
-                            class="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 inline-flex items-center justify-center rounded-md bg-slate-800 hover:bg-slate-700 ring-1 ring-slate-700/60">
-                        <iconify-icon icon="lucide:search" class="text-slate-300"></iconify-icon>
-                    </button>
-                </div>
-                <!-- Custom Only Toggle -->
-                <button @click="custom_only=!custom_only; page=1; load(); savePrefs()"
-                        :class="custom_only ? 'bg-emerald-600/80 hover:bg-emerald-600 ring-emerald-500/40 text-white' : 'bg-slate-800 hover:bg-slate-700 ring-slate-700/60 text-slate-200'"
-                        class="h-9 px-3 rounded-md text-sm inline-flex items-center gap-1 ring-1 transition-colors">
-                    <iconify-icon :icon="custom_only ? 'lucide:check-square' : 'lucide:square'" inline class="text-current"></iconify-icon>
-                    <span>Custom Only</span>
+        {{ section_heading('lucide:list', 'Mappings', '<span class="text-xs text-slate-400">Browse & override external ID relationships</span>') }}
+        <!-- Toolbar -->
+        <div class="flex flex-wrap items-center gap-2 border-b border-slate-800/70 py-1">
+            <!-- Search -->
+            <div class="relative flex-1 min-w-56 max-w-xl">
+                <input x-model="search"
+                       @keydown.enter.prevent="page=1; load(); savePrefs()"
+                       placeholder="Search (AniList, TMDB, IMDB, etc)"
+                       aria-label="Search mappings"
+                       class="w-full h-8 bg-slate-900/70 focus:bg-slate-900 border border-slate-700/70 focus:border-slate-600 rounded-md pl-8 pr-9 text-[11px] placeholder:text-slate-500 shadow-sm" />
+                <iconify-icon icon="lucide:search" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-[14px]"></iconify-icon>
+                <button @click="page=1; load(); savePrefs()"
+                        class="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 inline-flex items-center justify-center rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300"
+                        aria-label="Run search">
+                    <iconify-icon icon="lucide:arrow-right"></iconify-icon>
                 </button>
-                <!-- Display Dropdown (Per Page + Columns) -->
-                <div class="relative" @keydown.escape.stop="displayOpen=false">
-                    <button @click="displayOpen=!displayOpen"
-                            class="text-sm h-9 w-24 px-3 rounded-md bg-slate-800 hover:bg-slate-700 ring-1 ring-slate-700/60 flex items-center gap-1">
-                        <iconify-icon icon="lucide:layout-grid" class="text-slate-400" width="14" height="14" inline></iconify-icon>
-                        <span class="hidden sm:inline">Display</span>
-                        <span class="sm:hidden">Cols</span>
-                    </button>
-                    <div x-show="displayOpen"
-                         x-transition.opacity
-                         @click.outside="displayOpen=false"
-                         class="absolute mt-1 right-0 z-30 w-72 rounded-md border border-slate-700/70 bg-slate-900/95 backdrop-blur-sm p-3 shadow-lg space-y-3">
-                        <div class="flex items-center justify-between gap-3">
-                            <div class="text-[10px] uppercase tracking-wide text-slate-400 font-medium">Per Page</div>
-                            <select x-model.number="per_page"
-                                    @change="page=1; load(); savePrefs()"
-                                    class="bg-slate-950/70 focus:bg-slate-950 border border-slate-700/70 focus:border-slate-600 rounded-md px-2 py-1 text-xs shadow-sm">
-                                <option>10</option>
-                                <option>25</option>
-                                <option>50</option>
-                                <option>100</option>
-                            </select>
+            </div>
+            <!-- Custom Only -->
+            <button @click="custom_only=!custom_only; page=1; load(); savePrefs()"
+                    :class="custom_only ? 'bg-emerald-600/90 hover:bg-emerald-500 text-white ring-emerald-500/40' : 'bg-slate-800 hover:bg-slate-700 text-slate-300 ring-slate-700/60'"
+                    class="h-8 px-3 inline-flex items-center gap-1 rounded-md ring-1 text-[11px] font-medium">
+                <iconify-icon :icon="custom_only ? 'lucide:check-square' : 'lucide:square'" class="text-current text-[14px]"></iconify-icon>
+                <span>Custom Only</span>
+            </button>
+            <!-- Display / Columns -->
+            <div class="relative" @keydown.escape.stop="displayOpen=false">
+                <button @click="displayOpen=!displayOpen"
+                        class="h-8 px-3 inline-flex items-center gap-1 rounded-md bg-slate-800 hover:bg-slate-700 ring-1 ring-slate-700/60 text-[11px] font-medium">
+                    <iconify-icon icon="lucide:layout-grid" class="text-slate-400 text-[14px]"></iconify-icon>
+                    <span>Display</span>
+                </button>
+                <div x-show="displayOpen"
+                     x-transition.opacity
+                     @click.outside="displayOpen=false"
+                     class="absolute mt-1 right-0 z-30 w-72 rounded-md border border-slate-700/70 bg-slate-900/95 backdrop-blur-sm p-3 shadow-lg space-y-3">
+                    <div class="flex items-center justify-between gap-3">
+                        <div class="text-[10px] uppercase tracking-wide text-slate-400 font-medium">Per Page</div>
+                        <select x-model.number="per_page"
+                                @change="page=1; load(); savePrefs()"
+                                class="h-7 bg-slate-950/70 focus:bg-slate-950 border border-slate-700/70 focus:border-slate-600 rounded-md px-2 text-[11px] shadow-sm">
+                            <option>10</option>
+                            <option>25</option>
+                            <option>50</option>
+                            <option>100</option>
+                        </select>
+                    </div>
+                    <div class="space-y-1">
+                        <div class="text-[10px] uppercase tracking-wide text-slate-400 font-medium">Columns</div>
+                        <div class="grid grid-cols-2 gap-1 text-[11px]">
+                            <template x-for="[key,label] in Object.entries({title:'Title',anidb:'AniDB',imdb:'IMDB',tmdb_movie:'TMDB (Movie)',tmdb_show:'TMDB (Show)',tvdb:'TVDB',mal:'MAL',seasons:'Seasons'})"
+                                      :key="key">
+                                <label class="flex items-center gap-1.5 px-2 py-1 rounded-md hover:bg-slate-800/70 cursor-pointer select-none">
+                                    <input type="checkbox"
+                                           class="accent-emerald-600"
+                                           :checked="columns[key]"
+                                           @change="const prev=columns[key]; columns[key]=!columns[key]; savePrefs(); if(key==='title' && !prev && columns.title) fetchAni();">
+                                    <span class="truncate" x-text="label"></span>
+                                </label>
+                            </template>
                         </div>
-                        <div class="space-y-1">
-                            <div class="text-[10px] uppercase tracking-wide text-slate-400 font-medium">Columns</div>
-                            <div class="grid grid-cols-2 gap-1 text-[11px]">
-                                <template x-for="[key,label] in Object.entries({title:'Title',anidb:'AniDB',imdb:'IMDB',tmdb_movie:'TMDB (Movie)',tmdb_show:'TMDB (Show)',tvdb:'TVDB',mal:'MAL',seasons:'Seasons'})"
-                                          :key="key">
-                                    <label class="flex items-center gap-1.5 px-2 py-1 rounded-md hover:bg-slate-800/70 cursor-pointer select-none">
-                                        <input type="checkbox"
-                                               class="accent-emerald-600"
-                                               :checked="columns[key]"
-                                               @change="const prev=columns[key]; columns[key]=!columns[key]; savePrefs(); if(key==='title' && !prev && columns.title) fetchAni();">
-                                        <span class="truncate" x-text="label"></span>
-                                    </label>
-                                </template>
-                            </div>
-                        </div>
-                        <div class="flex flex-wrap gap-2 pt-1">
-                            <button class="text-[11px] px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700"
-                                    @click="setAllColumns(true)">Show All</button>
-                            <button class="text-[11px] px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700"
-                                    @click="setAllColumns(false)">Hide All</button>
-                            <button class="text-[11px] px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700"
-                                    @click="resetColumns()">Reset</button>
-                        </div>
+                    </div>
+                    <div class="flex flex-wrap gap-2 pt-1">
+                        <button class="text-[11px] px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700"
+                                @click="setAllColumns(true)">Show All</button>
+                        <button class="text-[11px] px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700"
+                                @click="setAllColumns(false)">Hide All</button>
+                        <button class="text-[11px] px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700"
+                                @click="resetColumns()">Reset</button>
                     </div>
                 </div>
             </div>
+            <div class="ml-auto">
+                <button @click="openNew()"
+                        class="h-8 inline-flex items-center gap-1 px-3 rounded-md bg-emerald-600/90 hover:bg-emerald-500 text-emerald-50 text-[11px] font-medium"
+                        title="New Override"
+                        aria-label="New Override">
+                    <iconify-icon icon="lucide:plus" class="text-[14px]"></iconify-icon>
+                </button>
+            </div>
         </div>
         <!-- Table Container -->
-        <div class="rounded-md border border-slate-800/70 bg-slate-900/40 backdrop-blur-sm overflow-hidden">
-            <div class="overflow-x-auto max-h-[70vh] scrollbar-thin">
+        <div class="relative rounded-md border border-slate-800/70 bg-slate-900/40 backdrop-blur-sm overflow-hidden h-[70vh] flex flex-col">
+            <!-- Status Bar -->
+            <div class="px-3 py-2 text-[11px] flex items-center gap-4 border-b border-slate-800/60 bg-slate-950/50">
+                <span class="text-slate-400">Showing <span class="text-slate-200 font-medium" x-text="items.length"></span>/<span class="text-slate-500" x-text="total"></span></span>
+                <span class="text-slate-500"
+                      x-text="'Page '+page+' / '+pages"
+                      x-show="pages>1"></span>
+                <template x-if="custom_only"><span class="text-emerald-400">Custom overrides only</span></template>
+            </div>
+            <div class="overflow-x-auto overflow-y-auto flex-1 scrollbar-thin">
                 <table class="min-w-full text-xs align-middle">
                     <thead class="text-slate-300 bg-gradient-to-b from-slate-900/70 to-slate-900/40 sticky top-0 z-10">
                         <tr class="divide-x divide-slate-800/70 whitespace-nowrap">
@@ -210,13 +209,13 @@
                                     <div class="flex flex-col gap-1 items-end">
                                         <div class="flex gap-1">
                                             <button @click="edit(m)"
-                                                    class="px-2 py-1 text-[11px] rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200">
+                                                    class="h-6 px-2 inline-flex items-center rounded-md bg-slate-800 hover:bg-slate-700 text-[11px] text-slate-200">
                                                 Edit
                                             </button>
                                             <button @click="m.custom && remove(m)"
                                                     :disabled="!m.custom"
                                                     :title="!m.custom ? 'Not deletable: not in your custom mappings' : 'Delete mapping'"
-                                                    class="px-2 py-1 text-[11px] rounded-md text-white disabled:opacity-35 disabled:cursor-not-allowed bg-red-600/80 hover:bg-red-600 disabled:hover:bg-red-600/80">
+                                                    class="h-6 px-2 inline-flex items-center rounded-md text-[11px] text-rose-200 bg-rose-700/70 hover:bg-rose-600 disabled:opacity-35 disabled:cursor-not-allowed">
                                                 Del
                                             </button>
                                         </div>
@@ -296,6 +295,7 @@
         function mappingsCrud() {
             return {
                 items: [],
+                total: 0,
                 page: 1,
                 pages: 1,
                 per_page: 25,
@@ -338,6 +338,7 @@
                         .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
                         .then(d => {
                             this.items = d.items;
+                            this.total = d.total ?? (d.pages * this.per_page);
                             this.pages = d.pages;
                             this.page = d.page;
                             // Only fetch AniList data if title column is visible
