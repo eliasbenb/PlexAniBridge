@@ -22,7 +22,7 @@ profiles:
     # plex_metadata_source: local
     #== Sync Options ==#
     # sync_interval: 3600
-    # polling_scan: false
+    # sync_modes: ["interval"]
     # full_scan: false
     # destructive_sync: false
     # excluded_sync_fields: ["notes", "score"]
