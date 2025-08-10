@@ -11,7 +11,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from src import __version__, log
+from src import __git_hash__, __version__, log
 from src.core.sched import SchedulerClient
 from src.web.routes import router
 from src.web.services.logging_handler import log_ws_handler
@@ -71,6 +71,7 @@ def create_app(scheduler: SchedulerClient | None = None) -> FastAPI:
 
     templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
     templates.env.globals.setdefault("version", __version__)
+    templates.env.globals.setdefault("git_hash", __git_hash__)
     templates.env.globals.setdefault("now", datetime.now(timezone.utc))
 
     app.extra["templates"] = templates

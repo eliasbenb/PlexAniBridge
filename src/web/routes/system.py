@@ -9,7 +9,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-from src import __version__
+from src import __git_hash__, __version__
 from src.web.state import app_state
 
 router = APIRouter()
@@ -114,6 +114,7 @@ async def about_page(request: Request) -> HTMLResponse:
         human_uptime = " ".join(parts)
     info = {
         "version": __version__,
+        "git_hash": __git_hash__,
         "python": platform.python_version(),
         "platform": platform.platform(),
         "utc_now": now.isoformat(),
