@@ -110,7 +110,7 @@
                                     <span x-text="outcomeLabel(item.outcome)"></span>
                                 </span>
                                 <span class="text-xs text-slate-400">
-                                    <span x-text="new Date(item.timestamp).toLocaleString()"></span>
+                                    <span x-text="new Date(item.timestamp + 'Z').toLocaleString()"></span>
                                 </span>
                             </div>
                             <div class="mt-1 flex flex-wrap gap-x-1.5 gap-y-1 text-[11px] text-slate-400">
