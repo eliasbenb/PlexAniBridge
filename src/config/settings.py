@@ -212,7 +212,7 @@ class PlexAnibridgeProfileConfig(BaseModel):
     sync_interval: int = Field(
         default=3600,
         ge=0,
-        description="Sync interval in seconds (-1 = run once)",
+        description="Sync interval in seconds",
     )
     sync_modes: list[SyncMode] = Field(
         default_factory=lambda: [SyncMode.INTERVAL],
