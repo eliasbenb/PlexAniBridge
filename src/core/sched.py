@@ -8,7 +8,7 @@ from typing import Any
 from tzlocal import get_localzone
 
 from src import log
-from src.config.settings import PlexAnibridgeConfig
+from src.config.settings import PlexAnibridgeConfig, SyncMode
 from src.core import AniMapClient, BridgeClient
 
 __all__ = ["SchedulerClient"]
@@ -26,7 +26,7 @@ class ProfileScheduler:
         profile_name: str,
         bridge_client: BridgeClient,
         sync_interval: int,
-        polling_scan: bool,
+        sync_modes: list[SyncMode],
         poll_interval: int = 30,
         stop_event: asyncio.Event | None = None,
     ):
@@ -36,14 +36,14 @@ class ProfileScheduler:
             profile_name: Name of the profile
             bridge_client: Bridge client for this profile
             sync_interval: Sync interval in seconds (-1 for single run)
-            polling_scan: Whether to use polling mode
+            sync_modes: List of sync modes enabled for this profile
             poll_interval: Polling interval in seconds
             stop_event: Event to signal shutdown
         """
         self.profile_name = profile_name
         self.bridge_client = bridge_client
         self.sync_interval = sync_interval
-        self.polling_scan = polling_scan
+        self.sync_modes = sync_modes
         self.poll_interval = poll_interval
         self.stop_event = stop_event or asyncio.Event()
 
@@ -88,27 +88,26 @@ class ProfileScheduler:
 
         self._running = True
 
-        if self.sync_interval == -1:
-            # Single run mode
-            log.debug(
-                f"{self.__class__.__name__}: [{self.profile_name}] Running in"
-                f"single-run mode"
-            )
-            await self.sync()
-        elif self.polling_scan:
-            # Polling mode
-            log.debug(
-                f"{self.__class__.__name__}: [{self.profile_name}] Starting polling "
-                f"mode"
-            )
-            asyncio.create_task(self._poll_loop())
-        else:
-            # Periodic mode
+        if SyncMode.INTERVAL in self.sync_modes:
             log.debug(
                 f"{self.__class__.__name__}: [{self.profile_name}] Starting periodic "
-                f"mode"
+                f"sync loop (every {self.sync_interval}s)"
             )
             asyncio.create_task(self._periodic_loop())
+
+        if SyncMode.POLL in self.sync_modes:
+            log.debug(
+                f"{self.__class__.__name__}: [{self.profile_name}] Starting polling "
+                f"sync loop (every {self.poll_interval}s)"
+            )
+            asyncio.create_task(self._poll_loop())
+
+        if not self.sync_modes:
+            log.debug(
+                f"{self.__class__.__name__}: [{self.profile_name}] No sync modes "
+                f"defined, performing single sync"
+            )
+            await self.sync()
 
     async def stop(self) -> None:
         """Stop the profile scheduler."""
@@ -239,7 +238,7 @@ class SchedulerClient:
             log.info(
                 f"{self.__class__.__name__}: [{profile_name}] Starting scheduler: "
                 f"interval={profile_config.sync_interval}s, "
-                f"polling={'enabled' if profile_config.polling_scan else 'disabled'}, "
+                f"modes={profile_config.sync_modes}, "
                 f"full_scan={'enabled' if profile_config.full_scan else 'disabled'}, "
                 f"destructive={
                     'enabled' if profile_config.destructive_sync else 'disabled'
@@ -250,7 +249,7 @@ class SchedulerClient:
                 profile_name=profile_name,
                 bridge_client=bridge_client,
                 sync_interval=profile_config.sync_interval,
-                polling_scan=profile_config.polling_scan,
+                sync_modes=profile_config.sync_modes,
                 poll_interval=30,
                 stop_event=self.stop_event,
             )
@@ -403,7 +402,7 @@ class SchedulerClient:
                     if bridge_client
                     else "Unknown",
                     "sync_interval": profile_config.sync_interval,
-                    "polling_scan": profile_config.polling_scan,
+                    "sync_modes": [m.value for m in profile_config.sync_modes],
                     "full_scan": profile_config.full_scan,
                     "destructive_sync": profile_config.destructive_sync,
                 },
