@@ -154,25 +154,31 @@ Determines the source of metadata for Plex content:
 
 `int` (Optional, default: `3600`)
 
-Interval in seconds between sync jobs for this profile. Set to `-1` to run once and exit.
-
-??? note "Sync Interval with Polling Scan"
-
-    If `POLLING_SCAN` is enabled, the sync interval determines how often the [mappings database](./advanced/custom-mappings.md) and your AniList profile are updated. Periodic scans will be disabled.
+Interval in seconds for the various synchronization functions of the application, including pulling metadata from AniList, pulling database updates, and interval sync jobs.
 
 ---
 
-### `POLLING_SCAN`
+### `SYNC_MODES`
 
-`bool` (Optional, default: `False`)
+`list[Enum("periodic", "poll", "webhook")]` (Optional, default: `["periodic"]`)
 
-When enabled, PlexAniBridge will detect changes in your Plex library in real-time instead of waiting for the sync interval.
+Determines the sync modes to use for this profile. Available modes:
 
-??? note "Sync Interval with Polling Scan"
+- `periodic`: Sync at the specified sync interval.
+- `poll`: Poll for changes every 30 seconds.
+- `webhook`: Trigger syncs via Plex [webhook payloads](https://support.plex.tv/articles/115002267687-webhooks/).
 
-    If enabled, the sync interval determines how often the [mappings database](./advanced/custom-mappings.md) and your AniList profile are updated.
+Setting `SYNC_MODES` to `None` or an empty list will cause the application to perform a one-time sync where one full sync is performed followed by an immediate exit.
 
----
+??? tip "Plex Webhooks"
+
+    To use Plex Webhooks correctly, you must:
+
+    1. Have [#PAB_WEB_ENABLED](`PAB_WEB_ENABLED`) set to `True`.
+    2. Include `webhook` in the `SYNC_MODES` list for your profile.
+    3. [Configure your Plex server](https://support.plex.tv/articles/115002267687-webhooks/) to send webhook payloads to the following URL: `http://<your-server-host>/webhook/plex/<profile-name>`.
+
+    Also ensure the Plex server and PlexAniBridge are accessible to each other over the network.
 
 ### `FULL_SCAN`
 
@@ -342,7 +348,7 @@ This example demonstrates configuring three distinct profiles, each with their o
 # Global defaults shared by all profiles
 PAB_PLEX_TOKEN=admin_plex_token
 PAB_PLEX_URL=http://localhost:32400
-PAB_POLLING_SCAN=True
+PAB_SYNC_MODES=["periodic"]
 
 # Admin user - aggressive sync with full features
 PAB_PROFILES__admin__ANILIST_TOKEN=admin_anilist_token
@@ -379,5 +385,5 @@ PAB_PROFILES__movies__EXCLUDED_SYNC_FIELDS=[]
 
 # TV Shows library - more conservative with updates
 PAB_PROFILES__tvshows__PLEX_SECTIONS=["Anime"]
-PAB_PROFILES__tvshows__POLLING_SCAN=True
+PAB_PROFILES__tvshows__SYNC_MODES=["periodic"]
 ```

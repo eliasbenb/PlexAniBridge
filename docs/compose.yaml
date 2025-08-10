@@ -13,7 +13,7 @@ services:
       # PAB_PLEX_GENRES: '[]'
       # PAB_PLEX_METADATA_SOURCE: local
       # PAB_SYNC_INTERVAL: 3600
-      # PAB_POLLING_SCAN: False
+      # PAB_SYNC_MODES: '["interval"]'
       # PAB_FULL_SCAN: False
       # PAB_DESTRUCTIVE_SYNC: False
       # PAB_EXCLUDED_SYNC_FIELDS: '["notes", "score"]'

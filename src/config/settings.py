@@ -23,6 +23,7 @@ __all__ = [
     "PlexMetadataSource",
     "SyncField",
     "LogLevel",
+    "SyncMode",
     "PlexAnibridgeProfileConfig",
     "PlexAnibridgeConfig",
 ]
@@ -134,6 +135,46 @@ class SyncField(BaseStrEnum):
         return to_camel(self.value)
 
 
+class SyncMode(BaseStrEnum):
+    """Synchronization execution modes.
+
+    Multiple modes can be enabled simultaneously by specifying a list.
+
+    periodic: Periodic scans every `sync_interval` seconds
+    poll: Poll for incremental changes every 30 seconds
+    webhook: External webhook-triggered syncs, dependent on `pab_web_enabled`
+    """
+
+    PERIODIC = "periodic"
+    POLL = "poll"
+    WEBHOOK = "webhook"
+
+
+def _apply_deprecations(data: dict) -> dict:
+    """Translate deprecated/legacy configuration fields in-place.
+
+    Central location for all migrations of removed/renamed settings so the
+    logic does not become duplicated across validators / constructors.
+
+    Args:
+        data: Raw configuration mapping
+
+    Returns:
+        dict: Same mapping
+    """
+    if not isinstance(data, dict):
+        return data
+    if "polling_scan" in data:
+        _log.warning(
+            "The 'polling_scan' setting is deprecated and will be removed in the future"
+        )
+        if "sync_modes" not in data:
+            polling_val = data.pop("polling_scan")
+            if polling_val:
+                data["sync_modes"] = [SyncMode.POLL]
+    return data
+
+
 class PlexAnibridgeProfileConfig(BaseModel):
     """Configuration for a single PlexAniBridge profile.
 
@@ -170,12 +211,17 @@ class PlexAnibridgeProfileConfig(BaseModel):
     )
     sync_interval: int = Field(
         default=3600,
-        ge=-1,
-        description="Sync interval in seconds (-1 = run once)",
+        ge=0,
+        description="Sync interval in seconds",
     )
-    polling_scan: bool = Field(
-        default=False,
-        description="Poll for changes every 30 seconds instead of a periodic scan",
+    sync_modes: list[SyncMode] = Field(
+        default_factory=lambda: [SyncMode.PERIODIC],
+        description="List of enabled sync modes (periodic, poll, webhook)",
+    )
+    polling_scan: bool | None = Field(
+        default=None,
+        deprecated="Use sync_modes list instead; True maps to ['poll']",
+        exclude=True,
     )
     full_scan: bool = Field(
         default=False,
@@ -255,6 +301,12 @@ class PlexAnibridgeProfileConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    @model_validator(mode="before")
+    @classmethod
+    def _translate_deprecated(cls, values):
+        """Apply centralized deprecated field translations for profile configs."""
+        return _apply_deprecations(values)
+
 
 class PlexAnibridgeConfig(BaseSettings):
     """Multi-configuration manager for PlexAniBridge application.
@@ -294,6 +346,7 @@ class PlexAnibridgeConfig(BaseSettings):
 
     def __init__(self, **data) -> None:
         """Initialize the configuration with provided data."""
+        _apply_deprecations(data)
         super().__init__(**data)
         self._apply_global_defaults()
 
@@ -348,12 +401,17 @@ class PlexAnibridgeConfig(BaseSettings):
     )
     sync_interval: int | None = Field(
         default=None,
-        ge=-1,
+        ge=0,
         description="Global default sync interval in seconds",
+    )
+    sync_modes: list[SyncMode] | None = Field(
+        default=None,
+        description="Global default list of sync modes",
     )
     polling_scan: bool | None = Field(
         default=None,
-        description="Global default polling scan setting",
+        deprecated="Use sync_modes list instead; True maps to ['poll']",
+        exclude=True,
     )
     full_scan: bool | None = Field(
         default=None,
@@ -405,7 +463,7 @@ class PlexAnibridgeConfig(BaseSettings):
         """Apply global defaults and instantiate profile configs from raw profiles."""
         shared_fields = self._shared_profile_fields()
         for profile_name, raw_config in self.raw_profiles.items():
-            config_data = raw_config.copy()
+            config_data = _apply_deprecations(raw_config.copy())
             for field_name in shared_fields:
                 if field_name not in config_data:
                     global_value = getattr(self, field_name)
@@ -438,6 +496,7 @@ class PlexAnibridgeConfig(BaseSettings):
     @classmethod
     def extract_raw_profiles(cls, values):
         """Extract raw profile data before main validation."""
+        values = _apply_deprecations(values)
         if isinstance(values, dict) and "profiles" in values:
             raw_profiles = values.get("profiles", {})
             if isinstance(raw_profiles, dict):
