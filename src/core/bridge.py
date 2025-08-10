@@ -1,6 +1,6 @@
 """Bridge Client Module."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from plexapi.library import MovieSection, ShowSection
 from src import log
@@ -187,7 +187,7 @@ class BridgeClient:
             f"-> AniList user $$'{self.anilist_client.user.name}'$$"
         )
 
-        sync_start_time = datetime.now(timezone.utc)
+        sync_start_time = datetime.now(UTC)
 
         movie_sync = MovieSyncClient(
             anilist_client=self.anilist_client,
@@ -223,7 +223,7 @@ class BridgeClient:
                 )
                 sync_stats = sync_stats.combine(section_stats)
 
-            sync_completion_time = datetime.now(timezone.utc)
+            sync_completion_time = datetime.now(UTC)
             duration = sync_completion_time - sync_start_time
 
             self._set_last_synced(sync_start_time)
@@ -249,7 +249,7 @@ class BridgeClient:
                 )
 
         except Exception as e:
-            end_time = datetime.now(timezone.utc)
+            end_time = datetime.now(UTC)
             duration = end_time - sync_start_time
 
             log.error(
@@ -282,9 +282,9 @@ class BridgeClient:
             f"section $$'{section.title}'$$"
         )
 
-        min_last_modified = (
-            self.last_synced or datetime.now(timezone.utc)
-        ) - timedelta(seconds=15)
+        min_last_modified = (self.last_synced or datetime.now(UTC)) - timedelta(
+            seconds=15
+        )
 
         items = list(
             self.plex_client.get_section_items(

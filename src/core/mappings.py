@@ -253,7 +253,7 @@ class MappingsClient:
             async with session.get(url) as response:
                 response.raise_for_status()
                 mappings_raw = await response.text()
-        except (aiohttp.ClientError, asyncio.TimeoutError):
+        except (TimeoutError, aiohttp.ClientError):
             if retry_count < 2:
                 log.warning(
                     f"{self.__class__.__name__}: Error reaching mappings URL "

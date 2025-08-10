@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import platform
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
@@ -93,7 +93,7 @@ async def about_page(request: Request) -> HTMLResponse:
         except Exception:
             status = {"error": "Unable to fetch scheduler status"}
     started_at = getattr(app_state, "started_at", None)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     uptime_seconds: float | None = None
     human_uptime: str | None = None
     if started_at:

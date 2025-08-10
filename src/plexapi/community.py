@@ -247,7 +247,7 @@ class PlexCommunityClient:
 
                 return await response.json()
 
-        except (aiohttp.ClientError, asyncio.TimeoutError):
+        except (TimeoutError, aiohttp.ClientError):
             log.error(
                 f"{self.__class__.__name__}: Connection error while making request to "
                 f"the Plex Community API"

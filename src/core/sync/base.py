@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator, Callable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Generic, TypeVar
 
 from pydantic import BaseModel
@@ -238,7 +238,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
                     existing_record.before_state = before_state
                     existing_record.after_state = after_state
                     existing_record.error_message = error_message
-                    existing_record.timestamp = datetime.now(timezone.utc)
+                    existing_record.timestamp = datetime.now(UTC)
                     ctx.session.commit()
                     return
 

@@ -7,7 +7,7 @@ route handlers and websocket endpoints.
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from plexapi.server import PlexServer
@@ -24,7 +24,7 @@ class AppState:
         self.plex: PlexServer | None = None
         self.scheduler: SchedulerClient | None = None
         self.on_shutdown_callbacks: list[Callable[[], Any]] = []
-        self.started_at: datetime = datetime.now(timezone.utc)
+        self.started_at: datetime = datetime.now(UTC)
 
     def set_scheduler(self, scheduler: SchedulerClient) -> None:
         """Set the scheduler client.

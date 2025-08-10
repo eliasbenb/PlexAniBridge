@@ -4,7 +4,7 @@ import asyncio
 import contextlib
 import json
 from collections.abc import AsyncIterator
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -136,10 +136,10 @@ class AniListClient:
             if self.user.options and self.user.options.timezone:
                 hours, minutes = map(int, self.user.options.timezone.split(":"))
             else:
-                return timezone.utc
+                return UTC
             return timezone(timedelta(hours=hours, minutes=minutes))
         except (AttributeError, ValueError):
-            return timezone.utc
+            return UTC
 
     async def update_anime_entry(self, media_list_entry: MediaList) -> None:
         """Updates an anime entry on the authenticated user's list.
@@ -716,7 +716,7 @@ class AniListClient:
 
                 return await response.json()
 
-        except (aiohttp.ClientError, asyncio.TimeoutError):
+        except (TimeoutError, aiohttp.ClientError):
             log.error(
                 f"{self.__class__.__name__}: Connection error while making request to "
                 f"AniList API"

@@ -2,7 +2,7 @@
 
 import asyncio
 import contextlib
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from tzlocal import get_localzone
@@ -127,9 +127,7 @@ class ProfileScheduler:
             try:
                 await self.sync()
 
-                next_sync = datetime.now(timezone.utc) + timedelta(
-                    seconds=self.sync_interval
-                )
+                next_sync = datetime.now(UTC) + timedelta(seconds=self.sync_interval)
                 log.info(
                     f"{self.__class__.__name__}: [{self.profile_name}] Next periodic "
                     f"sync scheduled for: {next_sync.astimezone(get_localzone())}"
@@ -265,7 +263,7 @@ class SchedulerClient:
             else:
                 next_sync_time = "in progress"
                 if profile_config.sync_interval > 0:
-                    next_sync = datetime.now(timezone.utc).astimezone(get_localzone())
+                    next_sync = datetime.now(UTC).astimezone(get_localzone())
                     next_sync_time = f"at {next_sync.strftime('%Y-%m-%d %H:%M:%S')}"
 
                 log.info(
@@ -448,7 +446,7 @@ class SchedulerClient:
 
         while self._running and not self.stop_event.is_set():
             try:
-                now = datetime.now(timezone.utc)
+                now = datetime.now(UTC)
                 next_sync_time = self._get_next_1am_utc(now)
 
                 sleep_duration = (next_sync_time - now).total_seconds()
@@ -462,7 +460,7 @@ class SchedulerClient:
                 try:
                     await asyncio.wait_for(self.stop_event.wait(), sleep_duration)
                     break
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     pass
 
                 if not self._running or self.stop_event.is_set():

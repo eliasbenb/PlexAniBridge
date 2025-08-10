@@ -1,7 +1,7 @@
 """Plex Client Module."""
 
 from collections.abc import Iterator
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from math import isnan
 from typing import TypeAlias
 from urllib.parse import urlparse
@@ -359,7 +359,7 @@ class PlexClient:
                 f"by items that have been watched"
             )
 
-            epoch = datetime.fromtimestamp(0, tz=timezone.utc)
+            epoch = datetime.fromtimestamp(0, tz=UTC)
 
             if section.TYPE == "movie":
                 filters["and"].append(

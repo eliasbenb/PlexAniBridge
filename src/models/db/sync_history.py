@@ -1,6 +1,6 @@
 """Sync History Database Model."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
@@ -93,5 +93,5 @@ class SyncHistory(Base):
         String, default=None, nullable=True
     )
     timestamp: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc), index=True
+        DateTime, default=lambda: datetime.now(UTC), index=True
     )

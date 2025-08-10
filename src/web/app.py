@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -72,7 +72,7 @@ def create_app(scheduler: SchedulerClient | None = None) -> FastAPI:
     templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
     templates.env.globals.setdefault("version", __version__)
     templates.env.globals.setdefault("git_hash", __git_hash__)
-    templates.env.globals.setdefault("now", datetime.now(timezone.utc))
+    templates.env.globals.setdefault("now", datetime.now(UTC))
 
     app.extra["templates"] = templates
     return app
