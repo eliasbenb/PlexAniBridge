@@ -170,6 +170,16 @@ Determines the sync modes to use for this profile. Available modes:
 
 Setting `SYNC_MODES` to `None` or an empty list will cause the application to perform a one-time sync where one full sync is performed followed by an immediate exit.
 
+??? tip "Plex Webhooks"
+
+    To use Plex Webhooks correctly, you must:
+
+    1. Have [#PAB_WEB_ENABLED](`PAB_WEB_ENABLED`) set to `True`.
+    2. Include `webhook` in the `SYNC_MODES` list for your profile.
+    3. [Configure your Plex server](https://support.plex.tv/articles/115002267687-webhooks/) to send webhook payloads to the following URL: `http://<your-server-host>/webhook/plex/<profile-name>`.
+
+    Also ensure the Plex server and PlexAniBridge are accessible to each other over the network.
+
 ### `FULL_SCAN`
 
 `bool` (Optional, default: `False`)
