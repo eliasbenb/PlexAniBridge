@@ -1,33 +1,45 @@
 {
-	"name": "PlexAniBridge",
-	"image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
-	"features": {
-		"ghcr.io/devcontainers/features/python:1": {
-			"version": "3.13"
-		},
-		"ghcr.io/devcontainers/features/github-cli:1": {},
-		"ghcr.io/va-h/devcontainers-features/uv:1": {
-			"shellautocompletion": true
-		},
-		"ghcr.io/devcontainers-extra/features/apt-packages:1": {
-			"packages": "sqlite3"
-		}
-	},
-	"customizations": {
-		"vscode": {
-			"extensions": [
-				"ms-python.python",
-				"charliermarsh.ruff",
-				"yzhang.markdown-all-in-one",
-				"yy0931.vscode-sqlite3-editor",
-				"redhat.vscode-yaml",
-				"rafaelha.vscode-flamegraph",
-				"eamodio.gitlens"
-			]
-		}
-	},
-	"postCreateCommand": "uv sync --all-groups --all-packages",
-	"containerEnv": {
-		"UV_LINK_MODE": "copy"
-	}
+    "name": "PlexAniBridge",
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+    "features": {
+        "ghcr.io/devcontainers/features/python:1": {
+            "version": "3.13"
+        },
+        "ghcr.io/devcontainers/features/github-cli:1": {},
+        "ghcr.io/va-h/devcontainers-features/uv:1": {
+            "shellautocompletion": true
+        },
+        "ghcr.io/devcontainers-extra/features/apt-packages:1": {
+            "packages": "sqlite3"
+        }
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "charliermarsh.ruff",
+                "eamodio.gitlens",
+                "monosans.djlint",
+                "ms-python.python",
+                "rafaelha.vscode-flamegraph",
+                "redhat.vscode-yaml",
+                "samuelcolvin.jinjahtml",
+                "tamasfe.even-better-toml",
+                "yy0931.vscode-sqlite3-editor",
+                "yzhang.markdown-all-in-one"
+            ]
+        }
+    },
+    "forwardPorts": [
+        4848
+    ],
+    "portsAttributes": {
+        "4848": {
+            "label": "PlexAniBridge Web",
+            "onAutoForward": "notify"
+        }
+    },
+    "postCreateCommand": "uv sync --all-groups --all-packages",
+    "containerEnv": {
+        "UV_LINK_MODE": "copy"
+    }
 }

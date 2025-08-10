@@ -308,6 +308,29 @@ Sets logging verbosity for the entire application.
 
     For the most detailed logs, set this to `DEBUG`.
 
+---
+
+### `PAB_WEB_ENABLED`
+
+`bool` (Optional, default: `False`)
+
+When enabled, the [web interface](./web/screenshots.md) is accessible.
+
+---
+
+### `PAB_WEB_HOST`
+
+`str` (Optional, default: `0.0.0.0`)
+
+The host address for the web interface.
+
+---
+
+### `PAB_WEB_PORT`
+
+`int` (Optional, default: `4848`)
+
+The port for the web interface.
 
 ## Advanced Examples
 
