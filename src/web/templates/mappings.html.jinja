@@ -398,13 +398,17 @@
                     this.modal = true;
                 },
                 edit(m) {
-                    this.form = JSON.parse(JSON.stringify(m));
+                    // Clone and strip UI-only / computed fields ('custom') before editing
+                    const clone = JSON.parse(JSON.stringify(m));
+                    delete clone.custom;
+                    this.form = clone;
                     this.formRaw = JSON.stringify(this.form, null, 2);
                     this.modal = true;
                 },
                 save() {
                     try {
                         const obj = JSON.parse(this.formRaw);
+                        delete obj.custom;
                         const aid = obj.anilist_id ?? obj.id;
                         if (!aid) {
                             alert('anilist_id is required');
