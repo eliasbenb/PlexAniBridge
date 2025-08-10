@@ -8,7 +8,6 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from pydantic.alias_generators import to_camel
-from pydantic.fields import _Unset
 from pydantic_settings import (
     BaseSettings,
     DotEnvSettingsSource,
@@ -142,19 +141,19 @@ class PlexAnibridgeProfileConfig(BaseModel):
     """
 
     anilist_token: str = Field(
-        _Unset,
+        ...,
         description="AniList API token for authentication",
     )
     plex_token: str = Field(
-        _Unset,
+        ...,
         description="Plex API token for authentication",
     )
     plex_user: str = Field(
-        _Unset,
+        ...,
         description="Plex username of target user",
     )
     plex_url: str = Field(
-        _Unset,
+        default=...,
         description="Plex server URL",
     )
     plex_sections: list[str] = Field(
@@ -239,11 +238,11 @@ class PlexAnibridgeProfileConfig(BaseModel):
         Raises:
             ValueError: If required fields are missing or empty
         """
-        if not self.anilist_token or self.anilist_token == _Unset:
+        if not self.anilist_token:
             raise ValueError("ANILIST_TOKEN is required for each profile")
-        if not self.plex_token or self.plex_token == _Unset:
+        if not self.plex_token:
             raise ValueError("PLEX_TOKEN is required for each profile")
-        if not self.plex_user or self.plex_user == _Unset:
+        if not self.plex_user:
             raise ValueError("PLEX_USER is required for each profile")
 
     def __str__(self) -> str:
