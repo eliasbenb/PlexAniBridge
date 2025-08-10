@@ -58,9 +58,19 @@
         const detail = e.detail || {};
         toast(`AniList: ${formatErr(detail.error || detail.message)}`, 'error');
     });
+    document.addEventListener('anilist-cache-changed', e => {
+        if (e.detail?.size === 0) {
+            toast('AniList cache cleared', 'success', { ttl: 4000 });
+        }
+    });
     document.addEventListener('plex-error', e => {
         const detail = e.detail || {};
         toast(`Plex: ${formatErr(detail.error || detail.message)}`, 'error');
+    });
+    document.addEventListener('plex-cache-changed', e => {
+        if (e.detail?.size === 0) {
+            toast('Plex cache cleared', 'success', { ttl: 4000 });
+        }
     });
     document.addEventListener('plex-token-refreshed', e => {
         const d = e.detail || {};

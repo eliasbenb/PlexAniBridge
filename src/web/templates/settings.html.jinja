@@ -52,6 +52,38 @@
                         </p>
                     </div>
                 </div>
+                <div class="mt-8 space-y-3">
+                    <h4 class="font-medium text-slate-200 text-sm tracking-wide flex items-center gap-2">
+                        <iconify-icon icon="lucide:database" inline class="text-slate-400"></iconify-icon>
+                        <span>Client Caches</span>
+                    </h4>
+                    <p class="text-[11px] text-slate-500 leading-relaxed">
+                        Clear locally cached AniList and Plex metadata stored in this browser. This does not affect server data.
+                    </p>
+                    <div x-data="{ ani: (window.AniList?AniList.cacheSize():0), plex:(window.Plex?Plex.cacheSize():0), clearing:false }"
+                         x-init=" window.addEventListener('anilist-cache-changed', e=>{ ani = e.detail?.size||0 }); window.addEventListener('plex-cache-changed', e=>{ plex = e.detail?.size||0 }); "
+                         class="space-y-2">
+                        <div class="flex flex-col gap-2">
+                            <div class="flex items-center gap-2">
+                                <button type="button"
+                                        @click="if(!window.AniList)return; if(confirm('Clear AniList cache?')) { AniList.clearCache(false); ani = 0 }"
+                                        class="w-48 px-3 py-1.5 rounded-md border border-slate-700 bg-slate-800/60 hover:bg-slate-700/60 text-[11px] font-medium text-slate-200 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
+                                    Clear AniList Cache
+                                </button>
+                                <span class="text-[10px] text-slate-500">(<span class="text-slate-300" x-text="ani"></span> items)</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button type="button"
+                                        @click="if(!window.Plex)return; if(confirm('Clear Plex cache (metadata + anonymous token)?')) { Plex.clearCache(false); Plex.clearToken(false); plex = 0 }"
+                                        class="w-48 px-3 py-1.5 rounded-md border border-slate-700 bg-slate-800/60 hover:bg-slate-700/60 text-[11px] font-medium text-slate-200 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500">
+                                    Clear Plex Cache
+                                </button>
+                                <span class="text-[10px] text-slate-500">(<span class="text-slate-300" x-text="plex"></span> items)</span>
+                            </div>
+                        </div>
+                        <p class="text-[10px] text-slate-500">Next metadata request will refetch required items.</p>
+                    </div>
+                </div>
             </div>
             <div class="md:col-span-2 space-y-4">
                 <div class="flex items-center gap-2">
