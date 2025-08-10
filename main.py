@@ -151,8 +151,8 @@ async def run() -> int:
             server_task = asyncio.create_task(server.serve())
             log.success(
                 "PlexAniBridge: Web UI started at "
-                f"http://{config.web_host}:{config.web_port} "
-                "(ctrl+c to stop)"
+                f"\033[92mhttp://{config.web_host}:{config.web_port} "
+                "(ctrl+c to stop)\033[0m"
             )
 
         await shutdown_handler.wait_for_shutdown()
