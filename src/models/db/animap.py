@@ -1,5 +1,7 @@
 """AniMap Model."""
 
+from __future__ import annotations
+
 import re
 from functools import cached_property
 
@@ -31,7 +33,7 @@ class TVDBMapping(BaseModel):
         return self.end - self.start + 1 if self.end else -1
 
     @classmethod
-    def from_string(cls, season: int, s: str) -> list["TVDBMapping"]:
+    def from_string(cls, season: int, s: str) -> list[TVDBMapping]:
         """Parse a string pattern into a TVDBMapping instance.
 
         Args:

@@ -1,5 +1,7 @@
 """Synchronization statistics and tracking module."""
 
+from __future__ import annotations
+
 from pydantic import BaseModel
 
 from plexapi.video import Episode, Movie, Season, Show
@@ -22,7 +24,7 @@ class ItemIdentifier(BaseModel):
     repr: str | None = None  # Cached string representation
 
     @classmethod
-    def from_item(cls, item: Movie | Show | Season | Episode) -> "ItemIdentifier":
+    def from_item(cls, item: Movie | Show | Season | Episode) -> ItemIdentifier:
         """Create an ItemIdentifier from a Plex media object.
 
         Args:
@@ -58,7 +60,7 @@ class ItemIdentifier(BaseModel):
     @classmethod
     def from_items(
         cls, items: list[Movie] | list[Show] | list[Season] | list[Episode]
-    ) -> list["ItemIdentifier"]:
+    ) -> list[ItemIdentifier]:
         """Create ItemIdentifiers from a list of Plex media objects.
 
         Args:
@@ -262,7 +264,7 @@ class SyncStats(BaseModel):
 
         return processed / total
 
-    def combine(self, other: "SyncStats") -> "SyncStats":
+    def combine(self, other: SyncStats) -> SyncStats:
         """Combine this stats instance with another.
 
         Args:
@@ -275,6 +277,6 @@ class SyncStats(BaseModel):
         combined._item_outcomes = {**self._item_outcomes, **other._item_outcomes}
         return combined
 
-    def __add__(self, other: "SyncStats") -> "SyncStats":
+    def __add__(self, other: SyncStats) -> SyncStats:
         """Combine statistics using the + operator."""
         return self.combine(other)

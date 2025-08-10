@@ -1,5 +1,7 @@
 """AniList Client."""
 
+from __future__ import annotations
+
 import asyncio
 import contextlib
 import json
@@ -78,7 +80,7 @@ class AniListClient:
         if self._session and not self._session.closed:
             await self._session.close()
 
-    async def __aenter__(self) -> "AniListClient":
+    async def __aenter__(self) -> AniListClient:
         """Async context manager entry.
 
         Returns:

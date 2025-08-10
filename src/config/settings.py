@@ -1,5 +1,7 @@
 """PlexAniBridge Configuration Settings."""
 
+from __future__ import annotations
+
 import os
 from enum import StrEnum
 from pathlib import Path
@@ -54,7 +56,7 @@ class BaseStrEnum(StrEnum):
     """
 
     @classmethod
-    def _missing_(cls, value: object) -> "BaseStrEnum | None":
+    def _missing_(cls, value: object) -> BaseStrEnum | None:
         """Handle case-insensitive lookup for enum values.
 
         Args:
@@ -203,10 +205,10 @@ class PlexAnibridgeProfileConfig(BaseModel):
         description="Fuzzy search threshold",
     )
 
-    _parent: "PlexAnibridgeConfig | None" = None
+    _parent: PlexAnibridgeConfig | None = None
 
     @property
-    def parent(self) -> "PlexAnibridgeConfig":
+    def parent(self) -> PlexAnibridgeConfig:
         """Get the parent multi-config instance.
 
         Returns:
@@ -469,7 +471,7 @@ class PlexAnibridgeConfig(BaseSettings):
         return values
 
     @model_validator(mode="after")
-    def validate_global_config(self) -> "PlexAnibridgeConfig":
+    def validate_global_config(self) -> PlexAnibridgeConfig:
         """Validates global configuration settings.
 
         Returns:

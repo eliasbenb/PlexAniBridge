@@ -1,5 +1,7 @@
 """Database Configuration for PlexAniBridge."""
 
+from __future__ import annotations
+
 from pathlib import Path
 from types import TracebackType
 
@@ -103,7 +105,7 @@ class PlexAniBridgeDB:
 
         command.upgrade(config, "head")
 
-    def __enter__(self) -> "PlexAniBridgeDB":
+    def __enter__(self) -> PlexAniBridgeDB:
         """Enters the context manager, returning the database instance.
 
         Returns:

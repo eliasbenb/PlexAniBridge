@@ -1,5 +1,7 @@
 """Plex Client Module."""
 
+from __future__ import annotations
+
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from math import isnan
@@ -93,7 +95,7 @@ class PlexClient:
         if hasattr(self, "community_client"):
             await self.community_client.close()
 
-    async def __aenter__(self) -> "PlexClient":
+    async def __aenter__(self) -> PlexClient:
         """Context manager enter method.
 
         Returns:

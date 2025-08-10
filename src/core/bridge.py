@@ -1,5 +1,7 @@
 """Bridge Client Module."""
 
+from __future__ import annotations
+
 from datetime import UTC, datetime, timedelta
 
 from plexapi.library import MovieSection, ShowSection
@@ -108,7 +110,7 @@ class BridgeClient:
         await self.anilist_client.close()
         await self.plex_client.close()
 
-    async def __aenter__(self) -> "BridgeClient":
+    async def __aenter__(self) -> BridgeClient:
         """Context manager enter method.
 
         Returns:

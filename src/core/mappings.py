@@ -1,5 +1,7 @@
 """Mappings Client Module."""
 
+from __future__ import annotations
+
 import asyncio
 import json
 from pathlib import Path
@@ -49,7 +51,7 @@ class MappingsClient:
         if self._session and not self._session.closed:
             await self._session.close()
 
-    async def __aenter__(self) -> "MappingsClient":
+    async def __aenter__(self) -> MappingsClient:
         """Context manager enter method.
 
         Returns:

@@ -1,5 +1,7 @@
 """Abstract base class for media synchronization between Plex and AniList."""
 
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator, Callable
 from datetime import UTC, datetime
@@ -59,7 +61,7 @@ class ParsedGuids(BaseModel):
     imdb: str | None = None
 
     @staticmethod
-    def from_guids(guids: list[Guid]) -> "ParsedGuids":
+    def from_guids(guids: list[Guid]) -> ParsedGuids:
         """Creates a ParsedGuids instance from a list of Plex GUIDs.
 
         Args:

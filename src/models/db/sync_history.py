@@ -1,5 +1,7 @@
 """Sync History Database Model."""
 
+from __future__ import annotations
+
 from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
@@ -20,7 +22,7 @@ class MediaType(StrEnum):
     EPISODE = "episode"
 
     @classmethod
-    def from_item(cls, item: Movie | Show | Season | Episode) -> "MediaType":
+    def from_item(cls, item: Movie | Show | Season | Episode) -> MediaType:
         """Get the media type from a Plex item.
 
         Args:
