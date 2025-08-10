@@ -647,7 +647,8 @@
                     return obj ? JSON.stringify(obj, null, 2) : '—';
                 },
                 truncateValue(v) {
-                    if (v === null || v === undefined) return 'null';
+                    if (v === null) return 'null';
+                    if (v === undefined) return 'undefined';
                     const s = typeof v === 'string' ? v : JSON.stringify(v);
                     return s.length > 60 ? s.slice(0, 57) + '…' : s;
                 },
@@ -773,7 +774,8 @@
                     return count + ' keys';
                 },
                 truncateValue(v) {
-                    if (v === null || v === undefined) return 'null';
+                    if (v === null) return 'null';
+                    if (v === undefined) return 'undefined';
                     const s = typeof v === 'string' ? v : JSON.stringify(v);
                     return s.length > 120 ? s.slice(0, 117) + '…' : s;
                 },
