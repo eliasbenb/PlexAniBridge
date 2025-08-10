@@ -149,6 +149,32 @@ class SyncMode(BaseStrEnum):
     INTERVAL = "interval"
     WEBHOOK = "webhook"
 
+
+def _apply_deprecations(data: dict) -> dict:
+    """Translate deprecated/legacy configuration fields in-place.
+
+    Central location for all migrations of removed/renamed settings so the
+    logic does not become duplicated across validators / constructors.
+
+    Args:
+        data: Raw configuration mapping
+
+    Returns:
+        dict: Same mapping
+    """
+    if not isinstance(data, dict):
+        return data
+    if "polling_scan" in data:
+        _log.warning(
+            "The 'polling_scan' setting is deprecated and will be removed in the future"
+        )
+        if "sync_modes" not in data:
+            polling_val = data.pop("polling_scan")
+            if polling_val:
+                data["sync_modes"] = [SyncMode.POLL]
+    return data
+
+
 class PlexAnibridgeProfileConfig(BaseModel):
     """Configuration for a single PlexAniBridge profile.
 
@@ -271,6 +297,12 @@ class PlexAnibridgeProfileConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    @model_validator(mode="before")
+    @classmethod
+    def _translate_deprecated(cls, values):
+        """Apply centralized deprecated field translations for profile configs."""
+        return _apply_deprecations(values)
+
 
 class PlexAnibridgeConfig(BaseSettings):
     """Multi-configuration manager for PlexAniBridge application.
@@ -310,6 +342,7 @@ class PlexAnibridgeConfig(BaseSettings):
 
     def __init__(self, **data) -> None:
         """Initialize the configuration with provided data."""
+        _apply_deprecations(data)
         super().__init__(**data)
         self._apply_global_defaults()
 
@@ -425,7 +458,7 @@ class PlexAnibridgeConfig(BaseSettings):
         """Apply global defaults and instantiate profile configs from raw profiles."""
         shared_fields = self._shared_profile_fields()
         for profile_name, raw_config in self.raw_profiles.items():
-            config_data = raw_config.copy()
+            config_data = _apply_deprecations(raw_config.copy())
             for field_name in shared_fields:
                 if field_name not in config_data:
                     global_value = getattr(self, field_name)
@@ -458,6 +491,7 @@ class PlexAnibridgeConfig(BaseSettings):
     @classmethod
     def extract_raw_profiles(cls, values):
         """Extract raw profile data before main validation."""
+        values = _apply_deprecations(values)
         if isinstance(values, dict) and "profiles" in values:
             raw_profiles = values.get("profiles", {})
             if isinstance(raw_profiles, dict):
