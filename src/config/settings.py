@@ -140,13 +140,13 @@ class SyncMode(BaseStrEnum):
 
     Multiple modes can be enabled simultaneously by specifying a list.
 
+    periodic: Periodic scans every `sync_interval` seconds
     poll: Poll for incremental changes every 30 seconds
-    interval: Periodic scans every `sync_interval` seconds
     webhook: External webhook-triggered syncs, dependent on `pab_web_enabled`
     """
 
+    PERIODIC = "periodic"
     POLL = "poll"
-    INTERVAL = "interval"
     WEBHOOK = "webhook"
 
 
@@ -215,8 +215,8 @@ class PlexAnibridgeProfileConfig(BaseModel):
         description="Sync interval in seconds",
     )
     sync_modes: list[SyncMode] = Field(
-        default_factory=lambda: [SyncMode.INTERVAL],
-        description="List of enabled sync modes (poll, interval, webhook)",
+        default_factory=lambda: [SyncMode.PERIODIC],
+        description="List of enabled sync modes (periodic, poll, webhook)",
     )
     polling_scan: bool | None = Field(
         default=None,

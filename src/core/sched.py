@@ -35,7 +35,7 @@ class ProfileScheduler:
         Args:
             profile_name: Name of the profile
             bridge_client: Bridge client for this profile
-            sync_interval: Sync interval in seconds (used only with INTERVAL mode)
+            sync_interval: Sync interval in seconds
             sync_modes: List of sync modes enabled for this profile
             poll_interval: Polling interval in seconds
             stop_event: Event to signal shutdown
@@ -100,7 +100,7 @@ class ProfileScheduler:
 
         self._running = True
 
-        if SyncMode.INTERVAL in self.sync_modes:
+        if SyncMode.PERIODIC in self.sync_modes:
             log.debug(
                 f"{self.__class__.__name__}: [{self.profile_name}] Starting periodic "
                 f"sync every {self.sync_interval}s"
@@ -263,7 +263,7 @@ class SchedulerClient:
             if profile_config.sync_modes:
                 next_sync_time = "in progress"
                 if (
-                    SyncMode.INTERVAL in profile_config.sync_modes
+                    SyncMode.PERIODIC in profile_config.sync_modes
                     and profile_config.sync_interval > 0
                 ):
                     next_sync = datetime.now(UTC).astimezone(get_localzone())
