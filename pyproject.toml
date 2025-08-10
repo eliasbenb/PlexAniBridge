@@ -3,7 +3,7 @@ name = "PlexAniBridge"
 version = "1.1.0"
 description = "The smart way to keep your AniList profile perfectly synchronized with your Plex library."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = { text = "MIT" }
 
 authors = [
@@ -27,7 +27,7 @@ keywords = [
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
@@ -47,7 +47,6 @@ dependencies = [
     "rapidfuzz>=3.13.0",
     "requests>=2.32.3",
     "sqlalchemy>=2.0.41",
-    "tomlkit>=0.13.2",
     "tzlocal>=5.3.1",
 ]
 
