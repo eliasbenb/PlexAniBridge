@@ -76,10 +76,10 @@
                               x-text="p?.config?.anilist_user"></span>
                         <span class="px-2 py-1 rounded-md bg-slate-800/80 text-slate-300"
                               x-text="'Interval: ' + (p?.config?.sync_interval ?? '-')"></span>
-                        <template x-if="(p?.config?.sync_modes && p.config.sync_modes.includes('periodic')) || (!p?.config?.sync_modes && !p?.config?.polling_scan)">
+                        <template x-if="(p?.config?.sync_modes && p.config.sync_modes.includes('periodic'))">
                             <span class="px-2 py-1 rounded-md bg-blue-900/50 text-blue-200">Periodic Scan</span>
                         </template>
-                        <template x-if="p?.config?.sync_modes?.includes('poll') || p?.config?.polling_scan">
+                        <template x-if="p?.config?.sync_modes?.includes('poll')">
                             <span class="px-2 py-1 rounded-md bg-blue-900/50 text-blue-200">Poll Scan</span>
                         </template>
                         <template x-if="p?.config?.sync_modes?.includes('webhook')">
