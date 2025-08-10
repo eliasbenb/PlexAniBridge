@@ -69,9 +69,7 @@ def validate_configuration():
                 profile_config = config.get_profile(profile_name)
                 log.info(
                     f"PlexAniBridge: Profile $$'{profile_name}'$$: "
-                    f"Plex user $$'{profile_config.plex_user}'$$, "
-                    f"interval {profile_config.sync_interval}s, "
-                    f"{'polling' if profile_config.polling_scan else 'periodic'} mode"
+                    f"{str(profile_config)}"
                 )
             except KeyError as e:
                 log.error(f"PlexAniBridge: Profile $$'{profile_name}'$$ not found: {e}")

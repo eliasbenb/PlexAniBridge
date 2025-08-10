@@ -240,15 +240,18 @@ class PlexAnibridgeProfileConfig(BaseModel):
                  values masked
         """
         secrets = ["anilist_token", "plex_token"]
-        return ", ".join(
-            [
-                f"{key.upper()}: {getattr(self, key)}"
-                if key not in secrets
-                else f"{key.upper()}: **********"
-                for key in self.__class__.model_fields
-                if not key.startswith("_") and getattr(self, key) != _Unset
-            ]
-        )
+        values: list[str] = []
+        for key in self.__class__.model_fields:
+            if key.startswith("_"):
+                continue
+            value = getattr(self, key)
+            if value is None:
+                continue
+            if key in secrets:
+                values.append(f"{key}: {'*' * 16}")
+            else:
+                values.append(f"{key}: {value}")
+        return ", ".join(values)
 
     model_config = ConfigDict(extra="forbid")
 
