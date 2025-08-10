@@ -23,6 +23,7 @@ __all__ = [
     "PlexMetadataSource",
     "SyncField",
     "LogLevel",
+    "SyncMode",
     "PlexAnibridgeProfileConfig",
     "PlexAnibridgeConfig",
 ]
@@ -134,6 +135,20 @@ class SyncField(BaseStrEnum):
         return to_camel(self.value)
 
 
+class SyncMode(BaseStrEnum):
+    """Synchronization execution modes.
+
+    Multiple modes can be enabled simultaneously by specifying a list.
+
+    poll: Poll for incremental changes every 30 seconds
+    interval: Periodic scans every `sync_interval` seconds
+    webhook: External webhook-triggered syncs, dependent on `pab_web_enabled`
+    """
+
+    POLL = "poll"
+    INTERVAL = "interval"
+    WEBHOOK = "webhook"
+
 class PlexAnibridgeProfileConfig(BaseModel):
     """Configuration for a single PlexAniBridge profile.
 
@@ -173,9 +188,10 @@ class PlexAnibridgeProfileConfig(BaseModel):
         ge=-1,
         description="Sync interval in seconds (-1 = run once)",
     )
-    polling_scan: bool = Field(
-        default=False,
-        description="Poll for changes every 30 seconds instead of a periodic scan",
+    sync_modes: list[SyncMode] = Field(
+        default_factory=lambda: [SyncMode.INTERVAL],
+        description="List of enabled sync modes (poll, interval, webhook)",
+    )
     )
     full_scan: bool = Field(
         default=False,
@@ -350,6 +366,10 @@ class PlexAnibridgeConfig(BaseSettings):
         default=None,
         ge=-1,
         description="Global default sync interval in seconds",
+    )
+    sync_modes: list[SyncMode] | None = Field(
+        default=None,
+        description="Global default list of sync modes",
     )
     polling_scan: bool | None = Field(
         default=None,
