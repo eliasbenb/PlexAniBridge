@@ -7,9 +7,7 @@ from typing import Any, TypeAlias
 from urllib.parse import urljoin, urlparse
 
 import aiohttp
-import tomlkit
 import yaml
-from tomlkit.exceptions import TOMLKitError
 
 from src import __version__, log
 
@@ -203,10 +201,7 @@ class MappingsClient:
                 case ".yaml" | ".yml":
                     with file_path.open() as f:
                         mappings = self._dict_str_keys(yaml.safe_load(f))
-                case ".toml":
-                    with file_path.open() as f:
-                        mappings = tomlkit.load(f)
-        except (json.JSONDecodeError, yaml.YAMLError, TOMLKitError):
+        except (json.JSONDecodeError, yaml.YAMLError):
             log.error(
                 f"{self.__class__.__name__}: Error decoding file "
                 f"$$'{str(file_path.resolve())}'$$",
@@ -289,15 +284,13 @@ class MappingsClient:
                     mappings = json.loads(mappings_raw)
                 case ".yaml" | ".yml":
                     mappings = self._dict_str_keys(yaml.safe_load(mappings_raw))
-                case ".toml":
-                    mappings = tomlkit.loads(mappings_raw)
                 case _:
                     log.warning(
                         f"{self.__class__.__name__}: Unknown file type for URL "
                         f"$$'{url}'$$, defaulting to JSON parsing"
                     )
                     mappings = json.loads(mappings_raw)
-        except (json.JSONDecodeError, yaml.YAMLError, TOMLKitError):
+        except (json.JSONDecodeError, yaml.YAMLError):
             log.error(
                 f"{self.__class__.__name__}: Error decoding file $$'{str(url)}'$$",
                 exc_info=True,
