@@ -146,6 +146,8 @@ async def run() -> int:
                 port=config.web_port,
                 log_config=None,
                 loop="asyncio",
+                proxy_headers=True,
+                forwarded_allow_ips="*",
             )
             server = uvicorn.Server(uv_config)
             server_task = asyncio.create_task(server.serve())
