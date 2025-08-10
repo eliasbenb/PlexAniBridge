@@ -211,13 +211,17 @@ class PlexAnibridgeProfileConfig(BaseModel):
     )
     sync_interval: int = Field(
         default=3600,
-        ge=-1,
+        ge=0,
         description="Sync interval in seconds (-1 = run once)",
     )
     sync_modes: list[SyncMode] = Field(
         default_factory=lambda: [SyncMode.INTERVAL],
         description="List of enabled sync modes (poll, interval, webhook)",
     )
+    polling_scan: bool | None = Field(
+        default=None,
+        deprecated="Use sync_modes list instead; True maps to ['poll']",
+        exclude=True,
     )
     full_scan: bool = Field(
         default=False,
@@ -397,7 +401,7 @@ class PlexAnibridgeConfig(BaseSettings):
     )
     sync_interval: int | None = Field(
         default=None,
-        ge=-1,
+        ge=0,
         description="Global default sync interval in seconds",
     )
     sync_modes: list[SyncMode] | None = Field(
@@ -406,7 +410,8 @@ class PlexAnibridgeConfig(BaseSettings):
     )
     polling_scan: bool | None = Field(
         default=None,
-        description="Global default polling scan setting",
+        deprecated="Use sync_modes list instead; True maps to ['poll']",
+        exclude=True,
     )
     full_scan: bool | None = Field(
         default=None,
