@@ -35,7 +35,7 @@ class ProfileScheduler:
         Args:
             profile_name: Name of the profile
             bridge_client: Bridge client for this profile
-            sync_interval: Sync interval in seconds (-1 for single run)
+            sync_interval: Sync interval in seconds (used only with INTERVAL mode)
             sync_modes: List of sync modes enabled for this profile
             poll_interval: Polling interval in seconds
             stop_event: Event to signal shutdown
@@ -90,28 +90,29 @@ class ProfileScheduler:
         if self._running:
             return
 
+        if not self.sync_modes:
+            log.debug(
+                f"{self.__class__.__name__}: [{self.profile_name}] No sync modes "
+                f"configured, triggering single run before exiting"
+            )
+            await self.sync()
+            return
+
         self._running = True
 
         if SyncMode.INTERVAL in self.sync_modes:
             log.debug(
                 f"{self.__class__.__name__}: [{self.profile_name}] Starting periodic "
-                f"sync loop (every {self.sync_interval}s)"
+                f"sync every {self.sync_interval}s"
             )
             asyncio.create_task(self._periodic_loop())
 
         if SyncMode.POLL in self.sync_modes:
             log.debug(
                 f"{self.__class__.__name__}: [{self.profile_name}] Starting polling "
-                f"sync loop (every {self.poll_interval}s)"
+                f"sync every {self.poll_interval}s"
             )
             asyncio.create_task(self._poll_loop())
-
-        if not self.sync_modes:
-            log.debug(
-                f"{self.__class__.__name__}: [{self.profile_name}] No sync modes "
-                f"defined, performing single sync"
-            )
-            await self.sync()
 
     async def stop(self) -> None:
         """Stop the profile scheduler."""
@@ -234,8 +235,6 @@ class SchedulerClient:
 
         self._daily_sync_task = asyncio.create_task(self._daily_db_sync_loop())
 
-        single_run_profiles = []
-
         for profile_name, bridge_client in self.bridge_clients.items():
             profile_config = self.global_config.get_profile(profile_name)
 
@@ -261,11 +260,12 @@ class SchedulerClient:
             self.profile_schedulers[profile_name] = scheduler
             await scheduler.start()
 
-            if profile_config.sync_interval == -1:
-                single_run_profiles.append(profile_name)
-            else:
+            if profile_config.sync_modes:
                 next_sync_time = "in progress"
-                if profile_config.sync_interval > 0:
+                if (
+                    SyncMode.INTERVAL in profile_config.sync_modes
+                    and profile_config.sync_interval > 0
+                ):
                     next_sync = datetime.now(UTC).astimezone(get_localzone())
                     next_sync_time = f"at {next_sync.strftime('%Y-%m-%d %H:%M:%S')}"
 
@@ -274,20 +274,17 @@ class SchedulerClient:
                     f"next sync: {next_sync_time}"
                 )
 
-        if single_run_profiles:
+        # If every profile is a single-run profile (no sync_modes), exit
+        if self.profile_schedulers and all(
+            not self.global_config.get_profile(name).sync_modes
+            for name in self.profile_schedulers
+        ):
             log.info(
-                f"{self.__class__.__name__}: Single-run profiles completed: "
-                f"{single_run_profiles}"
+                f"{self.__class__.__name__}: All profiles are single-run, stopping "
+                f"application"
             )
-            # If all profiles are single-run, wait for them to complete and then stop
-            if len(single_run_profiles) == len(self.profile_schedulers):
-                log.info(
-                    f"{self.__class__.__name__}: All profiles are single-run mode, "
-                    f"waiting for completion before stopping application"
-                )
-                # Wait a bit for any final tasks to complete
-                await asyncio.sleep(1)
-                self.stop_event.set()
+            self.stop_event.set()
+            exit()
 
         if self.profile_schedulers:
             log.info(
@@ -436,17 +433,10 @@ class SchedulerClient:
         Returns:
             datetime: Next 1:00 AM UTC
         """
-        # Start with next day at 1:00 AM UTC
-        next_sync_naive = (now + timedelta(days=1)).replace(
-            hour=1, minute=0, second=0, microsecond=0
-        )
-
-        # If we're already past 1:00 AM today, use today
-        today_1am = now.replace(hour=1, minute=0, second=0, microsecond=0)
-        if now < today_1am:
-            next_sync_naive = today_1am
-
-        return next_sync_naive
+        candidate = now.replace(hour=1, minute=0, second=0, microsecond=0)
+        if now >= candidate:
+            candidate += timedelta(days=1)
+        return candidate
 
     async def _daily_db_sync_loop(self) -> None:
         """Handle daily database synchronization at 1:00 AM UTC."""
