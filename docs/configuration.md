@@ -225,7 +225,7 @@ Allows regressive updates and deletions, which **can cause data loss**.
 Specifies which fields should **not** be synced. Available fields:
 
 - `status` (planning, current, completed, dropped, paused)
-- `score` (rating on a 0-10 scale)
+- `score` (rating on a normalized scale)
 - `progress` (episodes watched)
 - `repeat` (rewatch count)
 - `notes` (text reviews)
