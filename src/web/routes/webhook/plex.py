@@ -16,7 +16,26 @@ router = APIRouter()
 
 class PlexWebhookPayload(BaseModel):
     event: str | None = None
+    user: bool
+    owner: bool
+    Account: dict[str, Any] | None = None
+    Server: dict[str, Any] | None = None
+    Player: dict[str, Any] | None = None
     Metadata: dict[str, Any] | None = None
+
+    def account_id(self) -> int | None:
+        """Extract the account ID from the payload.
+
+        Returns:
+            int | None: The account ID or None if not found.
+        """
+        if not self.Account:
+            return None
+        if "id" not in self.Account:
+            return None
+        if isinstance(self.Account["id"], int):
+            return self.Account["id"]
+        return None
 
     def rating_key(self) -> str | None:
         """Extract the top level rating key.
@@ -85,6 +104,16 @@ async def plex_webhook(
 
     if SyncMode.WEBHOOK not in profile_config.sync_modes:
         raise HTTPException(503, "Webhook sync mode is not enabled for this profile")
+
+    profile_bridge = scheduler.bridge_clients.get(profile)
+    if not profile_bridge:
+        raise HTTPException(503, "Profile bridge not available")
+
+    account_id = payload.account_id()
+    if account_id is None:
+        raise HTTPException(400, "No account ID found in webhook payload")
+    if account_id != profile_bridge.plex_client.user_account_id:
+        raise HTTPException(403, "Account ID does not match profile")
 
     if payload.event not in ("library.new", "media.rate", "media.scrobble"):
         return {"ok": True, "processed_rating_key": None, "event": payload.event}
