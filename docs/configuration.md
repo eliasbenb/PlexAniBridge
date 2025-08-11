@@ -174,7 +174,7 @@ Setting `SYNC_MODES` to `None` or an empty list will cause the application to pe
 
     To use Plex Webhooks correctly, you must:
 
-    1. Have [#PAB_WEB_ENABLED](`PAB_WEB_ENABLED`) set to `True`.
+    1. Have [#PAB_WEB_ENABLED](`PAB_WEB_ENABLED`) set to `True` (the default).
     2. Include `webhook` in the `SYNC_MODES` list for your profile.
     3. [Configure your Plex server](https://support.plex.tv/articles/115002267687-webhooks/) to send webhook payloads to the following URL: `http://<your-server-host>/webhook/plex/<profile-name>`.
     4. Also ensure PlexAniBridge is accessible to Plex over the network.
@@ -319,7 +319,7 @@ Sets logging verbosity for the entire application.
 
 ### `PAB_WEB_ENABLED`
 
-`bool` (Optional, default: `False`)
+`bool` (Optional, default: `True`)
 
 When enabled, the [web interface](./web/screenshots.md) is accessible.
 

@@ -9,31 +9,31 @@
 # ... other global settings
 
 profiles:
-  {PROFILE_NAME}:
-    #= Required =#
-    anilist_token: eyJ...
-    plex_token: 2Sb...
-    plex_user: username
-    plex_url: http://localhost:32400
-    #= Optional =#
-    #== Plex Config ==#
-    # plex_sections: []
-    # plex_genres: []
-    # plex_metadata_source: local
-    #== Sync Options ==#
-    # sync_interval: 3600
-    # sync_modes: ["interval"]
-    # full_scan: false
-    # destructive_sync: false
-    # excluded_sync_fields: ["notes", "score"]
-    #== Advanced Settings ==#
-    # dry_run: false
-    # batch_requests: false
-    # search_fallback_threshold: -1
+    {PROFILE_NAME}:
+        #= Required =#
+        anilist_token: eyJ...
+        plex_token: 2Sb...
+        plex_user: username
+        plex_url: http://localhost:32400
+        #= Optional =#
+        #== Plex Config ==#
+        # plex_sections: []
+        # plex_genres: []
+        # plex_metadata_source: local
+        #== Sync Options ==#
+        # sync_interval: 3600
+        # sync_modes: ["interval"]
+        # full_scan: false
+        # destructive_sync: false
+        # excluded_sync_fields: ["notes", "score"]
+        #== Advanced Settings ==#
+        # dry_run: false
+        # batch_requests: false
+        # search_fallback_threshold: -1
 
 #= Global =#
 # data_path: ./data
 # log_level: INFO
-# web_enabled: false
+# web_enabled: true
 # web_host: 0.0.0.0
 # web_port: 4848

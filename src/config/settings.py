@@ -440,7 +440,7 @@ class PlexAnibridgeConfig(BaseSettings):
         description="Global default search fallback threshold",
     )
     web_enabled: bool = Field(
-        default=False,
+        default=True,
         description="Enable embedded FastAPI web UI server",
     )
     web_host: str = Field(
