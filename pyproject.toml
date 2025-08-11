@@ -84,7 +84,7 @@ indent-style = "space"
 quote-style = "double"
 
 [tool.ruff.lint]
-select = ["E", "F", "UP", "B", "SIM", "I", "D"]
+select = ["E", "F", "UP", "B", "SIM", "I", "D", "RUF"]
 
 [tool.ruff.lint.flake8-bugbear]
 extend-immutable-calls = ["fastapi.Depends"]

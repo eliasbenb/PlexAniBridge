@@ -10,7 +10,7 @@ from src.core.sched import SchedulerClient
 __all__ = [
     "AniListClient",
     "AniMapClient",
-    "PlexClient",
     "BridgeClient",
+    "PlexClient",
     "SchedulerClient",
 ]

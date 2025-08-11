@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 import yaml
 
@@ -20,7 +20,7 @@ from src.config import config
 class MappingsStore:
     """Load, persist, and query custom override mappings file."""
 
-    MAPPINGS_FILENAMES = [
+    MAPPINGS_FILENAMES: ClassVar[list[str]] = [
         "mappings.custom.yaml",
         "mappings.custom.yml",
         "mappings.custom.json",

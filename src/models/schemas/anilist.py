@@ -105,7 +105,7 @@ class MediaSort(AniListBaseEnum):
 class MediaListStatus(AniListBaseEnum):
     """Enum representing status of a media list entry (CURRENT, COMPLETED, etc)."""
 
-    _ignore_ = ["__priority"]
+    _ignore_ = ["__priority"]  # noqa: RUF012
 
     CURRENT = "CURRENT"
     PLANNING = "PLANNING"
@@ -114,7 +114,7 @@ class MediaListStatus(AniListBaseEnum):
     PAUSED = "PAUSED"
     REPEATING = "REPEATING"
 
-    __priority = {
+    __priority: ClassVar[dict[str, int]] = {
         "PLANNING": 1,
         "CURRENT": 2,
         "PAUSED": 2,

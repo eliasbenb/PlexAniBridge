@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 from pathlib import Path
-from typing import Any, TypeAlias
+from typing import Any, ClassVar, TypeAlias
 from urllib.parse import urljoin, urlparse
 
 import aiohttp
@@ -23,7 +23,7 @@ class MappingsClient:
 
     SCHEMA_VERSION = "v2"
     CDN_URL = f"https://raw.githubusercontent.com/eliasbenb/PlexAniBridge-Mappings/{SCHEMA_VERSION}/mappings.json"
-    MAPPING_FILES = [
+    MAPPING_FILES: ClassVar[list[str]] = [
         "mappings.custom.json",
         "mappings.custom.yaml",
         "mappings.custom.yml",
@@ -206,13 +206,13 @@ class MappingsClient:
         except (json.JSONDecodeError, yaml.YAMLError):
             log.error(
                 f"{self.__class__.__name__}: Error decoding file "
-                f"$$'{str(file_path.resolve())}'$$",
+                f"$$'{file_path.resolve()!s}'$$",
                 exc_info=True,
             )
         except Exception:
             log.error(
                 f"{self.__class__.__name__}: Unexpected error reading file "
-                f"$$'{str(file_path.resolve())}'$$",
+                f"$$'{file_path.resolve()!s}'$$",
                 exc_info=True,
             )
 
@@ -221,7 +221,7 @@ class MappingsClient:
         if not mappings:
             log.warning(
                 f"{self.__class__.__name__}: No mappings found in file "
-                f"$$'{str(file_path.resolve())}'$$"
+                f"$$'{file_path.resolve()!s}'$$"
             )
             return {}
 
@@ -232,7 +232,7 @@ class MappingsClient:
         else:
             log.warning(
                 f"{self.__class__.__name__}: The $includes key in "
-                f"$$'{str(file_path.resolve())}'$$ is not a list, ignoring all entries"
+                f"$$'{file_path.resolve()!s}'$$ is not a list, ignoring all entries"
             )
 
         return self._deep_merge(
@@ -296,13 +296,13 @@ class MappingsClient:
                     mappings = json.loads(mappings_raw)
         except (json.JSONDecodeError, yaml.YAMLError):
             log.error(
-                f"{self.__class__.__name__}: Error decoding file $$'{str(url)}'$$",
+                f"{self.__class__.__name__}: Error decoding file $$'{url!s}'$$",
                 exc_info=True,
             )
         except Exception:
             log.error(
                 f"{self.__class__.__name__}: Unexpected error reading file "
-                f"$$'{str(url)}'$$",
+                f"$$'{url!s}'$$",
                 exc_info=True,
             )
 

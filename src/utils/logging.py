@@ -5,6 +5,7 @@ import re
 import sys
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
+from typing import ClassVar
 
 import colorama
 from colorama import Fore, Style
@@ -31,7 +32,7 @@ class ColorFormatter(logging.Formatter):
         Bracketed values: Dimmed (e.g., $${key: value}$$)
     """
 
-    COLORS = {
+    COLORS: ClassVar[dict[str, str]] = {
         "DEBUG": Fore.CYAN,
         "INFO": Fore.GREEN,
         "SUCCESS": Fore.GREEN + Style.BRIGHT,

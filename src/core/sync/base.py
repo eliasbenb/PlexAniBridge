@@ -677,8 +677,8 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         }
 
         media_list = MediaList(
-            id=anilist_media.media_list_entry
-            and anilist_media.media_list_entry.id
+            id=(anilist_media.media_list_entry
+            and anilist_media.media_list_entry.id)
             or 0,
             user_id=self.anilist_client.user.id,
             media_id=anilist_media.id,
@@ -994,8 +994,8 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             anilist_val = getattr(anilist_media_list, key)
 
             if (
-                self.destructive_sync
-                and plex_val is not None
+                (self.destructive_sync
+                and plex_val is not None)
                 or self._should_update_field(rule, plex_val, anilist_val)
             ):
                 setattr(res_media_list, key, plex_val)
