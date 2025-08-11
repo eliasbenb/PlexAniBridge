@@ -1,39 +1,28 @@
-#== Replace {PROFILE_NAME} with your profile name (e.g., personal, family, etc.) ==#
-#== You can create multiple profiles for different configurations. ==#
-#== You can define global defaults that apply to all profiles (e.g. plex_url, sync_interval, etc.) ==#
+#== Global Defaults ==#
+anilist_token: ...
+plex_token: ...
+plex_user: ...
+plex_url: ...
+# plex_sections: []
+# plex_genres: []
+# plex_metadata_source: "local"
+# sync_interval: 3600
+# sync_modes: ["periodic"]
+# full_scan: false
+# destructive_sync: false
+# excluded_sync_fields: ["notes", "score"]
+# dry_run: false
+# batch_requests: false
+# search_fallback_threshold: -1
 
-#= Global Defaults (optional) =#
-# Set common values here to avoid repeating them in each profile
-# plex_url: http://localhost:32400
-# plex_token: 2Sb...
-# ... other global settings
+#== Profile Overrides ==#
+# profiles:
+#     example:
+#         $field: $value
 
-profiles:
-    {PROFILE_NAME}:
-        #= Required =#
-        anilist_token: eyJ...
-        plex_token: 2Sb...
-        plex_user: username
-        plex_url: http://localhost:32400
-        #= Optional =#
-        #== Plex Config ==#
-        # plex_sections: []
-        # plex_genres: []
-        # plex_metadata_source: local
-        #== Sync Options ==#
-        # sync_interval: 3600
-        # sync_modes: ["interval"]
-        # full_scan: false
-        # destructive_sync: false
-        # excluded_sync_fields: ["notes", "score"]
-        #== Advanced Settings ==#
-        # dry_run: false
-        # batch_requests: false
-        # search_fallback_threshold: -1
-
-#= Global =#
-# data_path: ./data
-# log_level: INFO
+#== Global Settings ==#
+# data_path: "./data"
+# log_level: "INFO"
 # web_enabled: true
-# web_host: 0.0.0.0
+# web_host: "0.0.0.0"
 # web_port: 4848
