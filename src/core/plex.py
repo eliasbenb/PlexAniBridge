@@ -166,10 +166,10 @@ class PlexClient:
 
         if self.is_online_user and self.online_client:
             self.user_client = self.online_client
-            self.user_account_id = 1
+            self.user_account_id = admin_account.id
         elif self.is_admin_user:
             self.user_client = self.admin_client
-            self.user_account_id = 1
+            self.user_account_id = admin_account.id
         else:
             if self.plex_metadata_source == PlexMetadataSource.ONLINE:
                 log.warning(
@@ -186,7 +186,7 @@ class PlexClient:
             except Exception as e:
                 raise ValueError(
                     f"{self.__class__.__name__}: Failed to switch to user "
-                    f"$$'{self.plex_user}'$$"
+                    f"'{self.plex_user}'"
                 ) from e
 
         log.debug(
