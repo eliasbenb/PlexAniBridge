@@ -2,6 +2,7 @@
 
 PUID=${PUID:-1000}
 PGID=${PGID:-1000}
+UMASK=${UMASK:-022}
 
 log() {
     printf "%s - init - INFO\t%s\n" "$(date '+%Y-%m-%d %H:%M:%S')" "$1"
@@ -20,8 +21,14 @@ if [ -d "/config" ]; then
     chown -R "$PUID:$PGID" /config
 fi
 
-umask 022
+if printf '%s' "$UMASK" | grep -Eq '^[0-7]{3,4}$'; then
+    umask "$UMASK"
+else
+    log "Invalid UMASK '$UMASK' provided, falling back to 022"
+    umask 022
+fi
 
-log "Starting PlexAniBridge (UID: $PUID, GID: $PGID)"
+CURRENT_UMASK=$(umask)
+log "Starting PlexAniBridge (UID: $PUID, GID: $PGID, UMASK: $CURRENT_UMASK)"
 
 exec su-exec abc "$@"
