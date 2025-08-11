@@ -7,11 +7,13 @@ dictionary keyed by AniList ID (as string). Values contain only override fields
 
 from __future__ import annotations
 
+import contextlib
 import json
 from pathlib import Path
 from typing import Any, ClassVar
 
-import yaml
+from ruamel.yaml import YAML
+from ruamel.yaml.comments import CommentedMap  # type: ignore
 
 from src import log
 from src.config import config
@@ -27,24 +29,21 @@ class MappingsStore:
     ]
 
     def __init__(self, base_dir: Path) -> None:
-        """Initialize the MappingsStore."""
+        """Create a mapping store rooted at base_dir and load existing data."""
         self.base_dir = base_dir
         self.file_path = self._resolve_file()
-        # Cache: dict[str(anilist_id)] -> dict(fields overrides)
         self._cache: dict[str, dict[str, Any]] = {}
+        self._yaml_rt: YAML | None = None
+        self._rt_doc: CommentedMap | None = None
+        self._json_special: dict[str, Any] = {}
         self._load()
 
     def _resolve_file(self) -> Path:
-        """Resolve the mappings file path.
-
-        Returns:
-            Path: The resolved mappings file path.
-        """
-        for name in MappingsStore.MAPPINGS_FILENAMES:
+        """Resolve the mappings file path."""
+        for name in self.MAPPINGS_FILENAMES:
             p = self.base_dir / name
             if p.exists():
                 return p
-        # Default to YAML custom file if none exists
         return self.base_dir / "mappings.custom.yaml"
 
     def _load(self) -> None:
@@ -54,49 +53,78 @@ class MappingsStore:
             return
         try:
             if self.file_path.suffix == ".json":
-                data = json.loads(self.file_path.read_text())
+                self._load_json()
             else:
-                data = yaml.safe_load(self.file_path.read_text()) or {}
-            # Normalize to dict[str, dict]
-            if isinstance(data, list):
-                conv: dict[str, dict[str, Any]] = {}
-                for item in data:
-                    if not isinstance(item, dict):
-                        continue
-                    key = item.get("anilist_id") or item.get("id")
-                    if key is None:
-                        continue
-                    k = str(key)
-                    v = {
-                        k2: v2
-                        for k2, v2 in item.items()
-                        if k2 not in {"anilist_id", "id"}
-                    }
-                    conv[k] = v
-                self._cache = conv
-            elif isinstance(data, dict):
-                self._cache = {
-                    str(k): (v or {})
-                    for k, v in data.items()
-                    if isinstance(v, dict) or v is None
-                }
-            else:
-                self._cache = {}
+                self._load_yaml()
         except Exception as e:
             log.error(f"MappingsStore: Failed to load mappings: {e}")
             self._cache = {}
+
+    def _load_json(self) -> None:
+        """Load mappings from a JSON file."""
+        data = json.loads(self.file_path.read_text()) or {}
+        if not isinstance(data, dict):
+            data = {}
+        self._json_special = {}
+        cache: dict[str, dict[str, Any]] = {}
+        for k, v in data.items():
+            if isinstance(k, str) and k.startswith("$"):
+                self._json_special[k] = v
+                continue
+            if str(k).isdigit() and (isinstance(v, dict) or v is None):
+                cache[str(int(k))] = v or {}
+        self._cache = cache
+
+    def _load_yaml(self) -> None:
+        """Load mappings from a YAML file."""
+        self._yaml_rt = YAML(typ="rt")
+        self._yaml_rt.preserve_quotes = True
+        loaded = self._yaml_rt.load(self.file_path.read_text()) or CommentedMap()
+        if not isinstance(loaded, CommentedMap):
+            loaded = CommentedMap()
+        self._rt_doc = loaded
+        cache: dict[str, dict[str, Any]] = {}
+        for k in list(loaded.keys()):
+            if isinstance(k, int | str) and str(k).isdigit():
+                v = loaded[k]
+                if isinstance(v, dict) or v is None:
+                    cache[str(int(k))] = v or {}
+                else:
+                    # Invalid data, remove to keep schema clean
+                    with contextlib.suppress(Exception):
+                        del loaded[k]
+            # else: non-numeric special keys are left untouched
+        self._cache = cache
 
     def _persist(self) -> None:
         """Persist the mappings to the file."""
         try:
             if self.file_path.suffix == ".json":
-                self.file_path.write_text(
-                    json.dumps(self._cache, indent=2, ensure_ascii=False)
-                )
-            else:
-                self.file_path.write_text(
-                    yaml.safe_dump(self._cache, sort_keys=False, allow_unicode=True)
-                )
+                out: dict[str, Any] = {**self._json_special, **self._cache}
+                self.file_path.write_text(json.dumps(out, indent=4))
+                return
+
+            if self._yaml_rt is None:
+                self._yaml_rt = YAML(typ="rt")
+                self._yaml_rt.preserve_quotes = True
+            if self._rt_doc is None:
+                self._rt_doc = CommentedMap()
+
+            # Remove numeric keys not in cache
+            for k in list(self._rt_doc.keys()):
+                if (
+                    isinstance(k, int | str)
+                    and str(k).isdigit()
+                    and str(int(k)) not in self._cache
+                ):
+                    with contextlib.suppress(Exception):
+                        del self._rt_doc[k]
+
+            for id_str, value in self._cache.items():
+                self._rt_doc[int(id_str)] = value or {}
+
+            with self.file_path.open("w", encoding="utf-8") as f:
+                self._yaml_rt.dump(self._rt_doc, f)
         except Exception as e:
             log.error(f"MappingsStore: Failed to write mappings: {e}")
 

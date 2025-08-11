@@ -46,6 +46,7 @@ dependencies = [
     "pyyaml>=6.0.2",
     "rapidfuzz>=3.13.0",
     "requests>=2.32.3",
+    "ruamel-yaml>=0.18.14",
     "sqlalchemy>=2.0.41",
     "tzlocal>=5.3.1",
 ]
