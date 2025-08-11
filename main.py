@@ -4,17 +4,13 @@ import asyncio
 import signal
 import sys
 
+import uvicorn
 from pydantic import ValidationError
 
 from src import PLEXANIBDRIGE_HEADER, log
 from src.config import config
 from src.core.sched import SchedulerClient
 from src.web.app import create_app
-
-try:
-    import uvicorn
-except Exception:
-    uvicorn = None
 
 
 class GracefulShutdownHandler:
@@ -134,9 +130,6 @@ async def run() -> int:
         await app_scheduler.start()
 
         if config.web_enabled:
-            if uvicorn is None:
-                log.error("PlexAniBridge: uvicorn not installed; cannot start web UI")
-                return 1
             app = create_app(app_scheduler)
             uv_config = uvicorn.Config(
                 app,
@@ -155,10 +148,11 @@ async def run() -> int:
                 "(ctrl+c to stop)\033[0m"
             )
 
-        await shutdown_handler.wait_for_shutdown()
-        if server_task:
-            server.should_exit = True  # type: ignore
+            await shutdown_handler.wait_for_shutdown()
+            server.should_exit = True
             await server_task
+        else:
+            await shutdown_handler.wait_for_shutdown()
 
     except KeyboardInterrupt:
         log.info("PlexAniBridge: Keyboard interrupt received, shutting down...")
