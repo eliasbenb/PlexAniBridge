@@ -86,6 +86,9 @@ quote-style = "double"
 [tool.ruff.lint]
 select = ["E", "F", "UP", "B", "SIM", "I", "D"]
 
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.Depends"]
+
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 
