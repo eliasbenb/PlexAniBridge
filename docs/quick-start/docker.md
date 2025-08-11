@@ -30,6 +30,7 @@ Below is a PlexAniBridge Docker compose file with example values. Optional envir
     environment:
         PUID: 1000
         PGID: 1000
+        UMASK: 022
         TZ: Etc/UTC
     ```
 
@@ -63,14 +64,15 @@ Below is a minimal example of a Docker run command with only the required variab
 
 ```shell
 docker run \
-  --name plexanibridge \
-  -e PUID=1000 \
-  -e PGID=1000 \
-  -e TZ=Etc/UTC \
-  -e PAB_ANILIST_TOKEN=eyJ... \
-  -e PAB_PLEX_TOKEN=2Sb... \
-  -e PAB_PLEX_USER=username \
-  -e PAB_PLEX_URL=http://plex:32400 \
-  -v /path/to/plexanibridge/data:/config \
-  ghcr.io/eliasbenb/plexanibridge:v1
+    --name plexanibridge \
+    -e PUID=1000 \
+    -e PGID=1000 \
+    -e UMASK=022 \\
+    -e TZ=Etc/UTC \
+    -e PAB_ANILIST_TOKEN=eyJ... \
+    -e PAB_PLEX_TOKEN=2Sb... \
+    -e PAB_PLEX_USER=username \
+    -e PAB_PLEX_URL=http://plex:32400 \
+    -v /path/to/plexanibridge/data:/config \
+    ghcr.io/eliasbenb/plexanibridge:v1
 ```
