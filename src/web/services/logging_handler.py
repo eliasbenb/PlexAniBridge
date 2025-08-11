@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from typing import Any
 
 from starlette.websockets import WebSocket
 
@@ -18,6 +19,7 @@ class WebsocketLogHandler(logging.Handler):
         super().__init__()
         self._connections: set[WebSocket] = set()
         self._lock = asyncio.Lock()
+        self._tasks: set[asyncio.Task[Any]] = set()  # Prevents early GC
 
     async def add(self, ws: WebSocket) -> None:
         """Add a websocket connection to the handler.
@@ -48,7 +50,9 @@ class WebsocketLogHandler(logging.Handler):
         except Exception:
             return
         for ws in list(self._connections):
-            asyncio.create_task(self._safe_send(ws, msg, record.levelname))
+            task = asyncio.create_task(self._safe_send(ws, msg, record.levelname))
+            self._tasks.add(task)
+            task.add_done_callback(self._tasks.discard)
 
     async def _safe_send(self, ws: WebSocket, msg: str, level: str) -> None:
         """Send a message to a websocket connection.

@@ -50,6 +50,7 @@ class ProfileScheduler:
         self._running = False
         self._sync_lock = asyncio.Lock()
         self._current_task: asyncio.Task | None = None
+        self._tasks: set[asyncio.Task] = set()  # Prevents early GC
 
     async def sync(
         self, poll: bool = False, rating_keys: list[str] | None = None
@@ -105,14 +106,18 @@ class ProfileScheduler:
                 f"{self.__class__.__name__}: [{self.profile_name}] Starting periodic "
                 f"sync every {self.sync_interval}s"
             )
-            asyncio.create_task(self._periodic_loop())
+            task = asyncio.create_task(self._periodic_loop())
+            self._tasks.add(task)
+            task.add_done_callback(self._tasks.discard)
 
         if SyncMode.POLL in self.sync_modes:
             log.debug(
                 f"{self.__class__.__name__}: [{self.profile_name}] Starting polling "
                 f"sync every {self.poll_interval}s"
             )
-            asyncio.create_task(self._poll_loop())
+            task = asyncio.create_task(self._poll_loop())
+            self._tasks.add(task)
+            task.add_done_callback(self._tasks.discard)
 
     async def stop(self) -> None:
         """Stop the profile scheduler."""
