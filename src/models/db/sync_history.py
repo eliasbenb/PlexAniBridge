@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import JSON, DateTime, Enum, Integer, String
+from sqlalchemy import JSON, DateTime, Enum, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from plexapi.video import Episode, Movie, Season, Show
@@ -96,4 +96,15 @@ class SyncHistory(Base):
     )
     timestamp: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(UTC), index=True
+    )
+
+    __table_args__ = (
+        Index(
+            "ix_sync_history_upsert_keys",
+            "profile_name",
+            "plex_rating_key",
+            "plex_child_rating_key",
+            "plex_type",
+            "outcome",
+        ),
     )
