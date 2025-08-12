@@ -101,19 +101,7 @@ async def list_mappings(
         )
         rows = ctx.session.execute(base_query).scalars().all()
 
-    def row_to_dict(a: AniMap) -> dict[str, Any]:
-        return {
-            "anilist_id": a.anilist_id,
-            "anidb_id": a.anidb_id,
-            "imdb_id": a.imdb_id,
-            "mal_id": a.mal_id,
-            "tmdb_movie_id": a.tmdb_movie_id,
-            "tmdb_show_id": a.tmdb_show_id,
-            "tvdb_id": a.tvdb_id,
-            "tvdb_mappings": a.tvdb_mappings,
-        }
-
-    items = [row_to_dict(r) for r in rows]
+    items = [r.model_dump(mode="json") for r in rows]
 
     # Merge overrides from store
     for i, item in enumerate(items):
