@@ -694,7 +694,7 @@ class AniListClient:
                     )
                     await asyncio.sleep(retry_after + 1)
                     return await self._make_request(
-                        query=query, variables=variables, retry_count=retry_count
+                        query=query, variables=variables, retry_count=retry_count + 1
                     )
                 elif response.status == 502:  # Bad Gateway
                     log.warning(
