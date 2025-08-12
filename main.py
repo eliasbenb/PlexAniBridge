@@ -64,8 +64,7 @@ def validate_configuration():
             try:
                 profile_config = config.get_profile(profile_name)
                 log.info(
-                    f"PlexAniBridge: Profile $$'{profile_name}'$$: "
-                    f"{str(profile_config)}"
+                    f"PlexAniBridge: Profile $$'{profile_name}'$$: {profile_config!s}"
                 )
             except KeyError as e:
                 log.error(f"PlexAniBridge: Profile $$'{profile_name}'$$ not found: {e}")
