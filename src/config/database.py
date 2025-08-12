@@ -5,9 +5,9 @@ from __future__ import annotations
 from pathlib import Path
 from types import TracebackType
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Engine
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
 
 from src import __file__ as src_file
 from src import config
@@ -45,7 +45,14 @@ class PlexAniBridgeDB:
         self.db_path = data_path / "plexanibridge.db"
 
         self.engine = self._setup_db()
-        self.session = Session(self.engine)
+        self._SessionLocal = sessionmaker(
+            bind=self.engine,
+            autoflush=False,
+            autocommit=False,
+            expire_on_commit=False,
+            future=True,
+        )
+        self._session: Session | None = None
         self._do_migrations()
 
     def _setup_db(self) -> Engine:
@@ -66,20 +73,31 @@ class PlexAniBridgeDB:
         import src.models  # noqa: F401
 
         if not self.data_path.exists():
-            try:
-                self.data_path.mkdir(parents=True, exist_ok=True)
-            except PermissionError as e:
-                raise PermissionError(
-                    f"{self.__class__.__name__}: You do not have permissions to create "
-                    f"files at '{self.data_path}'"
-                ) from e
+            self.data_path.mkdir(parents=True, exist_ok=True)
         elif self.data_path.is_file():
             raise ValueError(
                 f"{self.__class__.__name__}: The path '{self.data_path}' is a file, "
-                f"please delete it first or choose a different data folder path"
+                "please delete it first or choose a different data folder path",
             )
 
-        engine = create_engine(f"sqlite:///{self.db_path}")
+        engine = create_engine(
+            f"sqlite:///{self.db_path}",
+            connect_args={"check_same_thread": False},
+            pool_pre_ping=True,
+            future=True,
+        )
+
+        @event.listens_for(engine, "connect")
+        def _set_sqlite_pragma(dbapi_connection, _connection_record):
+            cur = dbapi_connection.cursor()
+            try:
+                cur.execute("PRAGMA journal_mode=WAL;")
+                cur.execute("PRAGMA synchronous=NORMAL;")
+                cur.execute("PRAGMA temp_store=MEMORY;")
+                cur.execute("PRAGMA cache_size=-20000;")
+                cur.execute("PRAGMA foreign_keys=ON;")
+            finally:
+                cur.close()
 
         return engine
 
@@ -96,21 +114,18 @@ class PlexAniBridgeDB:
         from alembic import command
         from alembic.config import Config
 
-        config = Config()
-        config.set_main_option(
+        cfg = Config()
+        cfg.set_main_option(
             "script_location",
             str(Path(src_file).resolve().parent.parent / "alembic"),
         )
-        config.set_main_option("sqlalchemy.url", f"sqlite:///{self.db_path}")
+        cfg.set_main_option("sqlalchemy.url", f"sqlite:///{self.db_path}")
 
-        command.upgrade(config, "head")
+        command.upgrade(cfg, "head")
 
     def __enter__(self) -> PlexAniBridgeDB:
-        """Enters the context manager, returning the database instance.
-
-        Returns:
-            PlexAniBridgeDB: This database instance
-        """
+        """Enters the context manager, returning the database instance."""
+        self._session = self._SessionLocal()
         return self
 
     def __exit__(
@@ -119,15 +134,17 @@ class PlexAniBridgeDB:
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> None:
-        """Exits the context manager, closing the session.
+        """Close the session opened for this context, if any."""
+        if self._session is not None:
+            self._session.close()
+            self._session = None
 
-        Args:
-            exc_type (type[BaseException] | None): Exception type if an exception
-                                                   occurred
-            exc_val (BaseException | None): Exception value if an exception occurred
-            exc_tb (TracebackType | None): Exception traceback if an exception occurred
-        """
-        self.session.close()
+    @property
+    def session(self) -> Session:
+        """Return the current SQLAlchemy session, creating it if needed."""
+        if self._session is None:
+            self._session = self._SessionLocal()
+        return self._session
 
 
 db = PlexAniBridgeDB(config.data_path)
