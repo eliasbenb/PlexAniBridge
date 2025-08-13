@@ -605,7 +605,9 @@ class AniListClient:
         )
 
         backup_file.write_text(data_without_media.model_dump_json())
-        log.info(f"{self.__class__.__name__}: Exported AniList data to '{backup_file}'")
+        log.info(
+            f"{self.__class__.__name__}: Exported AniList data to $$'{backup_file}'$$"
+        )
 
         cutoff_date = datetime.now() - timedelta(days=self.BACKUP_RETENTION_DAYS)
 

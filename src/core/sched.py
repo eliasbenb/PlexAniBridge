@@ -475,6 +475,12 @@ class SchedulerClient:
                     log.success(
                         f"{self.__class__.__name__}: Daily database sync completed"
                     )
+
+                    log.info(
+                        f"{self.__class__.__name__}: Reinitializing all AniList clients"
+                    )
+                    for bridge_client in self.bridge_clients.values():
+                        await bridge_client.anilist_client.initialize()
                 except Exception as e:
                     log.error(
                         f"{self.__class__.__name__}: Daily database sync failed: {e}",
