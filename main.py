@@ -13,37 +13,32 @@ from src.core.sched import SchedulerClient
 from src.web.app import create_app
 
 
-class GracefulShutdownHandler:
-    """Handles graceful shutdown on SIGINT and SIGTERM signals."""
+def _setup_signal_handlers_for_scheduler(scheduler: SchedulerClient) -> None:
+    """Install SIGINT/SIGTERM handlers that request scheduler shutdown."""
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = asyncio.get_event_loop()
 
-    def __init__(self) -> None:
-        """Initialize the shutdown handler."""
-        self.shutdown_event = asyncio.Event()
-        self._setup_signal_handlers()
-
-    def _setup_signal_handlers(self):
-        """Set up signal handlers for graceful shutdown."""
-        if sys.platform != "win32":
-            loop = asyncio.get_event_loop()
-            for sig in (signal.SIGINT, signal.SIGTERM):
-                loop.add_signal_handler(sig, self._signal_handler, sig)
-        else:
-            # Windows signal handling
-            signal.signal(signal.SIGINT, self._signal_handler)
-            signal.signal(signal.SIGTERM, self._signal_handler)
-
-    def _signal_handler(self, sig_num=None, frame=None):
-        """Handle shutdown signals."""
-        sig_name = signal.Signals(sig_num).name if sig_num else "UNKNOWN"
+    def _on_signal(sig):
+        name = signal.Signals(sig).name if sig else "UNKNOWN"
         log.info(
-            f"PlexAniBridge: Received {sig_name} signal, initiating graceful "
-            f"shutdown..."
+            f"PlexAniBridge: Received {name} signal, initiating graceful shutdown..."
         )
-        self.shutdown_event.set()
+        try:
+            scheduler.request_shutdown()
+        except Exception:
+            log.debug(
+                "Failed to request scheduler shutdown from signal handler",
+                exc_info=True,
+            )
 
-    async def wait_for_shutdown(self):
-        """Wait for shutdown signal."""
-        await self.shutdown_event.wait()
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        try:
+            loop.add_signal_handler(sig, lambda s=sig: _on_signal(s))
+        except NotImplementedError:
+            # Fallback for environments that don't support add_signal_handler
+            signal.signal(sig, lambda s, f: _on_signal(s))
 
 
 def validate_configuration():
@@ -113,7 +108,6 @@ async def run() -> int:
         int: Exit code (0 for success, 1 for error)
     """
     app_scheduler: SchedulerClient | None = None
-    shutdown_handler: GracefulShutdownHandler | None = None
     server_task: asyncio.Task | None = None
 
     try:
@@ -122,11 +116,11 @@ async def run() -> int:
         if not validate_configuration():
             return 1
 
-        shutdown_handler = GracefulShutdownHandler()
-
         app_scheduler = SchedulerClient(config)
         await app_scheduler.initialize()
         await app_scheduler.start()
+
+        _setup_signal_handlers_for_scheduler(app_scheduler)
 
         if config.web_enabled:
             app = create_app(app_scheduler)
@@ -139,20 +133,24 @@ async def run() -> int:
                 proxy_headers=True,
                 forwarded_allow_ips="*",
             )
+
             server = uvicorn.Server(uv_config)
-            server_task = asyncio.create_task(server.serve())
+            # Use `_serve()` so uvicorn doesn't install its own signal handlers
+            server_task = asyncio.create_task(server._serve())
+
             log.success(
                 "PlexAniBridge: Web UI started at "
                 f"\033[92mhttp://{config.web_host}:{config.web_port} "
                 "(ctrl+c to stop)\033[0m"
             )
 
-            await shutdown_handler.wait_for_shutdown()
+            await app_scheduler.wait_for_completion()
+
+            # Signal uvicorn server to stop and wait for it
             server.should_exit = True
             await server_task
         else:
-            await shutdown_handler.wait_for_shutdown()
-
+            await app_scheduler.wait_for_completion()
     except KeyboardInterrupt:
         log.info("PlexAniBridge: Keyboard interrupt received, shutting down...")
     except ValidationError as e:

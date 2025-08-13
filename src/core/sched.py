@@ -199,6 +199,11 @@ class SchedulerClient:
         self._running = False
         self._daily_sync_task: asyncio.Task | None = None
 
+    def request_shutdown(self) -> None:
+        """Request application shutdown from external callers."""
+        if not self.stop_event.is_set():
+            self.stop_event.set()
+
     async def initialize(self) -> None:
         """Initialize the application scheduler and all components."""
         log.info(f"{self.__class__.__name__}: Initializing application scheduler")
@@ -289,7 +294,7 @@ class SchedulerClient:
                 f"application"
             )
             self.stop_event.set()
-            exit()
+            return
 
         if self.profile_schedulers:
             log.info(
