@@ -17,6 +17,7 @@ The smart way to keep your AniList profile perfectly synchronized with your Plex
 - **🎯 Smart Content Matching**: Uses a [curated mappings database](https://github.com/eliasbenb/PlexAniBridge-Mappings) with fuzzy title search fallback and support for custom mapping overrides.
 - **⚡ Optimized Performance**: Intelligent batch processing, rate limiting, and caching to minimize API usage while maximizing sync speed.
 - **👥 Multi-User & Multi-Profile**: Supports multiple Plex users (including Home users) with individual AniList accounts and configurable sync profiles.
+- **🖥️ Web Dashboard**: Intuitive web interface with a real-time sync timeline, profile management, custom mapping editor, and log viewer.
 - **🔧 Flexible Configuration**: Filter by library sections or genres and configure scanning modes (polling or periodic).
 - **🛡️ Safe & Reliable**: Built-in dry run mode for testing and automatic AniList backups with a [restore script](https://github.com/eliasbenb/PlexAniBridge/blob/HEAD/scripts/anilist_restore.py) for easy recovery.
 - **🐳 Easy Deployment**: Docker-ready with easy and comprehensive environment variable configuration.
