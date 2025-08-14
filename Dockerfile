@@ -37,6 +37,7 @@ ENV PYTHONPATH=/opt/venv/lib/python3.13/site-packages \
     PYTHONUNBUFFERED=1 \
     PUID=1000 \
     PGID=1000 \
+    UMASK=022 \
     PAB_DATA_PATH=/config
 
 WORKDIR /app
@@ -47,6 +48,8 @@ COPY ./scripts/docker_init.sh /init
 RUN mkdir -p /config
 
 VOLUME ["/config"]
+
+EXPOSE 4848
 
 ENTRYPOINT ["/init"]
 CMD ["python", "/app/main.py"]

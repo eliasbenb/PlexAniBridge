@@ -1,15 +1,15 @@
 """Mappings Client Module."""
 
+from __future__ import annotations
+
 import asyncio
 import json
 from pathlib import Path
-from typing import Any, TypeAlias
+from typing import Any, ClassVar, TypeAlias
 from urllib.parse import urljoin, urlparse
 
 import aiohttp
-import tomlkit
 import yaml
-from tomlkit.exceptions import TOMLKitError
 
 from src import __version__, log
 
@@ -23,7 +23,7 @@ class MappingsClient:
 
     SCHEMA_VERSION = "v2"
     CDN_URL = f"https://raw.githubusercontent.com/eliasbenb/PlexAniBridge-Mappings/{SCHEMA_VERSION}/mappings.json"
-    MAPPING_FILES = [
+    MAPPING_FILES: ClassVar[list[str]] = [
         "mappings.custom.json",
         "mappings.custom.yaml",
         "mappings.custom.yml",
@@ -51,7 +51,7 @@ class MappingsClient:
         if self._session and not self._session.closed:
             await self._session.close()
 
-    async def __aenter__(self) -> "MappingsClient":
+    async def __aenter__(self) -> MappingsClient:
         """Context manager enter method.
 
         Returns:
@@ -203,23 +203,27 @@ class MappingsClient:
                 case ".yaml" | ".yml":
                     with file_path.open() as f:
                         mappings = self._dict_str_keys(yaml.safe_load(f))
-                case ".toml":
-                    with file_path.open() as f:
-                        mappings = tomlkit.load(f)
-        except (json.JSONDecodeError, yaml.YAMLError, TOMLKitError):
+        except (json.JSONDecodeError, yaml.YAMLError):
             log.error(
                 f"{self.__class__.__name__}: Error decoding file "
-                f"$$'{str(file_path.resolve())}'$$",
+                f"$$'{file_path.resolve()!s}'$$",
                 exc_info=True,
             )
         except Exception:
             log.error(
                 f"{self.__class__.__name__}: Unexpected error reading file "
-                f"$$'{str(file_path.resolve())}'$$",
+                f"$$'{file_path.resolve()!s}'$$",
                 exc_info=True,
             )
 
         self._loaded_sources.add(file)
+
+        if not mappings:
+            log.warning(
+                f"{self.__class__.__name__}: No mappings found in file "
+                f"$$'{file_path.resolve()!s}'$$"
+            )
+            return {}
 
         includes: list[str] = []
         includes_value: dict | list = mappings.get("$includes", [])
@@ -228,7 +232,7 @@ class MappingsClient:
         else:
             log.warning(
                 f"{self.__class__.__name__}: The $includes key in "
-                f"$$'{str(file_path.resolve())}'$$ is not a list, ignoring all entries"
+                f"$$'{file_path.resolve()!s}'$$ is not a list, ignoring all entries"
             )
 
         return self._deep_merge(
@@ -258,7 +262,7 @@ class MappingsClient:
             async with session.get(url) as response:
                 response.raise_for_status()
                 mappings_raw = await response.text()
-        except (aiohttp.ClientError, asyncio.TimeoutError):
+        except (TimeoutError, aiohttp.ClientError):
             if retry_count < 2:
                 log.warning(
                     f"{self.__class__.__name__}: Error reaching mappings URL "
@@ -270,11 +274,6 @@ class MappingsClient:
             log.error(
                 f"{self.__class__.__name__}: Error reaching mappings URL $$'{url}'$$",
                 exc_info=True,
-            )
-        except (json.JSONDecodeError, aiohttp.ContentTypeError):
-            log.error(
-                f"{self.__class__.__name__}: Error decoding mappings from URL "
-                f"$$'{url}'$$"
             )
         except Exception:
             log.error(
@@ -289,27 +288,31 @@ class MappingsClient:
                     mappings = json.loads(mappings_raw)
                 case ".yaml" | ".yml":
                     mappings = self._dict_str_keys(yaml.safe_load(mappings_raw))
-                case ".toml":
-                    mappings = tomlkit.loads(mappings_raw)
                 case _:
                     log.warning(
                         f"{self.__class__.__name__}: Unknown file type for URL "
                         f"$$'{url}'$$, defaulting to JSON parsing"
                     )
                     mappings = json.loads(mappings_raw)
-        except (json.JSONDecodeError, yaml.YAMLError, TOMLKitError):
+        except (json.JSONDecodeError, yaml.YAMLError):
             log.error(
-                f"{self.__class__.__name__}: Error decoding file $$'{str(url)}'$$",
+                f"{self.__class__.__name__}: Error decoding file $$'{url!s}'$$",
                 exc_info=True,
             )
         except Exception:
             log.error(
                 f"{self.__class__.__name__}: Unexpected error reading file "
-                f"$$'{str(url)}'$$",
+                f"$$'{url!s}'$$",
                 exc_info=True,
             )
 
         self._loaded_sources.add(url)
+
+        if not mappings:
+            log.warning(
+                f"{self.__class__.__name__}: No mappings found in URL $$'{url}'$$"
+            )
+            return {}
 
         includes: list[str] = []
         includes_value: dict | list = mappings.get("$includes", [])

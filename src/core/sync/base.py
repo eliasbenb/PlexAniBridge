@@ -1,28 +1,107 @@
 """Abstract base class for media synchronization between Plex and AniList."""
 
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator, Callable
+from datetime import UTC, datetime
 from typing import Generic, TypeVar
 
+from pydantic import BaseModel
 from rapidfuzz import fuzz
 
+from plexapi.media import Guid
 from plexapi.video import Episode, Movie, Season, Show
 from src import log
+from src.config.database import db
 from src.config.settings import SyncField
 from src.core import AniListClient, AniMapClient, PlexClient
-from src.models.anilist import FuzzyDate, Media, MediaList, MediaListStatus, ScoreFormat
-from src.models.animap import AniMap
-from src.models.sync import (
+from src.core.sync.stats import (
     ItemIdentifier,
-    ParsedGuids,
     SyncOutcome,
     SyncStats,
+)
+from src.models.db.animap import AniMap
+from src.models.db.sync_history import MediaType, SyncHistory
+from src.models.schemas.anilist import (
+    FuzzyDate,
+    Media,
+    MediaList,
+    MediaListStatus,
+    ScoreFormat,
 )
 from src.utils.types import Comparable
 
 T = TypeVar("T", bound=Movie | Show)  # Section item
 S = TypeVar("S", bound=Movie | Season)  # Item child (season)
 E = TypeVar("E", bound=list[Movie] | list[Episode])  # Item grandchild (episode)
+
+
+class ParsedGuids(BaseModel):
+    """Container for parsed media identifiers from different services.
+
+    Handles parsing and storage of media IDs from various services (TVDB, TMDB, IMDB)
+    from Plex's GUID format into a structured format. Provides iteration and string
+    representation for debugging.
+
+    Attributes:
+        tvdb (int | None): TVDB ID if available
+        tmdb (int | None): TMDB ID if available
+        imdb (str | None): IMDB ID if available
+
+    Note:
+        GUID formats expected from Plex:
+        - TVDB: "tvdb://123456"
+        - TMDB: "tmdb://123456"
+        - IMDB: "imdb://tt1234567"
+    """
+
+    tvdb: int | None = None
+    tmdb: int | None = None
+    imdb: str | None = None
+
+    @staticmethod
+    def from_guids(guids: list[Guid]) -> ParsedGuids:
+        """Creates a ParsedGuids instance from a list of Plex GUIDs.
+
+        Args:
+            guids (list[Guid]): List of Plex GUID objects
+
+        Returns:
+            ParsedGuids: New instance with parsed IDs
+        """
+        parsed_guids = ParsedGuids()
+        for guid in guids:
+            if not guid.id:
+                continue
+
+            split_guid = guid.id.split("://")
+            if len(split_guid) != 2:
+                continue
+
+            attr = split_guid[0]
+            if not hasattr(parsed_guids, attr):
+                continue
+
+            try:
+                setattr(parsed_guids, attr, int(split_guid[1]))
+            except ValueError:
+                setattr(parsed_guids, attr, str(split_guid[1]))
+
+        return parsed_guids
+
+    def __str__(self) -> str:
+        """Creates a string representation of the parsed IDs.
+
+        Returns:
+            str: String representation of the parsed IDs in a format like
+                 "id: xxx, id: xxx, id: xxx"
+        """
+        return ", ".join(
+            f"{field}: {getattr(self, field)}"
+            for field in self.__class__.model_fields
+            if getattr(self, field) is not None
+        )
 
 
 class BaseSyncClient(ABC, Generic[T, S, E]):
@@ -94,6 +173,8 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         }
 
         self.queued_batch_requests: list[MediaList] = []
+        # Track batch items for history recording
+        self.batch_history_items: list[tuple[T, S, MediaList | None, MediaList]] = []
 
     def clear_cache(self) -> None:
         """Clears the cache for all decorated methods in the class.
@@ -106,6 +187,91 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
                 getattr(self, attr), "cache_clear"
             ):
                 getattr(self, attr).cache_clear()
+
+    async def _create_sync_history(
+        self,
+        item: T,
+        child_item: S | None,
+        grandchild_items: E | None,
+        media_list_pair: tuple[MediaList | None, MediaList | None],
+        animapping: AniMap | None,
+        outcome: SyncOutcome,
+        error_message: str | None = None,
+    ) -> None:
+        """Creates a sync history record for tracking synchronization operations.
+
+        Args:
+            item (T): Grandparent Plex media item.
+            child_item (S): Target child item to sync.
+            grandchild_items (E): Grandchild items to extract data from.
+            media_list_pair (tuple[MediaList | None, MediaList | None]): Tuple of
+                matched AniList media list entries (before and after sync).
+            animapping (AniMap | None): ID mapping information.
+            outcome (SyncOutcome): Result of the synchronization operation.
+            error_message (str | None): Error message if the sync failed.
+        """
+        _before_state, _after_state = media_list_pair
+        before_state = (
+            _before_state.model_dump(mode="json") if _before_state is not None else None
+        )
+        after_state = (
+            _after_state.model_dump(mode="json") if _after_state is not None else None
+        )
+
+        with db as ctx:
+            if outcome == SyncOutcome.SKIPPED:
+                # If skipped, no need to create a history record
+                return
+            if outcome in (SyncOutcome.NOT_FOUND, SyncOutcome.FAILED):
+                # On error, upsert existing record if it exists
+                existing_record = (
+                    ctx.session.query(SyncHistory)
+                    .filter(
+                        SyncHistory.profile_name == self.profile_name,
+                        SyncHistory.plex_rating_key == str(item.ratingKey),
+                        SyncHistory.plex_child_rating_key
+                        == (str(child_item.ratingKey) if child_item else None),
+                        SyncHistory.plex_type == MediaType.from_item(item),
+                        SyncHistory.outcome == outcome,
+                    )
+                    .first()
+                )
+                if existing_record:
+                    if existing_record.error_message == error_message:
+                        return
+                    existing_record.before_state = before_state
+                    existing_record.after_state = after_state
+                    existing_record.error_message = error_message
+                    existing_record.timestamp = datetime.now(UTC)
+                    ctx.session.commit()
+                    return
+
+            try:
+                history_record = SyncHistory(
+                    profile_name=self.profile_name,
+                    plex_guid=item.guid,
+                    plex_rating_key=str(item.ratingKey),
+                    plex_child_rating_key=str(child_item.ratingKey)
+                    if child_item
+                    else None,
+                    plex_type=MediaType.from_item(item),
+                    anilist_id=animapping.anilist_id if animapping else None,
+                    outcome=outcome,
+                    before_state=before_state,
+                    after_state=after_state,
+                    error_message=error_message,
+                )
+
+                ctx.session.add(history_record)
+                ctx.session.commit()
+
+            except Exception as e:
+                log.error(
+                    f"Failed to create sync history record for {item.title} "
+                    f"({item.ratingKey}): {e}",
+                    exc_info=True,
+                )
+                ctx.session.rollback()
 
     async def process_media(self, item: T) -> None:
         """Processes a single media item for synchronization.
@@ -134,12 +300,14 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             self.sync_stats.register_pending_items(all_trackable_items)
         self.sync_stats.track_item(item_id, SyncOutcome.PENDING)
 
+        found_match = False
         async for (
             child_item,
             grandchild_items,
             animapping,
             anilist_media,
         ) in self.map_media(item):
+            found_match = True
             grandchild_ids = ItemIdentifier.from_items(grandchild_items)
 
             debug_log_title = self._debug_log_title(item=item, animapping=animapping)
@@ -166,14 +334,37 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
                 self.sync_stats.track_items(grandchild_ids, outcome)
                 self.sync_stats.track_item(item_id, outcome)
 
-            except Exception:
+            except Exception as e:
                 log.error(
                     f"{self.__class__.__name__}: [{self.profile_name}] Failed to "
                     f"process {item.type} {debug_log_title} {debug_log_ids}",
                     exc_info=True,
                 )
+
+                await self._create_sync_history(
+                    item=item,
+                    child_item=child_item,
+                    grandchild_items=grandchild_items,
+                    media_list_pair=(None, None),
+                    animapping=animapping,
+                    outcome=SyncOutcome.FAILED,
+                    error_message=str(e),
+                )
+
                 self.sync_stats.track_items(grandchild_ids, SyncOutcome.FAILED)
                 self.sync_stats.track_item(item_id, SyncOutcome.FAILED)
+
+        if not found_match:
+            await self._create_sync_history(
+                item=item,
+                child_item=None,
+                grandchild_items=None,
+                media_list_pair=(None, None),
+                animapping=None,
+                outcome=SyncOutcome.NOT_FOUND,
+                error_message=None,
+            )
+            self.sync_stats.track_item(item_id, SyncOutcome.NOT_FOUND)
 
     @abstractmethod
     async def _get_all_trackable_items(self, item: T) -> list[ItemIdentifier]:
@@ -315,7 +506,18 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
                     anilist_media.media_list_entry.id,
                     anilist_media.media_list_entry.media_id,
                 )
+
+                await self._create_sync_history(
+                    item=item,
+                    child_item=child_item,
+                    grandchild_items=grandchild_items,
+                    media_list_pair=(anilist_media_list, None),
+                    animapping=animapping,
+                    outcome=SyncOutcome.DELETED,
+                )
+
                 return SyncOutcome.DELETED
+
             return SyncOutcome.SKIPPED
 
         if not final_media_list.status:
@@ -336,6 +538,12 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
                 }"
             )
             self.queued_batch_requests.append(final_media_list)
+
+            # Store for batch history tracking
+            self.batch_history_items.append(
+                (item, child_item, anilist_media_list, final_media_list)
+            )
+
             return SyncOutcome.SYNCED  # Will be synced in batch
         else:
             log.info(
@@ -345,13 +553,43 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             log.success(
                 f"\t\tUPDATE: {MediaList.diff(anilist_media_list, final_media_list)}"
             )
-            await self.anilist_client.update_anime_entry(final_media_list)
 
-            log.success(
-                f"{self.__class__.__name__}: [{self.profile_name}] Synced {item.type} "
-                f"{debug_log_title} {debug_log_ids}"
-            )
-            return SyncOutcome.SYNCED
+            try:
+                await self.anilist_client.update_anime_entry(final_media_list)
+
+                log.success(
+                    f"{self.__class__.__name__}: [{self.profile_name}] Synced "
+                    f"{item.type} {debug_log_title} {debug_log_ids}"
+                )
+
+                await self._create_sync_history(
+                    item=item,
+                    child_item=child_item,
+                    grandchild_items=grandchild_items,
+                    media_list_pair=(anilist_media_list, final_media_list),
+                    animapping=animapping,
+                    outcome=SyncOutcome.SYNCED,
+                )
+
+                return SyncOutcome.SYNCED
+
+            except Exception as e:
+                log.error(
+                    f"Failed to sync {item.type} {debug_log_title} {debug_log_ids}",
+                    exc_info=True,
+                )
+
+                await self._create_sync_history(
+                    item=item,
+                    child_item=child_item,
+                    grandchild_items=grandchild_items,
+                    media_list_pair=(anilist_media_list, final_media_list),
+                    animapping=animapping,
+                    outcome=SyncOutcome.FAILED,
+                    error_message=str(e),
+                )
+
+                raise
 
     async def batch_sync(self) -> None:
         """Executes batch synchronization of queued media lists.
@@ -368,18 +606,49 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             f"with batch mode "
             f"$${{anilist_id: {[m.media_id for m in self.queued_batch_requests]}}}$$"
         )
+
         try:
             await self.anilist_client.batch_update_anime_entries(
                 self.queued_batch_requests
             )
+
             log.success(
                 f"{self.__class__.__name__}: [{self.profile_name}] Synced "
                 f"{len(self.queued_batch_requests)} items to AniList "
                 f"with batch mode $${{anilist_id: "
                 f"{[m.media_id for m in self.queued_batch_requests]}}}$$"
             )
+
+            for item, child_item, before_state, after_state in self.batch_history_items:
+                await self._create_sync_history(
+                    item=item,
+                    child_item=child_item,
+                    grandchild_items=None,
+                    media_list_pair=(before_state, after_state),
+                    animapping=None,
+                    outcome=SyncOutcome.SYNCED,
+                )
+
+        except Exception as e:
+            error_msg = str(e)
+            log.error(f"Batch sync failed: {e}", exc_info=True)
+
+            for item, child_item, before_state, after_state in self.batch_history_items:
+                await self._create_sync_history(
+                    item=item,
+                    child_item=child_item,
+                    grandchild_items=None,
+                    media_list_pair=(before_state, after_state),
+                    animapping=None,
+                    outcome=SyncOutcome.FAILED,
+                    error_message=error_msg,
+                )
+
+            raise
+
         finally:
             self.queued_batch_requests.clear()
+            self.batch_history_items.clear()
 
     async def _get_plex_media_list(
         self,
@@ -410,8 +679,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         }
 
         media_list = MediaList(
-            id=anilist_media.media_list_entry
-            and anilist_media.media_list_entry.id
+            id=(anilist_media.media_list_entry and anilist_media.media_list_entry.id)
             or 0,
             user_id=self.anilist_client.user.id,
             media_id=anilist_media.id,
@@ -727,10 +995,8 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             anilist_val = getattr(anilist_media_list, key)
 
             if (
-                self.destructive_sync
-                and plex_val is not None
-                or self._should_update_field(rule, plex_val, anilist_val)
-            ):
+                self.destructive_sync and plex_val is not None
+            ) or self._should_update_field(rule, plex_val, anilist_val):
                 setattr(res_media_list, key, plex_val)
 
         return res_media_list

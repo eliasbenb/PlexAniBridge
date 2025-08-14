@@ -1,6 +1,8 @@
 """Bridge Client Module."""
 
-from datetime import datetime, timedelta, timezone
+from __future__ import annotations
+
+from datetime import UTC, datetime, timedelta
 
 from plexapi.library import MovieSection, ShowSection
 from src import log
@@ -12,8 +14,10 @@ from src.core.sync import (
     MovieSyncClient,
     ShowSyncClient,
 )
-from src.models.housekeeping import Housekeeping
-from src.models.sync import ParsedGuids, SyncOutcome, SyncStats
+from src.core.sync.base import ParsedGuids
+from src.core.sync.stats import SyncStats
+from src.models.db.housekeeping import Housekeeping
+from src.models.db.sync_history import SyncOutcome
 
 __all__ = ["BridgeClient"]
 
@@ -86,7 +90,7 @@ class BridgeClient:
         """
         log.info(
             f"{self.__class__.__name__}: [{self.profile_name}] Initializing bridge "
-            f"client"
+            "client"
         )
 
         self.plex_client.clear_cache()
@@ -106,7 +110,7 @@ class BridgeClient:
         await self.anilist_client.close()
         await self.plex_client.close()
 
-    async def __aenter__(self) -> "BridgeClient":
+    async def __aenter__(self) -> BridgeClient:
         """Context manager enter method.
 
         Returns:
@@ -166,7 +170,9 @@ class BridgeClient:
             )
             ctx.session.commit()
 
-    async def sync(self, poll: bool = False) -> None:
+    async def sync(
+        self, poll: bool = False, rating_keys: list[str] | None = None
+    ) -> None:
         """Initiates the synchronization process for this profile.
 
         This is the main entry point for the sync process. It:
@@ -176,6 +182,8 @@ class BridgeClient:
 
         Args:
             poll (bool): Flag to enable polling scan mode, default False
+            rating_keys (list[str] | None): Optional list of Plex rating keys to
+                restrict the sync to.
         """
         log.info(
             f"{self.__class__.__name__}: [{self.profile_name}] Starting "
@@ -185,7 +193,7 @@ class BridgeClient:
             f"-> AniList user $$'{self.anilist_client.user.name}'$$"
         )
 
-        sync_start_time = datetime.now(timezone.utc)
+        sync_start_time = datetime.now(UTC)
 
         movie_sync = MovieSyncClient(
             anilist_client=self.anilist_client,
@@ -217,11 +225,11 @@ class BridgeClient:
         try:
             for section in plex_sections:
                 section_stats = await self._sync_section(
-                    section, poll, movie_sync, show_sync
+                    section, poll, movie_sync, show_sync, rating_keys=rating_keys
                 )
                 sync_stats = sync_stats.combine(section_stats)
 
-            sync_completion_time = datetime.now(timezone.utc)
+            sync_completion_time = datetime.now(UTC)
             duration = sync_completion_time - sync_start_time
 
             self._set_last_synced(sync_start_time)
@@ -238,13 +246,16 @@ class BridgeClient:
             unprocessed_items = sync_stats.get_grandchild_items_by_outcome(
                 SyncOutcome.PENDING
             )
-            log.debug(
-                f"{self.__class__.__name__}: [{self.profile_name}] "
-                f"Unprocessed items: {', '.join([repr(i) for i in unprocessed_items])}"
-            )
+            if unprocessed_items:
+                log.debug(
+                    f"{self.__class__.__name__}: [{self.profile_name}] "
+                    f"Unprocessed items: {
+                        ', '.join([repr(i) for i in unprocessed_items])
+                    }"
+                )
 
         except Exception as e:
-            end_time = datetime.now(timezone.utc)
+            end_time = datetime.now(UTC)
             duration = end_time - sync_start_time
 
             log.error(
@@ -260,6 +271,7 @@ class BridgeClient:
         poll: bool,
         movie_sync: MovieSyncClient,
         show_sync: ShowSyncClient,
+        rating_keys: list[str] | None = None,
     ) -> SyncStats:
         """Synchronizes a single Plex library section.
 
@@ -268,6 +280,8 @@ class BridgeClient:
             poll (bool): Flag to enable polling scan mode
             movie_sync (MovieSyncClient): Movie sync client
             show_sync (ShowSyncClient): Show sync client
+            rating_keys (list[str] | None): Optional list of Plex rating keys to
+                restrict sync to for this section.
 
         Returns:
             SyncStats: Statistics about the sync operation for the section
@@ -277,15 +291,16 @@ class BridgeClient:
             f"section $$'{section.title}'$$"
         )
 
-        min_last_modified = (
-            self.last_synced or datetime.now(timezone.utc)
-        ) - timedelta(seconds=15)
+        min_last_modified = (self.last_synced or datetime.now(UTC)) - timedelta(
+            seconds=15
+        )
 
         items = list(
             self.plex_client.get_section_items(
                 section,
                 min_last_modified=min_last_modified if poll else None,
                 require_watched=not self.profile_config.full_scan,
+                rating_keys=rating_keys,
             )
         )
 

@@ -1,12 +1,13 @@
 """PlexAniBridge Configuration Settings."""
 
+from __future__ import annotations
+
 import os
 from enum import StrEnum
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from pydantic.alias_generators import to_camel
-from pydantic.fields import _Unset
 from pydantic_settings import (
     BaseSettings,
     DotEnvSettingsSource,
@@ -19,11 +20,12 @@ from pydantic_settings import (
 from src.utils.logging import get_logger
 
 __all__ = [
+    "LogLevel",
+    "PlexAnibridgeConfig",
+    "PlexAnibridgeProfileConfig",
     "PlexMetadataSource",
     "SyncField",
-    "LogLevel",
-    "PlexAnibridgeProfileConfig",
-    "PlexAnibridgeConfig",
+    "SyncMode",
 ]
 
 _log = get_logger(log_name="PlexAniBridge", log_level="INFO")
@@ -54,7 +56,7 @@ class BaseStrEnum(StrEnum):
     """
 
     @classmethod
-    def _missing_(cls, value: object) -> "BaseStrEnum | None":
+    def _missing_(cls, value: object) -> BaseStrEnum | None:
         """Handle case-insensitive lookup for enum values.
 
         Args:
@@ -133,6 +135,46 @@ class SyncField(BaseStrEnum):
         return to_camel(self.value)
 
 
+class SyncMode(BaseStrEnum):
+    """Synchronization execution modes.
+
+    Multiple modes can be enabled simultaneously by specifying a list.
+
+    periodic: Periodic scans every `sync_interval` seconds
+    poll: Poll for incremental changes every 30 seconds
+    webhook: External webhook-triggered syncs, dependent on `pab_web_enabled`
+    """
+
+    PERIODIC = "periodic"
+    POLL = "poll"
+    WEBHOOK = "webhook"
+
+
+def _apply_deprecations(data: dict) -> dict:
+    """Translate deprecated/legacy configuration fields in-place.
+
+    Central location for all migrations of removed/renamed settings so the
+    logic does not become duplicated across validators / constructors.
+
+    Args:
+        data: Raw configuration mapping
+
+    Returns:
+        dict: Same mapping
+    """
+    if not isinstance(data, dict):
+        return data
+    if "polling_scan" in data:
+        _log.warning(
+            "The 'polling_scan' setting is deprecated and will be removed in the future"
+        )
+        if "sync_modes" not in data:
+            polling_val = data.pop("polling_scan")
+            if polling_val:
+                data["sync_modes"] = [SyncMode.POLL]
+    return data
+
+
 class PlexAnibridgeProfileConfig(BaseModel):
     """Configuration for a single PlexAniBridge profile.
 
@@ -140,19 +182,19 @@ class PlexAnibridgeProfileConfig(BaseModel):
     """
 
     anilist_token: str = Field(
-        _Unset,
+        ...,
         description="AniList API token for authentication",
     )
     plex_token: str = Field(
-        _Unset,
+        ...,
         description="Plex API token for authentication",
     )
     plex_user: str = Field(
-        _Unset,
+        ...,
         description="Plex username of target user",
     )
     plex_url: str = Field(
-        _Unset,
+        default=...,
         description="Plex server URL",
     )
     plex_sections: list[str] = Field(
@@ -169,12 +211,17 @@ class PlexAnibridgeProfileConfig(BaseModel):
     )
     sync_interval: int = Field(
         default=3600,
-        ge=-1,
-        description="Sync interval in seconds (-1 = run once)",
+        ge=0,
+        description="Sync interval in seconds",
     )
-    polling_scan: bool = Field(
-        default=False,
-        description="Poll for changes every 30 seconds instead of a periodic scan",
+    sync_modes: list[SyncMode] = Field(
+        default_factory=lambda: [SyncMode.PERIODIC],
+        description="List of enabled sync modes (periodic, poll, webhook)",
+    )
+    polling_scan: bool | None = Field(
+        default=None,
+        deprecated="Use sync_modes list instead; True maps to ['poll']",
+        exclude=True,
     )
     full_scan: bool = Field(
         default=False,
@@ -203,10 +250,10 @@ class PlexAnibridgeProfileConfig(BaseModel):
         description="Fuzzy search threshold",
     )
 
-    _parent: "PlexAnibridgeConfig | None" = None
+    _parent: PlexAnibridgeConfig | None = None
 
     @property
-    def parent(self) -> "PlexAnibridgeConfig":
+    def parent(self) -> PlexAnibridgeConfig:
         """Get the parent multi-config instance.
 
         Returns:
@@ -231,19 +278,6 @@ class PlexAnibridgeProfileConfig(BaseModel):
         """Get the global log level from parent config."""
         return self.parent.log_level
 
-    def validate_required_fields(self) -> None:
-        """Validates that required fields are provided.
-
-        Raises:
-            ValueError: If required fields are missing or empty
-        """
-        if not self.anilist_token or self.anilist_token == _Unset:
-            raise ValueError("ANILIST_TOKEN is required for each profile")
-        if not self.plex_token or self.plex_token == _Unset:
-            raise ValueError("PLEX_TOKEN is required for each profile")
-        if not self.plex_user or self.plex_user == _Unset:
-            raise ValueError("PLEX_USER is required for each profile")
-
     def __str__(self) -> str:
         """Creates a human-readable representation of the configuration.
 
@@ -252,17 +286,26 @@ class PlexAnibridgeProfileConfig(BaseModel):
                  values masked
         """
         secrets = ["anilist_token", "plex_token"]
-        return ", ".join(
-            [
-                f"{key.upper()}: {getattr(self, key)}"
-                if key not in secrets
-                else f"{key.upper()}: **********"
-                for key in self.__class__.model_fields
-                if not key.startswith("_") and getattr(self, key) != _Unset
-            ]
-        )
+        values: list[str] = []
+        for key in self.__class__.model_fields:
+            if key.startswith("_"):
+                continue
+            value = getattr(self, key)
+            if value is None:
+                continue
+            if key in secrets:
+                values.append(f"{key}: {'*' * 16}")
+            else:
+                values.append(f"{key}: {value}")
+        return ", ".join(values)
 
     model_config = ConfigDict(extra="forbid")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _translate_deprecated(cls, values):
+        """Apply centralized deprecated field translations for profile configs."""
+        return _apply_deprecations(values)
 
 
 class PlexAnibridgeConfig(BaseSettings):
@@ -285,6 +328,7 @@ class PlexAnibridgeConfig(BaseSettings):
             PAB_PROFILES__${PROFILE_NAME}__ANILIST_TOKEN: AniList token
             PAB_PROFILES__${PROFILE_NAME}__PLEX_TOKEN: Plex token
             PAB_PROFILES__${PROFILE_NAME}__PLEX_USER: Plex username
+            PAB_PROFILES__${PROFILE_NAME}__PLEX_URL: Plex server URL
             ... (all other PlexAnibridgeConfig settings)
 
     Example:
@@ -293,16 +337,18 @@ class PlexAnibridgeConfig(BaseSettings):
         PAB_PROFILES__personal__ANILIST_TOKEN=token1
         PAB_PROFILES__personal__PLEX_TOKEN=plex_token1
         PAB_PROFILES__personal__PLEX_USER=user1
+        PAB_PROFILES__personal__PLEX_URL=http://plex_url1
         PAB_PROFILES__family__ANILIST_TOKEN=token2
         PAB_PROFILES__family__PLEX_TOKEN=plex_token2
         PAB_PROFILES__family__PLEX_USER=user2
+        PAB_PROFILES__family__PLEX_URL=http://plex_url2
     """
 
     def __init__(self, **data) -> None:
         """Initialize the configuration with provided data."""
+        _apply_deprecations(data)
         super().__init__(**data)
         self._apply_global_defaults()
-        self._validate_profile_requirements()
 
     # Store raw profile data until after global defaults are applied
     raw_profiles: dict[str, dict] = Field(
@@ -355,12 +401,17 @@ class PlexAnibridgeConfig(BaseSettings):
     )
     sync_interval: int | None = Field(
         default=None,
-        ge=-1,
+        ge=0,
         description="Global default sync interval in seconds",
+    )
+    sync_modes: list[SyncMode] | None = Field(
+        default=None,
+        description="Global default list of sync modes",
     )
     polling_scan: bool | None = Field(
         default=None,
-        description="Global default polling scan setting",
+        deprecated="Use sync_modes list instead; True maps to ['poll']",
+        exclude=True,
     )
     full_scan: bool | None = Field(
         default=None,
@@ -388,48 +439,45 @@ class PlexAnibridgeConfig(BaseSettings):
         le=100,
         description="Global default search fallback threshold",
     )
+    web_enabled: bool = Field(
+        default=True,
+        description="Enable embedded FastAPI web UI server",
+    )
+    web_host: str = Field(
+        default="0.0.0.0",
+        description="Web server listen host",
+    )
+    web_port: int = Field(
+        default=4848,
+        description="Web server listen port",
+    )
+
+    @staticmethod
+    def _shared_profile_fields() -> set[str]:
+        """Compute field names present in both the global and per-profile models."""
+        return set(PlexAnibridgeProfileConfig.model_fields).intersection(
+            PlexAnibridgeConfig.model_fields
+        )
 
     def _apply_global_defaults(self) -> None:
-        """Apply global defaults and create profile instances."""
-        # Get all field names that exist in both configs (excluding multi-config fields)
-        config_fields = set(PlexAnibridgeProfileConfig.model_fields.keys())
-        multi_config_fields = set(self.__class__.model_fields.keys())
-        shared_fields = config_fields.intersection(multi_config_fields)
-
-        # Create profile instances from raw data with global defaults applied
-        for profile_name, raw_config_data in self.raw_profiles.items():
-            # Start with a copy of the raw data
-            config_data = raw_config_data.copy()
-
-            # Apply global defaults for fields not present in profile data
+        """Apply global defaults and instantiate profile configs from raw profiles."""
+        shared_fields = self._shared_profile_fields()
+        for profile_name, raw_config in self.raw_profiles.items():
+            config_data = _apply_deprecations(raw_config.copy())
             for field_name in shared_fields:
-                global_value = getattr(self, field_name)
-
-                # Apply global default if:
-                # 1. Global value is not None
-                # 2. Field is not set in profile data or is set to default
-                if global_value is not None and field_name not in config_data:
-                    config_data[field_name] = global_value
-
+                if field_name not in config_data:
+                    global_value = getattr(self, field_name)
+                    if global_value is not None:
+                        config_data[field_name] = global_value
             try:
-                config = PlexAnibridgeProfileConfig(**config_data)
-                config._parent = self
-                self.profiles[profile_name] = config
+                profile = PlexAnibridgeProfileConfig(**config_data)
+                profile._parent = self
+                self.profiles[profile_name] = profile
             except Exception as e:
                 _log.error(
                     f"{self.__class__.__name__}: Failed to create profile "
                     f"$$'{profile_name}'$$: {e}"
                 )
-                raise ValueError(
-                    f"Invalid configuration for profile '{profile_name}': {e}"
-                ) from e
-
-    def _validate_profile_requirements(self) -> None:
-        """Validate all profiles after global defaults are applied."""
-        for profile_name, config in self.profiles.items():
-            try:
-                config.validate_required_fields()
-            except ValueError as e:
                 raise ValueError(
                     f"Invalid configuration for profile '{profile_name}': {e}"
                 ) from e
@@ -448,6 +496,7 @@ class PlexAnibridgeConfig(BaseSettings):
     @classmethod
     def extract_raw_profiles(cls, values):
         """Extract raw profile data before main validation."""
+        values = _apply_deprecations(values)
         if isinstance(values, dict) and "profiles" in values:
             raw_profiles = values.get("profiles", {})
             if isinstance(raw_profiles, dict):
@@ -457,7 +506,7 @@ class PlexAnibridgeConfig(BaseSettings):
         return values
 
     @model_validator(mode="after")
-    def validate_global_config(self) -> "PlexAnibridgeConfig":
+    def validate_global_config(self) -> PlexAnibridgeConfig:
         """Validates global configuration settings.
 
         Returns:
@@ -466,46 +515,27 @@ class PlexAnibridgeConfig(BaseSettings):
         Raises:
             ValueError: If required global settings are missing or invalid
         """
-        self.data_path = Path(self.data_path).resolve()  # Ensure data path is absolute
+        self.data_path = Path(self.data_path).resolve()
 
-        # If no profiles are provided, try to create a default config from global
-        # settings
+        # If there are no explicit profiles, attempt to bootstrap a default from globals
         if not self.raw_profiles and not self.profiles:
-            if (
-                self.anilist_token
-                and self.anilist_token != _Unset
-                and self.plex_token
-                and self.plex_token != _Unset
-                and self.plex_user
-                and self.plex_user != _Unset
-            ):
+            if self.anilist_token and self.plex_token and self.plex_user:
                 _log.info(
-                    f"{self.__class__.__name__}: No profiles configured, creating "
-                    f"default profile from global settings"
+                    f"{self.__class__.__name__}: No profiles configured; "
+                    "creating implicit 'default' profile from globals"
                 )
-
-                default_config_data = {}
-
-                config_fields = set(PlexAnibridgeProfileConfig.model_fields.keys())
-                multi_config_fields = set(self.__class__.model_fields.keys())
-                shared_fields = config_fields.intersection(multi_config_fields)
-
-                for field_name in shared_fields:
-                    global_value = getattr(self, field_name)
-                    if global_value is not None:
-                        default_config_data[field_name] = global_value
-
-                # Store as raw data so it gets processed normally
-                self.raw_profiles["default"] = default_config_data
+                default_config = {}
+                for field_name in self._shared_profile_fields():
+                    value = getattr(self, field_name)
+                    if value is not None:
+                        default_config[field_name] = value
+                self.raw_profiles["default"] = default_config
             else:
                 raise ValueError(
-                    "No sync profiles configured and insufficient global settings for "
-                    "default profile. Please either:\n1. Set up at least one profile "
-                    "using PAB_PROFILES__${PROFILE_NAME}__ANILIST_TOKEN, "
-                    "PAB_PROFILES__${PROFILE_NAME}__PLEX_TOKEN, and "
-                    "PAB_PROFILES__${PROFILE_NAME}__PLEX_USER, or\n2. Provide global "
-                    "defaults using PAB_ANILIST_TOKEN, PAB_PLEX_TOKEN, and "
-                    "PAB_PLEX_USER"
+                    "No sufficiently populated sync profiles are configured. Either "
+                    "define at least one profile via PAB_PROFILES__${PROFILE}__* or "
+                    "set global PAB_ANILIST_TOKEN, PAB_PLEX_TOKEN, PAB_PLEX_USER, and "
+                    "PAB_PLEX_URL."
                 )
 
         return self

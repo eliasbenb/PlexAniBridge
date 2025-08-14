@@ -1,5 +1,7 @@
 """Plex Community Client Module."""
 
+from __future__ import annotations
+
 import asyncio
 from typing import Any
 
@@ -42,7 +44,7 @@ class PlexCommunityClient:
         if self._session and not self._session.closed:
             await self._session.close()
 
-    async def __aenter__(self) -> "PlexCommunityClient":
+    async def __aenter__(self) -> PlexCommunityClient:
         """Context manager enter method.
 
         Returns:
@@ -247,7 +249,7 @@ class PlexCommunityClient:
 
                 return await response.json()
 
-        except (aiohttp.ClientError, asyncio.TimeoutError):
+        except (TimeoutError, aiohttp.ClientError):
             log.error(
                 f"{self.__class__.__name__}: Connection error while making request to "
                 f"the Plex Community API"

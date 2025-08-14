@@ -24,17 +24,20 @@ The smart way to keep your AniList profile perfectly synchronized with your Plex
 
 ```yaml
 services:
-  plexanibridge:
-    image: ghcr.io/eliasbenb/plexanibridge:v1
-    environment:
-      PUID: 1000
-      PGID: 1000
-      TZ: Etc/UTC
-      PAB_ANILIST_TOKEN: eyJ...
-      PAB_PLEX_TOKEN: 2Sb...
-      PAB_PLEX_USER: username
-      PAB_PLEX_URL: http://plex:32400
-    volumes:
-      - /path/to/plexanibridge/data:/config
-    restart: unless-stopped
+    plexanibridge:
+        image: ghcr.io/eliasbenb/plexanibridge:v1
+        environment:
+            PUID: 1000
+            PGID: 1000
+            UMASK: 022
+            TZ: Etc/UTC
+            PAB_ANILIST_TOKEN: ...
+            PAB_PLEX_TOKEN: ...
+            PAB_PLEX_USER: ...
+            PAB_PLEX_URL: ...
+        volumes:
+            - /path/to/plexanibridge/data:/config
+        # ports:
+        #  - 4848:4848
+        restart: unless-stopped
 ```

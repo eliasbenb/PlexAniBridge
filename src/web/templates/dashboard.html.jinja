@@ -1,0 +1,186 @@
+{% extends "base.html.jinja" %}
+{% from "components/ui.html.jinja" import button, badge, section_heading %}
+{% block content %}
+    <div x-data="statusFeed()" x-init="init()" class="space-y-6">
+        <!-- Header / Controls -->
+        <div class="space-y-2">
+            {{ section_heading('lucide:users','Profiles',
+                        '<span class="hidden sm:inline"><span x-text="profileCount()"></span> total <template x-if="lastRefreshed">• updated <span x-text="formatTimeAgo(lastRefreshed)"></span></template></span>',
+                        button('Full Sync All','success','sm',None,None,False,'','@click="syncAll(false)"') ~ button('Poll Sync All','primary','sm',None,None,False,'','@click="syncAll(true)"') ) }}
+            <div class="flex items-center gap-2 text-xs">
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-medium ring-1"
+                      :class="isWsOpen ? 'bg-emerald-900/30 text-emerald-300 ring-emerald-700/40' : 'bg-amber-900/30 text-amber-300 ring-amber-700/40'">
+                    <span class="w-1.5 h-1.5 rounded-md"
+                          :class="isWsOpen ? 'bg-emerald-400' : 'bg-amber-400'"></span>
+                    <span x-text="isWsOpen ? 'Live' : 'Reconnecting…'"></span>
+                </span>
+            </div>
+        </div>
+        <!-- Grid / Cards -->
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <!-- Loading skeletons -->
+            <template x-if="isLoading && profileCount() === 0">
+                <template x-for="i in 3" :key="'sk-'+i">
+                    <div class="border border-slate-800/60 rounded-md p-4 bg-slate-900/40 animate-pulse">
+                        <div class="h-4 w-1/3 bg-slate-700/60 rounded-md"></div>
+                        <div class="mt-3 h-3 w-1/2 bg-slate-800/60 rounded-md"></div>
+                        <div class="mt-3 flex gap-2">
+                            <div class="h-6 w-20 bg-slate-800/60 rounded-md"></div>
+                            <div class="h-6 w-24 bg-slate-800/60 rounded-md"></div>
+                            <div class="h-6 w-16 bg-slate-800/60 rounded-md"></div>
+                        </div>
+                    </div>
+                </template>
+            </template>
+            <!-- Profile cards -->
+            <template x-for="([name, p], idx) in profileEntries()" :key="name">
+                <div class="group border border-slate-800/80 rounded-md p-4 bg-slate-900/40 hover:bg-slate-900/60 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                     @click="goTimeline(name)"
+                     @keydown.enter.prevent="goTimeline(name)"
+                     @keydown.space.prevent="goTimeline(name)"
+                     tabindex="0"
+                     :title="'Open timeline for '+name">
+                    <div class="flex items-start justify-between gap-2">
+                        <div>
+                            <div class="font-medium text-slate-100" x-text="name"></div>
+                            <div class="text-xs text-slate-400 mt-1">
+                                <template x-if="p?.status?.last_synced">
+                                    <span :title="new Date(p.status.last_synced + 'Z').toLocaleString()">
+                                        Last sync · <span x-text="formatTimeAgo(p.status.last_synced)"></span>
+                                    </span>
+                                </template>
+                                <template x-if="!p?.status?.last_synced">
+                                    <span>No sync yet</span>
+                                </template>
+                            </div>
+                        </div>
+                        <div class="flex shrink-0 gap-2 items-start">
+                            <a :href="'/timeline/'+name"
+                               @click.stop
+                               class="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-md bg-indigo-600/90 hover:bg-indigo-500 text-white shadow-sm">
+                                <span>Timeline</span>
+                                <iconify-icon icon="lucide:chevron-right" inline></iconify-icon>
+                            </a>
+                            <button @click.stop="sync(name,false)"
+                                    class="text-[11px] px-2 py-1 rounded-md bg-emerald-600/90 hover:bg-emerald-500 text-white">
+                                Full
+                            </button>
+                            <button @click.stop="sync(name,true)"
+                                    class="text-[11px] px-2 py-1 rounded-md bg-blue-600/90 hover:bg-blue-500 text-white">
+                                Poll
+                            </button>
+                        </div>
+                    </div>
+                    <div class="mt-3 text-xs flex flex-wrap gap-2">
+                        <span class="px-2 py-1 rounded-md bg-slate-800/80 text-slate-200"
+                              x-text="p?.config?.anilist_user"></span>
+                        <span class="px-2 py-1 rounded-md bg-slate-800/80 text-slate-300"
+                              x-text="'Interval: ' + (p?.config?.sync_interval ?? '-')"></span>
+                        <template x-if="(p?.config?.sync_modes && p.config.sync_modes.includes('periodic'))">
+                            <span class="px-2 py-1 rounded-md bg-blue-900/50 text-blue-200">Periodic Scan</span>
+                        </template>
+                        <template x-if="p?.config?.sync_modes?.includes('poll')">
+                            <span class="px-2 py-1 rounded-md bg-blue-900/50 text-blue-200">Poll Scan</span>
+                        </template>
+                        <template x-if="p?.config?.sync_modes?.includes('webhook')">
+                            <span class="px-2 py-1 rounded-md bg-blue-900/50 text-blue-200">Webhook Scan</span>
+                        </template>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </div>
+    <script>
+        function statusFeed() {
+            return {
+                profiles: {},
+                ws: null,
+                isLoading: true,
+                isWsOpen: false,
+                lastRefreshed: null,
+                toast(msg, level = 'error') {
+                    try {
+                        if (window.notify && notify.toast) notify.toast(msg, level);
+                    } catch (_) {}
+                },
+                init() {
+                    this.refresh();
+                    this.openWs();
+                },
+                profileCount() {
+                    return Object.keys(this.profiles || {}).length;
+                },
+                profileEntries() {
+                    // Sort entries by name for consistent rendering
+                    const entries = Object.entries(this.profiles || {});
+                    entries.sort((a, b) => a[0].localeCompare(b[0]));
+                    return entries;
+                },
+                openWs() {
+                    const url = getWsBase() + '/ws/status';
+                    this.ws = new WebSocket(url);
+                    this.ws.onopen = () => {
+                        this.isWsOpen = true;
+                    };
+                    this.ws.onmessage = (ev) => {
+                        try {
+                            const data = JSON.parse(ev.data);
+                            if (data && data.profiles) {
+                                this.profiles = data.profiles || {};
+                                this.isLoading = false;
+                                this.lastRefreshed = Date.now();
+                            }
+                        } catch (_) {}
+                    };
+                    this.ws.onclose = () => {
+                        this.isWsOpen = false;
+                        setTimeout(() => this.openWs(), 2000);
+                    };
+                },
+                refresh() {
+                    fetch('/api/status')
+                        .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
+                        .then(d => {
+                            this.profiles = d?.profiles || {};
+                            this.isLoading = false;
+                            this.lastRefreshed = Date.now();
+                        })
+                        .catch(e => {
+                            this.toast('Failed to load status: ' + (e && e.message ? e.message : String(e)));
+                        });
+                },
+                syncAll(poll) {
+                    fetch('/api/sync?poll=' + poll, {
+                            method: 'POST'
+                        })
+                        .then(() => this.refresh())
+                        .catch(e => this.toast('Sync all failed: ' + (e && e.message ? e.message : String(e))));
+                },
+                sync(name, poll) {
+                    fetch('/api/sync/' + name + '?poll=' + poll, {
+                            method: 'POST'
+                        })
+                        .then(() => this.refresh())
+                        .catch(e => this.toast('Sync ' + name + ' failed: ' + (e && e.message ? e.message : String(e))));
+                },
+                goTimeline(name) {
+                    if (!name) return;
+                    window.location = '/timeline/' + name;
+                },
+                formatTimeAgo(ts) {
+                    if (!ts) return '—';
+                    const d = new Date(ts);
+                    const diff = Math.max(0, Date.now() - d.getTime());
+                    const sec = Math.floor(diff / 1000);
+                    if (sec < 45) return 'just now';
+                    const min = Math.floor(sec / 60);
+                    if (min < 60) return `${min}m ago`;
+                    const hr = Math.floor(min / 60);
+                    if (hr < 24) return `${hr}h ago`;
+                    const day = Math.floor(hr / 24);
+                    return `${day}d ago`;
+                }
+            }
+        }
+    </script>
+{% endblock content %}

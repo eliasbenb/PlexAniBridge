@@ -5,6 +5,7 @@ import re
 import sys
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
+from typing import ClassVar
 
 import colorama
 from colorama import Fore, Style
@@ -31,7 +32,7 @@ class ColorFormatter(logging.Formatter):
         Bracketed values: Dimmed (e.g., $${key: value}$$)
     """
 
-    COLORS = {
+    COLORS: ClassVar[dict[str, str]] = {
         "DEBUG": Fore.CYAN,
         "INFO": Fore.GREEN,
         "SUCCESS": Fore.GREEN + Style.BRIGHT,
@@ -139,6 +140,9 @@ class Logger(logging.Logger):
             **kwargs: Arbitrary keyword arguments
         """
         if self.isEnabledFor(self.SUCCESS):
+            # Report caller's location (file:line) instead of this wrapper
+            # Respect an explicitly provided stacklevel if passed
+            kwargs.setdefault("stacklevel", 2)
             self._log(self.SUCCESS, msg, args, **kwargs)
 
     def setup(self, log_level: str, log_dir: str | None = None) -> None:

@@ -1,5 +1,7 @@
 """Plex Metadata API Module."""
 
+from __future__ import annotations
+
 from collections import defaultdict
 from collections.abc import Callable
 from functools import cached_property, wraps
@@ -39,7 +41,7 @@ def original_server(func: Callable[..., Any]) -> Callable[..., Any]:
     """
 
     @wraps(func)
-    def wrapper(self: "PlexMetadataObject", *args: Any, **kwargs: Any) -> Any:
+    def wrapper(self: PlexMetadataObject, *args: Any, **kwargs: Any) -> Any:
         original_url = self._server._baseurl
         original_token = self._server._token
         try:
@@ -65,7 +67,7 @@ def discover_server(func: Callable[..., Any]) -> Callable[..., Any]:
     """
 
     @wraps(func)
-    def wrapper(self: "PlexMetadataObject", *args: Any, **kwargs: Any) -> Any:
+    def wrapper(self: PlexMetadataObject, *args: Any, **kwargs: Any) -> Any:
         original_url = self._server._baseurl
         original_token = self._server._token
         try:
@@ -91,7 +93,7 @@ def metadata_server(func: Callable[..., Any]) -> Callable[..., Any]:
     """
 
     @wraps(func)
-    def wrapper(self: "PlexMetadataObject", *args: Any, **kwargs: Any) -> Any:
+    def wrapper(self: PlexMetadataObject, *args: Any, **kwargs: Any) -> Any:
         original_url = self._server._baseurl
         original_token = self._server._token
         try:

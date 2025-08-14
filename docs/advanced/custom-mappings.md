@@ -40,10 +40,6 @@ Below is an example mappings file. You can use [the JSON schema](https://github.
     }
     ```
 
-!!! tip "Mapping File Formats"
-
-    JSON or YAML can be used as the format for the custom mappings file. The file extension determines the format of the file (`.json`, `.yaml`, or `.yml`).
-
 ## Local Custom Mappings
 
 PlexAniBridge will look for a custom mappings file with the name `mappings.custom.(json|yaml|yml)` in the `PAB_DATA_PATH` directory. The file extension determines the format of the file (JSON or YAML).
@@ -60,5 +56,3 @@ There are community maintained mappings repositories that you can use to get pre
 ## Default Mappings
 
 If you want to contribute your custom mappings to the community, you can submit a pull request to the [PlexAniBridge-Mappings](https://github.com/eliasbenb/PlexAniBridge-Mappings) repository. Your pull request should modify the [`mappings.edits.json`](https://github.com/eliasbenb/PlexAniBridge-Mappings/blob/HEAD/mappings.edits.json) and **not** the [`mappings.json`](https://github.com/eliasbenb/PlexAniBridge-Mappings/blob/HEAD/mappings.json) file.
-
-To browse the existing mappings with a web UI, you can use the [PlexAniBridge-Mappings Query Builder](https://plexanibridge-mappings.elias.eu.org).

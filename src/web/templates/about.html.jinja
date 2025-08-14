@@ -1,0 +1,53 @@
+{% extends "base.html.jinja" %}
+{% from "components/ui.html.jinja" import section_heading, card %}
+{% block title %}
+    PlexAniBridge - About
+{% endblock title %}
+{% block content %}
+    <div class="space-y-8">
+        {{ section_heading('lucide:activity', 'About', None, None) }}
+        <div class="space-y-4 max-w-prose text-slate-300">
+            <p class="text-sm">
+                PlexAniBridge synchronizes your Plex watch history, ratings, and reviews with your AniList profile. Below you can find runtime diagnostics and scheduler status to help with troubleshooting.
+            </p>
+            <p class="text-xs leading-relaxed">
+                Source code is available on <a href="https://github.com/eliasbenb/PlexAniBridge"
+    class="text-blue-400 hover:underline"
+    target="_blank"
+    rel="noopener">GitHub</a> under the MIT license. If you encounter issues, open an issue on GitHub or check the logs section in the sidebar.
+            </p>
+        </div>
+        <div class="grid gap-4 md:grid-cols-3">
+            <div class="rounded-md border border-slate-800 bg-slate-900/50 p-4 space-y-2">
+                <h3 class="font-medium text-slate-200 text-sm tracking-wide">Runtime</h3>
+                <ul class="text-[11px] text-slate-300 space-y-1">
+                    <li>
+                        <span class="text-slate-500">Version:</span> {{ info.version }}
+                    </li>
+                    <li>
+                        <span class="text-slate-500">Git Hash:</span> {{ info.git_hash }}
+                    </li>
+                    <li>
+                        <span class="text-slate-500">Python:</span> {{ info.python }}
+                    </li>
+                    <li class="break-all">
+                        <span class="text-slate-500">Platform:</span> {{ info.platform }}
+                    </li>
+                    <li>
+                        <span class="text-slate-500">Started:</span> {{ info.started_at }}
+                    </li>
+                    <li>
+                        <span class="text-slate-500">Uptime:</span> {{ info.uptime }}
+                    </li>
+                    <li>
+                        <span class="text-slate-500">UTC Now:</span> {{ info.utc_now }}
+                    </li>
+                </ul>
+            </div>
+            <div class="rounded-md border border-slate-800 bg-slate-900/50 p-4 space-y-2 md:col-span-2">
+                <h3 class="font-medium text-slate-200 text-sm tracking-wide">Scheduler Status</h3>
+                <pre class="text-[11px] overflow-auto max-h-72 bg-slate-950/60 p-2 rounded-md border border-slate-800">{{ status | tojson(indent=2) }}</pre>
+            </div>
+        </div>
+    </div>
+{% endblock content %}

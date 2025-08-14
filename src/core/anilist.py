@@ -1,10 +1,12 @@
 """AniList Client."""
 
+from __future__ import annotations
+
 import asyncio
 import contextlib
 import json
 from collections.abc import AsyncIterator
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -13,7 +15,7 @@ from async_lru import alru_cache
 from limiter import Limiter
 
 from src import __version__, log
-from src.models.anilist import (
+from src.models.schemas.anilist import (
     Media,
     MediaFormat,
     MediaList,
@@ -78,7 +80,7 @@ class AniListClient:
         if self._session and not self._session.closed:
             await self._session.close()
 
-    async def __aenter__(self) -> "AniListClient":
+    async def __aenter__(self) -> AniListClient:
         """Async context manager entry.
 
         Returns:
@@ -136,10 +138,10 @@ class AniListClient:
             if self.user.options and self.user.options.timezone:
                 hours, minutes = map(int, self.user.options.timezone.split(":"))
             else:
-                return timezone.utc
+                return UTC
             return timezone(timedelta(hours=hours, minutes=minutes))
         except (AttributeError, ValueError):
-            return timezone.utc
+            return UTC
 
     async def update_anime_entry(self, media_list_entry: MediaList) -> None:
         """Updates an anime entry on the authenticated user's list.
@@ -603,7 +605,9 @@ class AniListClient:
         )
 
         backup_file.write_text(data_without_media.model_dump_json())
-        log.info(f"{self.__class__.__name__}: Exported AniList data to '{backup_file}'")
+        log.info(
+            f"{self.__class__.__name__}: Exported AniList data to $$'{backup_file}'$$"
+        )
 
         cutoff_date = datetime.now() - timedelta(days=self.BACKUP_RETENTION_DAYS)
 
@@ -692,7 +696,7 @@ class AniListClient:
                     )
                     await asyncio.sleep(retry_after + 1)
                     return await self._make_request(
-                        query=query, variables=variables, retry_count=retry_count
+                        query=query, variables=variables, retry_count=retry_count + 1
                     )
                 elif response.status == 502:  # Bad Gateway
                     log.warning(
@@ -716,7 +720,7 @@ class AniListClient:
 
                 return await response.json()
 
-        except (aiohttp.ClientError, asyncio.TimeoutError):
+        except (TimeoutError, aiohttp.ClientError):
             log.error(
                 f"{self.__class__.__name__}: Connection error while making request to "
                 f"AniList API"

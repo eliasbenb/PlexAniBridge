@@ -1,7 +1,9 @@
 """Plex Client Module."""
 
+from __future__ import annotations
+
 from collections.abc import Iterator
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from math import isnan
 from typing import TypeAlias
 from urllib.parse import urlparse
@@ -29,7 +31,7 @@ from src.plexapi.community import PlexCommunityClient
 from src.plexapi.metadata import PlexMetadataServer
 from src.utils.requests import SelectiveVerifySession
 
-__all__ = ["Media", "MediaHistory", "Section", "PlexClient"]
+__all__ = ["Media", "MediaHistory", "PlexClient", "Section"]
 
 Media: TypeAlias = Movie | Show | Season | Episode
 MediaHistory: TypeAlias = MovieHistory | EpisodeHistory
@@ -93,7 +95,7 @@ class PlexClient:
         if hasattr(self, "community_client"):
             await self.community_client.close()
 
-    async def __aenter__(self) -> "PlexClient":
+    async def __aenter__(self) -> PlexClient:
         """Context manager enter method.
 
         Returns:
@@ -164,10 +166,10 @@ class PlexClient:
 
         if self.is_online_user and self.online_client:
             self.user_client = self.online_client
-            self.user_account_id = 1
+            self.user_account_id = admin_account.id
         elif self.is_admin_user:
             self.user_client = self.admin_client
-            self.user_account_id = 1
+            self.user_account_id = admin_account.id
         else:
             if self.plex_metadata_source == PlexMetadataSource.ONLINE:
                 log.warning(
@@ -184,7 +186,7 @@ class PlexClient:
             except Exception as e:
                 raise ValueError(
                     f"{self.__class__.__name__}: Failed to switch to user "
-                    f"$$'{self.plex_user}'$$"
+                    f"'{self.plex_user}'"
                 ) from e
 
         log.debug(
@@ -290,6 +292,7 @@ class PlexClient:
         section: Section,
         min_last_modified: datetime | None = None,
         require_watched: bool = False,
+        rating_keys: list[str] | None = None,
         **kwargs,
     ) -> Iterator[Media]:
         """Retrieve items from a specified Plex library section with optional filtering.
@@ -302,8 +305,13 @@ class PlexClient:
                 least once.
             **kwargs: Additional keyword arguments passed to section.search().
 
+        Args (extended):
+            rating_keys: Optional list of rating keys to restrict results to. If
+                provided, only items whose ratingKey matches one of the values will
+                be yielded. (Strings or ints coerced to string)
+
         Yields:
-            Media: Media items matching the criteria
+            Media: Media items matching the criteria.
         """
         filters: dict[str, list] = {"and": []}
 
@@ -359,7 +367,7 @@ class PlexClient:
                 f"by items that have been watched"
             )
 
-            epoch = datetime.fromtimestamp(0, tz=timezone.utc)
+            epoch = datetime.fromtimestamp(0, tz=UTC)
 
             if section.TYPE == "movie":
                 filters["and"].append(
@@ -402,7 +410,14 @@ class PlexClient:
             )
             filters["and"].append({"genre": self.plex_genres})
 
-        yield from section.search(filters=filters, **kwargs)
+        # Perform base search
+        items = section.search(filters=filters, **kwargs)
+
+        if rating_keys:
+            rk_set = {str(rk) for rk in rating_keys}
+            yield from (i for i in items if str(i.ratingKey) in rk_set)
+        else:
+            yield from items
 
     @alru_cache(maxsize=1024, ttl=30)
     async def get_user_review(self, item: Media) -> str | None:

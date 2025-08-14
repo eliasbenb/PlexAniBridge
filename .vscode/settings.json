@@ -2,8 +2,17 @@
     "[python]": {
         "editor.defaultFormatter": "charliermarsh.ruff"
     },
-    "python.defaultInterpreterPath": ".venv/bin/python",
+    "[jinja][jinja-html]": {
+        "djlint.enableLinting": true,
+        "editor.defaultFormatter": "monosans.djlint"
+    },
+    "editor.detectIndentation": false,
+    "editor.formatOnSave": true,
+    "editor.insertSpaces": true,
+    "editor.tabSize": 4,
+    "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
     "python.envFile": "",
+    "python.terminal.activateEnvInCurrentTerminal": true,
     "ruff.fixAll": true,
     "ruff.organizeImports": true,
     "yaml.customTags": [

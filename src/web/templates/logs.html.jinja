@@ -1,0 +1,465 @@
+{% extends "base.html.jinja" %}
+{% from "components/ui.html.jinja" import section_heading, button %}
+{% block title %}
+    PlexAniBridge - Logs
+{% endblock title %}
+{% block content %}
+    <div x-data="logViewer()" x-init="init()" class="space-y-6">
+        {{ section_heading('lucide:terminal', 'Logs', '<span class="text-xs text-slate-400">Live stream & archived history</span>') }}
+        <!-- Tabs -->
+        <div class="flex items-center gap-2 border-b border-slate-800/70">
+            <button @click="switchTab('live')"
+                    :class="tab==='live' ? 'bg-slate-800/80 text-slate-100' : 'text-slate-400 hover:text-slate-200'"
+                    class="px-4 h-9 text-xs font-medium rounded-t-md inline-flex items-center gap-1">
+                <iconify-icon icon="lucide:activity" class="text-[13px]"></iconify-icon>
+                Live
+                <span class="w-1.5 h-1.5 rounded-full ml-1"
+                      :class="isWsOpen ? 'bg-emerald-400' : 'bg-amber-400'"></span>
+            </button>
+            <button @click="switchTab('history')"
+                    :class="tab==='history' ? 'bg-slate-800/80 text-slate-100' : 'text-slate-400 hover:text-slate-200'"
+                    class="px-4 h-9 text-xs font-medium rounded-t-md inline-flex items-center gap-1">
+                <iconify-icon icon="lucide:folder-search" class="text-[13px]"></iconify-icon>
+                History
+            </button>
+            <div class="flex-1"></div>
+            <!-- Shared Controls -->
+            <div class="flex items-center gap-2 py-1">
+                <div class="relative">
+                    <select x-model="level"
+                            @change="persistPrefs(); applyFilter()"
+                            title="Minimum log level"
+                            aria-label="Minimum log level"
+                            class="h-8 bg-slate-900/70 focus:bg-slate-900 border border-slate-700/70 focus:border-slate-600 rounded-md pl-2 pr-7 text-[11px] shadow-sm">
+                        <option>DEBUG</option>
+                        <option>INFO</option>
+                        <option>SUCCESS</option>
+                        <option>WARNING</option>
+                        <option>ERROR</option>
+                    </select>
+                </div>
+                <div class="relative w-56">
+                    <input x-model.trim="search"
+                           @input.debounce.300ms="applyFilter()"
+                           placeholder="Search..."
+                           aria-label="Search logs"
+                           class="w-full h-8 bg-slate-900/70 focus:bg-slate-900 border border-slate-700/70 focus:border-slate-600 rounded-md pl-8 pr-8 text-[11px] placeholder:text-slate-500 shadow-sm" />
+                    <iconify-icon icon="lucide:search" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-[14px]"></iconify-icon>
+                    <button x-show="search"
+                            @click="search=''; applyFilter()"
+                            class="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 inline-flex items-center justify-center rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300"
+                            aria-label="Clear search">
+                        <iconify-icon icon="lucide:x" class="text-[14px]"></iconify-icon>
+                    </button>
+                </div>
+                <button @click="wrap=!wrap; persistPrefs()"
+                        :title="wrap ? 'Disable wrap' : 'Enable wrap'"
+                        class="h-8 w-8 inline-flex items-center justify-center rounded-md bg-slate-800 hover:bg-slate-700 ring-1 ring-slate-700/60 text-slate-300"
+                        :class="wrap ? 'bg-slate-700/80 text-slate-100' : ''"
+                        aria-label="Toggle wrap">
+                    <iconify-icon :icon="wrap ? 'lucide:wrap-text' : 'lucide:align-left'"></iconify-icon>
+                </button>
+                <template x-if="tab==='live'">
+                    <button @click="autoScroll=!autoScroll; persistPrefs()"
+                            :title="autoScroll ? 'Auto-scroll enabled' : 'Auto-scroll paused'"
+                            class="h-8 w-8 inline-flex items-center justify-center rounded-md ring-1 ring-slate-700/60"
+                            :class="autoScroll ? 'bg-emerald-600/90 hover:bg-emerald-500 text-white' : 'bg-slate-800 hover:bg-slate-700 text-slate-300'"
+                            aria-label="Toggle auto scroll">
+                        <iconify-icon :icon="autoScroll ? 'lucide:chevrons-down' : 'lucide:pause'"></iconify-icon>
+                    </button>
+                </template>
+                <template x-if="tab==='live'">
+                    <button @click="download()"
+                            class="h-8 w-8 inline-flex items-center justify-center rounded-md bg-emerald-700/70 hover:bg-emerald-600 text-emerald-50"
+                            title="Download live logs"
+                            aria-label="Download live logs">
+                        <iconify-icon icon="lucide:download"></iconify-icon>
+                    </button>
+                </template>
+                <template x-if="tab==='live'">
+                    <button @click="clear()"
+                            class="h-8 w-8 inline-flex items-center justify-center rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300"
+                            title="Clear live logs"
+                            aria-label="Clear live logs">
+                        <iconify-icon icon="lucide:trash-2"></iconify-icon>
+                    </button>
+                </template>
+                <template x-if="tab==='history'">
+                    <button @click="refreshFiles()"
+                            class="h-8 w-8 inline-flex items-center justify-center rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300"
+                            title="Refresh file list"
+                            aria-label="Refresh file list">
+                        <iconify-icon icon="lucide:refresh-cw"></iconify-icon>
+                    </button>
+                </template>
+            </div>
+        </div>
+        <!-- Content Area (fixed height) -->
+        <div class="relative rounded-md border border-slate-800/70 bg-slate-900/40 backdrop-blur-sm h-[75vh] flex flex-col overflow-hidden">
+            <!-- Live Tab -->
+            <div x-show="tab==='live'" class="flex flex-col h-full" x-cloak>
+                <div class="flex items-center gap-2 px-3 py-2 text-[11px] border-b border-slate-800/60 bg-slate-950/60">
+                    <span class="text-slate-400">Showing <span class="text-slate-200 font-medium" x-text="filtered.length"></span>/<span class="text-slate-500" x-text="logs.length"></span></span>
+                    <div class="flex items-center gap-2 ml-auto text-slate-500">
+                        <span class="hidden sm:inline"
+                              x-text="autoScroll ? 'Auto-scroll on' : 'Auto-scroll off'"></span>
+                        <span class="w-1.5 h-1.5 rounded-md"
+                              :class="isWsOpen ? 'bg-emerald-400' : 'bg-amber-400'"></span>
+                        <span class="hidden md:inline" x-show="lastReceived">Updated <span x-text="formatTimeAgo(lastReceived)"></span></span>
+                    </div>
+                </div>
+                <div class="flex-1 overflow-auto font-mono text-[11px] leading-normal p-1 scrollbar-thin"
+                     x-ref="scroller">
+                    <template x-for="(entry, idx) in filtered" :key="idx">
+                        <div class="flex items-start gap-2 px-2 py-0.5 border-l-2 pr-3 group"
+                             :class="entryClass(entry.level)">
+                            <span class="w-[54px] shrink-0 text-[10px] text-slate-500 tabular-nums text-right"
+                                  x-text="formatTime(entry)"></span>
+                            <span class="shrink-0 font-semibold tracking-wide text-[10px] px-1 rounded-md bg-slate-800/70 text-slate-300 h-5 flex items-center"
+                                  :class="badgeClass(entry.level)"
+                                  x-text="entry.level"></span>
+                            <span class="flex-1 text-slate-200 min-w-0"
+                                  :class="wrap ? 'whitespace-pre-wrap break-words' : 'whitespace-pre'"
+                                  x-html="formatMessage(entry.message)"></span>
+                        </div>
+                    </template>
+                    <p x-show="!filtered.length" class="text-slate-500 text-xs p-2">No log entries.</p>
+                </div>
+                <div class="flex flex-wrap gap-2 p-2 border-t border-slate-800/60 bg-slate-950/50 text-[11px] text-slate-400"
+                     x-show="logs.length">
+                    <span>Total: <span class="text-slate-200 font-medium" x-text="logs.length"></span></span>
+                    <template x-for="lvl in ['DEBUG','INFO','SUCCESS','WARNING','ERROR']"
+                              :key="lvl">
+                        <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-slate-800/70 border border-slate-700/60"
+                              :class="lvl===level ? 'ring-1 ring-emerald-500/40' : ''">
+                            <span x-text="lvl"></span>
+                            <span class="text-slate-500" x-text="countLevel(lvl)"></span>
+                        </span>
+                    </template>
+                </div>
+            </div>
+            <!-- History Tab -->
+            <div x-show="tab==='history'" class="flex flex-col h-full" x-cloak>
+                <div class="flex items-center justify-between gap-3 px-3 py-2 text-[11px] border-b border-slate-800/60 bg-slate-950/60">
+                    <div class="flex items-center gap-2">
+                        <span class="text-slate-400"
+                              x-text="currentFile ? currentFile.name : 'Select a file'"></span>
+                        <template x-if="historyEntries.length"><span class="text-slate-500">(<span class="text-slate-200" x-text="historyEntries.length"></span> lines)</span></template>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <select x-model.number="historyLines"
+                                @change="currentFile && loadFile(currentFile)"
+                                class="h-7 bg-slate-900/70 border border-slate-700/60 rounded-md text-[11px] px-1">
+                            <template x-for="n in [100,250,500,1000,2000]" :key="n">
+                                <option :value="n" x-text="n + ' lines'"></option>
+                            </template>
+                        </select>
+                        <button @click="if(currentFile) loadFile(currentFile, true)"
+                                class="h-7 w-7 inline-flex items-center justify-center rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300"
+                                title="Reload"
+                                aria-label="Reload file">
+                            <iconify-icon icon="lucide:refresh-cw"></iconify-icon>
+                        </button>
+                        <button @click="downloadHistory()"
+                                :disabled="!historyEntries.length"
+                                class="h-7 w-7 inline-flex items-center justify-center rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-40"
+                                title="Download file excerpt"
+                                aria-label="Download file excerpt">
+                            <iconify-icon icon="lucide:download"></iconify-icon>
+                        </button>
+                    </div>
+                </div>
+                <div class="flex flex-1 overflow-hidden">
+                    <!-- File List -->
+                    <div class="w-64 border-r border-slate-800/60 flex flex-col">
+                        <div class="text-[10px] px-3 py-1 border-b border-slate-800/60 text-slate-500"
+                             x-text="files.length + ' file' + (files.length===1?'':'s')"></div>
+                        <div class="flex-1 overflow-auto divide-y divide-slate-800/60">
+                            <template x-for="f in files" :key="f.name">
+                                <button @click="loadFile(f)"
+                                        class="w-full text-left px-3 py-2 group text-[11px] flex flex-col gap-0.5 hover:bg-slate-800/70"
+                                        :class="currentFile && currentFile.name===f.name ? 'bg-slate-800 ring-inset ring-1 ring-emerald-600/40' : ''">
+                                    <div class="flex items-center justify-between gap-2">
+                                        <span class="font-medium text-slate-200 truncate" x-text="f.name"></span>
+                                        <span class="text-[10px] px-1 rounded-md"
+                                              :class="f.current ? 'bg-emerald-700/30 text-emerald-300 border border-emerald-700/40' : 'bg-slate-800/70 text-slate-400'"
+                                              x-text="f.current ? 'active' : 'archived'"></span>
+                                    </div>
+                                    <div class="flex items-center gap-2 text-slate-500 text-[10px]">
+                                        <span x-text="formatFileTime(f.mtime)"></span><span>•</span><span x-text="formatSize(f.size)"></span>
+                                    </div>
+                                </button>
+                            </template>
+                            <p x-show="!files.length" class="text-[11px] text-slate-500 p-3">No log files found.</p>
+                        </div>
+                    </div>
+                    <!-- Viewer -->
+                    <div class="flex-1 flex flex-col">
+                        <div class="flex-1 overflow-auto font-mono text-[11px] leading-normal p-1 scrollbar-thin"
+                             x-ref="historyScroller">
+                            <template x-for="(entry, idx) in historyFiltered" :key="idx">
+                                <div class="flex items-start gap-2 px-2 py-0.5 border-l-2 pr-3 group"
+                                     :class="entryClass(entry.level)">
+                                    <span class="w-[54px] shrink-0 text-[10px] text-slate-500 tabular-nums text-right"
+                                          x-text="formatTime(entry)"></span>
+                                    <span class="shrink-0 font-semibold tracking-wide text-[10px] px-1 rounded-md bg-slate-800/70 text-slate-300 h-5 flex items-center"
+                                          :class="badgeClass(entry.level)"
+                                          x-text="entry.level"></span>
+                                    <span class="flex-1 text-slate-200 min-w-0"
+                                          :class="wrap ? 'whitespace-pre-wrap break-words' : 'whitespace-pre'"
+                                          x-html="formatMessage(entry.message)"></span>
+                                </div>
+                            </template>
+                            <p x-show="currentFile && !historyFiltered.length"
+                               class="text-slate-500 text-xs p-2">No lines match.</p>
+                            <p x-show="!currentFile" class="text-slate-500 text-xs p-2">Select a file to view its tail.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        function logViewer() {
+            return {
+                tab: 'live',
+                logs: [],
+                filtered: [],
+                files: [],
+                currentFile: null,
+                historyEntries: [],
+                historyFiltered: [],
+                historyLines: 500,
+                lastHistoryLinesLoaded: null,
+                level: 'INFO',
+                search: '',
+                autoScroll: true,
+                wrap: false,
+                ws: null,
+                isWsOpen: false,
+                lastReceived: null,
+                init() {
+                    this.loadPrefs();
+                    this.open();
+                    this.refreshFiles();
+                },
+                switchTab(t) {
+                    this.tab = t;
+                    try {
+                        localStorage.setItem('logs.tab', t);
+                    } catch {};
+                    if (t === 'live' && this.autoScroll) this.$nextTick(() => this.scrollToBottom());
+                },
+                open() {
+                    const url = getWsBase() + '/ws/logs';
+                    this.ws = new WebSocket(url);
+                    this.ws.onopen = () => {
+                        this.isWsOpen = true;
+                    };
+                    this.ws.onmessage = (ev) => {
+                        try {
+                            const d = JSON.parse(ev.data);
+                            if (d) {
+                                this.logs.push(d);
+                                this.lastReceived = Date.now();
+                                this.applyFilter();
+                                if (this.autoScroll) this.$nextTick(() => this.scrollToBottom());
+                            }
+                        } catch {}
+                    };
+                    this.ws.onclose = () => {
+                        this.isWsOpen = false;
+                        setTimeout(() => this.open(), 2000);
+                    };
+                },
+                scrollToBottom() {
+                    const el = this.$refs.scroller;
+                    if (!el) return;
+                    el.scrollTop = el.scrollHeight;
+                },
+                applyFilter() {
+                    const minRank = this.levelRank(this.level);
+                    const q = this.search?.toLowerCase() || '';
+                    this.filtered = this.logs.filter(l => this.levelRank(l.level) >= minRank && (!q || (l.message || '').toLowerCase().includes(q)));
+                    // Apply same filter logic to history
+                    this.historyFiltered = this.historyEntries.filter(l => this.levelRank(l.level) >= minRank && (!q || (l.message || '').toLowerCase().includes(q)));
+                },
+                levelRank(l) {
+                    return {
+                        DEBUG: 10,
+                        INFO: 20,
+                        SUCCESS: 25,
+                        WARNING: 30,
+                        ERROR: 40
+                    } [l] || 0;
+                },
+                entryClass(lvl) {
+                    return {
+                        DEBUG: 'border-l-slate-700/60',
+                        INFO: 'border-l-slate-600/60',
+                        SUCCESS: 'border-l-emerald-600/70',
+                        WARNING: 'border-l-amber-500/80',
+                        ERROR: 'border-l-red-600/80'
+                    } [lvl] || 'border-l-slate-700/60';
+                },
+                badgeClass(lvl) {
+                    return {
+                        DEBUG: 'bg-slate-800/70 text-slate-400',
+                        INFO: 'bg-slate-800/70 text-slate-300',
+                        SUCCESS: 'bg-emerald-700/30 text-emerald-300 border border-emerald-700/40',
+                        WARNING: 'bg-amber-700/30 text-amber-300 border border-amber-700/40',
+                        ERROR: 'bg-red-700/30 text-red-300 border border-red-700/40'
+                    } [lvl] || 'bg-slate-800/70 text-slate-300';
+                },
+                clear() {
+                    this.logs = [];
+                    this.filtered = [];
+                },
+                countLevel(lvl) {
+                    return this.logs.filter(l => l.level === lvl).length;
+                },
+                formatTime(entry) {
+                    if (entry.timestamp) {
+                        // Expecting ISO or epoch
+                        try {
+                            const d = typeof entry.timestamp === 'number' ? new Date(entry.timestamp) : new Date(entry.timestamp);
+                            return d.toLocaleTimeString([], {
+                                hour12: false
+                            });
+                        } catch {}
+                    }
+                    return '';
+                },
+                formatTimeAgo(ts) {
+                    if (!ts) return '';
+                    const diff = Math.floor((Date.now() - ts) / 1000);
+                    if (diff < 60) return diff + 's ago';
+                    const m = Math.floor(diff / 60);
+                    if (m < 60) return m + 'm ago';
+                    const h = Math.floor(m / 60);
+                    return h + 'h ago';
+                },
+                formatMessage(msg) {
+                    if (msg === null || msg === undefined) return '';
+                    // Ensure we work with a string
+                    let safe = String(msg);
+                    // Escape HTML to prevent injection before adding our spans
+                    safe = safe
+                        .replace(/&/g, '&amp;')
+                        .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    // Highlight $$'...'<span> pattern -> blue with quotes preserved
+                    // Pattern mirrors server-side formatter logic (non-greedy, allow internal single quotes not followed by $$)
+                    safe = safe.replace(/\$\$'((?:[^']|'(?!\$\$))*)'\$\$/g, (m, inner) => {
+                        return `<span class="text-sky-300">'${inner}'</span>`;
+                    });
+                    // Highlight $${...}$$ pattern -> dim / gray braces retained
+                    safe = safe.replace(/\$\$\{(.*?)\}\$\$/g, (m, inner) => {
+                        return `<span class="text-slate-400">{${inner}}</span>`;
+                    });
+                    return safe;
+                },
+                download() {
+                    if (!this.logs.length) return;
+                    const lines = this.logs.map(l => `[${l.level}] ${l.message}`);
+                    const blob = new Blob([lines.join('\n')], {
+                        type: 'text/plain'
+                    });
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(blob);
+                    a.download = 'logs-' + new Date().toISOString().replace(/[:T]/g, '-').slice(0, 19) + '.txt';
+                    document.body.appendChild(a);
+                    a.click();
+                    setTimeout(() => {
+                        URL.revokeObjectURL(a.href);
+                        a.remove();
+                    }, 100);
+                },
+                persistPrefs() {
+                    try {
+                        localStorage.setItem('logs.prefs', JSON.stringify({
+                            level: this.level,
+                            autoScroll: this.autoScroll,
+                            wrap: this.wrap
+                        }));
+                    } catch {}
+                },
+                loadPrefs() {
+                    try {
+                        const p = JSON.parse(localStorage.getItem('logs.prefs') || 'null');
+                        if (p) {
+                            this.level = p.level || this.level;
+                            this.autoScroll = !!p.autoScroll;
+                            this.wrap = !!p.wrap;
+                        }
+                        const t = localStorage.getItem('logs.tab');
+                        if (t) this.tab = t;
+                    } catch {}
+                },
+                async refreshFiles() {
+                    try {
+                        const r = await fetch('/api/logs/files');
+                        if (!r.ok) return;
+                        this.files = await r.json();
+
+                        if (!this.currentFile) {
+                            const active = this.files.find(f => f.current);
+                            if (active) {
+                                this.loadFile(active);
+                            }
+                        }
+                    } catch {}
+                },
+                async loadFile(f, force = false) {
+                    const sameFile = this.currentFile && this.currentFile.name === f.name;
+                    if (!force && sameFile && this.lastHistoryLinesLoaded === this.historyLines) return;
+                    this.currentFile = f;
+                    try {
+                        const r = await fetch(`/api/logs/file/${encodeURIComponent(f.name)}?lines=${this.historyLines}`);
+                        if (!r.ok) return;
+                        this.historyEntries = await r.json();
+                        this.lastHistoryLinesLoaded = this.historyLines;
+                        this.applyFilter();
+                        this.$nextTick(() => {
+                            const el = this.$refs.historyScroller;
+                            if (el) el.scrollTop = el.scrollHeight;
+                        });
+                    } catch {}
+                },
+                downloadHistory() {
+                    if (!this.historyEntries.length) return;
+                    const lines = this.historyEntries.map(l => `[${l.level}] ${l.message}`);
+                    const blob = new Blob([lines.join('\n')], {
+                        type: 'text/plain'
+                    });
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(blob);
+                    a.download = (this.currentFile ? this.currentFile.name.replace(/\.log.*/, '') : 'history') + '-excerpt-' + new Date().toISOString().replace(/[:T]/g, '-').slice(0, 19) + '.txt';
+                    document.body.appendChild(a);
+                    a.click();
+                    setTimeout(() => {
+                        URL.revokeObjectURL(a.href);
+                        a.remove();
+                    }, 100);
+                },
+                formatFileTime(ms) {
+                    try {
+                        return new Date(ms).toLocaleString();
+                    } catch {
+                        return '';
+                    }
+                },
+                formatSize(bytes) {
+                    if (bytes < 1024) return bytes + ' B';
+                    const units = ['KB', 'MB', 'GB'];
+                    let v = bytes / 1024;
+                    let i = 0;
+                    while (v >= 1024 && i < units.length - 1) {
+                        v /= 1024;
+                        i++;
+                    }
+                    return v.toFixed((v < 10) ? 1 : 0) + ' ' + units[i];
+                }
+            }
+        }
+    </script>
+{% endblock content %}

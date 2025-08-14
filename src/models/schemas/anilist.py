@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from enum import StrEnum
 from functools import cache
 from typing import Annotated, Any, ClassVar, Generic, TypeVar, get_args, get_origin
@@ -10,9 +10,7 @@ from typing import Annotated, Any, ClassVar, Generic, TypeVar, get_args, get_ori
 from pydantic import AfterValidator, BaseModel, ConfigDict
 from pydantic.alias_generators import to_camel
 
-UTCDateTime = Annotated[
-    datetime, AfterValidator(lambda dt: dt.astimezone(timezone.utc))
-]
+UTCDateTime = Annotated[datetime, AfterValidator(lambda dt: dt.astimezone(UTC))]
 
 
 class AniListBaseEnum(StrEnum):
@@ -107,7 +105,7 @@ class MediaSort(AniListBaseEnum):
 class MediaListStatus(AniListBaseEnum):
     """Enum representing status of a media list entry (CURRENT, COMPLETED, etc)."""
 
-    _ignore_ = ["__priority"]
+    _ignore_ = ["__priority"]  # noqa: RUF012
 
     CURRENT = "CURRENT"
     PLANNING = "PLANNING"
@@ -116,7 +114,7 @@ class MediaListStatus(AniListBaseEnum):
     PAUSED = "PAUSED"
     REPEATING = "REPEATING"
 
-    __priority = {
+    __priority: ClassVar[dict[str, int]] = {
         "PLANNING": 1,
         "CURRENT": 2,
         "PAUSED": 2,

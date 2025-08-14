@@ -1,8 +1,7 @@
 """Version Utilities Module."""
 
+import tomllib
 from pathlib import Path
-
-import tomlkit
 
 from src import __file__ as src_file
 
@@ -20,8 +19,10 @@ def get_pyproject_version() -> str:
         if not toml_file.exists() or not toml_file.is_file():
             return "unknown"
 
-        toml_data = tomlkit.load(toml_file.open())
-        project_data = toml_data.get("project", {})
+        with toml_file.open("rb") as f:
+            toml_data = tomllib.load(f)
+
+        project_data = toml_data.get("project") or {}
         if isinstance(project_data, dict) and "version" in project_data:
             return project_data["version"]
         return "unknown"
