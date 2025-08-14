@@ -84,7 +84,13 @@
                 {{ navlink('settings', 'Settings', 'lucide:settings') }}
                 {{ navlink('about', 'About', 'lucide:activity') }}
                 <div class="mt-auto pt-4 border-t border-slate-800/60">
-                    <p class="px-3 text-[11px] text-slate-500">© {{ now.year }} PlexAniBridge</p>
+                    <p class="px-3 text-[11px] text-slate-500">
+                        © {{ now.year }}
+                        <a href="https://plexanibridge.elias.eu.org"
+                           target="_blank"
+                           rel="noopener"
+                           class="hover:text-slate-200 transition-colors">PlexAniBridge</a>
+                    </p>
                 </div>
             </nav>
         </aside>
@@ -135,7 +141,7 @@
                         <a href="https://github.com/eliasbenb/PlexAniBridge"
                            target="_blank"
                            rel="noopener"
-                           class="text-slate-400 hover:text-slate-200 inline-flex items-center gap-1">
+                           class="text-slate-400 hover:text-slate-200 transition-colors inline-flex items-center gap-1">
                             <iconify-icon icon="lucide:github" inline></iconify-icon>
                             <span>GitHub</span>
                         </a>
@@ -145,7 +151,7 @@
                         Made by <a href="https://github.com/eliasbenb"
     target="_blank"
     rel="noopener"
-    class="hover:text-slate-200">@eliasbenb</a>
+    class="hover:text-slate-200 transition-colors">@eliasbenb</a>
                     </div>
                 </div>
             </footer>
