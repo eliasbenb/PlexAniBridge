@@ -237,7 +237,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
                     .first()
                 )
                 if existing_record:
-                    if existing_record.error_message != error_message:
+                    if existing_record.error_message == error_message:
                         return
                     existing_record.before_state = before_state
                     existing_record.after_state = after_state
