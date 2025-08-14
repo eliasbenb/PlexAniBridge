@@ -173,15 +173,9 @@
                                     <button @click="tab='changes'"
                                             :class="tab==='changes' ? 'bg-slate-700/70 text-slate-100' : 'text-slate-400 hover:text-slate-200'"
                                             class="px-2 py-1 font-medium">Changes</button>
-                                    <button @click="tab='before'"
-                                            :class="tab==='before' ? 'bg-slate-700/70 text-slate-100' : 'text-slate-400 hover:text-slate-200'"
-                                            class="px-2 py-1 font-medium">Before</button>
-                                    <button @click="tab='after'"
-                                            :class="tab==='after' ? 'bg-slate-700/70 text-slate-100' : 'text-slate-400 hover:text-slate-200'"
-                                            class="px-2 py-1 font-medium">After</button>
-                                    <button @click="tab='side'"
-                                            :class="tab==='side' ? 'bg-slate-700/70 text-slate-100' : 'text-slate-400 hover:text-slate-200'"
-                                            class="px-2 py-1 font-medium hidden md:inline-flex">Side-by-Side</button>
+                                    <button @click="tab='compare'"
+                                            :class="tab==='compare' ? 'bg-slate-700/70 text-slate-100' : 'text-slate-400 hover:text-slate-200'"
+                                            class="px-2 py-1 font-medium hidden md:inline-flex">Compare</button>
                                 </div>
                                 <div class="flex items-center gap-2 text-[11px] grow min-w-[12rem]"
                                      x-show="tab==='changes'">
@@ -213,7 +207,7 @@
                             </div>
                             <!-- Panels -->
                             <div class="space-y-3">
-                                <div class="overflow-auto" :class="tab==='side' ? '' : 'space-y-3'">
+                                <div class="overflow-auto" :class="tab==='compare' ? '' : 'space-y-3'">
                                     <!-- Changes Tab -->
                                     <template x-if="tab==='changes'">
                                         <div>
@@ -242,24 +236,8 @@
                                                class="text-[11px] text-slate-500 italic">No differences.</p>
                                         </div>
                                     </template>
-                                    <!-- Before Tab -->
-                                    <template x-if="tab==='before'">
-                                        <div class="space-y-2">
-                                            <h5 class="text-xs font-semibold uppercase tracking-wider text-slate-400">State Before</h5>
-                                            <pre class="text-[11px] leading-tight bg-slate-900/80 border border-slate-800 rounded-md p-2 overflow-auto max-h-72"
-                                                 x-html="highlightJson(item.before_state)"></pre>
-                                        </div>
-                                    </template>
-                                    <!-- After Tab -->
-                                    <template x-if="tab==='after'">
-                                        <div class="space-y-2">
-                                            <h5 class="text-xs font-semibold uppercase tracking-wider text-slate-400">State After</h5>
-                                            <pre class="text-[11px] leading-tight bg-slate-900/80 border border-slate-800 rounded-md p-2 overflow-auto max-h-72"
-                                                 x-html="highlightJson(item.after_state)"></pre>
-                                        </div>
-                                    </template>
-                                    <!-- Side-by-Side Tab -->
-                                    <template x-if="tab==='side'">
+                                    <!-- Compare Tab -->
+                                    <template x-if="tab==='compare'">
                                         <div class="grid md:grid-cols-2 gap-2 md:gap-3 items-start">
                                             <div class="space-y-1.5">
                                                 <h5 class="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1">
