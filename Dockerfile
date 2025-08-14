@@ -38,7 +38,13 @@ ENV PYTHONPATH=/opt/venv/lib/python3.13/site-packages \
     PUID=1000 \
     PGID=1000 \
     UMASK=022 \
+    SQLITE_VERSION=3500400 \
     PAB_DATA_PATH=/config
+
+RUN wget "https://sqlite.org/2025/sqlite-tools-linux-x64-${SQLITE_VERSION}.zip" -O /tmp/sqlite-tools.zip && \
+    unzip /tmp/sqlite-tools.zip -d /usr/local/bin && \
+    rm /tmp/sqlite-tools.zip && \
+    chmod +x /usr/local/bin/sqlite3
 
 WORKDIR /app
 
