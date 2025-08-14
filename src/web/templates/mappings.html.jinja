@@ -271,14 +271,22 @@
                     <div class="flex items-start justify-between gap-4">
                         <h3 class="text-sm font-semibold tracking-wide flex items-center gap-2">
                             <iconify-icon icon="lucide:edit-3" class="text-slate-400" inline></iconify-icon>
-                            <span x-text="form.anilist_id ? 'Edit Override #'+form.anilist_id : 'New Override'"></span>
+                            <span x-text="form._isNew ? 'New Override' : ('Edit Override #'+form.anilist_id)"></span>
                         </h3>
                         <button @click="modal=false" class="text-slate-400 hover:text-slate-200">
                             <iconify-icon icon="lucide:x" class="text-slate-400"></iconify-icon>
                         </button>
                     </div>
-                    <textarea x-model="formRaw"
-                              class="w-full h-64 resize-none bg-slate-950/80 focus:bg-slate-950 border border-slate-800 focus:border-slate-600 rounded-md p-2 font-mono text-[11px] leading-tight shadow-inner"></textarea>
+                    <div class="space-y-2">
+                        <div class="flex items-center gap-2">
+                            <label class="text-[11px] text-slate-400">AniList ID</label>
+                            <input x-model.number="form.anilist_id"
+                                   type="number"
+                                   class="flex-1 h-8 w-full bg-slate-950/80 focus:bg-slate-950 border border-slate-800 focus:border-slate-600 rounded-md px-2 text-[11px] shadow-sm" />
+                        </div>
+                        <textarea x-model="formRaw"
+                                  class="w-full h-56 resize-none bg-slate-950/80 focus:bg-slate-950 border border-slate-800 focus:border-slate-600 rounded-md p-2 font-mono text-[11px] leading-tight shadow-inner"></textarea>
+                    </div>
                     <div class="flex justify-end gap-2 pt-1">
                         <button @click="modal=false"
                                 class="px-3 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-sm">Cancel</button>
@@ -392,30 +400,39 @@
                 },
                 openNew() {
                     this.form = {
-                        anilist_id: null
+                        anilist_id: null,
+                        _isNew: true
                     };
-                    this.formRaw = JSON.stringify(this.form, null, 2);
+                    this.formRaw = JSON.stringify({}, null, 2);
                     this.modal = true;
                 },
                 edit(m) {
                     // Clone and strip UI-only / computed fields ('custom') before editing
                     const clone = JSON.parse(JSON.stringify(m));
                     delete clone.custom;
-                    this.form = clone;
-                    this.formRaw = JSON.stringify(this.form, null, 2);
+                    // Extract the AniList id into its own field and remove from raw JSON
+                    const aid = clone.anilist_id ?? clone.id ?? null;
+                    delete clone.anilist_id;
+                    delete clone.id;
+                    this.form = {
+                        anilist_id: aid,
+                        _isNew: false
+                    };
+                    this.formRaw = JSON.stringify(clone, null, 2);
                     this.modal = true;
                 },
                 save() {
                     try {
-                        const obj = JSON.parse(this.formRaw);
+                        const obj = JSON.parse(this.formRaw || '{}');
                         delete obj.custom;
-                        const aid = obj.anilist_id ?? obj.id;
+                        const aid = this.form.anilist_id ?? null;
                         if (!aid) {
                             alert('anilist_id is required');
                             return;
                         }
-                        const method = aid ? 'PUT' : 'POST';
-                        const url = aid ? '/api/mappings/' + aid : '/api/mappings';
+                        obj.anilist_id = aid;
+                        const method = this.form._isNew ? 'POST' : 'PUT';
+                        const url = this.form._isNew ? '/api/mappings' : '/api/mappings/' + aid;
                         fetch(url, {
                                 method,
                                 headers: {
