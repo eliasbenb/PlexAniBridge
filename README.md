@@ -47,4 +47,4 @@ services:
 
 ![Web UI Screenshot](./docs/img/screenshots/timeline.png)
 
-_View more screenshots in the [documentation](https://plexanibridge.elias.eu.org/docs/web/screenshots)_
+_View more screenshots in the [documentation](https://plexanibridge.elias.eu.org/web/screenshots)_
