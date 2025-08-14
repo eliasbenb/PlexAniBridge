@@ -1,82 +1,45 @@
 {% extends "base.html.jinja" %}
-{% from "components/ui.html.jinja" import section_heading, button %}
+{% from "components/ui.html.jinja" import section_heading %}
 {% block title %}
     PlexAniBridge - Mappings
 {% endblock title %}
 {% block content %}
-    <div x-data="mappingsCrud()" x-init="init()" class="space-y-6">
+    <div x-data="Mappings()" x-init="init()" class="space-y-6">
         {{ section_heading('lucide:list', 'Mappings', '<span class="text-xs text-slate-400">Browse & override external ID relationships</span>') }}
         <!-- Toolbar -->
         <div class="flex flex-wrap items-center gap-2 border-b border-slate-800/70 py-1">
             <!-- Search -->
             <div class="relative flex-1 min-w-56 max-w-xl">
-                <input x-model="search"
-                       @keydown.enter.prevent="page=1; load(); savePrefs()"
+                <input x-model="query"
+                       @keydown.enter.prevent="page=1; load()"
                        placeholder="Search (AniList, TMDB, IMDB, etc)"
                        aria-label="Search mappings"
                        class="w-full h-8 bg-slate-900/70 focus:bg-slate-900 border border-slate-700/70 focus:border-slate-600 rounded-md pl-8 pr-9 text-[11px] placeholder:text-slate-500 shadow-sm" />
                 <iconify-icon icon="lucide:search" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-[14px]"></iconify-icon>
-                <button @click="page=1; load(); savePrefs()"
+                <button @click="page=1; load()"
                         class="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 inline-flex items-center justify-center rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300"
                         aria-label="Run search">
                     <iconify-icon icon="lucide:arrow-right"></iconify-icon>
                 </button>
             </div>
             <!-- Custom Only -->
-            <button @click="custom_only=!custom_only; page=1; load(); savePrefs()"
-                    :class="custom_only ? 'bg-emerald-600/90 hover:bg-emerald-500 text-white ring-emerald-500/40' : 'bg-slate-800 hover:bg-slate-700 text-slate-300 ring-slate-700/60'"
+            <button @click="customOnly=!customOnly; page=1; load()"
+                    :class="customOnly ? 'bg-emerald-600/90 hover:bg-emerald-500 text-white ring-emerald-500/40' : 'bg-slate-800 hover:bg-slate-700 text-slate-300 ring-slate-700/60'"
                     class="h-8 px-3 inline-flex items-center gap-1 rounded-md ring-1 text-[11px] font-medium">
-                <iconify-icon :icon="custom_only ? 'lucide:check-square' : 'lucide:square'" class="text-current text-[14px]"></iconify-icon>
+                <iconify-icon :icon="customOnly ? 'lucide:check-square' : 'lucide:square'" class="text-current text-[14px]"></iconify-icon>
                 <span>Custom Only</span>
             </button>
-            <!-- Display / Columns -->
-            <div class="relative" @keydown.escape.stop="displayOpen=false">
-                <button @click="displayOpen=!displayOpen"
-                        class="h-8 px-3 inline-flex items-center gap-1 rounded-md bg-slate-800 hover:bg-slate-700 ring-1 ring-slate-700/60 text-[11px] font-medium">
-                    <iconify-icon icon="lucide:layout-grid" class="text-slate-400 text-[14px]"></iconify-icon>
-                    <span>Display</span>
-                </button>
-                <div x-show="displayOpen"
-                     x-transition.opacity
-                     @click.outside="displayOpen=false"
-                     class="absolute mt-1 right-0 z-30 w-72 rounded-md border border-slate-700/70 bg-slate-900/95 backdrop-blur-sm p-3 shadow-lg space-y-3">
-                    <div class="flex items-center justify-between gap-3">
-                        <div class="text-[10px] uppercase tracking-wide text-slate-400 font-medium">Per Page</div>
-                        <select x-model.number="per_page"
-                                @change="page=1; load(); savePrefs()"
-                                class="h-7 bg-slate-950/70 focus:bg-slate-950 border border-slate-700/70 focus:border-slate-600 rounded-md px-2 text-[11px] shadow-sm">
-                            <option>10</option>
-                            <option>25</option>
-                            <option>50</option>
-                            <option>100</option>
-                        </select>
-                    </div>
-                    <div class="space-y-1">
-                        <div class="text-[10px] uppercase tracking-wide text-slate-400 font-medium">Columns</div>
-                        <div class="grid grid-cols-2 gap-1 text-[11px]">
-                            <template x-for="[key,label] in Object.entries({title:'Title',anidb:'AniDB',imdb:'IMDB',tmdb_movie:'TMDB (Movie)',tmdb_show:'TMDB (Show)',tvdb:'TVDB',mal:'MAL',seasons:'Seasons'})"
-                                      :key="key">
-                                <label class="flex items-center gap-1.5 px-2 py-1 rounded-md hover:bg-slate-800/70 cursor-pointer select-none">
-                                    <input type="checkbox"
-                                           class="accent-emerald-600"
-                                           :checked="columns[key]"
-                                           @change="const prev=columns[key]; columns[key]=!columns[key]; savePrefs(); if(key==='title' && !prev && columns.title) fetchAni();">
-                                    <span class="truncate" x-text="label"></span>
-                                </label>
-                            </template>
-                        </div>
-                    </div>
-                    <div class="flex flex-wrap gap-2 pt-1">
-                        <button class="text-[11px] px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700"
-                                @click="setAllColumns(true)">Show All</button>
-                        <button class="text-[11px] px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700"
-                                @click="setAllColumns(false)">Hide All</button>
-                        <button class="text-[11px] px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700"
-                                @click="resetColumns()">Reset</button>
-                    </div>
-                </div>
-            </div>
-            <div class="ml-auto">
+            <!-- Per page -->
+            <div class="flex items-center gap-2 ml-auto">
+                <label class="text-[11px] text-slate-400">Per Page</label>
+                <select x-model.number="perPage"
+                        @change="page=1; load()"
+                        class="h-8 bg-slate-950/70 focus:bg-slate-950 border border-slate-700/70 focus:border-slate-600 rounded-md px-2 text-[11px] shadow-sm">
+                    <option>10</option>
+                    <option>25</option>
+                    <option>50</option>
+                    <option>100</option>
+                </select>
                 <button @click="openNew()"
                         class="h-8 inline-flex items-center gap-1 px-3 rounded-md bg-emerald-600/90 hover:bg-emerald-500 text-emerald-50 text-[11px] font-medium"
                         title="New Override"
@@ -93,55 +56,28 @@
                 <span class="text-slate-500"
                       x-text="'Page '+page+' / '+pages"
                       x-show="pages>1"></span>
-                <template x-if="custom_only"><span class="text-emerald-400">Custom overrides only</span></template>
+                <template x-if="customOnly"><span class="text-emerald-400">Custom overrides only</span></template>
             </div>
             <div class="overflow-x-auto overflow-y-auto flex-1 scrollbar-thin">
                 <table class="min-w-full text-xs align-middle">
                     <thead class="text-slate-300 bg-gradient-to-b from-slate-900/70 to-slate-900/40 sticky top-0 z-10">
                         <tr class="divide-x divide-slate-800/70 whitespace-nowrap">
-                            <th class="px-3 py-2 text-left font-medium truncate"
-                                x-show="columns.title">
-                                <span class="block truncate">Title</span>
-                            </th>
-                            <th class="px-3 py-2 text-left font-medium truncate">
-                                <span class="block truncate">AniList</span>
-                            </th>
-                            <th class="px-3 py-2 text-left font-medium truncate"
-                                x-show="columns.anidb">
-                                <span class="block truncate">AniDB</span>
-                            </th>
-                            <th class="px-3 py-2 text-left font-medium truncate"
-                                x-show="columns.imdb">
-                                <span class="block truncate">IMDB</span>
-                            </th>
-                            <th class="px-3 py-2 text-left font-medium truncate"
-                                x-show="columns.tmdb_movie">
-                                <span class="block truncate">TMDB (Movie)</span>
-                            </th>
-                            <th class="px-3 py-2 text-left font-medium truncate"
-                                x-show="columns.tmdb_show">
-                                <span class="block truncate">TMDB (Show)</span>
-                            </th>
-                            <th class="px-3 py-2 text-left font-medium truncate"
-                                x-show="columns.tvdb">
-                                <span class="block truncate">TVDB</span>
-                            </th>
-                            <th class="px-3 py-2 text-left font-medium truncate" x-show="columns.mal">
-                                <span class="block truncate">MAL</span>
-                            </th>
-                            <th class="px-3 py-2 text-left font-medium truncate"
-                                x-show="columns.seasons">
-                                <span class="block truncate">Seasons</span>
-                            </th>
-                            <th class="px-3 py-2 text-left font-medium truncate">
-                                <span class="block truncate"></span>
-                            </th>
+                            <th class="px-3 py-2 text-left font-medium truncate">Title</th>
+                            <th class="px-3 py-2 text-left font-medium truncate">AniList</th>
+                            <th class="px-3 py-2 text-left font-medium truncate">AniDB</th>
+                            <th class="px-3 py-2 text-left font-medium truncate">IMDB</th>
+                            <th class="px-3 py-2 text-left font-medium truncate">TMDB (Movie)</th>
+                            <th class="px-3 py-2 text-left font-medium truncate">TMDB (Show)</th>
+                            <th class="px-3 py-2 text-left font-medium truncate">TVDB</th>
+                            <th class="px-3 py-2 text-left font-medium truncate">MAL</th>
+                            <th class="px-3 py-2 text-left font-medium truncate">Seasons</th>
+                            <th class="px-3 py-2 text-right font-medium truncate">Actions</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-800/60">
-                        <template x-for="m in items" :key="m.anilist_id">
+                        <template x-for="m in items" :key="m.anilist_id || m.id">
                             <tr class="hover:bg-slate-800/40 transition-colors align-top">
-                                <td class="px-3 py-2 w-64" x-show="columns.title">
+                                <td class="px-3 py-2 w-64">
                                     <div class="flex items-start gap-2">
                                         <div class="w-12 shrink-0" x-show="m.anilist_id">
                                             <template x-if="mappingAni(m) && !mappingAni(m)._error && mappingAni(m)?.coverImage?.medium">
@@ -169,52 +105,35 @@
                                             <div class="text-[10px] text-slate-500 flex flex-wrap gap-1 items-center"
                                                  x-show="mappingAni(m)">
                                                 <span x-text="mappingAni(m)?.format || ''"></span>
-                                                <template x-if="mappingAni(m)?.episodes">
-                                                    <span>· <span x-text="mappingAni(m).episodes+'ep'"></span></span>
-                                                </template>
-                                                <template x-if="mappingAni(m)?.season">
-                                                    <span>· <span x-text="(mappingAni(m).season||'') + ' ' + (mappingAni(m).seasonYear||'')"></span></span>
-                                                </template>
+                                                <template x-if="mappingAni(m)?.episodes"><span>· <span x-text="mappingAni(m).episodes+'ep'"></span></span></template>
+                                                <template x-if="mappingAni(m)?.season"><span>· <span x-text="(mappingAni(m).season||'') + ' ' + (mappingAni(m).seasonYear||'')"></span></span></template>
                                             </div>
                                         </div>
                                     </div>
                                 </td>
                                 <td class="px-3 py-2 font-mono"
-                                    x-show="m.anilist_id"
                                     x-html="fmtLinks('anilist', m.anilist_id)"></td>
+                                <td class="px-3 py-2 font-mono" x-html="fmtLinks('anidb', m.anidb_id)"></td>
+                                <td class="px-3 py-2 font-mono" x-html="fmtLinks('imdb', m.imdb_id)"></td>
                                 <td class="px-3 py-2 font-mono"
-                                    x-show="columns.anidb"
-                                    x-html="fmtLinks('anidb', m.anidb_id)"></td>
-                                <td class="px-3 py-2 font-mono"
-                                    x-show="columns.imdb"
-                                    x-html="fmtLinks('imdb', m.imdb_id)"></td>
-                                <td class="px-3 py-2 font-mono"
-                                    x-show="columns.tmdb_movie"
                                     x-html="fmtLinks('tmdb_movie', m.tmdb_movie_id)"></td>
                                 <td class="px-3 py-2 font-mono"
-                                    x-show="columns.tmdb_show"
                                     x-html="fmtLinks('tmdb_show', m.tmdb_show_id)"></td>
-                                <td class="px-3 py-2 font-mono"
-                                    x-show="columns.tvdb"
-                                    x-html="fmtLinks('tvdb', m.tvdb_id)"></td>
-                                <td class="px-3 py-2 font-mono"
-                                    x-show="columns.mal"
-                                    x-html="fmtLinks('mal', m.mal_id)"></td>
-                                <td class="px-3 py-2 font-mono"
-                                    x-show="columns.seasons"
-                                    :title="JSON.stringify(m.tvdb_mappings)">
+                                <td class="px-3 py-2 font-mono" x-html="fmtLinks('tvdb', m.tvdb_id)"></td>
+                                <td class="px-3 py-2 font-mono" x-html="fmtLinks('mal', m.mal_id)"></td>
+                                <td class="px-3 py-2 font-mono" :title="JSON.stringify(m.tvdb_mappings)">
                                     <span x-text="fmtSeasons(m)"></span>
                                 </td>
                                 <td class="px-3 py-2 whitespace-nowrap align-top text-right">
                                     <div class="flex flex-col gap-1 items-end">
                                         <div class="flex gap-1">
-                                            <button @click="edit(m)"
+                                            <button @click="openEdit(m)"
                                                     class="h-6 px-2 inline-flex items-center rounded-md bg-slate-800 hover:bg-slate-700 text-[11px] text-slate-200">
                                                 Edit
                                             </button>
-                                            <button @click="m.custom && remove(m)"
-                                                    :disabled="!m.custom"
-                                                    :title="!m.custom ? 'Not deletable: not in your custom mappings' : 'Delete mapping'"
+                                            <button @click="remove(m)"
+                                                    :disabled="m.custom===false"
+                                                    :title="m.custom===false ? 'Not deletable: not in your custom mappings' : 'Delete mapping'"
                                                     class="h-6 px-2 inline-flex items-center rounded-md text-[11px] text-rose-200 bg-rose-700/70 hover:bg-rose-600 disabled:opacity-35 disabled:cursor-not-allowed">
                                                 Del
                                             </button>
@@ -240,7 +159,7 @@
         </div>
         <!-- Pagination -->
         <div class="flex flex-wrap gap-2 items-center text-xs" x-show="pages>1">
-            <button @click="page>1 && (page--, load())"
+            <button @click="page > 1 && (page--, load())"
                     :disabled="page===1"
                     class="px-3 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed">
                 Prev
@@ -255,7 +174,7 @@
                        class="w-12 px-1 py-0.5 rounded-md bg-slate-900 border border-slate-700 text-center text-xs font-semibold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
                 / <span x-text="pages"></span>
             </div>
-            <button @click="page<pages && (page++, load())"
+            <button @click="page < pages && (page++, load())"
                     :disabled="page===pages"
                     class="px-3 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed">
                 Next
@@ -280,12 +199,151 @@
                     <div class="space-y-2">
                         <div class="flex items-center gap-2">
                             <label class="text-[11px] text-slate-400">AniList ID</label>
-                            <input x-model.number="form.anilist_id"
+                            <input x-model="form.anilist_id"
+                                   :disabled="!form._isNew"
                                    type="number"
-                                   class="flex-1 h-8 w-full bg-slate-950/80 focus:bg-slate-950 border border-slate-800 focus:border-slate-600 rounded-md px-2 text-[11px] shadow-sm" />
+                                   class="flex-1 h-8 w-full bg-slate-950/80 focus:bg-slate-950 border border-slate-800 focus:border-slate-600 rounded-md px-2 text-[11px] shadow-sm disabled:opacity-60 disabled:cursor-not-allowed" />
                         </div>
-                        <textarea x-model="formRaw"
-                                  class="w-full h-56 resize-none bg-slate-950/80 focus:bg-slate-950 border border-slate-800 focus:border-slate-600 rounded-md p-2 font-mono text-[11px] leading-tight shadow-inner"></textarea>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <div class="flex items-center justify-between">
+                                    <label class="text-[11px] text-slate-400">AniDB ID</label>
+                                    <select x-model="form.anidb_mode"
+                                            class="h-7 px-2 rounded-md bg-slate-900 border border-slate-700 text-[11px]">
+                                        <option value="omit">Omit</option>
+                                        <option value="null">Null</option>
+                                        <option value="value">Value</option>
+                                    </select>
+                                </div>
+                                <input x-model="form.anidb_id"
+                                       :disabled="form.anidb_mode!=='value'"
+                                       type="number"
+                                       class="w-full h-8 bg-slate-950/80 border border-slate-800 rounded-md px-2 text-[11px] mt-1 disabled:opacity-60 disabled:cursor-not-allowed" />
+                            </div>
+                            <div>
+                                <div class="flex items-center justify-between">
+                                    <label class="text-[11px] text-slate-400">TVDB ID</label>
+                                    <select x-model="form.tvdb_mode"
+                                            class="h-7 px-2 rounded-md bg-slate-900 border border-slate-700 text-[11px]">
+                                        <option value="omit">Omit</option>
+                                        <option value="null">Null</option>
+                                        <option value="value">Value</option>
+                                    </select>
+                                </div>
+                                <input x-model="form.tvdb_id"
+                                       :disabled="form.tvdb_mode!=='value'"
+                                       type="number"
+                                       class="w-full h-8 bg-slate-950/80 border border-slate-800 rounded-md px-2 text-[11px] mt-1 disabled:opacity-60 disabled:cursor-not-allowed" />
+                            </div>
+                            <div class="col-span-2">
+                                <div class="flex items-center justify-between">
+                                    <label class="text-[11px] text-slate-400">
+                                        IMDB IDs <span class="text-xs text-slate-500">(comma separated)</span>
+                                    </label>
+                                    <select x-model="form.imdb_mode"
+                                            class="h-7 px-2 rounded-md bg-slate-900 border border-slate-700 text-[11px]">
+                                        <option value="omit">Omit</option>
+                                        <option value="null">Null</option>
+                                        <option value="value">Value</option>
+                                    </select>
+                                </div>
+                                <input x-model="form.imdb_csv"
+                                       :disabled="form.imdb_mode!=='value'"
+                                       type="text"
+                                       class="w-full h-8 bg-slate-950/80 border border-slate-800 rounded-md px-2 text-[11px] mt-1 disabled:opacity-60 disabled:cursor-not-allowed" />
+                            </div>
+                            <div>
+                                <div class="flex items-center justify-between">
+                                    <label class="text-[11px] text-slate-400">
+                                        MAL IDs <span class="text-xs text-slate-500">(comma separated)</span>
+                                    </label>
+                                    <select x-model="form.mal_mode"
+                                            class="h-7 px-2 rounded-md bg-slate-900 border border-slate-700 text-[11px]">
+                                        <option value="omit">Omit</option>
+                                        <option value="null">Null</option>
+                                        <option value="value">Value</option>
+                                    </select>
+                                </div>
+                                <input x-model="form.mal_csv"
+                                       :disabled="form.mal_mode!=='value'"
+                                       type="text"
+                                       class="w-full h-8 bg-slate-950/80 border border-slate-800 rounded-md px-2 text-[11px] mt-1 disabled:opacity-60 disabled:cursor-not-allowed" />
+                            </div>
+                            <div>
+                                <div class="flex items-center justify-between">
+                                    <label class="text-[11px] text-slate-400">
+                                        TMDB (Movie) IDs <span class="text-xs text-slate-500">(comma separated)</span>
+                                    </label>
+                                    <select x-model="form.tmdb_movie_mode"
+                                            class="h-7 px-2 rounded-md bg-slate-900 border border-slate-700 text-[11px]">
+                                        <option value="omit">Omit</option>
+                                        <option value="null">Null</option>
+                                        <option value="value">Value</option>
+                                    </select>
+                                </div>
+                                <input x-model="form.tmdb_movie_csv"
+                                       :disabled="form.tmdb_movie_mode!=='value'"
+                                       type="text"
+                                       class="w-full h-8 bg-slate-950/80 border border-slate-800 rounded-md px-2 text-[11px] mt-1 disabled:opacity-60 disabled:cursor-not-allowed" />
+                            </div>
+                            <div>
+                                <div class="flex items-center justify-between">
+                                    <label class="text-[11px] text-slate-400">
+                                        TMDB (Show) IDs <span class="text-xs text-slate-500">(comma separated)</span>
+                                    </label>
+                                    <select x-model="form.tmdb_show_mode"
+                                            class="h-7 px-2 rounded-md bg-slate-900 border border-slate-700 text-[11px]">
+                                        <option value="omit">Omit</option>
+                                        <option value="null">Null</option>
+                                        <option value="value">Value</option>
+                                    </select>
+                                </div>
+                                <input x-model="form.tmdb_show_csv"
+                                       :disabled="form.tmdb_show_mode!=='value'"
+                                       type="text"
+                                       class="w-full h-8 bg-slate-950/80 border border-slate-800 rounded-md px-2 text-[11px] mt-1 disabled:opacity-60 disabled:cursor-not-allowed" />
+                            </div>
+                            <div class="col-span-2">
+                                <div class="flex items-center justify-between">
+                                    <label class="text-[11px] text-slate-400">TVDB Season Mappings</label>
+                                    <div class="flex items-center gap-2">
+                                        <select x-model="form.tvdb_map_mode"
+                                                class="h-7 px-2 rounded-md bg-slate-900 border border-slate-700 text-[11px]">
+                                            <option value="omit">Omit</option>
+                                            <option value="null">Null</option>
+                                            <option value="value">Value</option>
+                                        </select>
+                                        <button @click.prevent="addTvdbRow()"
+                                                :disabled="form.tvdb_map_mode!=='value'"
+                                                class="text-[11px] px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed">
+                                            Add
+                                        </button>
+                                    </div>
+                                </div>
+                                <template x-for="(row, idx) in form.tvdb_mappings" :key="idx">
+                                    <div class="flex items-center gap-2 mt-2">
+                                        <input x-model="row.season"
+                                               :disabled="form.tvdb_map_mode!=='value'"
+                                               placeholder="season (e.g. s1 or 1)"
+                                               class="w-28 h-8 bg-slate-950/80 border border-slate-800 rounded-md px-2 text-[11px] disabled:opacity-40 disabled:cursor-not-allowed" />
+                                        <input x-model="row.pattern"
+                                               :disabled="form.tvdb_map_mode!=='value'"
+                                               placeholder="pattern (e.g. e1-e12|2)"
+                                               class="flex-1 h-8 bg-slate-950/80 border border-slate-800 rounded-md px-2 text-[11px] disabled:opacity-40 disabled:cursor-not-allowed" />
+                                        <button @click.prevent="form.tvdb_mappings.splice(idx,1)"
+                                                :disabled="form.tvdb_map_mode!=='value'"
+                                                class="text-[11px] px-2 py-1 rounded-md bg-rose-700/90 hover:bg-rose-600 text-white disabled:opacity-40 disabled:cursor-not-allowed">
+                                            Rem
+                                        </button>
+                                    </div>
+                                </template>
+                                <div class="text-[10px] text-slate-500 mt-4">
+                                    <p>Omit: leaves field unchanged; allows for inheritance from upstream mappings.</p>
+                                    <p>Null: explicitly clears the field and sets it to null.</p>
+                                    <p>Value: provides a specific value for a manual override.</p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div class="flex justify-end gap-2 pt-1">
                         <button @click="modal=false"
@@ -300,184 +358,228 @@
         </div>
     </div>
     <script>
-        function mappingsCrud() {
+        function Mappings() {
             return {
                 items: [],
                 total: 0,
                 page: 1,
                 pages: 1,
-                per_page: 25,
-                search: "{{ search or '' }}",
-                custom_only: false,
+                perPage: 25,
+                query: "{{ search or '' }}",
+                customOnly: false,
+                loading: false,
                 modal: false,
-                columnsOpen: false,
                 form: {},
-                formRaw: '',
                 media: {},
                 rawOpen: {},
-                columns: {
-                    title: true,
-                    anidb: true,
-                    imdb: true,
-                    tmdb_movie: true,
-                    tmdb_show: true,
-                    tvdb: true,
-                    mal: true,
-                    seasons: true,
-                },
-                displayOpen: false,
+
                 init() {
-                    this.loadPrefs();
                     this.load();
                 },
-                toast(msg, level = 'error') {
-                    try {
-                        if (window.notify && notify.toast) notify.toast(msg, level);
-                    } catch (_) {}
-                },
-                load() {
+
+                async load() {
+                    this.loading = true;
                     const p = new URLSearchParams({
                         page: this.page,
-                        per_page: this.per_page
+                        per_page: this.perPage
                     });
-                    if (this.search) p.set('search', this.search);
-                    if (this.custom_only) p.set('custom_only', 'true');
-                    fetch('/api/mappings?' + p)
-                        .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
-                        .then(d => {
-                            this.items = d.items;
-                            this.total = d.total ?? (d.pages * this.per_page);
-                            this.pages = d.pages;
-                            this.page = d.page;
-                            // Only fetch AniList data if title column is visible
-                            if (this.columns.title) this.fetchAni();
-                        })
-                        .catch(e => this.toast('Failed to load mappings: ' + (e?.message || e)));
-                },
-                savePrefs() {
+                    if (this.query) p.set('search', this.query);
+                    if (this.customOnly) p.set('custom_only', 'true');
                     try {
-                        localStorage.setItem('mappings.columns', JSON.stringify(this.columns));
-                        localStorage.setItem('mappings.per_page', String(this.per_page));
-                        localStorage.setItem('mappings.search', this.search || '');
-                        localStorage.setItem('mappings.custom_only', this.custom_only ? '1' : '0');
-                    } catch (_) {}
-                },
-                loadPrefs() {
-                    try {
-                        const cols = JSON.parse(localStorage.getItem('mappings.columns') || 'null');
-                        if (cols && typeof cols === 'object') this.columns = {
-                            ...this.columns,
-                            ...cols
-                        };
-                        const pp = parseInt(localStorage.getItem('mappings.per_page') || '0');
-                        if (pp) this.per_page = pp;
-                        const s = localStorage.getItem('mappings.search');
-                        if (typeof s === 'string') this.search = s;
-                        const co = localStorage.getItem('mappings.custom_only');
-                        if (co === '1') this.custom_only = true;
-                    } catch (_) {}
-                },
-                setAllColumns(v) {
-                    const prevTitle = this.columns.title;
-                    for (const k of Object.keys(this.columns)) this.columns[k] = !!v;
-                    this.savePrefs();
-                    if (!prevTitle && this.columns.title) this.fetchAni();
-                },
-                resetColumns() {
-                    const prevTitle = this.columns.title;
-                    this.columns = {
-                        title: true,
-                        anidb: true,
-                        imdb: true,
-                        tmdb_movie: true,
-                        tmdb_show: true,
-                        tvdb: true,
-                        mal: true,
-                        seasons: true
-                    };
-                    this.savePrefs();
-                    if (!prevTitle && this.columns.title) this.fetchAni();
-                },
-                openNew() {
-                    this.form = {
-                        anilist_id: null,
-                        _isNew: true
-                    };
-                    this.formRaw = JSON.stringify({}, null, 2);
-                    this.modal = true;
-                },
-                edit(m) {
-                    // Clone and strip UI-only / computed fields ('custom') before editing
-                    const clone = JSON.parse(JSON.stringify(m));
-                    delete clone.custom;
-                    // Extract the AniList id into its own field and remove from raw JSON
-                    const aid = clone.anilist_id ?? clone.id ?? null;
-                    delete clone.anilist_id;
-                    delete clone.id;
-                    this.form = {
-                        anilist_id: aid,
-                        _isNew: false
-                    };
-                    this.formRaw = JSON.stringify(clone, null, 2);
-                    this.modal = true;
-                },
-                save() {
-                    try {
-                        const obj = JSON.parse(this.formRaw || '{}');
-                        delete obj.custom;
-                        const aid = this.form.anilist_id ?? null;
-                        if (!aid) {
-                            alert('anilist_id is required');
-                            return;
-                        }
-                        obj.anilist_id = aid;
-                        const method = this.form._isNew ? 'POST' : 'PUT';
-                        const url = this.form._isNew ? '/api/mappings' : '/api/mappings/' + aid;
-                        fetch(url, {
-                                method,
-                                headers: {
-                                    'Content-Type': 'application/json'
-                                },
-                                body: JSON.stringify(obj)
-                            })
-                            .then(r => r.ok ? r.json() : Promise.reject())
-                            .then(() => {
-                                this.modal = false;
-                                this.load();
-                            })
-                            .catch(() => this.toast('Save failed'));
-                    } catch {
-                        alert('Invalid JSON');
+                        const r = await fetch('/api/mappings?' + p.toString());
+                        if (!r.ok) throw new Error('HTTP ' + r.status);
+                        const d = await r.json();
+                        this.items = d.items || [];
+                        this.total = d.total ?? (d.pages * this.perPage) ?? this.items.length;
+                        this.pages = d.pages ?? 1;
+                        this.page = d.page ?? this.page;
+                        this.fetchAni();
+                    } catch (e) {
+                        console.error(e);
+                        alert('Failed to load mappings');
+                    } finally {
+                        this.loading = false;
                     }
                 },
-                remove(m) {
+
+                // CRUD
+                openNew() {
+                    this.form = this._emptyForm();
+                    this.modal = true;
+                },
+                openEdit(m) {
+                    const f = this._emptyForm();
+                    f._isNew = false;
+                    f.anilist_id = m.anilist_id ?? '';
+                    // scalar modes
+                    if ('anidb_id' in m) {
+                        f.anidb_mode = m.anidb_id === null ? 'null' : 'value';
+                        f.anidb_id = m.anidb_id ?? '';
+                    } else {
+                        f.anidb_mode = 'omit';
+                    }
+                    if ('tvdb_id' in m) {
+                        f.tvdb_mode = m.tvdb_id === null ? 'null' : 'value';
+                        f.tvdb_id = m.tvdb_id ?? '';
+                    } else {
+                        f.tvdb_mode = 'omit';
+                    }
+                    f.imdb_csv = Array.isArray(m.imdb_id) ? m.imdb_id.join(',') : (m.imdb_id || '');
+                    f.imdb_mode = ('imdb_id' in m) ? (m.imdb_id === null ? 'null' : 'value') : 'omit';
+                    f.mal_csv = Array.isArray(m.mal_id) ? m.mal_id.join(',') : (m.mal_id || '');
+                    f.mal_mode = ('mal_id' in m) ? (m.mal_id === null ? 'null' : 'value') : 'omit';
+                    f.tmdb_movie_csv = Array.isArray(m.tmdb_movie_id) ? m.tmdb_movie_id.join(',') : (m.tmdb_movie_id || '');
+                    f.tmdb_movie_mode = ('tmdb_movie_id' in m) ? (m.tmdb_movie_id === null ? 'null' : 'value') : 'omit';
+                    f.tmdb_show_csv = Array.isArray(m.tmdb_show_id) ? m.tmdb_show_id.join(',') : (m.tmdb_show_id || '');
+                    f.tmdb_show_mode = ('tmdb_show_id' in m) ? (m.tmdb_show_id === null ? 'null' : 'value') : 'omit';
+                    if (m.tvdb_mappings && typeof m.tvdb_mappings === 'object') {
+                        for (const [season, pattern] of Object.entries(m.tvdb_mappings)) {
+                            f.tvdb_mappings.push({
+                                season,
+                                pattern
+                            });
+                        }
+                        f.tvdb_map_mode = 'value';
+                    } else if ('tvdb_mappings' in m && m.tvdb_mappings === null) {
+                        f.tvdb_map_mode = 'null';
+                    } else {
+                        f.tvdb_map_mode = 'omit';
+                    }
+                    this.form = f;
+                    this.modal = true;
+                },
+                async save() {
+                    const aid = Number(this.form.anilist_id);
+                    if (!aid || Number.isNaN(aid)) {
+                        alert('AniList ID is required');
+                        return;
+                    }
+                    const payload = this._toPayload(this.form);
+                    const isNew = this.form._isNew;
+                    const url = isNew ? '/api/mappings' : '/api/mappings/' + aid;
+                    const method = isNew ? 'POST' : 'PUT';
+                    try {
+                        const r = await fetch(url, {
+                            method,
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(payload)
+                        });
+                        if (!r.ok) throw new Error('HTTP ' + r.status);
+                        this.modal = false;
+                        this.load();
+                    } catch (e) {
+                        console.error(e);
+                        alert('Save failed');
+                    }
+                },
+                async remove(m) {
                     if (!confirm('Delete override for AniList ' + m.anilist_id + '?')) return;
-                    fetch('/api/mappings/' + m.anilist_id, {
+                    try {
+                        const r = await fetch('/api/mappings/' + m.anilist_id, {
                             method: 'DELETE'
-                        })
-                        .then(r => {
-                            if (!r.ok) throw new Error('HTTP ' + r.status);
-                        })
-                        .then(() => this.load())
-                        .catch(e => this.toast('Delete failed: ' + (e?.message || e)));
+                        });
+                        if (!r.ok) throw new Error('HTTP ' + r.status);
+                        this.load();
+                    } catch (e) {
+                        console.error(e);
+                        alert('Delete failed');
+                    }
                 },
-                extractAniId(m) {
-                    return m.anilist_id || null;
+                _emptyForm() {
+                    return {
+                        _isNew: true,
+                        anilist_id: '',
+                        // scalars
+                        anidb_mode: 'omit',
+                        anidb_id: '',
+                        tvdb_mode: 'omit',
+                        tvdb_id: '',
+                        // arrays
+                        imdb_mode: 'omit',
+                        imdb_csv: '',
+                        mal_mode: 'omit',
+                        mal_csv: '',
+                        tmdb_movie_mode: 'omit',
+                        tmdb_movie_csv: '',
+                        tmdb_show_mode: 'omit',
+                        tmdb_show_csv: '',
+                        // tvdb mappings
+                        tvdb_map_mode: 'omit',
+                        tvdb_mappings: []
+                    };
                 },
-                fetchAni() {
-                    if (!this.columns.title) return; // safety guard
-                    const ids = [...new Set(this.items.map(m => this.extractAniId(m)).filter(Boolean))];
-                    const missing = ids.filter(id => !this.media[id]);
-                    if (!missing.length) return;
-                    AniList.fetch(missing).then(data => {
-                        this.media = {
-                            ...this.media,
-                            ...data
-                        };
+                addTvdbRow() {
+                    this.form.tvdb_mappings.push({
+                        season: '',
+                        pattern: ''
                     });
                 },
+                _toPayload(f) {
+                    const toInt = (v) => {
+                        if (v === null || v === undefined || v === '') return null;
+                        const n = Number(v);
+                        return Number.isFinite(n) ? n : null;
+                    };
+                    const parseCSV = (s, to = 'string') => {
+                        if (!s || !String(s).trim()) return null;
+                        const arr = String(s).split(',').map(x => x.trim()).filter(Boolean);
+                        if (!arr.length) return null;
+                        if (to === 'int') return arr.map(x => Number(x)).filter(n => Number.isFinite(n));
+                        return arr;
+                    };
+                    const out = {
+                        anilist_id: toInt(f.anilist_id)
+                    };
+                    // Scalars with modes
+                    if (f.anidb_mode === 'null') out.anidb_id = null;
+                    else if (f.anidb_mode === 'value') out.anidb_id = toInt(f.anidb_id);
+                    if (f.tvdb_mode === 'null') out.tvdb_id = null;
+                    else if (f.tvdb_mode === 'value') out.tvdb_id = toInt(f.tvdb_id);
+                    // Arrays with modes
+                    if (f.imdb_mode === 'null') out.imdb_id = null;
+                    else if (f.imdb_mode === 'value') out.imdb_id = parseCSV(f.imdb_csv, 'string');
+                    if (f.mal_mode === 'null') out.mal_id = null;
+                    else if (f.mal_mode === 'value') out.mal_id = parseCSV(f.mal_csv, 'int');
+                    if (f.tmdb_movie_mode === 'null') out.tmdb_movie_id = null;
+                    else if (f.tmdb_movie_mode === 'value') out.tmdb_movie_id = parseCSV(f.tmdb_movie_csv, 'int');
+                    if (f.tmdb_show_mode === 'null') out.tmdb_show_id = null;
+                    else if (f.tmdb_show_mode === 'value') out.tmdb_show_id = parseCSV(f.tmdb_show_csv, 'int');
+                    // tvdb_mappings with mode
+                    if (f.tvdb_map_mode === 'null') {
+                        out.tvdb_mappings = null;
+                    } else if (f.tvdb_map_mode === 'value') {
+                        const obj = {};
+                        if (Array.isArray(f.tvdb_mappings)) {
+                            for (const row of f.tvdb_mappings) {
+                                if (!row || !row.season) continue;
+                                let key = String(row.season).trim();
+                                if (!key) continue;
+                                if (!key.toLowerCase().startsWith('s')) key = 's' + key;
+                                obj[key] = row.pattern ? String(row.pattern) : '';
+                            }
+                        }
+                        out.tvdb_mappings = Object.keys(obj).length ? obj : null;
+                    }
+                    return out;
+                },
+                fetchAni() {
+                    try {
+                        if (!window.AniList || typeof AniList.fetch !== 'function') return;
+                        const ids = [...new Set(this.items.map(m => m.anilist_id).filter(Boolean))];
+                        const missing = ids.filter(id => !this.media[id]);
+                        if (!missing.length) return;
+                        AniList.fetch(missing).then(data => {
+                            this.media = {
+                                ...this.media,
+                                ...data
+                            };
+                        });
+                    } catch (_) {}
+                },
                 mappingAni(m) {
-                    const id = this.extractAniId(m);
+                    const id = m?.anilist_id;
                     return id ? this.media[id] : null;
                 },
                 aniTitle(a) {
@@ -497,8 +599,7 @@
                         case 'anidb':
                             return `https://anidb.net/anime/${val}`;
                         case 'imdb':
-                            const imdb = val.startsWith('tt') ? val : `tt${val}`;
-                            return `https://www.imdb.com/title/${imdb}/`;
+                            return `https://www.imdb.com/title/${val}/`;
                         case 'tmdb_movie':
                             return `https://www.themoviedb.org/movie/${val}`;
                         case 'tmdb_show':
@@ -527,7 +628,7 @@
                 fmtSeasons(m) {
                     return Object.keys(m.tvdb_mappings || {}).length;
                 }
-            }
+            };
         }
     </script>
 {% endblock content %}
