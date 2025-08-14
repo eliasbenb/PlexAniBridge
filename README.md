@@ -41,3 +41,9 @@ services:
         #  - 4848:4848
         restart: unless-stopped
 ```
+
+## Web UI Screenshot
+
+![Web UI Screenshot](./docs/img/screenshots/timeline.png)
+
+_View more screenshots in the [documentation](https://plexanibridge.elias.eu.org/docs/web/screenshots)_
