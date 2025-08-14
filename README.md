@@ -37,8 +37,8 @@ services:
             PAB_PLEX_URL: ...
         volumes:
             - /path/to/plexanibridge/data:/config
-        # ports:
-        #  - 4848:4848
+        ports:
+         - 4848:4848
         restart: unless-stopped
 ```
 
