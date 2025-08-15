@@ -240,15 +240,6 @@ class PlexService {
                 const key = full || it.guid; // prefer full original
                 this.cache.set(key, { m: it, t: now });
             }
-            // For any missing, mark minimal error placeholders to avoid repeat hammering quickly
-            const returnedSet = new Set(items.map(i => i.guid));
-            for (const original of chunk) {
-                const sg = original.split('/').pop();
-                const matched = Array.from(returnedSet).some(rg => rg.endsWith(sg));
-                if (!matched) {
-                    this.cache.set(original, { m: { guid: original, _error: true }, t: now });
-                }
-            }
         } catch (e) { this._dispatch('plex-error', { error: String(e), chunk }); }
     }
 
