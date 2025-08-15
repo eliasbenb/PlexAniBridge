@@ -145,7 +145,16 @@
                             <iconify-icon icon="lucide:github" inline></iconify-icon>
                             <span>GitHub</span>
                         </a>
-                        <span class="text-slate-600">v{{ version }} ({{ git_hash[:7] }})</span>
+                        <div>
+                            <a href="https://github.com/eliasbenb/PlexAniBridge/releases/tag/v{{ version }}"
+                               target="_blank"
+                               rel="noopener"
+                               class="text-slate-600 hover:text-slate-200 transition-colors">v{{ version }}</a>
+                            <a href="https://github.com/eliasbenb/PlexAniBridge/tree/{{ git_hash }}"
+                               target="_blank"
+                               rel="noopener"
+                               class="text-slate-600 hover:text-slate-200 transition-colors">({{ git_hash[:7] }})</a>
+                        </div>
                     </div>
                     <div class="text-slate-600">
                         Made by <a href="https://github.com/eliasbenb"
