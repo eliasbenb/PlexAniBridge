@@ -172,7 +172,10 @@ class AniMapClient:
             new_data = {}
             for key, entry in mappings.items():
                 anilist_id = int(key)
+                # Start from the column defaults so omitted fields become None
+                # and will overwrite existing DB values on update
                 processed_entry: dict[str, Any] = {
+                    **animap_defaults,
                     "anilist_id": anilist_id,
                 }
 
