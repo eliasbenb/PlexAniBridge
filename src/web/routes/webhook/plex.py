@@ -1,5 +1,6 @@
 """Plex Webhook endpoint."""
 
+from logging import DEBUG
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -46,23 +47,38 @@ async def parse_webhook_request(request: Request) -> PlexWebhook:
 
 @router.post("/{profile}")
 async def plex_webhook(
+    request: Request,
     profile: str,
     payload: PlexWebhook = Depends(parse_webhook_request),
 ) -> dict[str, Any]:
     """Receive Plex webhook and trigger a targeted sync.
 
     Args:
+        request (Request): The incoming HTTP request.
         profile (str): The profile name to target for the sync.
         payload (PlexWebhook): The parsed webhook payload.
 
     Returns:
         A dictionary containing the result of the webhook processing.
     """
+    if log.getEffectiveLevel() <= DEBUG:
+        log.debug(f"Received Plex webhook for profile: {profile}")
+        body = (
+            (await request.body())
+            .decode("utf-8", "replace")
+            .translate({10: None, 13: None, 9: None, 32: None})  # Remove whitespace
+            .strip()
+        )
+        log.debug(f"Webhook payload: {body}")
+
     scheduler = app_state.scheduler
     if not scheduler:
         raise HTTPException(503, "Scheduler not available")
 
-    profile_config = scheduler.global_config.get_profile(profile)
+    try:
+        profile_config = scheduler.global_config.get_profile(profile)
+    except KeyError:
+        raise HTTPException(404, f"Profile '{profile}' not found") from None
 
     if SyncMode.WEBHOOK not in profile_config.sync_modes:
         raise HTTPException(503, "Webhook sync mode is not enabled for this profile")
