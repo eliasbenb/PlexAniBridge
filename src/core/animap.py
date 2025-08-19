@@ -299,16 +299,11 @@ class AniMapClient:
             if not values:
                 return false()
 
-            conditions = []
-            for value in values:
-                conditions.append(
-                    exists(
-                        select(1)
-                        .select_from(func.json_each(field))
-                        .where(column("value") == value)
-                    )
-                )
-            return or_(*conditions)
+            return exists(
+                select(1)
+                .select_from(func.json_each(field))
+                .where(column("value").in_(values))
+            )
 
         def json_dict_contains(field: Mapped, key: str) -> BinaryExpression:
             """Generate a SQL expression for checking if a JSON field contains a key.
