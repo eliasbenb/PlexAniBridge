@@ -123,3 +123,13 @@ async def plex_webhook(
         "processed_rating_key": payload.top_level_rating_key,
         "event": payload.event,
     }
+
+
+@router.post("/{profile}")
+async def _deprecated_plex_webhook_profile(
+    request: Request,
+    profile: str,
+    payload: PlexWebhook = Depends(parse_webhook_request),
+):
+    """Deprecated webhook endpoint that took a profile name as a parameter."""
+    return await plex_webhook(request, payload)
