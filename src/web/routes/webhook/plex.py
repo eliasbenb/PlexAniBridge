@@ -45,45 +45,47 @@ async def parse_webhook_request(request: Request) -> PlexWebhook:
         raise HTTPException(400, f"Invalid payload structure: {e}") from e
 
 
-@router.post("/{profile}")
+@router.post("")
 async def plex_webhook(
     request: Request,
-    profile: str,
     payload: PlexWebhook = Depends(parse_webhook_request),
 ) -> dict[str, Any]:
     """Receive Plex webhook and trigger a targeted sync.
 
     Args:
         request (Request): The incoming HTTP request.
-        profile (str): The profile name to target for the sync.
         payload (PlexWebhook): The parsed webhook payload.
 
     Returns:
         A dictionary containing the result of the webhook processing.
     """
     if log.getEffectiveLevel() <= DEBUG:
-        log.debug(f"Received Plex webhook for profile: {profile}")
         body = (
             (await request.body())
             .decode("utf-8", "replace")
             .translate({10: None, 13: None, 9: None, 32: None})  # Remove whitespace
             .strip()
         )
-        log.debug(f"Webhook payload: {body}")
+        log.debug(f"Received Plex webhook: {body}")
 
     scheduler = app_state.scheduler
     if not scheduler:
         raise HTTPException(503, "Scheduler not available")
 
+    if not payload.account_id:
+        raise HTTPException(400, "No account ID found in webhook payload")
+
     try:
-        profile_config = scheduler.global_config.get_profile(profile)
-    except KeyError:
-        raise HTTPException(404, f"Profile '{profile}' not found") from None
+        profile_name, profile_config = scheduler.get_profile_for_plex_account(
+            payload.account_id
+        )
+    except KeyError as e:
+        raise HTTPException(404, "Profile not found") from e
 
     if SyncMode.WEBHOOK not in profile_config.sync_modes:
         raise HTTPException(503, "Webhook sync mode is not enabled for this profile")
 
-    profile_bridge = scheduler.bridge_clients.get(profile)
+    profile_bridge = scheduler.bridge_clients.get(profile_name)
     if not profile_bridge:
         raise HTTPException(503, "Profile bridge not available")
 
@@ -105,14 +107,16 @@ async def plex_webhook(
     log.info(
         f"Webhook: Received Plex event {payload.event} with "
         f"rating_key={payload.top_level_rating_key} "
-        f"targeting profile={profile or '*'}",
+        f"targeting profile={profile_name or '*'}",
     )
     try:
         await scheduler.trigger_sync(
-            profile_name=profile, poll=False, rating_keys=[payload.top_level_rating_key]
+            profile_name=profile_name,
+            poll=False,
+            rating_keys=[payload.top_level_rating_key],
         )
     except KeyError:
-        raise HTTPException(404, f"Profile '{profile}' not found") from None
+        raise HTTPException(404, f"Profile '{profile_name}' not found") from None
 
     return {
         "ok": True,
