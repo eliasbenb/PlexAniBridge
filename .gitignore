@@ -173,3 +173,7 @@ cython_debug/
 
 # Profilers
 *.pyspy
+
+# Node
+node_modules/
+.pnpm-store/

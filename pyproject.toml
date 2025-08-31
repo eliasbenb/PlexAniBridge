@@ -57,19 +57,6 @@ Homepage = "https://plexanibridge.elias.eu.org"
 Issues = "https://github.com/eliasbenb/PlexAniBridge/issues"
 Source = "https://github.com/eliasbenb/PlexAniBridge"
 
-[tool.djlint]
-extension = ".html.jinja"
-format_css = true
-format_js = true
-indent = 4
-profile = "jinja"
-
-[tool.djlint.css]
-indent_size = 4
-
-[tool.djlint.js]
-indent_size = 4
-
 [tool.pyright]
 extraPaths = ["./src/stubs"]
 include = ["main.py", "src"]
@@ -88,7 +75,17 @@ quote-style = "double"
 select = ["E", "F", "UP", "B", "SIM", "I", "D", "RUF"]
 
 [tool.ruff.lint.flake8-bugbear]
-extend-immutable-calls = ["fastapi.Depends"]
+extend-immutable-calls = [
+    "fastapi.Body",
+    "fastapi.Cookie",
+    "fastapi.Depends",
+    "fastapi.File",
+    "fastapi.Form",
+    "fastapi.Header",
+    "fastapi.Path",
+    "fastapi.Query",
+    "fastapi.Security",
+]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
@@ -97,4 +94,4 @@ convention = "google"
 members = ["docs"]
 
 [dependency-groups]
-dev = ["djlint>=1.36.4", "py-spy>=0.4.0", "ruff>=0.12.0"]
+dev = ["py-spy>=0.4.0", "ruff>=0.12.0"]
