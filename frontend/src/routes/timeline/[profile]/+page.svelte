@@ -70,7 +70,7 @@
     let page = $state(1);
     let pages = $state(1);
     let perPage = $state(50);
-    let outcomeFilter: string | null = $state(null);
+    let outcomeFilter: string | null = $state("synced");
     let showJump = $state(false);
     let newItemsCount = $state(0);
     let ws: WebSocket | null = null;
@@ -232,17 +232,15 @@
         );
     }
 
-    function orderedStats() {
-        return Object.fromEntries(
-            Object.entries(stats).sort(
-                (a, b) => metaFor(a[0]).order - metaFor(b[0]).order,
-            ),
-        );
-    }
-
     const buildQuery = (p: number) => {
         const u = new URLSearchParams({ page: String(p), per_page: String(perPage) });
         if (outcomeFilter) u.set("outcome", outcomeFilter);
+        console.log(
+            "Building query with outcomeFilter:",
+            outcomeFilter,
+            "URL:",
+            `/api/history/${params.profile}?${u}`,
+        );
         return `/api/history/${params.profile}?${u}`;
     };
 
@@ -382,7 +380,11 @@
                 if (!Array.isArray(d.items)) return;
                 let added = 0;
                 for (const it of d.items) {
-                    if (!knownIds.has(it.id)) {
+                    if (
+                        !knownIds.has(it.id) &&
+                        (!outcomeFilter || it.outcome === outcomeFilter)
+                    ) {
+                        // Apply outcomeFilter to WebSocket data
                         items = [it, ...items];
                         knownIds.add(it.id);
                         added++;
@@ -464,21 +466,23 @@
         </div>
     </div>
     <div class="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
-        {#each Object.entries(orderedStats()) as [k, v] (k)}
+        {#each Object.entries(OUTCOME_META) as [k, meta] (k)}
             <button
                 type="button"
                 onclick={() => toggleOutcomeFilter(k)}
                 class={`group relative cursor-pointer select-none overflow-hidden rounded-md p-3 text-left transition ${outcomeFilter === k ? "border-sky-500 bg-sky-950/40 ring-1 ring-sky-400/60" : "border border-slate-800 bg-gradient-to-br from-slate-900/70 to-slate-800/30 hover:border-slate-700"}`}
                 title={outcomeFilter === k
                     ? "Click to remove filter"
-                    : "Funnel by " + metaFor(k).label}
+                    : "Funnel by " + meta.label}
             >
                 <div
                     class="text-[10px] font-medium uppercase tracking-wide text-slate-400"
                 >
-                    {metaFor(k).label}
+                    {meta.label}
                 </div>
-                <div class="mt-1 text-2xl font-semibold tabular-nums">{v}</div>
+                <div class="mt-1 text-2xl font-semibold tabular-nums">
+                    {stats[k] || 0}
+                </div>
                 {#if outcomeFilter === k}
                     <div class="absolute right-1 top-1">
                         <span
