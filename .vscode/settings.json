@@ -24,6 +24,15 @@
     "editor.formatOnSave": true,
     "editor.insertSpaces": true,
     "editor.tabSize": 4,
+    "eslint.workingDirectories": [
+        "./frontend"
+    ],
+    "eslint.validate": [
+        "javascript",
+        "typescript",
+        "svelte",
+        "html",
+    ],
     "prettier.configPath": "./frontend/.prettierrc",
     "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
     "python.envFile": "",

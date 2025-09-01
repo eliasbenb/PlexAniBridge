@@ -2,6 +2,7 @@
     import { onMount } from "svelte";
 
     import { ArrowRight, Check, List, PenLine, Plus, Search, X } from "@lucide/svelte";
+    import { SvelteURLSearchParams } from "svelte/reactivity";
 
     type ExternalIds = {
         anilist_id?: number | null;
@@ -92,7 +93,7 @@
     async function load() {
         loading = true;
         try {
-            const p = new URLSearchParams({
+            const p = new SvelteURLSearchParams({
                 page: String(page),
                 per_page: String(perPage),
             });
@@ -172,21 +173,21 @@
             const n = Number(v);
             return Number.isFinite(n) ? n : null;
         };
-        function parseCSV(s: string, to: "string"): string[] | null;
-        function parseCSV(s: string, to: "int"): number[] | null;
-        function parseCSV(
-            s: string,
-            to: "string" | "int",
-        ): (string[] | number[]) | null {
+
+        function parseCSV(s: string, to: "string" | "int"): string[] | number[] | null {
             if (!s || !s.trim()) return null;
             const arr = s
                 .split(",")
                 .map((x) => x.trim())
                 .filter(Boolean);
             if (!arr.length) return null;
-            return to === "int"
-                ? arr.map((x) => Number(x)).filter((n) => Number.isFinite(n))
-                : arr;
+            if (to === "int") {
+                const nums = arr
+                    .map((x) => Number(x))
+                    .filter((n) => Number.isFinite(n));
+                return nums as number[];
+            }
+            return arr as string[];
         }
 
         const out: Mapping = { anilist_id: toInt(f.anilist_id) } as Mapping;
@@ -195,15 +196,17 @@
         if (f.tvdb_mode === "null") out.tvdb_id = null;
         else if (f.tvdb_mode === "value") out.tvdb_id = toInt(f.tvdb_id);
         if (f.imdb_mode === "null") out.imdb_id = null;
-        else if (f.imdb_mode === "value") out.imdb_id = parseCSV(f.imdb_csv, "string");
+        else if (f.imdb_mode === "value")
+            out.imdb_id = parseCSV(f.imdb_csv, "string") as string[] | null;
         if (f.mal_mode === "null") out.mal_id = null;
-        else if (f.mal_mode === "value") out.mal_id = parseCSV(f.mal_csv, "int");
-        if (f.tmdb_movie_mode === "null") out.tmdb_movie_id = null;
+        else if (f.mal_mode === "value")
+            out.mal_id = parseCSV(f.mal_csv, "int") as number[] | null;
+        if (f.tmdb_movie_mode === "null") out.tmdb_movie_id = null as number[] | null;
         else if (f.tmdb_movie_mode === "value")
-            out.tmdb_movie_id = parseCSV(f.tmdb_movie_csv, "int");
-        if (f.tmdb_show_mode === "null") out.tmdb_show_id = null;
+            out.tmdb_movie_id = parseCSV(f.tmdb_movie_csv, "int") as number[] | null;
+        if (f.tmdb_show_mode === "null") out.tmdb_show_id = null as number[] | null;
         else if (f.tmdb_show_mode === "value")
-            out.tmdb_show_id = parseCSV(f.tmdb_show_csv, "int");
+            out.tmdb_show_id = parseCSV(f.tmdb_show_csv, "int") as number[] | null;
         if (f.tvdb_map_mode === "null") out.tvdb_mappings = null;
         else if (f.tvdb_map_mode === "value") {
             const obj: Record<string, string> = {};
@@ -277,7 +280,8 @@
         try {
             pref = localStorage.getItem("anilist.lang");
         } catch {}
-        if (pref && (t as any)[pref]) return (t as any)[pref] as string;
+        if (pref && (t as Record<string, string | undefined>)[pref])
+            return (t as Record<string, string | undefined>)[pref] as string;
         return t.romaji || t.english || t.native || null;
     }
 
@@ -301,14 +305,14 @@
                     bind:value={query}
                     placeholder="Search (AniList, TMDB, IMDB, etc)"
                     aria-label="Search mappings"
-                    class="h-8 w-72 rounded-md border border-slate-700/70 bg-slate-900/70 pr-9 pl-8 text-[11px] shadow-sm placeholder:text-slate-500 focus:border-slate-600 focus:bg-slate-900"
+                    class="h-8 w-72 rounded-md border border-slate-700/70 bg-slate-900/70 pl-8 pr-9 text-[11px] shadow-sm placeholder:text-slate-500 focus:border-slate-600 focus:bg-slate-900"
                     onkeydown={(e) => e.key === "Enter" && ((page = 1), load())}
                 />
                 <Search
-                    class="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-slate-500"
+                    class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500"
                 />
                 <button
-                    class="absolute top-1/2 right-1 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md bg-slate-800 text-slate-300 hover:bg-slate-700"
+                    class="absolute right-1 top-1/2 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md bg-slate-800 text-slate-300 hover:bg-slate-700"
                     aria-label="Run search"
                     onclick={() => ((page = 1), load())}
                 >
@@ -424,7 +428,7 @@
                                             />
                                         {:else}
                                             <div
-                                                class="flex h-16 w-12 shrink-0 items-center justify-center rounded-md border border-dashed border-slate-700 bg-slate-800/30 text-[9px] text-slate-500 select-none"
+                                                class="flex h-16 w-12 shrink-0 select-none items-center justify-center rounded-md border border-dashed border-slate-700 bg-slate-800/30 text-[9px] text-slate-500"
                                             >
                                                 No Art
                                             </div>
@@ -441,11 +445,11 @@
                                                 class="flex flex-wrap gap-1 text-[9px] text-slate-400"
                                             >
                                                 {#if m.anilist.format}<span
-                                                        class="rounded bg-slate-800/70 px-1 py-0.5 tracking-wide uppercase"
+                                                        class="rounded bg-slate-800/70 px-1 py-0.5 uppercase tracking-wide"
                                                         >{m.anilist.format}</span
                                                     >{/if}
                                                 {#if m.anilist.status}<span
-                                                        class="rounded bg-slate-800/70 px-1 py-0.5 tracking-wide uppercase"
+                                                        class="rounded bg-slate-800/70 px-1 py-0.5 uppercase tracking-wide"
                                                         >{m.anilist.status}</span
                                                     >{/if}
                                                 {#if m.anilist.episodes}<span
@@ -526,7 +530,7 @@
                                         {/if}{/each}{:else}-{/if}</td
                             >
                             <td class="px-3 py-2 font-mono">{fmtSeasons(m)}</td>
-                            <td class="px-3 py-2 text-right whitespace-nowrap">
+                            <td class="whitespace-nowrap px-3 py-2 text-right">
                                 <div class="flex flex-col items-end gap-1">
                                     <div class="flex gap-1">
                                         <button
@@ -592,7 +596,7 @@
                     min="1"
                     max={pages}
                     bind:value={page}
-                    class="h-6 w-12 [appearance:textfield] rounded-md border border-slate-700 bg-slate-900 px-1 text-center text-xs font-semibold [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                    class="h-6 w-12 rounded-md border border-slate-700 bg-slate-900 px-1 text-center text-xs font-semibold [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                     onchange={load}
                 />
                 / {pages}

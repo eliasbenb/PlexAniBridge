@@ -11,9 +11,6 @@ importers:
       '@lucide/svelte':
         specifier: ^0.542.0
         version: 0.542.0(svelte@5.38.6)
-      svelte-highlight:
-        specifier: ^7.8.4
-        version: 7.8.4
     devDependencies:
       '@eslint/compat':
         specifier: 1.3.2
@@ -959,10 +956,6 @@ packages:
     resolution: {integrity: sha512-EykJT/Q1KjTWctppgIAgfSO0tKVuZUjhgMr17kqTumMl6Afv3EISleU7qZUzoXDFTAHTDC4NOoG/ZxU3EvlMPQ==}
     engines: {node: '>=8'}
 
-  highlight.js@11.11.1:
-    resolution: {integrity: sha512-Xwwo44whKBVCYoliBQwaPvtd/2tYFkRQtXDWj1nackaV2JPXx3L0+Jvd8/qCJ2p+ML0/XVkJ2q+Mr+UVdpJK5w==}
-    engines: {node: '>=12.0.0'}
-
   ignore@5.3.2:
     resolution: {integrity: sha512-hsBTNUqQTDwkWtcdYI2i06Y/nUBEsNEDJKjWdigLvegy8kDuJAS8uRlpkkcQpyEXL0Z/pjDy5HBmMjRCJ2gq+g==}
     engines: {node: '>= 4'}
@@ -1386,9 +1379,6 @@ packages:
     peerDependenciesMeta:
       svelte:
         optional: true
-
-  svelte-highlight@7.8.4:
-    resolution: {integrity: sha512-aVp+Q0hH9kI7PlSDrklmFTF4Uj7wYj7UGuqkREnkXlqpEffxr2g6esZcMMaTgECdg5rb2mJqM88+nwS10ecoTg==}
 
   svelte@5.38.6:
     resolution: {integrity: sha512-ltBPlkvqk3bgCK7/N323atUpP3O3Y+DrGV4dcULrsSn4fZaaNnOmdplNznwfdWclAgvSr5rxjtzn/zJhRm6TKg==}
@@ -2320,8 +2310,6 @@ snapshots:
 
   has-flag@4.0.0: {}
 
-  highlight.js@11.11.1: {}
-
   ignore@5.3.2: {}
 
   ignore@7.0.5: {}
@@ -2632,10 +2620,6 @@ snapshots:
       postcss-selector-parser: 7.1.0
     optionalDependencies:
       svelte: 5.38.6
-
-  svelte-highlight@7.8.4:
-    dependencies:
-      highlight.js: 11.11.1
 
   svelte@5.38.6:
     dependencies:

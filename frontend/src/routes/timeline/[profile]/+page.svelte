@@ -14,7 +14,7 @@
         ExternalLink,
         Funnel,
         History,
-        Infinity,
+        Infinity as InfinityIcon,
         LoaderCircle,
         RefreshCcw,
         RotateCw,
@@ -26,6 +26,7 @@
         Trash2,
         X,
     } from "@lucide/svelte";
+    import { SvelteSet, SvelteURLSearchParams } from "svelte/reactivity";
 
     const { params } = $props<{ params: { profile: string } }>();
 
@@ -39,8 +40,8 @@
         plex_child_rating_key?: string | null;
         plex_type?: string;
         error_message?: string;
-        before_state?: any;
-        after_state?: any;
+        before_state?: object;
+        after_state?: object;
         anilist?: {
             id?: number;
             title?: { romaji?: string; english?: string; native?: string };
@@ -74,7 +75,7 @@
     let showJump = $state(false);
     let newItemsCount = $state(0);
     let ws: WebSocket | null = null;
-    let knownIds = new Set<number>();
+    let knownIds = new SvelteSet<number>();
     let sentinel: HTMLDivElement | null = $state(null);
     let titleLangTick = $state(0); // force rerender on title language preference change
     let openDiff: Record<number, boolean> = $state({});
@@ -98,19 +99,19 @@
 
     type DiffEntry = {
         path: string;
-        before: any;
-        after: any;
+        before: unknown;
+        after: unknown;
         status: "added" | "removed" | "changed" | "unchanged";
     };
 
     function buildDiff(item: HistoryItem): DiffEntry[] {
         const before = item.before_state || {};
         const after = item.after_state || {};
-        const paths = new Set<string>();
-        const visit = (obj: any, base = "") => {
+        const paths = new SvelteSet<string>();
+        const visit = (obj: unknown, base = "") => {
             if (!obj || typeof obj !== "object") return;
-            for (const k of Object.keys(obj)) {
-                const val = obj[k];
+            for (const k of Object.keys(obj as Record<string, unknown>)) {
+                const val = (obj as Record<string, unknown>)[k];
                 const path = base ? `${base}.${k}` : k;
                 if (val && typeof val === "object" && !Array.isArray(val))
                     visit(val, path);
@@ -122,8 +123,16 @@
         const diff: DiffEntry[] = [];
         for (const p of paths) {
             const segs = p.split(".");
-            const get = (root: any) =>
-                segs.reduce((o, k) => (o && k in o ? o[k] : undefined), root);
+            const get = (root: unknown) =>
+                segs.reduce<unknown>(
+                    (o, k) =>
+                        o &&
+                        typeof o === "object" &&
+                        k in (o as Record<string, unknown>)
+                            ? (o as Record<string, unknown>)[k]
+                            : undefined,
+                    root,
+                );
             const bv = get(before);
             const av = get(after);
             let status: DiffEntry["status"] = "unchanged";
@@ -145,29 +154,30 @@
         return diff;
     }
 
-    function truncateValue(v: any, max = 120) {
+    function truncateValue(v: unknown, max = 120) {
         if (v === null) return "null";
         if (v === undefined) return "undefined";
         const s = typeof v === "string" ? v : JSON.stringify(v);
         return s.length > max ? s.slice(0, max - 1) + "…" : s;
     }
 
-    function sizeLabel(obj: any) {
+    function sizeLabel(obj: unknown) {
         if (!obj) return "0 keys";
         let count = 0;
-        const scan = (o: any) => {
+        const scan = (o: unknown) => {
             if (o && typeof o === "object")
-                Object.keys(o).forEach((k) => {
+                Object.keys(o as Record<string, unknown>).forEach((k) => {
                     count++;
-                    if (o[k] && typeof o[k] === "object" && !Array.isArray(o[k]))
-                        scan(o[k]);
+                    const child = (o as Record<string, unknown>)[k];
+                    if (child && typeof child === "object" && !Array.isArray(child))
+                        scan(child);
                 });
         };
         scan(obj);
         return count + " keys";
     }
 
-    function highlightJson(obj: any) {
+    function highlightJson(obj: object) {
         if (!obj) return '<span class="text-slate-600">—</span>';
         const json = JSON.stringify(obj, null, 2);
         return json
@@ -185,19 +195,23 @@
                         return `<span class='text-pink-300'>${m}</span>`;
                     return `<span class='text-amber-300'>${m}</span>`;
                 },
-            );
+            )
+            .trim();
     }
 
-    function copyJson(obj: any) {
+    function copyJson(obj: unknown) {
         try {
             navigator.clipboard.writeText(JSON.stringify(obj, null, 2));
         } catch {}
     }
 
-    const OUTCOME_META: Record<
-        string,
-        { label: string; color: string; icon: any; order: number }
-    > = {
+    interface OutcomeMeta {
+        label: string;
+        color: string;
+        icon: typeof Circle;
+        order: number;
+    }
+    const OUTCOME_META: Record<string, OutcomeMeta> = {
         synced: {
             label: "Synced",
             color: "bg-emerald-600/80",
@@ -233,7 +247,10 @@
     }
 
     const buildQuery = (p: number) => {
-        const u = new URLSearchParams({ page: String(p), per_page: String(perPage) });
+        const u = new SvelteURLSearchParams({
+            page: String(p),
+            per_page: String(perPage),
+        });
         if (outcomeFilter) u.set("outcome", outcomeFilter);
         console.log(
             "Building query with outcomeFilter:",
@@ -254,7 +271,8 @@
         try {
             pref = localStorage.getItem("anilist.lang");
         } catch {}
-        if (pref && (t as any)[pref]) return (t as any)[pref] as string;
+        if (pref && (t as Record<string, string | undefined>)[pref])
+            return (t as Record<string, string | undefined>)[pref] as string;
         return t.romaji || t.english || t.native || null;
     }
 
@@ -304,7 +322,7 @@
             const oc = data.outcome || item.outcome;
             if (oc) stats[oc] = Math.max(0, (stats[oc] || 1) - 1);
         } catch (e) {
-            // @ts-ignore
+            // @ts-expect-error optional global notifier
             if (window.notify?.toast) window.notify.toast("Delete failed", "error");
             console.error(e);
         }
@@ -329,7 +347,7 @@
             page = d.page || 1;
             pages = d.pages || 1;
             perPage = d.per_page || perPage;
-            knownIds = new Set(items.map((i) => i.id));
+            knownIds = new SvelteSet(items.map((i) => i.id));
             newItemsCount = 0;
         } catch (e) {
             console.error(e);
@@ -346,7 +364,7 @@
             const r = await fetch(buildQuery(next));
             if (!r.ok) throw new Error("HTTP " + r.status);
             const d = await r.json();
-            const existing = new Set(items.map((i: HistoryItem) => i.id));
+            const existing = new SvelteSet(items.map((i: HistoryItem) => i.id));
             const newOnes = (d.items || []).filter(
                 (i: HistoryItem) => !existing.has(i.id),
             );
@@ -410,10 +428,10 @@
                 method: "POST",
             });
             // optionally surface toast if a global notifier exists
-            // @ts-ignore
+            // @ts-expect-error optional global notifier
             if (window.notify?.toast) window.notify.toast("Sync started", "info");
-        } catch (e) {
-            // @ts-ignore
+        } catch {
+            // @ts-expect-error optional global notifier
             if (window.notify?.toast) window.notify.toast("Sync failed", "error");
         }
     }
@@ -513,7 +531,7 @@
         hidden={!items.length}
     >
         <span class="inline-flex items-center gap-1"
-            ><Infinity class="inline h-4 w-4" /> Scroll to load older history</span
+            ><InfinityIcon class="inline h-4 w-4" /> Scroll to load older history</span
         >
         {#if loadingMore}<span class="inline-flex items-center gap-1 text-sky-300"
                 ><LoaderCircle class="inline h-4 w-4 animate-spin" /> Loading…</span
@@ -799,12 +817,12 @@
                                             >{sizeLabel(item.before_state)}</span
                                         >
                                     </h5>
-                                    <pre
-                                        class="max-h-64 overflow-auto rounded-md border border-slate-800 bg-slate-900/80 p-2 text-[11px] leading-tight"><span
-                                            >{@html highlightJson(
-                                                item.before_state,
-                                            )}</span
-                                        ></pre>
+                                    <code
+                                        class="block max-h-64 overflow-auto whitespace-pre rounded-md border border-slate-800 bg-slate-900/80 p-2 font-mono text-[11px] leading-tight"
+                                    >
+                                        <!-- eslint-disable-next-line svelte/no-at-html-tags -->
+                                        {@html highlightJson(item.before_state ?? {})}
+                                    </code>
                                 </div>
                                 <div class="space-y-1.5">
                                     <h5
@@ -815,12 +833,12 @@
                                             >{sizeLabel(item.after_state)}</span
                                         >
                                     </h5>
-                                    <pre
-                                        class="max-h-64 overflow-auto rounded-md border border-slate-800 bg-slate-900/80 p-2 text-[11px] leading-tight"><span
-                                            >{@html highlightJson(
-                                                item.after_state,
-                                            )}</span
-                                        ></pre>
+                                    <code
+                                        class="block max-h-64 overflow-auto whitespace-pre rounded-md border border-slate-800 bg-slate-900/80 p-2 font-mono text-[11px] leading-tight"
+                                    >
+                                        <!-- eslint-disable-next-line svelte/no-at-html-tags -->
+                                        {@html highlightJson(item.after_state ?? {})}
+                                    </code>
                                 </div>
                             </div>
                         {/if}

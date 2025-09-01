@@ -4,8 +4,8 @@
     import { Languages, Settings, User } from "@lucide/svelte";
 
     interface SettingsResp {
-        global_config: Record<string, any>;
-        profiles: { name: string; settings: Record<string, any> }[];
+        global_config: Record<string, unknown>;
+        profiles: { name: string; settings: Record<string, unknown> }[];
     }
 
     let data: SettingsResp = $state({ global_config: {}, profiles: [] });
@@ -36,8 +36,9 @@
             const r = await fetch("/api/system/settings");
             if (!r.ok) throw new Error("HTTP " + r.status);
             data = await r.json();
-        } catch (e: any) {
-            error = e?.message || String(e);
+        } catch (e: unknown) {
+            if (e instanceof Error) error = e.message;
+            else error = String(e);
         } finally {
             loading = false;
         }
@@ -73,7 +74,7 @@
                             <span class="min-w-40 break-all text-slate-500">{k}</span>
                             <span class="break-all text-slate-300">
                                 {#if v == null}
-                                    <span class="text-slate-600 italic">(unset)</span>
+                                    <span class="italic text-slate-600">(unset)</span>
                                 {:else if typeof v === "string"}
                                     {v}
                                 {:else}
@@ -144,7 +145,7 @@
                                         >
                                         <span class="break-all text-slate-300">
                                             {#if v == null}
-                                                <span class="text-slate-600 italic"
+                                                <span class="italic text-slate-600"
                                                     >(unset)</span
                                                 >
                                             {:else if typeof v === "string"}

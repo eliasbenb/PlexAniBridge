@@ -14,7 +14,7 @@
     }
 
     let info: AboutInfo = $state({});
-    let status: any = $state(null);
+    let status: unknown = $state(null);
     let loading = $state(true);
     let error: string | null = $state(null);
 
@@ -27,8 +27,9 @@
             const d = await r.json();
             info = d.info || {};
             status = d.status;
-        } catch (e: any) {
-            error = e?.message || String(e);
+        } catch (e: unknown) {
+            if (e instanceof Error) error = e.message;
+            else error = String(e);
         } finally {
             loading = false;
         }

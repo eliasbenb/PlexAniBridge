@@ -253,14 +253,10 @@
         // $$'text'$$ => blue quoted text
         safe = safe.replace(
             /\$\$'((?:[^']|'(?!\$\$))*)'\$\$/g,
-            (_m, inner) => `<span class=\"text-sky-300\">'${inner}'</span>`,
+            (_m, inner) => `'${inner}'`,
         );
-        // $${json}$$ => gray braces content
-        safe = safe.replace(
-            /\$\$\{(.*?)\}\$\$/g,
-            (_m, inner) => `<span class=\"text-slate-400\">{${inner}}</span>`,
-        );
-        return safe;
+        safe = safe.replace(/\$\$\{(.*?)\}\$\$/g, (_m, inner) => `{${inner}}`);
+        return safe; // now plain text markers, no styling spans
     }
 
     function switchTab(t: "live" | "history") {
@@ -336,7 +332,7 @@
                     id="log-level"
                     bind:value={level}
                     onchange={applyFilter}
-                    class="h-8 rounded-md border border-slate-700/70 bg-slate-900/70 pr-7 pl-2 text-[11px] shadow-sm focus:border-slate-600 focus:bg-slate-900"
+                    class="h-8 rounded-md border border-slate-700/70 bg-slate-900/70 pl-2 pr-7 text-[11px] shadow-sm focus:border-slate-600 focus:bg-slate-900"
                 >
                     <option>DEBUG</option><option>INFO</option><option>SUCCESS</option
                     ><option>WARNING</option><option>ERROR</option>
@@ -349,17 +345,17 @@
                     bind:value={search}
                     oninput={() => applyFilter()}
                     placeholder="Search..."
-                    class="h-8 w-full rounded-md border border-slate-700/70 bg-slate-900/70 pr-8 pl-8 text-[11px] shadow-sm placeholder:text-slate-500 focus:border-slate-600 focus:bg-slate-900"
+                    class="h-8 w-full rounded-md border border-slate-700/70 bg-slate-900/70 pl-8 pr-8 text-[11px] shadow-sm placeholder:text-slate-500 focus:border-slate-600 focus:bg-slate-900"
                 />
                 <Search
-                    class="absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-slate-500"
+                    class="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500"
                 />
                 {#if search}
                     <button
                         aria-label="Clear search"
                         type="button"
                         onclick={() => ((search = ""), applyFilter())}
-                        class="absolute top-1/2 right-1 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md bg-slate-800 text-slate-300 hover:bg-slate-700"
+                        class="absolute right-1 top-1/2 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md bg-slate-800 text-slate-300 hover:bg-slate-700"
                     >
                         <X class="h-3.5 w-3.5 text-[14px]" />
                     </button>
@@ -461,7 +457,7 @@
                             class={`group flex items-start gap-2 border-l-2 px-2 py-0.5 pr-3 ${entryClass(entry.level)}`}
                         >
                             <span
-                                class="w-[54px] shrink-0 text-right text-[10px] text-slate-500 tabular-nums"
+                                class="w-[54px] shrink-0 text-right text-[10px] tabular-nums text-slate-500"
                                 >{formatTime(entry)}</span
                             >
                             <span
@@ -473,7 +469,7 @@
                                 class:whitespace-pre-wrap={wrap}
                                 class:break-words={wrap}
                                 class:whitespace-pre={!wrap}
-                                >{@html highlight(entry.message)}</span
+                                >{highlight(entry.message)}</span
                             >
                         </div>
                     {/each}
@@ -555,7 +551,7 @@
                                 <button
                                     type="button"
                                     onclick={() => loadFile(f)}
-                                    class={`group flex w-full flex-col gap-0.5 px-3 py-2 text-left text-[11px] hover:bg-slate-800/70 ${currentFile && currentFile.name === f.name ? "bg-slate-800 ring-1 ring-emerald-600/40 ring-inset" : ""}`}
+                                    class={`group flex w-full flex-col gap-0.5 px-3 py-2 text-left text-[11px] hover:bg-slate-800/70 ${currentFile && currentFile.name === f.name ? "bg-slate-800 ring-1 ring-inset ring-emerald-600/40" : ""}`}
                                 >
                                     <div
                                         class="flex items-center justify-between gap-2"
@@ -595,7 +591,7 @@
                                     class={`group flex items-start gap-2 border-l-2 px-2 py-0.5 pr-3 ${entryClass(entry.level)}`}
                                 >
                                     <span
-                                        class="w-[54px] shrink-0 text-right text-[10px] text-slate-500 tabular-nums"
+                                        class="w-[54px] shrink-0 text-right text-[10px] tabular-nums text-slate-500"
                                         >{formatTime(entry)}</span
                                     >
                                     <span
@@ -607,7 +603,7 @@
                                         class:whitespace-pre-wrap={wrap}
                                         class:break-words={wrap}
                                         class:whitespace-pre={!wrap}
-                                        >{@html highlight(entry.message)}</span
+                                        >{highlight(entry.message)}</span
                                     >
                                 </div>
                             {/each}
