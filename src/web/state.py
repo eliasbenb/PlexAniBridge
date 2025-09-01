@@ -4,8 +4,6 @@ Holds references to long-lived singletons (scheduler, log broadcaster, etc.) nee
 route handlers and websocket endpoints.
 """
 
-from __future__ import annotations
-
 from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any

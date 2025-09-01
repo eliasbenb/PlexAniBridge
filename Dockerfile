@@ -1,4 +1,4 @@
-FROM python:3.13-alpine AS builder
+FROM python:3.13-alpine AS python-builder
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
@@ -18,11 +18,22 @@ WORKDIR /app
 
 RUN uv sync --frozen --no-dev --no-editable
 
+FROM node:22-alpine AS node-builder
+
+WORKDIR /app
+
+COPY ./frontend /app
+
+ENV CI=1
+
+RUN corepack enable && \
+    pnpm install --frozen-lockfile
+
+RUN pnpm build
+
 FROM python:3.13-alpine
 
 RUN apk add --no-cache shadow su-exec
-
-COPY --from=builder /opt/venv /opt/venv
 
 LABEL maintainer="Elias Benbourenane <eliasbenbourenane@gmail.com>" \
     org.opencontainers.image.title="PlexAniBridge" \
@@ -45,7 +56,11 @@ WORKDIR /app
 COPY . /app
 COPY ./scripts/docker_init.sh /init
 
-RUN mkdir -p /config
+RUN rm -rf /app/frontend && \
+    mkdir -p /config
+
+COPY --from=python-builder /opt/venv /opt/venv
+COPY --from=node-builder /app/build /app/frontend/build
 
 VOLUME ["/config"]
 

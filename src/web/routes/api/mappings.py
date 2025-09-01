@@ -3,25 +3,57 @@
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 from sqlalchemy import and_, column, exists, func, or_, select
 
 from src.config.database import db
 from src.models.db.animap import AniMap
+from src.models.schemas.anilist import MediaWithoutList as AniListMetadata
 from src.web.services.mappings_store import get_mappings_store
 from src.web.state import app_state
 
 __all__ = ["router"]
 
+
+class MappingItemModel(BaseModel):
+    """Flattened mapping item with optional AniList metadata."""
+
+    anilist_id: int
+    anidb_id: int | None = None
+    imdb_id: list[str] | None = None
+    mal_id: list[int] | None = None
+    tmdb_movie_id: list[int] | None = None
+    tmdb_show_id: list[int] | None = None
+    tvdb_id: int | None = None
+    tvdb_mappings: dict[str, str] | None = None
+    custom: bool = False
+    anilist: AniListMetadata | None = None
+
+
+class ListMappingsResponse(BaseModel):
+    items: list[MappingItemModel]
+    total: int
+    page: int
+    per_page: int
+    pages: int
+    with_anilist: bool = False
+
+
+class DeleteMappingResponse(BaseModel):
+    ok: bool
+
+
 router = APIRouter()
 
 
-@router.get("")
+@router.get("", response_model=ListMappingsResponse)
 async def list_mappings(
     page: int = 1,
     per_page: int = 25,
     search: str | None = None,
     custom_only: bool = False,
-) -> dict[str, Any]:
+    with_anilist: bool = False,
+) -> ListMappingsResponse:
     """List mappings from AniMap database with optional search and pagination.
 
     Edits are stored separately as overrides and merged into the result.
@@ -39,23 +71,19 @@ async def list_mappings(
         if num is not None:
             or_parts.extend(
                 [
-                    AniMap.anilist_id == num,
-                    AniMap.anidb_id == num,
-                    AniMap.tvdb_id == num,
-                    exists(
-                        select(1)
-                        .select_from(func.json_each(AniMap.tmdb_movie_id))
-                        .where(column("value") == num)
+                    # Direct ID matches
+                    *(
+                        getattr(AniMap, k) == num
+                        for k in ["tmdb_movie_id", "tmdb_show_id", "mal_id"]
                     ),
-                    exists(
-                        select(1)
-                        .select_from(func.json_each(AniMap.tmdb_show_id))
-                        .where(column("value") == num)
-                    ),
-                    exists(
-                        select(1)
-                        .select_from(func.json_each(AniMap.mal_id))
-                        .where(column("value") == num)
+                    # JSONB containment
+                    *(
+                        exists(
+                            select(1)
+                            .select_from(func.json_each(getattr(AniMap, k)))
+                            .where(column("value") == num)
+                        )
+                        for k in ["tmdb_movie_id", "tmdb_show_id", "mal_id"]
                     ),
                 ]
             )
@@ -76,13 +104,14 @@ async def list_mappings(
         # Preload custom override IDs for filtering query.
         custom_ids = set(store.keys())
         if not custom_ids:
-            return {
-                "items": [],
-                "total": 0,
-                "page": page,
-                "per_page": per_page,
-                "pages": 0,
-            }
+            return ListMappingsResponse(
+                items=[],
+                total=0,
+                page=page,
+                per_page=per_page,
+                pages=0,
+                with_anilist=with_anilist,
+            )
         where_clauses.append(AniMap.anilist_id.in_(custom_ids))
 
     with db as ctx:
@@ -101,29 +130,59 @@ async def list_mappings(
         )
         rows = ctx.session.execute(base_query).scalars().all()
 
-    items = [r.model_dump(mode="json") for r in rows]
+    items = list(rows)
 
-    # Merge overrides from store
-    for i, item in enumerate(items):
-        ov = store.get(item["anilist_id"])
+    enriched_map: dict[int, AniListMetadata] = {}
+    if with_anilist and app_state.scheduler and app_state.scheduler.bridge_clients:
+        first_bridge = next(iter(app_state.scheduler.bridge_clients.values()))
+        try:
+            medias = await first_bridge.anilist_client.batch_get_anime(  # type: ignore[arg-type]
+                [it.anilist_id for it in items if it.anilist_id]
+            )
+            for m in medias:
+                d = m.model_dump(mode="json")
+                d.pop("media_list_entry", None)
+                enriched_map[m.id] = AniListMetadata(**d)
+        except Exception:
+            pass
+
+    store_overrides = get_mappings_store()
+    overrides: dict[int, dict[str, Any]] = {}
+
+    for override_id in list(store_overrides.keys()):
+        ov = store_overrides.get(override_id)
         if ov:
-            merged = {**item, **{k: v for k, v in ov.items() if k != "anilist_id"}}
-            merged["custom"] = True
-            items[i] = merged
-        else:
-            item["custom"] = False
+            overrides[override_id] = ov
 
-    return {
-        "items": items,
-        "total": total,
-        "page": page,
-        "per_page": per_page,
-        "pages": (total + per_page - 1) // per_page,
-    }
+    result_items: list[MappingItemModel] = []
+    for it in items:
+        ov = overrides.get(it.anilist_id) or {}
+        result_items.append(
+            MappingItemModel(
+                anilist_id=it.anilist_id,
+                anidb_id=ov.get("anidb_id", it.anidb_id),
+                imdb_id=ov.get("imdb_id", it.imdb_id),
+                mal_id=ov.get("mal_id", it.mal_id),
+                tmdb_movie_id=ov.get("tmdb_movie_id", it.tmdb_movie_id),
+                tmdb_show_id=ov.get("tmdb_show_id", it.tmdb_show_id),
+                tvdb_id=ov.get("tvdb_id", it.tvdb_id),
+                tvdb_mappings=ov.get("tvdb_mappings", it.tvdb_mappings),
+                custom=bool(ov),
+                anilist=enriched_map.get(it.anilist_id),
+            )
+        )
+    return ListMappingsResponse(
+        items=result_items,
+        total=total,
+        page=page,
+        per_page=per_page,
+        pages=(total + per_page - 1) // per_page,
+        with_anilist=with_anilist,
+    )
 
 
-@router.post("")
-async def create_mapping(mapping: dict[str, Any]) -> dict[str, Any]:
+@router.post("", response_model=MappingItemModel)
+async def create_mapping(mapping: dict[str, Any]) -> MappingItemModel:
     """Create a new custom mapping.
 
     Args:
@@ -137,11 +196,13 @@ async def create_mapping(mapping: dict[str, Any]) -> dict[str, Any]:
     if not app_state.scheduler:
         raise HTTPException(503, "Scheduler not available")
     await app_state.scheduler.shared_animap_client._sync_db()
-    return res
+
+    res_obj = MappingItemModel(**res)
+    return res_obj
 
 
-@router.put("/{mapping_id}")
-async def update_mapping(mapping_id: int, mapping: dict[str, Any]) -> dict[str, Any]:
+@router.put("/{mapping_id}", response_model=MappingItemModel)
+async def update_mapping(mapping_id: int, mapping: dict[str, Any]) -> MappingItemModel:
     """Update an existing custom mapping.
 
     Args:
@@ -157,11 +218,11 @@ async def update_mapping(mapping_id: int, mapping: dict[str, Any]) -> dict[str, 
     if not app_state.scheduler:
         raise HTTPException(503, "Scheduler not available")
     await app_state.scheduler.shared_animap_client._sync_db()
-    return res
+    return MappingItemModel(**res)
 
 
-@router.get("/{mapping_id}")
-async def get_mapping(mapping_id: int) -> dict[str, Any]:
+@router.get("/{mapping_id}", response_model=MappingItemModel)
+async def get_mapping(mapping_id: int) -> MappingItemModel:
     """Retrieve a single custom mapping by ID.
 
     Args:
@@ -174,11 +235,11 @@ async def get_mapping(mapping_id: int) -> dict[str, Any]:
     m = store.get(mapping_id)
     if not m:
         raise HTTPException(404, "Not found")
-    return m
+    return MappingItemModel(**m)
 
 
-@router.delete("/{mapping_id}")
-async def delete_mapping(mapping_id: int) -> dict[str, Any]:
+@router.delete("/{mapping_id}", response_model=DeleteMappingResponse)
+async def delete_mapping(mapping_id: int) -> DeleteMappingResponse:
     """Delete a custom mapping.
 
     Args:
@@ -193,4 +254,4 @@ async def delete_mapping(mapping_id: int) -> dict[str, Any]:
     if not app_state.scheduler:
         raise HTTPException(503, "Scheduler not available")
     await app_state.scheduler.shared_animap_client._sync_db()
-    return {"ok": True}
+    return DeleteMappingResponse(ok=True)

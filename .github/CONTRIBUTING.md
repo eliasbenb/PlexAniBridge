@@ -32,9 +32,9 @@ If you are only making changes to the documentation, you can opt to clone the re
 
 ## Contributing Code
 
-- Follow the coding standard. We use [ruff](https://docs.astral.sh/ruff/) for Python linting and [djLint](https://github.com/djlint/djLint) for HTML template linting.
+- Follow the coding standard. We use [ruff](https://docs.astral.sh/ruff/) for Python linting and [ESLint](https://eslint.org/) for JavaScript/TypeScript linting.
   - Run `ruff check` to ensure your code passes the Python linting rules.
-  - Run `djlint .` to ensure your HTML templates pass the linting rules.
+  - Run `(cd frontend && pnpx lint)` to ensure your JavaScript/TypeScript code passes the linting rules.
 - Update or add documentation in the `docs/` directory if it affects usage.
 - Make sure any complex or non-obvious code is explained with comments. This helps maintain readability and ease of review.
 

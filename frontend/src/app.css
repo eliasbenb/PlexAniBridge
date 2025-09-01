@@ -1,0 +1,62 @@
+@import "tailwindcss";
+
+@theme {
+    --color-bg: #05070d;
+    --color-bg-alt: #0f1522;
+    --color-surface: #141c2b;
+    --color-surface-alt: #1d293b;
+    --color-border: #243347;
+    --color-accent: #3b82f6;
+    --color-accent-muted: #1d4ed8;
+    --color-accent-foreground: #e3f2ff;
+    --color-danger: #ef4444;
+    --color-warning: #f59e0b;
+    --color-success: #10b981;
+}
+
+html {
+    color-scheme: dark;
+}
+
+body {
+    background: var(--color-bg);
+    color: var(--color-accent-foreground);
+}
+
+* {
+    scrollbar-width: thin;
+    scrollbar-color: #334155 #020617;
+}
+*::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+*::-webkit-scrollbar-track {
+    background: #020617;
+}
+*::-webkit-scrollbar-thumb {
+    background: #334155;
+    border-radius: 999px;
+}
+*::-webkit-scrollbar-thumb:hover {
+    background: #475569;
+}
+
+.btn-base {
+    @apply inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors;
+}
+.nav-link {
+    @apply flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-slate-400 transition-colors hover:bg-slate-700/40 hover:text-white;
+}
+.nav-link-active {
+    @apply bg-slate-700/50 text-white;
+}
+.nav-link[aria-current="page"] {
+    @apply bg-slate-800/70 text-slate-100 ring-1 ring-slate-700/70;
+}
+.badge {
+    @apply inline-flex items-center rounded-full border border-slate-700 bg-slate-800/60 px-2 py-0.5 text-[11px] font-medium tracking-wider text-slate-300 uppercase;
+}
+.fade-in {
+    animation: fade-in 0.35s ease-out;
+}

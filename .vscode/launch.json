@@ -5,6 +5,12 @@
             "request": "launch",
             "name": "Run PlexAniBridge",
             "program": "${workspaceFolder}/main.py"
+        },
+        {
+            "type": "node-terminal",
+            "request": "launch",
+            "name": "Run Frontend",
+            "command": "pnpm -C frontend run dev"
         }
     ],
 }

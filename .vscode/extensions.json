@@ -1,14 +1,16 @@
 {
     "recommendations": [
         "charliermarsh.ruff",
+        "dbaeumer.vscode-eslint",
         "eamodio.gitlens",
-        "monosans.djlint",
+        "esbenp.prettier-vscode",
         "ms-python.python",
         "rafaelha.vscode-flamegraph",
         "redhat.vscode-yaml",
-        "samuelcolvin.jinjahtml",
         "tamasfe.even-better-toml",
         "yy0931.vscode-sqlite3-editor",
-        "yzhang.markdown-all-in-one"
+        "yzhang.markdown-all-in-one",
+        "svelte.svelte-vscode",
+        "bradlc.vscode-tailwindcss"
     ]
 }

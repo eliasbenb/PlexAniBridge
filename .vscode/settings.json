@@ -2,14 +2,38 @@
     "[python]": {
         "editor.defaultFormatter": "charliermarsh.ruff"
     },
-    "[jinja][jinja-html]": {
-        "djlint.enableLinting": true,
-        "editor.defaultFormatter": "monosans.djlint"
+    "[javascript][typescript]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    "[svelte]": {
+        "editor.defaultFormatter": "svelte.svelte-vscode"
+    },
+    "[html]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    "[css][tailwindcss]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    "[json]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    "files.associations": {
+        "*.css": "tailwindcss"
     },
     "editor.detectIndentation": false,
     "editor.formatOnSave": true,
     "editor.insertSpaces": true,
     "editor.tabSize": 4,
+    "eslint.workingDirectories": [
+        "./frontend"
+    ],
+    "eslint.validate": [
+        "javascript",
+        "typescript",
+        "svelte",
+        "html",
+    ],
+    "prettier.configPath": "./frontend/.prettierrc",
     "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
     "python.envFile": "",
     "python.terminal.activateEnvInCurrentTerminal": true,
