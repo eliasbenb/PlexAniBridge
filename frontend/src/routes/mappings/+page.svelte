@@ -23,7 +23,12 @@
             native?: string;
             userPreferred?: string;
         };
-        coverImage?: { medium?: string; large?: string; color?: string };
+        coverImage?: {
+            medium?: string;
+            large?: string;
+            extraLarge: string;
+            color?: string;
+        };
         format?: string;
         status?: string;
         episodes?: number;
@@ -385,24 +390,29 @@
                 </thead>
                 <tbody class="divide-y divide-slate-800/60">
                     {#each items as m (m.anilist_id)}
+                        {@const coverImage =
+                            m.anilist?.coverImage?.medium ??
+                            m.anilist?.coverImage?.large ??
+                            m.anilist?.coverImage?.extraLarge ??
+                            null}
                         <tr class="align-top transition-colors hover:bg-slate-800/40">
                             <td class="w-64 px-3 py-2">
                                 <div class="flex items-start gap-2">
                                     <div class="w-12 shrink-0">
-                                        {#if m.anilist?.coverImage?.medium}
+                                        {#if coverImage}
                                             <img
-                                                alt={(m.anilist.title?.userPreferred ||
-                                                    m.anilist.title?.romaji ||
+                                                alt={(m.anilist?.title?.userPreferred ||
+                                                    m.anilist?.title?.romaji ||
                                                     "Cover") + " cover"}
                                                 loading="lazy"
-                                                src={m.anilist.coverImage.medium}
+                                                src={coverImage}
                                                 class="h-16 w-12 rounded-md object-cover ring-1 ring-slate-700/60"
                                             />
                                         {:else}
                                             <div
-                                                class="flex h-16 w-12 select-none items-center justify-center rounded-md bg-slate-800 text-center text-[9px] leading-tight text-slate-500"
+                                                class="flex h-16 w-12 shrink-0 select-none items-center justify-center rounded-md border border-dashed border-slate-700 bg-slate-800/30 text-[9px] text-slate-500"
                                             >
-                                                No Cover
+                                                No Art
                                             </div>
                                         {/if}
                                     </div>
