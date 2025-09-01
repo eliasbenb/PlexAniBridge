@@ -120,14 +120,14 @@
             </div>
             <div class="flex gap-2">
                 <button
-                    class="inline-flex items-center gap-1 rounded-md border border-amber-600/60 bg-amber-600/30 px-3 py-1.5 text-sm font-medium text-amber-200 shadow-sm backdrop-blur-sm transition-colors hover:bg-amber-600/40 focus:outline-none focus:ring-2 focus:ring-amber-500/40"
+                    class="inline-flex items-center gap-1 rounded-md border border-amber-600/60 bg-amber-600/30 px-3 py-1.5 text-sm font-medium text-amber-200 shadow-sm backdrop-blur-sm transition-colors hover:bg-amber-600/40 focus:ring-2 focus:ring-amber-500/40 focus:outline-none"
                     onclick={syncDatabase}
                 >
                     <DatabaseBackup class="inline h-4 w-4" />
                     <span>Sync Database</span>
                 </button>
                 <button
-                    class="inline-flex items-center gap-1 rounded-md border border-emerald-600/60 bg-emerald-600/30 px-3 py-1.5 text-sm font-medium text-emerald-200 shadow-sm backdrop-blur-sm transition-colors hover:bg-emerald-600/40 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                    class="inline-flex items-center gap-1 rounded-md border border-emerald-600/60 bg-emerald-600/30 px-3 py-1.5 text-sm font-medium text-emerald-200 shadow-sm backdrop-blur-sm transition-colors hover:bg-emerald-600/40 focus:ring-2 focus:ring-emerald-500/40 focus:outline-none"
                     onclick={() => syncAll(false)}
                     title="Trigger a full sync for all profiles"
                 >
@@ -135,7 +135,7 @@
                     <span>Full Sync All</span>
                 </button>
                 <button
-                    class="inline-flex items-center gap-1 rounded-md border border-sky-600/60 bg-sky-600/30 px-3 py-1.5 text-sm font-medium text-sky-200 shadow-sm backdrop-blur-sm transition-colors hover:bg-sky-600/40 focus:outline-none focus:ring-2 focus:ring-sky-500/40"
+                    class="inline-flex items-center gap-1 rounded-md border border-sky-600/60 bg-sky-600/30 px-3 py-1.5 text-sm font-medium text-sky-200 shadow-sm backdrop-blur-sm transition-colors hover:bg-sky-600/40 focus:ring-2 focus:ring-sky-500/40 focus:outline-none"
                     onclick={() => syncAll(true)}
                     title="Trigger a poll sync for all profiles"
                 >
@@ -164,7 +164,7 @@
         {#each profileEntries() as [name, p] (name)}
             <button
                 type="button"
-                class="group cursor-pointer rounded-md border border-slate-800/80 bg-slate-900/50 p-4 text-left transition-colors hover:bg-slate-900/70 focus:outline-none focus:ring-2 focus:ring-sky-600/40"
+                class="group cursor-pointer rounded-md border border-slate-800/80 bg-slate-900/50 p-4 text-left transition-colors hover:bg-slate-900/70 focus:ring-2 focus:ring-sky-600/40 focus:outline-none"
                 onclick={() => goTimeline(name)}
                 title={`Open timeline for ${name}`}
             >

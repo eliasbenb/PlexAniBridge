@@ -21,13 +21,6 @@
         "",
         ".css$"
     ],
-    "overrides": [
-        {
-            "files": "*.svelte",
-            "options": {
-                "parser": "svelte"
-            }
-        }
-    ],
+    "overrides": [{ "files": "*.svelte", "options": { "parser": "svelte" } }],
     "tailwindStylesheet": "./src/app.css"
 }
