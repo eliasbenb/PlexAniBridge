@@ -46,7 +46,7 @@ async def sync_database() -> OkResponse:
     return OkResponse(ok=True)
 
 
-@router.post("/profil/{profile}", response_model=OkResponse)
+@router.post("/profile/{profile}", response_model=OkResponse)
 async def sync_profile(profile: str, poll: bool = Query(False)) -> OkResponse:
     """Trigger a sync for a specific profile.
 
