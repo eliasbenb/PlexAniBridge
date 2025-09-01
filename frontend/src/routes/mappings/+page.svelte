@@ -407,7 +407,12 @@
                         <tr class="align-top transition-colors hover:bg-slate-800/40">
                             <td class="w-64 px-3 py-2">
                                 <div class="flex items-start gap-2">
-                                    <div class="w-12 shrink-0">
+                                    <a
+                                        href={`https://anilist.co/anime/${m.anilist_id}`}
+                                        rel="noopener noreferrer"
+                                        target="_blank"
+                                        class="w-12 shrink-0"
+                                    >
                                         {#if coverImage}
                                             <img
                                                 alt={(preferredTitle(
@@ -424,7 +429,7 @@
                                                 No Art
                                             </div>
                                         {/if}
-                                    </div>
+                                    </a>
                                     <div class="min-w-0 space-y-0.5">
                                         <div class="truncate font-medium">
                                             {#if m?.anilist?.title}
