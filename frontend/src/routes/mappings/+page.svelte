@@ -17,12 +17,7 @@
 
     interface AniListMediaLite {
         id: number;
-        title?: {
-            romaji?: string;
-            english?: string;
-            native?: string;
-            userPreferred?: string;
-        };
+        title?: { romaji?: string; english?: string; native?: string };
         coverImage?: {
             medium?: string;
             large?: string;
@@ -272,6 +267,20 @@
         return Object.keys(m.tvdb_mappings || {}).length;
     }
 
+    function preferredTitle(t?: {
+        romaji?: string;
+        english?: string;
+        native?: string;
+    }) {
+        if (!t) return null;
+        let pref: string | null = null;
+        try {
+            pref = localStorage.getItem("anilist.lang");
+        } catch {}
+        if (pref && (t as any)[pref]) return (t as any)[pref] as string;
+        return t.romaji || t.english || t.native || null;
+    }
+
     onMount(load);
 </script>
 
@@ -401,9 +410,9 @@
                                     <div class="w-12 shrink-0">
                                         {#if coverImage}
                                             <img
-                                                alt={(m.anilist?.title?.userPreferred ||
-                                                    m.anilist?.title?.romaji ||
-                                                    "Cover") + " cover"}
+                                                alt={(preferredTitle(
+                                                    m.anilist?.title,
+                                                ) || "Cover") + " cover"}
                                                 loading="lazy"
                                                 src={coverImage}
                                                 class="h-16 w-12 rounded-md object-cover ring-1 ring-slate-700/60"
@@ -418,9 +427,8 @@
                                     </div>
                                     <div class="min-w-0 space-y-0.5">
                                         <div class="truncate font-medium">
-                                            {#if m.anilist && (m.anilist.title?.userPreferred || m.anilist.title?.romaji)}
-                                                {m.anilist.title.userPreferred ||
-                                                    m.anilist.title.romaji}
+                                            {#if m?.anilist?.title}
+                                                {preferredTitle(m.anilist.title)}
                                             {:else}AniList {m.anilist_id}{/if}
                                         </div>
                                         {#if m.anilist && (m.anilist.format || m.anilist.status || m.anilist.episodes)}

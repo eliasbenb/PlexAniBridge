@@ -1,7 +1,7 @@
 <script lang="ts">
     import { onMount } from "svelte";
 
-    import { Database, Languages, Settings, User } from "@lucide/svelte";
+    import { Languages, Settings, User } from "@lucide/svelte";
 
     interface SettingsResp {
         global_config: Record<string, any>;
@@ -27,25 +27,6 @@
                 new CustomEvent("anilist-lang-changed", { detail: { lang: v } }),
             );
         } catch {}
-    }
-
-    function clearAni() {
-        if (confirm("Clear AniList cache?")) {
-            localStorage.removeItem("anilist.cache");
-            dispatchEvent(
-                new CustomEvent("anilist-cache-changed", { detail: { size: 0 } }),
-            );
-        }
-    }
-
-    function clearPlex() {
-        if (confirm("Clear Plex cache (metadata + token)?")) {
-            localStorage.removeItem("plex.cache");
-            localStorage.removeItem("plex.token");
-            dispatchEvent(
-                new CustomEvent("plex-cache-changed", { detail: { size: 0 } }),
-            );
-        }
     }
 
     async function load() {
@@ -135,33 +116,6 @@
                         >{titleLang}</span
                     >
                 </p>
-            </div>
-            <div class="space-y-2">
-                <h4
-                    class="flex items-center gap-2 text-sm font-medium tracking-wide text-slate-200"
-                >
-                    <Database class="inline h-4 w-4 text-slate-400" /><span
-                        >Client Caches</span
-                    >
-                </h4>
-                <p class="text-[11px] leading-relaxed text-slate-500">
-                    Clear locally cached AniList and Plex metadata stored in this
-                    browser.
-                </p>
-                <div class="flex flex-col gap-2">
-                    <button
-                        type="button"
-                        onclick={clearAni}
-                        class="w-48 rounded-md border border-slate-700 bg-slate-800/60 px-3 py-1.5 text-[11px] font-medium text-slate-200 hover:bg-slate-700/60"
-                        >Clear AniList Cache</button
-                    >
-                    <button
-                        type="button"
-                        onclick={clearPlex}
-                        class="w-48 rounded-md border border-slate-700 bg-slate-800/60 px-3 py-1.5 text-[11px] font-medium text-slate-200 hover:bg-slate-700/60"
-                        >Clear Plex Cache</button
-                    >
-                </div>
             </div>
         </div>
         <div class="space-y-4 md:col-span-2">
