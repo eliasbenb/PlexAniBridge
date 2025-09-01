@@ -305,14 +305,14 @@
                     bind:value={query}
                     placeholder="Search (AniList, TMDB, IMDB, etc)"
                     aria-label="Search mappings"
-                    class="h-8 w-72 rounded-md border border-slate-700/70 bg-slate-900/70 pl-8 pr-9 text-[11px] shadow-sm placeholder:text-slate-500 focus:border-slate-600 focus:bg-slate-900"
+                    class="h-8 w-72 rounded-md border border-slate-700/70 bg-slate-900/70 pr-9 pl-8 text-[11px] shadow-sm placeholder:text-slate-500 focus:border-slate-600 focus:bg-slate-900"
                     onkeydown={(e) => e.key === "Enter" && ((page = 1), load())}
                 />
                 <Search
-                    class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500"
+                    class="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-slate-500"
                 />
                 <button
-                    class="absolute right-1 top-1/2 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md bg-slate-800 text-slate-300 hover:bg-slate-700"
+                    class="absolute top-1/2 right-1 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md bg-slate-800 text-slate-300 hover:bg-slate-700"
                     aria-label="Run search"
                     onclick={() => ((page = 1), load())}
                 >
@@ -428,7 +428,7 @@
                                             />
                                         {:else}
                                             <div
-                                                class="flex h-16 w-12 shrink-0 select-none items-center justify-center rounded-md border border-dashed border-slate-700 bg-slate-800/30 text-[9px] text-slate-500"
+                                                class="flex h-16 w-12 shrink-0 items-center justify-center rounded-md border border-dashed border-slate-700 bg-slate-800/30 text-[9px] text-slate-500 select-none"
                                             >
                                                 No Art
                                             </div>
@@ -445,11 +445,11 @@
                                                 class="flex flex-wrap gap-1 text-[9px] text-slate-400"
                                             >
                                                 {#if m.anilist.format}<span
-                                                        class="rounded bg-slate-800/70 px-1 py-0.5 uppercase tracking-wide"
+                                                        class="rounded bg-slate-800/70 px-1 py-0.5 tracking-wide uppercase"
                                                         >{m.anilist.format}</span
                                                     >{/if}
                                                 {#if m.anilist.status}<span
-                                                        class="rounded bg-slate-800/70 px-1 py-0.5 uppercase tracking-wide"
+                                                        class="rounded bg-slate-800/70 px-1 py-0.5 tracking-wide uppercase"
                                                         >{m.anilist.status}</span
                                                     >{/if}
                                                 {#if m.anilist.episodes}<span
@@ -530,7 +530,7 @@
                                         {/if}{/each}{:else}-{/if}</td
                             >
                             <td class="px-3 py-2 font-mono">{fmtSeasons(m)}</td>
-                            <td class="whitespace-nowrap px-3 py-2 text-right">
+                            <td class="px-3 py-2 text-right whitespace-nowrap">
                                 <div class="flex flex-col items-end gap-1">
                                     <div class="flex gap-1">
                                         <button
@@ -596,7 +596,7 @@
                     min="1"
                     max={pages}
                     bind:value={page}
-                    class="h-6 w-12 rounded-md border border-slate-700 bg-slate-900 px-1 text-center text-xs font-semibold [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                    class="h-6 w-12 [appearance:textfield] rounded-md border border-slate-700 bg-slate-900 px-1 text-center text-xs font-semibold [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                     onchange={load}
                 />
                 / {pages}

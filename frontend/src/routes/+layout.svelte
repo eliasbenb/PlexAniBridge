@@ -59,13 +59,22 @@
     onMount(() => {
         loadMeta();
         openWs();
+
+        if (typeof navigator !== "undefined" && "serviceWorker" in navigator) {
+            navigator.serviceWorker
+                .register("/sw.js")
+                .then(() => {
+                    // Service worker registered
+                })
+                .catch(() => {
+                    // Registration failed; continue without SW
+                });
+        }
     });
 </script>
 
 <svelte:head>
     <title>PlexAniBridge</title>
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <meta name="color-scheme" content="dark" />
 </svelte:head>
 
 <div
@@ -74,11 +83,11 @@
     <!-- Toast mount point -->
     <div
         id="toast-root"
-        class="pointer-events-none fixed right-4 top-16 z-[60] flex w-80 max-w-[90vw] flex-col gap-2"
+        class="pointer-events-none fixed top-16 right-4 z-[60] flex w-80 max-w-[90vw] flex-col gap-2"
     ></div>
     <a
         href="#main"
-        class="sr-only bg-blue-600 px-3 py-2 text-sm font-medium text-white shadow-lg focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded-md"
+        class="sr-only bg-blue-600 px-3 py-2 text-sm font-medium text-white shadow-lg focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded-md"
         >Skip to content</a
     >
     <!-- Mobile backdrop -->
@@ -96,7 +105,7 @@
     {/if}
     <!-- Sidebar -->
     <aside
-        class="fixed inset-y-0 left-0 z-40 flex w-64 -translate-x-full flex-col border-r border-slate-800 bg-slate-950/95 px-3 pb-6 pt-4 shadow-xl shadow-slate-950/50 backdrop-blur transition-transform duration-300 ease-out lg:translate-x-0"
+        class="fixed inset-y-0 left-0 z-40 flex w-64 -translate-x-full flex-col border-r border-slate-800 bg-slate-950/95 px-3 pt-4 pb-6 shadow-xl shadow-slate-950/50 backdrop-blur transition-transform duration-300 ease-out lg:translate-x-0"
         class:translate-x-0={sidebarOpen}
     >
         <div class="mb-4 flex items-center gap-3 px-2">
@@ -105,7 +114,7 @@
                 <h1 class="text-base font-semibold tracking-tight text-white">
                     PlexAniBridge
                 </h1>
-                <p class="text-[11px] uppercase tracking-wide text-slate-500">
+                <p class="text-[11px] tracking-wide text-slate-500 uppercase">
                     Sync Dashboard
                 </p>
             </a>
@@ -130,7 +139,7 @@
                 ><Terminal class="inline h-4 w-4" /><span>Logs</span></a
             >
             <div
-                class="mt-4 px-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500"
+                class="mt-4 px-3 text-[10px] font-semibold tracking-wider text-slate-500 uppercase"
             >
                 System
             </div>
@@ -167,7 +176,7 @@
         >
             <button
                 type="button"
-                class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-700/70 bg-slate-800/70 text-slate-300 hover:bg-slate-700/70 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 lg:hidden"
+                class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-700/70 bg-slate-800/70 text-slate-300 hover:bg-slate-700/70 hover:text-white focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none lg:hidden"
                 aria-label="Toggle navigation"
                 onclick={() => (sidebarOpen = !sidebarOpen)}
             >

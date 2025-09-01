@@ -488,13 +488,13 @@
             <button
                 type="button"
                 onclick={() => toggleOutcomeFilter(k)}
-                class={`group relative cursor-pointer select-none overflow-hidden rounded-md p-3 text-left transition ${outcomeFilter === k ? "border-sky-500 bg-sky-950/40 ring-1 ring-sky-400/60" : "border border-slate-800 bg-gradient-to-br from-slate-900/70 to-slate-800/30 hover:border-slate-700"}`}
+                class={`group relative cursor-pointer overflow-hidden rounded-md p-3 text-left transition select-none ${outcomeFilter === k ? "border-sky-500 bg-sky-950/40 ring-1 ring-sky-400/60" : "border border-slate-800 bg-gradient-to-br from-slate-900/70 to-slate-800/30 hover:border-slate-700"}`}
                 title={outcomeFilter === k
                     ? "Click to remove filter"
                     : "Funnel by " + meta.label}
             >
                 <div
-                    class="text-[10px] font-medium uppercase tracking-wide text-slate-400"
+                    class="text-[10px] font-medium tracking-wide text-slate-400 uppercase"
                 >
                     {meta.label}
                 </div>
@@ -502,7 +502,7 @@
                     {stats[k] || 0}
                 </div>
                 {#if outcomeFilter === k}
-                    <div class="absolute right-1 top-1">
+                    <div class="absolute top-1 right-1">
                         <span
                             class="mr-1 inline-flex items-center gap-0.5 rounded bg-sky-600/70 px-1 py-0.5 text-[9px] font-semibold text-white"
                             ><Funnel class="inline h-3 w-3" /> Active</span
@@ -623,13 +623,13 @@
                                     >
                                         {#if item.anilist?.format}
                                             <span
-                                                class="rounded bg-slate-800/70 px-1 py-0.5 uppercase tracking-wide"
+                                                class="rounded bg-slate-800/70 px-1 py-0.5 tracking-wide uppercase"
                                                 >{item.anilist.format}</span
                                             >
                                         {/if}
                                         {#if item.anilist?.status}
                                             <span
-                                                class="rounded bg-slate-800/70 px-1 py-0.5 uppercase tracking-wide"
+                                                class="rounded bg-slate-800/70 px-1 py-0.5 tracking-wide uppercase"
                                                 >{item.anilist.status}</span
                                             >
                                         {/if}
@@ -706,16 +706,16 @@
                             >
                                 <div class="relative flex-1">
                                     <Search
-                                        class="absolute left-1.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500"
+                                        class="absolute top-1/2 left-1.5 h-3.5 w-3.5 -translate-y-1/2 text-slate-500"
                                     />
                                     <input
                                         bind:value={ui.filter}
                                         placeholder="Funnel path…"
-                                        class="w-full rounded-md border border-slate-700/70 bg-slate-900/60 py-1 pl-6 pr-2 placeholder:text-slate-600 focus:border-sky-500 focus:outline-none"
+                                        class="w-full rounded-md border border-slate-700/70 bg-slate-900/60 py-1 pr-2 pl-6 placeholder:text-slate-600 focus:border-sky-500 focus:outline-none"
                                     />
                                 </div>
                                 <label
-                                    class="inline-flex cursor-pointer select-none items-center gap-1"
+                                    class="inline-flex cursor-pointer items-center gap-1 select-none"
                                 >
                                     <input
                                         type="checkbox"
@@ -769,7 +769,7 @@
                                                 class="flex flex-wrap items-start gap-2"
                                             >
                                                 <span
-                                                    class="max-w-full break-all rounded bg-slate-800/80 px-1.5 py-0.5 font-mono text-[10px] text-slate-300 group-hover:bg-slate-700/80"
+                                                    class="max-w-full rounded bg-slate-800/80 px-1.5 py-0.5 font-mono text-[10px] break-all text-slate-300 group-hover:bg-slate-700/80"
                                                     >{d.path}</span
                                                 >
                                                 <div
@@ -802,7 +802,7 @@
                                     {/each}
                                 </ul>
                             {:else}
-                                <p class="text-[11px] italic text-slate-500">
+                                <p class="text-[11px] text-slate-500 italic">
                                     No differences.
                                 </p>
                             {/if}
@@ -810,7 +810,7 @@
                             <div class="grid items-start gap-2 md:grid-cols-2 md:gap-3">
                                 <div class="space-y-1.5">
                                     <h5
-                                        class="flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-slate-400"
+                                        class="flex items-center gap-1 text-xs font-semibold tracking-wider text-slate-400 uppercase"
                                     >
                                         Before <span
                                             class="text-[10px] font-normal text-slate-600"
@@ -818,7 +818,7 @@
                                         >
                                     </h5>
                                     <code
-                                        class="block max-h-64 overflow-auto whitespace-pre rounded-md border border-slate-800 bg-slate-900/80 p-2 font-mono text-[11px] leading-tight"
+                                        class="block max-h-64 overflow-auto rounded-md border border-slate-800 bg-slate-900/80 p-2 font-mono text-[11px] leading-tight whitespace-pre"
                                     >
                                         <!-- eslint-disable-next-line svelte/no-at-html-tags -->
                                         {@html highlightJson(item.before_state ?? {})}
@@ -826,7 +826,7 @@
                                 </div>
                                 <div class="space-y-1.5">
                                     <h5
-                                        class="flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-slate-400"
+                                        class="flex items-center gap-1 text-xs font-semibold tracking-wider text-slate-400 uppercase"
                                     >
                                         After <span
                                             class="text-[10px] font-normal text-slate-600"
@@ -834,7 +834,7 @@
                                         >
                                     </h5>
                                     <code
-                                        class="block max-h-64 overflow-auto whitespace-pre rounded-md border border-slate-800 bg-slate-900/80 p-2 font-mono text-[11px] leading-tight"
+                                        class="block max-h-64 overflow-auto rounded-md border border-slate-800 bg-slate-900/80 p-2 font-mono text-[11px] leading-tight whitespace-pre"
                                     >
                                         <!-- eslint-disable-next-line svelte/no-at-html-tags -->
                                         {@html highlightJson(item.after_state ?? {})}
@@ -852,15 +852,15 @@
     {/if}
     <div bind:this={sentinel}></div>
     {#if showJump}
-        <div class="fixed bottom-6 right-6 z-40">
+        <div class="fixed right-6 bottom-6 z-40">
             <button
                 onclick={jumpToLatest}
-                class="pointer-events-auto flex items-center gap-2 rounded-md border border-sky-500/60 bg-gradient-to-r from-sky-600 to-sky-500 py-2 pl-3 pr-3 text-sm font-medium text-white shadow-md shadow-slate-950/40 backdrop-blur-md hover:from-sky-500 hover:to-sky-400"
+                class="pointer-events-auto flex items-center gap-2 rounded-md border border-sky-500/60 bg-gradient-to-r from-sky-600 to-sky-500 py-2 pr-3 pl-3 text-sm font-medium text-white shadow-md shadow-slate-950/40 backdrop-blur-md hover:from-sky-500 hover:to-sky-400"
             >
                 <ArrowUp class="inline h-4 w-4" />
                 <span class="hidden sm:inline">Latest</span>
                 {#if newItemsCount > 0}<span
-                        class="inline-flex h-5 min-w-5 items-center justify-center rounded-md border border-white/20 bg-slate-900/70 px-1 text-[10px] font-semibold leading-none text-white shadow ring-1 ring-sky-300/40"
+                        class="inline-flex h-5 min-w-5 items-center justify-center rounded-md border border-white/20 bg-slate-900/70 px-1 text-[10px] leading-none font-semibold text-white shadow ring-1 ring-sky-300/40"
                         >{newItemsCount}</span
                     >{/if}
             </button>

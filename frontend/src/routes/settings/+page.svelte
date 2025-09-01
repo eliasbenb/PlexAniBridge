@@ -74,7 +74,7 @@
                             <span class="min-w-40 break-all text-slate-500">{k}</span>
                             <span class="break-all text-slate-300">
                                 {#if v == null}
-                                    <span class="italic text-slate-600">(unset)</span>
+                                    <span class="text-slate-600 italic">(unset)</span>
                                 {:else if typeof v === "string"}
                                     {v}
                                 {:else}
@@ -145,7 +145,7 @@
                                         >
                                         <span class="break-all text-slate-300">
                                             {#if v == null}
-                                                <span class="italic text-slate-600"
+                                                <span class="text-slate-600 italic"
                                                     >(unset)</span
                                                 >
                                             {:else if typeof v === "string"}
