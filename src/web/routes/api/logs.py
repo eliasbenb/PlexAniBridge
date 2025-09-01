@@ -1,24 +1,29 @@
-"""API endpoints for accessing historical log files.
-
-Provides lightweight read-only access to the rotating log files written by
-the application logger. Enables the web UI to list available log files and
-fetch their (tail) contents parsed into structured JSON entries compatible
-with the live websocket log format.
-"""
-
-from __future__ import annotations
+"""API endpoints for accessing historical log files."""
 
 import logging
 import re
 from pathlib import Path
-from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
-from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
 from src.config import config
 
 __all__ = ["router"]
+
+
+class LogFileModel(BaseModel):
+    name: str
+    size: int
+    mtime: int  # epoch ms
+    current: bool
+
+
+class LogEntryModel(BaseModel):
+    timestamp: str | None = None
+    level: str
+    message: str
+
 
 router = APIRouter()
 
@@ -41,15 +46,20 @@ def _list_log_files() -> list[Path]:
     )
 
 
-@router.get("/files", summary="List available log files")
-async def list_log_files() -> JSONResponse:
+@router.get(
+    "/files",
+    summary="List available log files",
+    response_model=list[LogFileModel],
+)
+async def list_log_files() -> list[LogFileModel]:
     """Return metadata about available log files.
 
     Returns:
         JSONResponse: List of log file metadata sorted by most recent first.
     """
     files = _list_log_files()
-    data: list[dict[str, Any]] = []
+    res: list[LogFileModel] = []
+
     # Determine current effective log level to identify active file.
     root_logger = logging.getLogger("PlexAniBridge")
     current_level_name = logging.getLevelName(root_logger.getEffectiveLevel())
@@ -57,16 +67,17 @@ async def list_log_files() -> JSONResponse:
 
     for f in files:
         st = f.stat()
-        data.append(
-            {
-                "name": f.name,
-                "size": st.st_size,
-                "mtime": int(st.st_mtime * 1000),
+        res.append(
+            LogFileModel(
+                name=f.name,
+                size=st.st_size,
+                mtime=int(st.st_mtime * 1000),
                 # Active file is the one matching the current log level base file
-                "current": f.name == active_filename,
-            }
+                current=f.name == active_filename,
+            )
         )
-    return JSONResponse(data)
+
+    return res
 
 
 def _safe_resolve(name: str) -> Path:
@@ -133,16 +144,20 @@ def _tail_lines(path: Path, max_lines: int) -> list[str]:
         if len(lines) < max_lines and buffer:
             try:
                 lines.append(buffer.decode("utf-8", errors="replace"))
-            except Exception:  # pragma: no cover - defensive
+            except Exception:
                 lines.append("")
 
     return list(reversed(lines[-max_lines:]))
 
 
-@router.get("/file/{name}", summary="Fetch parsed tail of a log file")
+@router.get(
+    "/file/{name}",
+    summary="Fetch parsed tail of a log file",
+    response_model=list[LogEntryModel],
+)
 async def get_log_file(
     name: str, lines: int = Query(500, ge=1, le=10000)
-) -> JSONResponse:
+) -> list[LogEntryModel]:
     """Return the last N lines of a log file parsed into JSON entries.
 
     Args:
@@ -154,21 +169,21 @@ async def get_log_file(
     """
     path = _safe_resolve(name)
     raw_lines = _tail_lines(path, lines)
-    entries: list[dict[str, Any]] = []
+    res: list[LogEntryModel] = []
 
     for ln in raw_lines:
         ln = ln.rstrip("\n\r")
         m = LINE_RE.match(ln)
         if m:
             gd = m.groupdict()
-            entries.append(
-                {
-                    "timestamp": gd["timestamp"],
-                    "level": gd["level"],
-                    "message": gd["message"],
-                }
+            res.append(
+                LogEntryModel(
+                    timestamp=gd["timestamp"],
+                    level=gd["level"],
+                    message=gd["message"],
+                )
             )
         else:
-            entries.append({"timestamp": None, "level": "INFO", "message": ln})
+            res.append(LogEntryModel(timestamp=None, level="INFO", message=ln))
 
-    return JSONResponse(entries)
+    return res

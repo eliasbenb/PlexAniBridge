@@ -1,63 +1,53 @@
-"""Websocket endpoint for live sync history timeline updates."""
-
-from __future__ import annotations
+"""WebSocket endpoint for real-time timeline updates."""
 
 import asyncio
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from sqlalchemy import func
 
-from src.config.database import db
-from src.models.db.sync_history import SyncHistory, SyncOutcome
+from src.web.services.history_service import history_service
 
 router = APIRouter()
 
 
 @router.websocket("/{profile}")
-async def history_ws(ws: WebSocket, profile: str) -> None:
-    """Periodically push latest history page + stats to client.
+async def history_websocket(websocket: WebSocket, profile: str) -> None:
+    """Stream live history updates to client.
 
-    Args:
-        ws (WebSocket): The WebSocket connection.
-        profile (str): The profile name.
+    Polls for changes every 5 seconds and pushes updates when items change.
     """
-    await ws.accept()
-    last_ids: set[int] = set()
+    await websocket.accept()
+
+    last_item_ids: set[int] = set()
 
     try:
         while True:
-            with db as ctx:
-                q = (
-                    ctx.session.query(SyncHistory)
-                    .filter(SyncHistory.profile_name == profile)
-                    .order_by(SyncHistory.timestamp.desc())
-                )
-                items = q.limit(100).all()
+            page_data = await history_service.get_page(
+                profile=profile,
+                page=1,
+                per_page=25,
+                outcome=None,
+            )
 
-                stats_rows = (
-                    ctx.session.query(SyncHistory.outcome, func.count(SyncHistory.id))
-                    .filter(SyncHistory.profile_name == profile)
-                    .group_by(SyncHistory.outcome)
-                    .all()
-                )
+            # Check if items have changed
+            current_ids = {item.id for item in page_data.items}
 
-            stats = {o.value if hasattr(o, "value") else o: c for o, c in stats_rows}
-            for o in SyncOutcome:
-                stats.setdefault(o.value, 0)
+            if current_ids != last_item_ids:
+                last_item_ids = current_ids
 
-            ids = {r.id for r in items}
-            if ids != last_ids:
-                last_ids = ids
-                await ws.send_json(
+                await websocket.send_json(
                     {
-                        "items": [r.model_dump(mode="json") for r in items],
-                        "stats": stats,
+                        "items": [
+                            item.model_dump(mode="json") for item in page_data.items
+                        ],
+                        "stats": page_data.stats,
                         "profile": profile,
+                        "total": page_data.total,
                     }
                 )
+
             await asyncio.sleep(5)
+
     except WebSocketDisconnect:
         pass
-
-
-__all__ = ["router"]
+    except Exception:
+        await websocket.close()

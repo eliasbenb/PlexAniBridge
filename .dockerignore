@@ -46,3 +46,10 @@ __pycache__
 *.pyc
 *.pyo
 *.pyd
+
+# Node
+.pnpm-store
+.svelte-kit
+build
+node_modules
+frontend/node_modules

@@ -14,6 +14,9 @@
     "[css][tailwindcss]": {
         "editor.defaultFormatter": "esbenp.prettier-vscode"
     },
+    "[json]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
     "files.associations": {
         "*.css": "tailwindcss"
     },
@@ -21,6 +24,7 @@
     "editor.formatOnSave": true,
     "editor.insertSpaces": true,
     "editor.tabSize": 4,
+    "prettier.configPath": "./frontend/.prettierrc",
     "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
     "python.envFile": "",
     "python.terminal.activateEnvInCurrentTerminal": true,
