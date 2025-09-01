@@ -1,6 +1,7 @@
 """Sync history service with TTL caching."""
 
 import logging
+import re
 from typing import Any
 
 import aiohttp
@@ -98,7 +99,13 @@ class HistoryService:
         bridge = self._get_bridge(profile)
         result: dict[str, dict[str, Any] | None] = {}
 
-        guids_str = ",".join([guid.rsplit("/")[-1] for guid in guids_tuple if guid])
+        guids_str = ",".join(
+            [
+                guid.rsplit("/", 1)[-1]
+                for guid in guids_tuple
+                if re.match(r"^plex://(?:show|movie)/[0-9a-fA-F]{24}$", guid)
+            ]
+        )
 
         # Use proper Plex API headers schema
         headers = {
