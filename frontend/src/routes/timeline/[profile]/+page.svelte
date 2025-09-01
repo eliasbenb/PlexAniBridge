@@ -404,7 +404,9 @@
 
     async function triggerSync(poll: boolean) {
         try {
-            await fetch(`/api/sync/${params.profile}?poll=${poll}`, { method: "POST" });
+            await fetch(`/api/sync/profile/${params.profile}?poll=${poll}`, {
+                method: "POST",
+            });
             // optionally surface toast if a global notifier exists
             // @ts-ignore
             if (window.notify?.toast) window.notify.toast("Sync started", "info");

@@ -1,7 +1,13 @@
 <script lang="ts">
     import { onMount } from "svelte";
 
-    import { ChevronRight, CloudDownload, RefreshCcw, Users } from "@lucide/svelte";
+    import {
+        ChevronRight,
+        CloudDownload,
+        DatabaseBackup,
+        RefreshCcw,
+        Users,
+    } from "@lucide/svelte";
 
     import { goto } from "$app/navigation";
 
@@ -76,8 +82,14 @@
         fetch(`/api/sync?poll=${poll}`, { method: "POST" }).then(refresh);
     }
 
+    function syncDatabase() {
+        fetch(`/api/sync/database`, { method: "POST" }).then(refresh);
+    }
+
     function syncProfile(name: string, poll: boolean) {
-        fetch(`/api/sync/${name}?poll=${poll}`, { method: "POST" }).then(refresh);
+        fetch(`/api/sync/profile/${name}?poll=${poll}`, { method: "POST" }).then(
+            refresh,
+        );
     }
 
     function goTimeline(name: string) {
@@ -107,6 +119,13 @@
                 <p class="text-xs text-slate-400">Browse your configured profiles.</p>
             </div>
             <div class="flex gap-2">
+                <button
+                    class="inline-flex items-center gap-1 rounded-md border border-amber-600/60 bg-amber-600/30 px-3 py-1.5 text-sm font-medium text-amber-200 shadow-sm backdrop-blur-sm transition-colors hover:bg-amber-600/40 focus:outline-none focus:ring-2 focus:ring-amber-500/40"
+                    onclick={syncDatabase}
+                >
+                    <DatabaseBackup class="inline h-4 w-4" />
+                    <span>Sync Database</span>
+                </button>
                 <button
                     class="inline-flex items-center gap-1 rounded-md border border-emerald-600/60 bg-emerald-600/30 px-3 py-1.5 text-sm font-medium text-emerald-200 shadow-sm backdrop-blur-sm transition-colors hover:bg-emerald-600/40 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
                     onclick={() => syncAll(false)}
@@ -173,7 +192,7 @@
                             onclick={(e) => {
                                 e.stopPropagation();
                             }}
-                            class="inline-flex items-center gap-1 rounded-md border border-sky-600/60 bg-sky-600/30 px-2 py-1 text-[11px] font-medium text-sky-200 shadow-sm hover:bg-sky-600/40"
+                            class="inline-flex items-center gap-1 rounded-md border border-indigo-600/60 bg-indigo-600/30 px-2 py-1 text-[11px] font-medium text-indigo-200 shadow-sm hover:bg-indigo-600/40"
                         >
                             <span>Timeline</span>
                             <ChevronRight class="inline h-3 w-3" />
