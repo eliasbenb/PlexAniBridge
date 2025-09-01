@@ -596,20 +596,28 @@
                                             item.timestamp + "Z",
                                         ).toLocaleString()}</span
                                     >
-                                    {#if item.anilist?.format}<span
-                                            class="hidden rounded-md bg-slate-800/60 px-1.5 py-0.5 text-[10px] text-slate-300 sm:inline-flex"
-                                            title="Format">{item.anilist.format}</span
-                                        >{/if}
-                                    {#if item.anilist?.episodes}<span
-                                            class="hidden rounded-md bg-slate-800/60 px-1.5 py-0.5 text-[10px] text-slate-300 sm:inline-flex"
-                                            title="Episodes"
-                                            >Ep {item.anilist.episodes}</span
-                                        >{/if}
-                                    {#if item.anilist?.status}<span
-                                            class="hidden rounded-md bg-slate-800/60 px-1.5 py-0.5 text-[10px] text-slate-400 sm:inline-flex"
-                                            title="AniList Status"
-                                            >{item.anilist.status}</span
-                                        >{/if}
+                                    <div
+                                        class="flex flex-wrap gap-1 text-[9px] text-slate-400"
+                                    >
+                                        {#if item.anilist?.format}
+                                            <span
+                                                class="rounded bg-slate-800/70 px-1 py-0.5 uppercase tracking-wide"
+                                                >{item.anilist.format}</span
+                                            >
+                                        {/if}
+                                        {#if item.anilist?.status}
+                                            <span
+                                                class="rounded bg-slate-800/70 px-1 py-0.5 uppercase tracking-wide"
+                                                >{item.anilist.status}</span
+                                            >
+                                        {/if}
+                                        {#if item.anilist?.episodes}
+                                            <span
+                                                class="rounded bg-slate-800/70 px-1 py-0.5"
+                                                >EP {item.anilist.episodes}</span
+                                            >
+                                        {/if}
+                                    </div>
                                 </div>
                             </div>
                             <div class="flex shrink-0 items-center gap-2">
