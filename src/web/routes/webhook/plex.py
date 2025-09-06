@@ -1,6 +1,5 @@
 """Plex Webhook endpoint."""
 
-from logging import DEBUG
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -59,15 +58,6 @@ async def plex_webhook(
     Returns:
         A dictionary containing the result of the webhook processing.
     """
-    if log.getEffectiveLevel() <= DEBUG:
-        body = (
-            (await request.body())
-            .decode("utf-8", "replace")
-            .translate({10: None, 13: None, 9: None, 32: None})  # Remove whitespace
-            .strip()
-        )
-        log.debug(f"Received Plex webhook: {body}")
-
     scheduler = app_state.scheduler
     if not scheduler:
         raise HTTPException(503, "Scheduler not available")
