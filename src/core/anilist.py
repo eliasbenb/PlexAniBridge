@@ -480,7 +480,7 @@ class AniListClient:
         Raises:
             aiohttp.ClientError: If the API request fails.
         """
-        BATCH_SIZE = 10
+        BATCH_SIZE = 50
 
         if not anilist_ids:
             return []
@@ -509,30 +509,26 @@ class AniListClient:
                 f"mode $${{anilist_ids: {batch_ids}}}$$"
             )
 
-            query_parts = []
-            variables = {}
-
-            for j, anilist_id in enumerate(batch_ids):
-                query_parts.append(f"""
-                m{j}: Media(id: $id{j}, type: ANIME) {{
+            query = f"""
+            query BatchGetAnime($ids: [Int]) {{
+            Page(perPage: {len(batch_ids)}) {{
+                media(id_in: $ids, type: ANIME) {{
                     {Media.model_dump_graphql()}
                 }}
-            """)
-                variables[f"id{j}"] = anilist_id
-
-            query = f"""
-            query BatchGetAnime({
-                ", ".join([f"$id{j}: Int" for j in range(len(batch_ids))])
-            }) {{
-                {" ".join(query_parts)}
+            }}
             }}
             """
 
+            variables = {"ids": batch_ids}
             response = await self._make_request(query, variables)
 
-            for j, anilist_id in enumerate(batch_ids):
-                media_data = response["data"][f"m{j}"]
-                media = Media(**media_data)
+            media_list = response.get("data", {}).get("Page", {}).get("media", []) or []
+            media_by_id = {m["id"]: Media(**m) for m in media_list}
+
+            for anilist_id in batch_ids:
+                media = media_by_id.get(anilist_id)
+                if not media:
+                    continue
                 self.offline_anilist_entries[anilist_id] = media
                 result.append(media)
 

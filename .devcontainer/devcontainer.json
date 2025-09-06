@@ -5,6 +5,9 @@
         "ghcr.io/devcontainers/features/python:1": {
             "version": "3.13"
         },
+        "ghcr.io/devcontainers/features/node:1": {
+            "version": "22"
+        },
         "ghcr.io/devcontainers/features/github-cli:1": {},
         "ghcr.io/va-h/devcontainers-features/uv:1": {
             "shellautocompletion": true
@@ -17,15 +20,17 @@
         "vscode": {
             "extensions": [
                 "charliermarsh.ruff",
+                "dbaeumer.vscode-eslint",
                 "eamodio.gitlens",
-                "monosans.djlint",
+                "esbenp.prettier-vscode",
                 "ms-python.python",
                 "rafaelha.vscode-flamegraph",
                 "redhat.vscode-yaml",
-                "samuelcolvin.jinjahtml",
                 "tamasfe.even-better-toml",
                 "yy0931.vscode-sqlite3-editor",
-                "yzhang.markdown-all-in-one"
+                "yzhang.markdown-all-in-one",
+                "svelte.svelte-vscode",
+                "bradlc.vscode-tailwindcss"
             ]
         }
     },

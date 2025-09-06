@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any, ClassVar
 
 from ruamel.yaml import YAML
-from ruamel.yaml.comments import CommentedMap  # type: ignore
+from ruamel.yaml.comments import CommentedMap
 
 from src import log
 from src.config import config
@@ -221,7 +221,11 @@ _mappings_store: MappingsStore | None = None
 
 
 def get_mappings_store() -> MappingsStore:
-    """Get the global mappings store instance."""
+    """Get the global mappings store instance.
+
+    Returns:
+        MappingsStore: The global mappings store instance.
+    """
     global _mappings_store
     if _mappings_store is None:
         _mappings_store = MappingsStore(config.data_path)

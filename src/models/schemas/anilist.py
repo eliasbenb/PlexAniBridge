@@ -518,6 +518,15 @@ class MediaListCollection(AniListBaseModel, Generic[GroupType]):
     has_next_chunk: bool | None = None
 
 
+class MediaCoverImage(AniListBaseModel):
+    """Model representing a media cover image."""
+
+    extra_large: str | None = None
+    large: str | None = None
+    medium: str | None = None
+    color: str | None = None
+
+
 class AiringSchedule(AniListBaseModel):
     """Model representing an airing schedule for a media entry."""
 
@@ -532,20 +541,22 @@ class MediaWithoutList(AniListBaseModel):
     """Model representing a media entry without list information."""
 
     id: int
-    id_mal: int | None = None
+    # id_mal: int | None = None
     type: MediaType | None = None
     format: MediaFormat | None = None
     status: MediaStatus | None = None
-    season: MediaSeason | None = None
-    season_year: int | None = None
+    # season: MediaSeason | None = None
+    # season_year: int | None = None
     episodes: int | None = None
     duration: int | None = None
-    synonyms: list[str] | None = None
-    is_locked: bool | None = None
+    cover_image: MediaCoverImage | None = None
+    # banner_image: str | None = None
+    # synonyms: list[str] | None = None
+    # is_locked: bool | None = None
     title: MediaTitle | None = None
-    start_date: FuzzyDate | None = None
-    end_date: FuzzyDate | None = None
-    next_airing_episode: AiringSchedule | None = None
+    # start_date: FuzzyDate | None = None
+    # end_date: FuzzyDate | None = None
+    # next_airing_episode: AiringSchedule | None = None
 
 
 class Media(MediaWithoutList):

@@ -1,24 +1,22 @@
 """FastAPI application factory and setup."""
 
-from __future__ import annotations
-
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.exception_handlers import http_exception_handler
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from src import __git_hash__, __version__, log
+from src import log
 from src.core.sched import SchedulerClient
 from src.web.routes import router
 from src.web.services.logging_handler import log_ws_handler
 from src.web.state import app_state
 
-TEMPLATES_DIR = Path(__file__).parent / "templates"
-STATIC_DIR = Path(__file__).parent / "static"
+FRONTEND_BUILD_DIR = Path(__file__).parent.parent.parent / "frontend" / "build"
 
 
 @asynccontextmanager
@@ -67,14 +65,31 @@ def create_app(scheduler: SchedulerClient | None = None) -> FastAPI:
         app.extra["scheduler"] = scheduler
 
     app.include_router(router)
-    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
-    templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
-    templates.env.globals.setdefault("version", __version__)
-    templates.env.globals.setdefault("git_hash", __git_hash__)
-    templates.env.globals.setdefault("now", datetime.now(UTC))
+    index_file = FRONTEND_BUILD_DIR / "index.html"
+    if not FRONTEND_BUILD_DIR.exists():
+        log.warning(
+            "Web: Frontend build directory does not exist, no SPA will be served"
+        )
+        return app
+    if not index_file.exists():
+        log.error("Web: Frontend index file does not exist, no SPA will be served")
+        return app
 
-    app.extra["templates"] = templates
+    app.mount("/", StaticFiles(directory=FRONTEND_BUILD_DIR, html=True), name="spa")
+
+    api_prefixes = ("/api/", "/ws/", "/webhook/")
+
+    @app.exception_handler(StarletteHTTPException)
+    async def spa_404_handler(request: Request, exc: StarletteHTTPException):
+        if (
+            exc.status_code == 404
+            and not request.url.path.startswith(api_prefixes)
+            and "." not in request.url.path.rsplit("/", 1)[-1]
+        ):
+            return FileResponse(index_file)
+        return await http_exception_handler(request, exc)
+
     return app
 
 
