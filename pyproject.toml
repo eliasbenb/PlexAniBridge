@@ -51,11 +51,24 @@ dependencies = [
     "tzlocal>=5.3.1",
 ]
 
+[project.scripts]
+pab-build = "scripts.dev:build"
+pab-clean = "scripts.dev:clean"
+pab-deps-install = "scripts.dev:deps_install"
+pab-deps-upgrade = "scripts.dev:deps_upgrade"
+pab-dev = "scripts.dev:dev"
+pab-format = "scripts.dev:format"
+pab-lint = "scripts.dev:lint"
+pab-start = "scripts.dev:start"
+
 [project.urls]
 Documentation = "https://plexanibridge.elias.eu.org"
 Homepage = "https://plexanibridge.elias.eu.org"
 Issues = "https://github.com/eliasbenb/PlexAniBridge/issues"
 Source = "https://github.com/eliasbenb/PlexAniBridge"
+
+[tool.hatch.build.targets.wheel]
+packages = ["scripts"]
 
 [tool.pyright]
 extraPaths = ["./src/stubs"]
@@ -92,6 +105,10 @@ convention = "google"
 
 [tool.uv.workspace]
 members = ["docs"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = ["py-spy>=0.4.0", "ruff>=0.12.0"]

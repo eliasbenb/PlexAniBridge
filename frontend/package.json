@@ -8,6 +8,7 @@
         "build": "vite build",
         "preview": "vite preview --host",
         "prepare": "svelte-kit sync || echo ''",
+        "clean": "rm -rf build",
         "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
         "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
         "format": "prettier --write .",

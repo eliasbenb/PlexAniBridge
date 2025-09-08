@@ -48,7 +48,7 @@
             "onAutoForward": "notify"
         }
     },
-    "postCreateCommand": "uv sync --all-groups --all-packages",
+    "postCreateCommand": "uv run pab-deps-install",
     "containerEnv": {
         "UV_LINK_MODE": "copy"
     }
