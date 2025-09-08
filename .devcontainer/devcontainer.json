@@ -35,11 +35,16 @@
         }
     },
     "forwardPorts": [
-        4848
+        4848,
+        5173
     ],
     "portsAttributes": {
         "4848": {
-            "label": "PlexAniBridge Web",
+            "label": "PlexAniBridge Server",
+            "onAutoForward": "notify"
+        },
+        "5173": {
+            "label": "PlexAniBridge Frontend",
             "onAutoForward": "notify"
         }
     },
