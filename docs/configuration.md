@@ -176,7 +176,7 @@ Setting `SYNC_MODES` to `None` or an empty list will cause the application to pe
 
     1. Have [`PAB_WEB_ENABLED`](#pab_web_enabled) set to `True` (the default).
     2. Include `webhook` in the [`SYNC_MODES`](#sync_modes) list for your profile.
-    3. [Configure your Plex server](https://support.plex.tv/articles/115002267687-webhooks/) to send webhook payloads to the following URL: `http://<your-server-host>/webhook/plex/<profile-name>`.
+    3. [Configure your Plex server](https://support.plex.tv/articles/115002267687-webhooks/) to send webhook payloads to the following URL: `http://<your-server-host>/webhook/plex`.
     4. Also ensure PlexAniBridge is accessible to Plex over the network.
 
     _Note: If you do not explicitly define a profile name in your config, the profile name is likely assigned as 'default'._
