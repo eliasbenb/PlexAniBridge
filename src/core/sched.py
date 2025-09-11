@@ -510,23 +510,25 @@ class SchedulerClient:
         log.info("Daily database sync scheduler stopped")
 
     @lru_cache(maxsize=128)
-    def get_profile_for_plex_account(
+    def get_profiles_for_plex_account(
         self, account_id: int | str
-    ) -> tuple[str, PlexAnibridgeProfileConfig]:
-        """Find a profile name and its config by Plex account id.
+    ) -> list[tuple[str, PlexAnibridgeProfileConfig]]:
+        """Find all profile names and their configs by Plex account id.
 
         This is memoized to avoid repeated linear scans of profile lists for
         frequent webhook requests.
 
         Args:
-            account_id: Plex user account id (int or str) to search for
+            account_id (int | str): Plex user account id to search for.
 
         Returns:
-            Tuple of (profile_name, PlexAnibridgeProfileConfig)
+            list[tuple[str, PlexAnibridgeProfileConfig]]: A list of tuples containing
+                the profile names and their configurations.
 
         Raises:
             KeyError: If no profile matches the given account id
         """
+        profiles = []
         for profile_name, bridge_client in self.bridge_clients.items():
             if not bridge_client:
                 continue
@@ -534,9 +536,12 @@ class SchedulerClient:
                 continue
             if bridge_client.plex_client.user_account_id == account_id:
                 profile_config = self.global_config.get_profile(profile_name)
-                return profile_name, profile_config
+                profiles.append((profile_name, profile_config))
 
-        raise KeyError(f"Profile for Plex account id '{account_id}' not found")
+        if not profiles:
+            raise KeyError(f"Profile for Plex account id '{account_id}' not found")
+
+        return profiles
 
     async def __aenter__(self):
         """Async context manager entry."""
