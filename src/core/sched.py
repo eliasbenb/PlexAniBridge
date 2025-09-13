@@ -5,10 +5,15 @@ import contextlib
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from cachetools.func import lru_cache
 from tzlocal import get_localzone
 
 from src import log
-from src.config.settings import PlexAnibridgeConfig, SyncMode
+from src.config.settings import (
+    PlexAnibridgeConfig,
+    PlexAnibridgeProfileConfig,
+    SyncMode,
+)
 from src.core import AniMapClient, BridgeClient
 
 __all__ = ["SchedulerClient"]
@@ -503,6 +508,40 @@ class SchedulerClient:
                 await asyncio.sleep(3600)  # Retry after 1 hour on error
 
         log.info("Daily database sync scheduler stopped")
+
+    @lru_cache(maxsize=128)
+    def get_profiles_for_plex_account(
+        self, account_id: int | str
+    ) -> list[tuple[str, PlexAnibridgeProfileConfig]]:
+        """Find all profile names and their configs by Plex account id.
+
+        This is memoized to avoid repeated linear scans of profile lists for
+        frequent webhook requests.
+
+        Args:
+            account_id (int | str): Plex user account id to search for.
+
+        Returns:
+            list[tuple[str, PlexAnibridgeProfileConfig]]: A list of tuples containing
+                the profile names and their configurations.
+
+        Raises:
+            KeyError: If no profile matches the given account id
+        """
+        profiles = []
+        for profile_name, bridge_client in self.bridge_clients.items():
+            if not bridge_client:
+                continue
+            if not bridge_client.plex_client:
+                continue
+            if bridge_client.plex_client.user_account_id == account_id:
+                profile_config = self.global_config.get_profile(profile_name)
+                profiles.append((profile_name, profile_config))
+
+        if not profiles:
+            raise KeyError(f"Profile for Plex account id '{account_id}' not found")
+
+        return profiles
 
     async def __aenter__(self):
         """Async context manager entry."""

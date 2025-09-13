@@ -540,14 +540,6 @@ class PlexAnibridgeConfig(BaseSettings):
 
         return self
 
-    def get_profile_names(self) -> list[str]:
-        """Get a list of all configured profile names.
-
-        Returns:
-            list[str]: List of profile names
-        """
-        return list(self.profiles.keys())
-
     def get_profile(self, name: str) -> PlexAnibridgeProfileConfig:
         """Get a specific profile configuration.
 
