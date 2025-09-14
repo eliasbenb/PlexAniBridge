@@ -47,22 +47,24 @@
         pattern: string;
     }
 
+    type FieldMode = "omit" | "null" | "value";
+
     interface EditForm {
         _isNew: boolean;
         anilist_id: string | number | "";
-        anidb_mode: "omit" | "null" | "value";
+        anidb_mode: FieldMode;
         anidb_id: string | number | "";
-        tvdb_mode: "omit" | "null" | "value";
+        tvdb_mode: FieldMode;
         tvdb_id: string | number | "";
-        imdb_mode: "omit" | "null" | "value";
+        imdb_mode: FieldMode;
         imdb_csv: string;
-        mal_mode: "omit" | "null" | "value";
+        mal_mode: FieldMode;
         mal_csv: string;
-        tmdb_movie_mode: "omit" | "null" | "value";
+        tmdb_movie_mode: FieldMode;
         tmdb_movie_csv: string;
-        tmdb_show_mode: "omit" | "null" | "value";
+        tmdb_show_mode: FieldMode;
         tmdb_show_csv: string;
-        tvdb_map_mode: "omit" | "null" | "value";
+        tvdb_map_mode: FieldMode;
         tvdb_mappings: TvdbMapRow[];
     }
 
@@ -123,38 +125,52 @@
         const f = emptyForm();
         f._isNew = false;
         f.anilist_id = m.anilist_id ?? "";
-        // Scalar numeric ids
-        if (m.anidb_id !== undefined) {
-            f.anidb_mode = m.anidb_id === null ? "null" : "value";
-            f.anidb_id = (m.anidb_id as number | null) ?? "";
+
+        function setScalarField(
+            value: unknown,
+            modeField: keyof Pick<EditForm, "anidb_mode" | "tvdb_mode">,
+            valueField: keyof Pick<EditForm, "anidb_id" | "tvdb_id">,
+        ) {
+            if (value === undefined) return;
+            if (value === null) {
+                f[modeField] = "null";
+            } else if (typeof value === "number" || typeof value === "string") {
+                f[modeField] = "value";
+                f[valueField] = value;
+            }
         }
-        if (m.tvdb_id !== undefined) {
-            f.tvdb_mode = m.tvdb_id === null ? "null" : "value";
-            f.tvdb_id = (m.tvdb_id as number | null) ?? "";
+
+        function setArrayField(
+            value: unknown,
+            modeField: keyof Pick<
+                EditForm,
+                "imdb_mode" | "mal_mode" | "tmdb_movie_mode" | "tmdb_show_mode"
+            >,
+            csvField: keyof Pick<
+                EditForm,
+                "imdb_csv" | "mal_csv" | "tmdb_movie_csv" | "tmdb_show_csv"
+            >,
+        ) {
+            if (value === undefined) return;
+            if (value === null) {
+                f[modeField] = "null";
+            } else if (Array.isArray(value)) {
+                f[modeField] = "value";
+                f[csvField] = value.map((v) => String(v)).join(",");
+            }
         }
-        // Arrays / CSV
-        if (m.imdb_id !== undefined) {
-            f.imdb_mode = m.imdb_id === null ? "null" : "value";
-            f.imdb_csv = Array.isArray(m.imdb_id)
-                ? m.imdb_id.join(",")
-                : m.imdb_id || "";
-        }
-        if (m.mal_id !== undefined) {
-            f.mal_mode = m.mal_id === null ? "null" : "value";
-            f.mal_csv = Array.isArray(m.mal_id) ? m.mal_id.join(",") : m.mal_id || "";
-        }
-        if (m.tmdb_movie_id !== undefined) {
-            f.tmdb_movie_mode = m.tmdb_movie_id === null ? "null" : "value";
-            f.tmdb_movie_csv = Array.isArray(m.tmdb_movie_id)
-                ? m.tmdb_movie_id.join(",")
-                : m.tmdb_movie_id || "";
-        }
-        if (m.tmdb_show_id !== undefined) {
-            f.tmdb_show_mode = m.tmdb_show_id === null ? "null" : "value";
-            f.tmdb_show_csv = Array.isArray(m.tmdb_show_id)
-                ? m.tmdb_show_id.join(",")
-                : m.tmdb_show_id || "";
-        }
+
+        // Set scalar fields
+        setScalarField(m.anidb_id, "anidb_mode", "anidb_id");
+        setScalarField(m.tvdb_id, "tvdb_mode", "tvdb_id");
+
+        // Set array fields
+        setArrayField(m.imdb_id, "imdb_mode", "imdb_csv");
+        setArrayField(m.mal_id, "mal_mode", "mal_csv");
+        setArrayField(m.tmdb_movie_id, "tmdb_movie_mode", "tmdb_movie_csv");
+        setArrayField(m.tmdb_show_id, "tmdb_show_mode", "tmdb_show_csv");
+
+        // Handle tvdb_mappings specially
         if (m.tvdb_mappings && typeof m.tvdb_mappings === "object") {
             f.tvdb_map_mode = "value";
             for (const [season, pattern] of Object.entries(m.tvdb_mappings)) {
@@ -163,6 +179,7 @@
         } else if ("tvdb_mappings" in m && m.tvdb_mappings === null) {
             f.tvdb_map_mode = "null";
         }
+
         modal = true;
         form = f;
     }
@@ -185,28 +202,35 @@
                 const nums = arr
                     .map((x) => Number(x))
                     .filter((n) => Number.isFinite(n));
-                return nums as number[];
+                return nums;
             }
-            return arr as string[];
+            return arr;
         }
 
-        const out: Mapping = { anilist_id: toInt(f.anilist_id) } as Mapping;
+        const out: Mapping = { anilist_id: toInt(f.anilist_id) };
+
         if (f.anidb_mode === "null") out.anidb_id = null;
         else if (f.anidb_mode === "value") out.anidb_id = toInt(f.anidb_id);
+
         if (f.tvdb_mode === "null") out.tvdb_id = null;
         else if (f.tvdb_mode === "value") out.tvdb_id = toInt(f.tvdb_id);
+
         if (f.imdb_mode === "null") out.imdb_id = null;
         else if (f.imdb_mode === "value")
             out.imdb_id = parseCSV(f.imdb_csv, "string") as string[] | null;
+
         if (f.mal_mode === "null") out.mal_id = null;
         else if (f.mal_mode === "value")
             out.mal_id = parseCSV(f.mal_csv, "int") as number[] | null;
-        if (f.tmdb_movie_mode === "null") out.tmdb_movie_id = null as number[] | null;
+
+        if (f.tmdb_movie_mode === "null") out.tmdb_movie_id = null;
         else if (f.tmdb_movie_mode === "value")
             out.tmdb_movie_id = parseCSV(f.tmdb_movie_csv, "int") as number[] | null;
-        if (f.tmdb_show_mode === "null") out.tmdb_show_id = null as number[] | null;
+
+        if (f.tmdb_show_mode === "null") out.tmdb_show_id = null;
         else if (f.tmdb_show_mode === "value")
             out.tmdb_show_id = parseCSV(f.tmdb_show_csv, "int") as number[] | null;
+
         if (f.tvdb_map_mode === "null") out.tvdb_mappings = null;
         else if (f.tvdb_map_mode === "value") {
             const obj: Record<string, string> = {};
@@ -280,8 +304,9 @@
         try {
             pref = localStorage.getItem("anilist.lang");
         } catch {}
-        if (pref && (t as Record<string, string | undefined>)[pref])
-            return (t as Record<string, string | undefined>)[pref] as string;
+        if (pref && t[pref as keyof typeof t]) {
+            return t[pref as keyof typeof t] || null;
+        }
         return t.romaji || t.english || t.native || null;
     }
 
