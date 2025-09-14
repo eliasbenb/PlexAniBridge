@@ -1,6 +1,6 @@
 [project]
 name = "PlexAniBridge"
-version = "1.2.1"
+version = "1.2.2"
 description = "The smart way to keep your AniList profile perfectly synchronized with your Plex library."
 readme = "README.md"
 requires-python = ">=3.11"
