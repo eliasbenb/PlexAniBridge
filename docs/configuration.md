@@ -170,7 +170,7 @@ Determines the sync modes to use for this profile. Available modes:
 
 Setting `SYNC_MODES` to `None` or an empty list will cause the application to perform a one-time sync where one full sync is performed followed by an immediate exit.
 
-??? tip "Plex Webhooks"
+!!! tip "Plex Webhooks"
 
     To use Plex Webhooks correctly, you must:
 
