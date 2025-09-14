@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 
 from plexapi.library import MovieSection, ShowSection
+
 from src import log
 from src.config.database import db
 from src.config.settings import PlexAnibridgeConfig, PlexAnibridgeProfileConfig

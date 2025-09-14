@@ -6,10 +6,10 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
+from plexapi.video import Episode, Movie, Season, Show
 from sqlalchemy import JSON, DateTime, Enum, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
-from plexapi.video import Episode, Movie, Season, Show
 from src.models.db.base import Base
 
 

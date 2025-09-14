@@ -5,9 +5,9 @@ from collections import Counter
 from collections.abc import AsyncIterator
 from datetime import datetime
 
+from plexapi.video import Episode, EpisodeHistory, MovieHistory, Season, Show
 from tzlocal import get_localzone
 
-from plexapi.video import Episode, EpisodeHistory, MovieHistory, Season, Show
 from src import log
 from src.core.sync.base import BaseSyncClient, ParsedGuids
 from src.core.sync.stats import ItemIdentifier

@@ -12,7 +12,6 @@ from xml.etree import ElementTree
 
 import requests
 from limiter import Limiter
-
 from plexapi.base import PlexObject, cached_data_property
 from plexapi.exceptions import BadRequest, NotFound, Unauthorized
 from plexapi.library import (
@@ -24,6 +23,7 @@ from plexapi.library import (
 from plexapi.server import PlexServer
 from plexapi.utils import cleanXMLString
 from plexapi.video import Episode, Movie, Season, Show, Video
+
 from src import log
 from src.utils.cache import gttl_cache
 

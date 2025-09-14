@@ -111,8 +111,9 @@ class PlexAniBridgeDB:
             AlembicError: If migration execution fails
             FileNotFoundError: If Alembic migration scripts are not found
         """
-        from alembic import command
         from alembic.config import Config
+
+        from alembic import command
 
         cfg = Config()
         cfg.set_main_option(

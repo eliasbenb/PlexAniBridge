@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from plexapi.video import Episode, Movie, Season, Show
 from pydantic import BaseModel
 
-from plexapi.video import Episode, Movie, Season, Show
 from src.models.db.sync_history import SyncOutcome
 
 

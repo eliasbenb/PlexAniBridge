@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from plexapi.server import PlexServer
+
 from src.core.sched import SchedulerClient
 
 __all__ = ["AppState", "app_state"]

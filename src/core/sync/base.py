@@ -7,11 +7,11 @@ from collections.abc import AsyncIterator, Callable
 from datetime import UTC, datetime
 from typing import Generic, TypeVar
 
+from plexapi.media import Guid
+from plexapi.video import Episode, Movie, Season, Show
 from pydantic import BaseModel
 from rapidfuzz import fuzz
 
-from plexapi.media import Guid
-from plexapi.video import Episode, Movie, Season, Show
 from src import log
 from src.config.database import db
 from src.config.settings import SyncField

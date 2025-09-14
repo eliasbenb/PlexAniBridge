@@ -2,9 +2,9 @@
 
 from collections.abc import AsyncIterator
 
+from plexapi.video import Movie
 from tzlocal import get_localzone
 
-from plexapi.video import Movie
 from src import log
 from src.core.sync.base import BaseSyncClient, ParsedGuids
 from src.core.sync.stats import ItemIdentifier

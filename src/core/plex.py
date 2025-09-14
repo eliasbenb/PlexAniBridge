@@ -9,11 +9,9 @@ from typing import TypeAlias
 from urllib.parse import urlparse
 from xml.etree import ElementTree
 
+import plexapi.utils
 from async_lru import alru_cache
 from cachetools.func import ttl_cache
-from tzlocal import get_localzone
-
-import plexapi.utils
 from plexapi.library import LibrarySection, MovieSection, ShowSection
 from plexapi.myplex import MyPlexUser
 from plexapi.server import PlexServer
@@ -25,6 +23,8 @@ from plexapi.video import (
     Season,
     Show,
 )
+from tzlocal import get_localzone
+
 from src import log
 from src.config.settings import PlexMetadataSource
 from src.plexapi.community import PlexCommunityClient

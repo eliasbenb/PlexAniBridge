@@ -38,6 +38,7 @@
     "python.envFile": "",
     "python.terminal.activateEnvInCurrentTerminal": true,
     "ruff.fixAll": true,
+    "ruff.importStrategy": "fromEnvironment",
     "ruff.organizeImports": true,
     "yaml.customTags": [
         "!ENV scalar",
