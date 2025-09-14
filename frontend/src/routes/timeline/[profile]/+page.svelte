@@ -589,18 +589,24 @@
                                     class="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-400"
                                 >
                                     {#if item.anilist?.id}
+                                        <!-- eslint-disable svelte/no-navigation-without-resolve -->
                                         <a
                                             href={anilistUrl(item)!}
                                             target="_blank"
                                             rel="noopener"
                                             class="inline-flex items-center gap-1 rounded-md border border-sky-600/60 bg-sky-700/50 px-1 py-0.5 text-[9px] font-semibold text-sky-100 hover:bg-sky-600/60"
                                             title="Open in AniList"
-                                            ><ExternalLink
-                                                class="inline h-3.5 w-3.5 text-[11px]"
-                                            />AniList</a
                                         >
+                                            <ExternalLink
+                                                class="inline h-3.5 w-3.5 text-[11px]"
+                                            />
+                                            AniList
+                                        </a>
+                                        <!-- eslint-enable svelte/no-navigation-without-resolve -->
                                     {/if}
+
                                     {#if item.plex_guid}
+                                        <!-- eslint-disable svelte/no-navigation-without-resolve -->
                                         <a
                                             href={plexUrl(item)!}
                                             target="_blank"
@@ -612,6 +618,7 @@
                                                 class="inline h-3.5 w-3.5 text-[11px]"
                                             /> Plex</a
                                         >
+                                        <!-- eslint-enable svelte/no-navigation-without-resolve -->
                                     {/if}
                                     <span class="text-xs text-slate-400"
                                         >{new Date(
