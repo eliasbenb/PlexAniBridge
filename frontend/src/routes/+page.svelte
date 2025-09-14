@@ -10,6 +10,7 @@
     } from "@lucide/svelte";
 
     import { goto } from "$app/navigation";
+    import { resolve } from "$app/paths";
 
     type ProfileStatus = {
         status?: { last_synced?: string };
@@ -93,7 +94,7 @@
     }
 
     function goTimeline(name: string) {
-        goto(`/timeline/${name}`);
+        goto(resolve(`/timeline/${name}`));
     }
 
     onMount(() => {
@@ -188,7 +189,7 @@
                     </div>
                     <div class="flex shrink-0 items-start gap-2">
                         <a
-                            href={"/timeline/" + name}
+                            href={resolve(`/timeline/${name}`)}
                             onclick={(e) => {
                                 e.stopPropagation();
                             }}

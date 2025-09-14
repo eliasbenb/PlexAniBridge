@@ -28,6 +28,8 @@
     } from "@lucide/svelte";
     import { SvelteSet, SvelteURLSearchParams } from "svelte/reactivity";
 
+    import { highlightJson } from "$lib/utils";
+
     const { params } = $props<{ params: { profile: string } }>();
 
     type HistoryItem = {
@@ -175,28 +177,6 @@
         };
         scan(obj);
         return count + " keys";
-    }
-
-    function highlightJson(obj: object) {
-        if (!obj) return '<span class="text-slate-600">—</span>';
-        const json = JSON.stringify(obj, null, 2);
-        return json
-            .replace(/(&|<)/g, (c) => (c === "&" ? "&amp;" : "&lt;"))
-            .replace(
-                /("(\\.|[^"])*"\s*:)|("(\\.|[^"])*")|\b(true|false|null)\b|-?\b\d+(?:\.\d+)?\b/g,
-                (m) => {
-                    if (/^".*":$/.test(m))
-                        return `<span class='text-sky-300'>${m}</span>`;
-                    if (/^"/.test(m))
-                        return `<span class='text-emerald-300'>${m}</span>`;
-                    if (/true|false/.test(m))
-                        return `<span class='text-indigo-300'>${m}</span>`;
-                    if (/null/.test(m))
-                        return `<span class='text-pink-300'>${m}</span>`;
-                    return `<span class='text-amber-300'>${m}</span>`;
-                },
-            )
-            .trim();
     }
 
     function copyJson(obj: unknown) {
@@ -589,18 +569,24 @@
                                     class="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-400"
                                 >
                                     {#if item.anilist?.id}
+                                        <!-- eslint-disable svelte/no-navigation-without-resolve -->
                                         <a
                                             href={anilistUrl(item)!}
                                             target="_blank"
                                             rel="noopener"
                                             class="inline-flex items-center gap-1 rounded-md border border-sky-600/60 bg-sky-700/50 px-1 py-0.5 text-[9px] font-semibold text-sky-100 hover:bg-sky-600/60"
                                             title="Open in AniList"
-                                            ><ExternalLink
-                                                class="inline h-3.5 w-3.5 text-[11px]"
-                                            />AniList</a
                                         >
+                                            <ExternalLink
+                                                class="inline h-3.5 w-3.5 text-[11px]"
+                                            />
+                                            AniList
+                                        </a>
+                                        <!-- eslint-enable svelte/no-navigation-without-resolve -->
                                     {/if}
+
                                     {#if item.plex_guid}
+                                        <!-- eslint-disable svelte/no-navigation-without-resolve -->
                                         <a
                                             href={plexUrl(item)!}
                                             target="_blank"
@@ -612,6 +598,7 @@
                                                 class="inline h-3.5 w-3.5 text-[11px]"
                                             /> Plex</a
                                         >
+                                        <!-- eslint-enable svelte/no-navigation-without-resolve -->
                                     {/if}
                                     <span class="text-xs text-slate-400"
                                         >{new Date(

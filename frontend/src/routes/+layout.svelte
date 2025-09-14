@@ -13,6 +13,7 @@
         X,
     } from "@lucide/svelte";
 
+    import { resolve } from "$app/paths";
     import { page } from "$app/state";
     import logo from "$lib/assets/favicon.svg";
 
@@ -110,7 +111,7 @@
     >
         <div class="mb-4 flex items-center gap-3 px-2">
             <img src={logo} alt="Logo" class="h-8 w-8" loading="lazy" />
-            <a href="/" class="group">
+            <a href={resolve("/")} class="group">
                 <h1 class="text-base font-semibold tracking-tight text-white">
                     PlexAniBridge
                 </h1>
@@ -121,19 +122,19 @@
         </div>
         <nav class="flex flex-1 flex-col gap-1 text-sm font-medium">
             <a
-                href="/"
+                href={resolve("/")}
                 class="nav-link {active('/', true) ? 'nav-link-active' : ''}"
                 aria-current={active("/", true) ? "page" : undefined}
                 ><LayoutDashboard class="inline h-4 w-4" /><span>Dashboard</span></a
             >
             <a
-                href="/mappings"
+                href={resolve("/mappings")}
                 class="nav-link {active('/mappings') ? 'nav-link-active' : ''}"
                 aria-current={active("/mappings") ? "page" : undefined}
                 ><List class="inline h-4 w-4" /><span>Mappings</span></a
             >
             <a
-                href="/logs"
+                href={resolve("/logs")}
                 class="nav-link {active('/logs') ? 'nav-link-active' : ''}"
                 aria-current={active("/logs") ? "page" : undefined}
                 ><Terminal class="inline h-4 w-4" /><span>Logs</span></a
@@ -144,13 +145,13 @@
                 System
             </div>
             <a
-                href="/settings"
+                href={resolve("/settings")}
                 class="nav-link {active('/settings') ? 'nav-link-active' : ''}"
                 aria-current={active("/settings") ? "page" : undefined}
                 ><Settings class="inline h-4 w-4" /><span>Settings</span></a
             >
             <a
-                href="/about"
+                href={resolve("/about")}
                 class="nav-link {active('/about') ? 'nav-link-active' : ''}"
                 aria-current={active("/about") ? "page" : undefined}
                 ><Activity class="inline h-4 w-4" /><span>About</span></a
