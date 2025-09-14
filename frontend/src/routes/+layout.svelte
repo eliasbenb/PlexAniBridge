@@ -19,6 +19,9 @@
 
     import "../app.css";
 
+    import { apiFetch } from "$lib/api";
+    import ToastHost from "$lib/components/toast-host.svelte";
+
     let { children } = $props();
     let version = $state("v?");
     let gitHash = $state("");
@@ -34,12 +37,14 @@
 
     async function loadMeta() {
         try {
-            const r = await fetch("/api/system/meta");
+            const r = await apiFetch("/api/system/meta", undefined, { silent: true });
             if (!r.ok) return;
             const d = await r.json();
             if (d.version) version = d.version;
             if (d.git_hash) gitHash = d.git_hash;
-        } catch {}
+        } catch {
+            // toast("Failed to load meta", "warn"); // keep silent by default
+        }
     }
 
     function openWs() {
@@ -81,11 +86,8 @@
 <div
     class="min-h-dvh bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-950 via-slate-950 to-slate-900 text-slate-100 antialiased selection:bg-blue-600/40 selection:text-white"
 >
-    <!-- Toast mount point -->
-    <div
-        id="toast-root"
-        class="pointer-events-none fixed top-16 right-4 z-[60] flex w-80 max-w-[90vw] flex-col gap-2"
-    ></div>
+    <!-- Toasts -->
+    <ToastHost />
     <a
         href="#main"
         class="sr-only bg-blue-600 px-3 py-2 text-sm font-medium text-white shadow-lg focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded-md"

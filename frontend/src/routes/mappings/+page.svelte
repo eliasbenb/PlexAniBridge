@@ -4,6 +4,8 @@
     import { ArrowRight, Check, List, PenLine, Plus, Search, X } from "@lucide/svelte";
     import { SvelteURLSearchParams } from "svelte/reactivity";
 
+    import { apiFetch } from "$lib/api";
+    import { toast } from "$lib/notify";
     import { highlightJson } from "$lib/utils";
 
     type ExternalIds = {
@@ -105,7 +107,7 @@
             if (query) p.set("search", query);
             if (customOnly) p.set("custom_only", "true");
             p.set("with_anilist", "true");
-            const r = await fetch("/api/mappings?" + p.toString());
+            const r = await apiFetch("/api/mappings?" + p.toString());
             if (!r.ok) throw new Error("HTTP " + r.status);
             const d = await r.json();
             items = d.items || [];
@@ -114,6 +116,7 @@
             page = d.page || page;
         } catch (e) {
             console.error("load mappings failed", e);
+            toast("Failed to load mappings", "error");
         } finally {
             loading = false;
         }
@@ -361,31 +364,37 @@
         const url = isNew ? "/api/mappings" : "/api/mappings/" + aid;
         const method = isNew ? "POST" : "PUT";
         try {
-            const r = await fetch(url, {
-                method,
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload),
-            });
+            const r = await apiFetch(
+                url,
+                {
+                    method,
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload),
+                },
+                { successMessage: isNew ? "Mapping created" : "Mapping updated" },
+            );
             if (!r.ok) throw new Error("HTTP " + r.status);
             modal = false;
             load();
         } catch (e) {
             console.error("save failed", e);
-            alert("Save failed");
+            toast("Save failed", "error");
         }
     }
 
     async function remove(m: Mapping) {
         if (!confirm("Delete override for AniList " + m.anilist_id + "?")) return;
         try {
-            const r = await fetch("/api/mappings/" + m.anilist_id, {
-                method: "DELETE",
-            });
+            const r = await apiFetch(
+                "/api/mappings/" + m.anilist_id,
+                { method: "DELETE" },
+                { successMessage: "Mapping deleted" },
+            );
             if (!r.ok) throw new Error("HTTP " + r.status);
             load();
         } catch (e) {
             console.error("delete failed", e);
-            alert("Delete failed");
+            toast("Delete failed", "error");
         }
     }
 

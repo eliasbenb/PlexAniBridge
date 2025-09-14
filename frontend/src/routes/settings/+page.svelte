@@ -3,6 +3,9 @@
 
     import { Languages, Settings, User } from "@lucide/svelte";
 
+    import { apiFetch } from "$lib/api";
+    import { toast } from "$lib/notify";
+
     interface SettingsResp {
         global_config: Record<string, unknown>;
         profiles: { name: string; settings: Record<string, unknown> }[];
@@ -27,13 +30,14 @@
                 new CustomEvent("anilist-lang-changed", { detail: { lang: v } }),
             );
         } catch {}
+        toast(`Language set to ${v}`, "success");
     }
 
     async function load() {
         loading = true;
         error = null;
         try {
-            const r = await fetch("/api/system/settings");
+            const r = await apiFetch("/api/system/settings");
             if (!r.ok) throw new Error("HTTP " + r.status);
             data = await r.json();
         } catch (e: unknown) {

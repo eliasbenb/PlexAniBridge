@@ -3,17 +3,20 @@
 
     import {
         Activity,
-        AlignLeft,
         ChevronsDown,
         Download,
         FolderSearch,
         Pause,
         RefreshCw,
         Search,
+        TextAlignStart,
+        TextWrap,
         Trash2,
-        WrapText,
         X,
     } from "@lucide/svelte";
+
+    import { apiFetch } from "$lib/api";
+    import { toast } from "$lib/notify";
 
     interface LogEntry {
         timestamp: string | null;
@@ -152,14 +155,16 @@
 
     async function refreshFiles() {
         try {
-            const r = await fetch("/api/logs/files");
+            const r = await apiFetch("/api/logs/files", undefined, { silent: true });
             if (!r.ok) return;
             files = await r.json();
             if (!currentFile) {
                 const active = files.find((f) => f.current);
                 if (active) loadFile(active);
             }
-        } catch {}
+        } catch {
+            toast("Failed to load log files", "error");
+        }
     }
 
     async function loadFile(f: FileMeta, force = false) {
@@ -167,15 +172,19 @@
         if (!force && same && lastHistoryLinesLoaded === historyLines) return;
         currentFile = f;
         try {
-            const r = await fetch(
+            const r = await apiFetch(
                 `/api/logs/file/${encodeURIComponent(f.name)}?lines=${historyLines}`,
+                undefined,
+                { silent: true },
             );
             if (!r.ok) return;
             historyEntries = await r.json();
             lastHistoryLinesLoaded = historyLines;
             applyFilter();
             requestAnimationFrame(() => scrollToBottom("history"));
-        } catch {}
+        } catch {
+            toast("Failed to load log file", "error");
+        }
     }
 
     function downloadLive() {
@@ -369,9 +378,9 @@
                 class={`inline-flex h-8 w-8 items-center justify-center rounded-md ring-1 ring-slate-700/60 ${wrap ? "bg-slate-700/80 text-slate-100" : "bg-slate-800 text-slate-300 hover:bg-slate-700"}`}
             >
                 {#if wrap}
-                    <WrapText class="inline h-4 w-4" />
+                    <TextWrap class="inline h-4 w-4" />
                 {:else}
-                    <AlignLeft class="inline h-4 w-4" />
+                    <TextAlignStart class="inline h-4 w-4" />
                 {/if}
             </button>
             {#if tab === "live"}
