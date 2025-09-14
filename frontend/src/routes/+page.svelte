@@ -11,6 +11,8 @@
 
     import { goto } from "$app/navigation";
     import { resolve } from "$app/paths";
+    import { apiFetch } from "$lib/api";
+    import { toast } from "$lib/notify";
 
     type ProfileStatus = {
         status?: { last_synced?: string };
@@ -46,7 +48,7 @@
 
     async function refresh() {
         try {
-            const r = await fetch("/api/status");
+            const r = await apiFetch("/api/status");
             if (!r.ok) throw new Error("HTTP " + r.status);
             const d = await r.json();
             profiles = d.profiles || {};
@@ -54,6 +56,7 @@
             lastRefreshed = Date.now();
         } catch (e) {
             console.error("Failed to load status", e);
+            toast("Failed to load status", "error");
         }
     }
 
@@ -79,18 +82,39 @@
         };
     }
 
-    function syncAll(poll: boolean) {
-        fetch(`/api/sync?poll=${poll}`, { method: "POST" }).then(refresh);
-    }
-
-    function syncDatabase() {
-        fetch(`/api/sync/database`, { method: "POST" }).then(refresh);
-    }
-
-    function syncProfile(name: string, poll: boolean) {
-        fetch(`/api/sync/profile/${name}?poll=${poll}`, { method: "POST" }).then(
-            refresh,
+    async function syncAll(poll: boolean) {
+        await apiFetch(
+            `/api/sync?poll=${poll}`,
+            { method: "POST" },
+            {
+                successMessage: poll
+                    ? "Triggered poll sync for all profiles"
+                    : "Triggered full sync for all profiles",
+            },
         );
+        refresh();
+    }
+
+    async function syncDatabase() {
+        await apiFetch(
+            `/api/sync/database`,
+            { method: "POST" },
+            { successMessage: "Triggered database sync" },
+        );
+        refresh();
+    }
+
+    async function syncProfile(name: string, poll: boolean) {
+        await apiFetch(
+            `/api/sync/profile/${name}?poll=${poll}`,
+            { method: "POST" },
+            {
+                successMessage: poll
+                    ? `Triggered poll sync for profile ${name}`
+                    : `Triggered full sync for profile ${name}`,
+            },
+        );
+        refresh();
     }
 
     function goTimeline(name: string) {

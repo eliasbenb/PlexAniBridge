@@ -3,6 +3,9 @@
 
     import { Activity } from "@lucide/svelte";
 
+    import { apiFetch } from "$lib/api";
+    import { toast } from "$lib/notify";
+
     interface AboutInfo {
         version?: string;
         git_hash?: string;
@@ -22,7 +25,7 @@
         loading = true;
         error = null;
         try {
-            const r = await fetch("/api/system/about");
+            const r = await apiFetch("/api/system/about");
             if (!r.ok) throw new Error("HTTP " + r.status);
             const d = await r.json();
             info = d.info || {};
@@ -30,6 +33,7 @@
         } catch (e: unknown) {
             if (e instanceof Error) error = e.message;
             else error = String(e);
+            toast("Failed to load About info", "error");
         } finally {
             loading = false;
         }

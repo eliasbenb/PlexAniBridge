@@ -28,6 +28,8 @@
     } from "@lucide/svelte";
     import { SvelteSet, SvelteURLSearchParams } from "svelte/reactivity";
 
+    import { apiFetch } from "$lib/api";
+    import { toast } from "$lib/notify";
     import { highlightJson } from "$lib/utils";
 
     const { params } = $props<{ params: { profile: string } }>();
@@ -290,7 +292,7 @@
     async function deleteHistory(item: HistoryItem) {
         if (!confirm("Delete this history entry?")) return;
         try {
-            const res = await fetch(`/api/history/${params.profile}/${item.id}`, {
+            const res = await apiFetch(`/api/history/${params.profile}/${item.id}`, {
                 method: "DELETE",
             });
             if (!res.ok) throw new Error("HTTP " + res.status);
@@ -301,9 +303,9 @@
             // Adjust stats
             const oc = data.outcome || item.outcome;
             if (oc) stats[oc] = Math.max(0, (stats[oc] || 1) - 1);
+            toast("History entry deleted", "success");
         } catch (e) {
-            // @ts-expect-error optional global notifier
-            if (window.notify?.toast) window.notify.toast("Delete failed", "error");
+            toast("Delete failed", "error");
             console.error(e);
         }
     }
@@ -319,7 +321,7 @@
     async function loadFirst() {
         loadingInitial = true;
         try {
-            const r = await fetch(buildQuery(1));
+            const r = await apiFetch(buildQuery(1));
             if (!r.ok) throw new Error("HTTP " + r.status);
             const d = await r.json();
             items = d.items || [];
@@ -341,7 +343,7 @@
         loadingMore = true;
         const next = page + 1;
         try {
-            const r = await fetch(buildQuery(next));
+            const r = await apiFetch(buildQuery(next));
             if (!r.ok) throw new Error("HTTP " + r.status);
             const d = await r.json();
             const existing = new SvelteSet(items.map((i: HistoryItem) => i.id));
@@ -404,15 +406,17 @@
 
     async function triggerSync(poll: boolean) {
         try {
-            await fetch(`/api/sync/profile/${params.profile}?poll=${poll}`, {
-                method: "POST",
-            });
-            // optionally surface toast if a global notifier exists
-            // @ts-expect-error optional global notifier
-            if (window.notify?.toast) window.notify.toast("Sync started", "info");
+            await apiFetch(
+                `/api/sync/profile/${params.profile}?poll=${poll}`,
+                { method: "POST" },
+                {
+                    successMessage: poll
+                        ? `Triggered poll sync for profile ${params.profile}`
+                        : `Triggered full sync for profile ${params.profile}`,
+                },
+            );
         } catch {
-            // @ts-expect-error optional global notifier
-            if (window.notify?.toast) window.notify.toast("Sync failed", "error");
+            toast("Sync failed", "error");
         }
     }
 
