@@ -4,7 +4,7 @@ export function highlightJson(obj: object) {
     return json
         .replace(/(&|<)/g, (c) => (c === "&" ? "&amp;" : "&lt;"))
         .replace(
-            /("(\\.|[^"])*"\s*:)|("(\\.|[^"])*")|\b(true|false|null)\b|-?\b\d+(?:\.\d+)?\b/g,
+            /("(?:\\.|[^"\\])*"\s*:)|("(?:\\.|[^"\\])*")|\b(true|false|null)\b|-?\b\d+(?:\.\d+)?\b/g,
             (m) => {
                 if (/^".*":$/.test(m)) return `<span class='text-sky-300'>${m}</span>`;
                 if (/^"/.test(m)) return `<span class='text-emerald-300'>${m}</span>`;
