@@ -76,8 +76,10 @@ class HistoryService:
 
         result = {}
         for m in medias:
-            m.media_list_entry = None
-            result[m.id] = m.model_dump(mode="json")
+            # Create a deep copy to avoid mutating cached objects
+            copy_m = m.model_copy(deep=True)
+            copy_m.media_list_entry = None
+            result[m.id] = copy_m.model_dump(mode="json")
         return result
 
     @alru_cache(maxsize=256, ttl=600)  # Cache for 10 minutes
