@@ -10,7 +10,9 @@ from pydantic import BaseModel
 from sqlalchemy import func, select
 
 from src.config.database import db
-from src.models.db.sync_history import SyncHistory
+from src.core.anilist import AniListClient
+from src.models.db.sync_history import SyncHistory, SyncOutcome
+from src.models.schemas.anilist import MediaList as AniMediaList
 from src.web.state import app_state
 
 logger = logging.getLogger(__name__)
@@ -311,6 +313,124 @@ class HistoryService:
 
         # Invalidate related caches after deletion
         await self.clear_profile_cache(profile)
+
+    async def undo_item(self, profile: str, item_id: int) -> HistoryItem:
+        """Undo a history item by reverting or deleting the AniList entry.
+
+        Args:
+            profile (str): Profile name
+            item_id (int): History row id to undo
+
+        Returns:
+            HistoryItem: Newly created history record representing the undo action.
+        """
+        bridge = self._get_bridge(profile)
+        with db as ctx:
+            row: SyncHistory | None = (
+                ctx.session.query(SyncHistory)
+                .filter(
+                    SyncHistory.profile_name == profile,
+                    SyncHistory.id == item_id,
+                )
+                .first()
+            )
+            if not row:
+                raise ValueError("History item not found")
+
+            outcome = str(row.outcome)
+            before_state = row.before_state
+            after_state = row.after_state
+
+        new_before: dict | None = None
+        new_after: dict | None = None
+        new_outcome = row.outcome
+        error_message: str | None = None
+
+        anilist_client: AniListClient = bridge.anilist_client
+
+        try:
+            # Revert update
+            if (
+                outcome == "synced"
+                and before_state is not None
+                and after_state is not None
+            ):
+                entry = AniMediaList(**before_state)
+                await anilist_client.update_anime_entry(entry)
+                new_before = after_state
+                new_after = before_state
+
+                new_outcome = SyncOutcome.UNDONE
+
+            # Undo creation -> delete
+            elif (
+                outcome == "synced" and before_state is None and after_state is not None
+            ):
+                entry_id = after_state.get("id")
+                media_id = after_state.get("mediaId")
+                if entry_id and media_id:
+                    await anilist_client.delete_anime_entry(
+                        entry_id=entry_id, media_id=media_id
+                    )
+                    new_before = after_state
+                    new_after = None
+
+                    new_outcome = SyncOutcome.UNDONE
+                else:
+                    error_message = "Missing id/mediaId for deletion"
+
+            # Restore deletion -> recreate
+            elif (
+                outcome == "deleted"
+                and before_state is not None
+                and after_state is None
+            ):
+                entry = AniMediaList(**before_state)
+                await anilist_client.update_anime_entry(entry)
+                new_before = None
+                new_after = before_state
+
+                new_outcome = SyncOutcome.UNDONE
+
+            else:
+                error_message = "Undo not supported for this history row"
+        except Exception as e:
+            error_message = f"Undo failed: {e}"
+
+        with db as ctx:
+            new_row = SyncHistory(
+                profile_name=profile,
+                plex_guid=row.plex_guid,
+                plex_rating_key=row.plex_rating_key,
+                plex_child_rating_key=row.plex_child_rating_key,
+                plex_type=row.plex_type,
+                anilist_id=row.anilist_id,
+                outcome=new_outcome,
+                before_state=new_before,
+                after_state=new_after,
+                error_message=error_message,
+            )
+            ctx.session.add(new_row)
+            ctx.session.commit()
+            created = HistoryItem(
+                id=new_row.id,
+                profile_name=new_row.profile_name,
+                plex_guid=new_row.plex_guid,
+                plex_rating_key=new_row.plex_rating_key,
+                plex_child_rating_key=new_row.plex_child_rating_key,
+                plex_type=str(new_row.plex_type),
+                anilist_id=new_row.anilist_id,
+                outcome=str(new_row.outcome),
+                before_state=new_row.before_state,
+                after_state=new_row.after_state,
+                error_message=new_row.error_message,
+                timestamp=new_row.timestamp.isoformat(),
+                anilist=None,
+                plex=None,
+            )
+
+        await self.clear_profile_cache(profile)
+        return created
 
     async def clear_profile_cache(self, profile: str) -> None:
         """Clear all cached data for a specific profile.
