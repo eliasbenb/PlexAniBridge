@@ -3,6 +3,7 @@
 
     import {
         Activity,
+        ArchiveRestore,
         Github,
         LayoutDashboard,
         List,
@@ -140,6 +141,12 @@
                 class="nav-link {active('/logs') ? 'nav-link-active' : ''}"
                 aria-current={active("/logs") ? "page" : undefined}
                 ><Terminal class="inline h-4 w-4" /><span>Logs</span></a
+            >
+            <a
+                href={resolve("/backups")}
+                class="nav-link {active('/backups') ? 'nav-link-active' : ''}"
+                aria-current={active("/backups") ? "page" : undefined}
+                ><ArchiveRestore class="inline h-4 w-4" /><span>Backups</span></a
             >
             <div
                 class="mt-4 px-3 text-[10px] font-semibold tracking-wider text-slate-500 uppercase"
