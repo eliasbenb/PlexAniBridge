@@ -8,7 +8,6 @@
         Circle,
         CircleCheck,
         CircleX,
-        Clock,
         CloudDownload,
         Copy,
         ExternalLink,
@@ -20,7 +19,6 @@
         RotateCw,
         Search,
         SearchX,
-        SkipForward,
         SquareMinus,
         SquarePlus,
         Trash2,
@@ -208,12 +206,11 @@
             order: 2,
         },
         deleted: { label: "Deleted", color: "bg-rose-600/80", icon: Trash2, order: 3 },
-        pending: { label: "Pending", color: "bg-slate-600/80", icon: Clock, order: 4 },
-        skipped: {
-            label: "Skipped",
-            color: "bg-slate-500/60",
-            icon: SkipForward,
-            order: 5,
+        undone: {
+            label: "Undone",
+            color: "bg-violet-600/80",
+            icon: RotateCw,
+            order: 6,
         },
     };
 
@@ -307,6 +304,82 @@
         } catch (e) {
             toast("Delete failed", "error");
             console.error(e);
+        }
+    }
+
+    function canUndo(item: HistoryItem): boolean {
+        if (
+            item.outcome === "synced" &&
+            item.before_state != null &&
+            item.after_state != null
+        )
+            return true; // revert update
+        if (
+            item.outcome === "synced" &&
+            item.before_state == null &&
+            item.after_state != null
+        )
+            return true; // undo creation (delete)
+        if (
+            item.outcome === "deleted" &&
+            item.before_state != null &&
+            item.after_state == null
+        )
+            return true; // restore deletion
+        return false;
+    }
+
+    function canShowDiff(item: HistoryItem): boolean {
+        // Diff panel should be available for original sync changes and subsequent undo entries
+        if (!item) return false;
+        if (!(item.before_state || item.after_state)) return false;
+        return item.outcome === "synced" || item.outcome === "undone";
+    }
+
+    let undoLoading: Record<number, boolean> = $state({});
+
+    async function undoHistory(item: HistoryItem) {
+        if (undoLoading[item.id]) return;
+        if (!canUndo(item)) return toast("Undo not available for this entry", "warn");
+        undoLoading[item.id] = true;
+        try {
+            const res = await apiFetch(
+                `/api/history/${params.profile}/${item.id}/undo`,
+                { method: "POST" },
+                { successMessage: "Undo requested" },
+            );
+            if (!res.ok) throw new Error("HTTP " + res.status);
+            const data = await res.json();
+            const newItem: HistoryItem | undefined = data.item;
+            if (newItem) {
+                // Stats update
+                if (newItem.outcome) {
+                    stats[newItem.outcome] = (stats[newItem.outcome] || 0) + 1;
+                }
+                const passesFilter =
+                    !outcomeFilter || newItem.outcome === outcomeFilter;
+                if (passesFilter) {
+                    items = [newItem, ...items];
+                    knownIds.add(newItem.id);
+
+                    if (newItem.before_state || newItem.after_state) {
+                        openDiff[newItem.id] = true;
+                        ensureDiffUi(newItem.id);
+                    }
+
+                    if (!isNearTop) newItemsCount += 1;
+                } else {
+                    toast(
+                        `Undo created a '${newItem.outcome}' entry hidden by current filter`,
+                        "info",
+                    );
+                }
+            }
+        } catch (e) {
+            console.error(e);
+            toast("Undo failed", "error");
+        } finally {
+            undoLoading[item.id] = false;
         }
     }
 
@@ -634,6 +707,23 @@
                                 </div>
                             </div>
                             <div class="flex shrink-0 items-center gap-2">
+                                {#if canUndo(item)}
+                                    <button
+                                        type="button"
+                                        disabled={undoLoading[item.id]}
+                                        onclick={() => undoHistory(item)}
+                                        class="inline-flex h-8 items-center justify-center gap-1 rounded-md border border-violet-600/60 bg-violet-700/40 px-2 text-[11px] font-medium text-violet-100 hover:bg-violet-600/50 disabled:opacity-50"
+                                        title="Undo this change"
+                                    >
+                                        {#if undoLoading[item.id]}
+                                            <LoaderCircle
+                                                class="inline h-4 w-4 animate-spin"
+                                            />
+                                        {:else}
+                                            <RotateCw class="inline h-4 w-4" />
+                                        {/if}
+                                    </button>
+                                {/if}
                                 <button
                                     type="button"
                                     onclick={() => deleteHistory(item)}
@@ -647,7 +737,7 @@
                         {#if item.error_message}<div class="text-[11px] text-red-400">
                                 {item.error_message}
                             </div>{/if}
-                        {#if item.outcome === "synced" && (item.before_state || item.after_state)}
+                        {#if canShowDiff(item)}
                             <div class="pt-1">
                                 <button
                                     type="button"
@@ -666,7 +756,7 @@
                     </div>
                 </div>
             </div>
-            {#if openDiff[item.id] && item.outcome === "synced" && (item.before_state || item.after_state)}
+            {#if openDiff[item.id] && canShowDiff(item)}
                 {@const ui = ensureDiffUi(item.id)}
                 {@const diffs = buildDiff(item)}
                 <div

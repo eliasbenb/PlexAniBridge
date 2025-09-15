@@ -26,6 +26,12 @@ class OkResponse(BaseModel):
     ok: bool = True
 
 
+class UndoResponse(BaseModel):
+    """Response model for undo operation."""
+
+    item: ServiceHistoryItem
+
+
 @router.get("/{profile}", response_model=GetHistoryResponse)
 async def get_history(
     profile: str,
@@ -72,3 +78,15 @@ async def delete_history(profile: str, item_id: int) -> OkResponse:
     except ValueError as e:
         raise HTTPException(404, str(e)) from e
     return OkResponse()
+
+
+@router.post("/{profile}/{item_id}/undo", response_model=UndoResponse)
+async def undo_history(profile: str, item_id: int) -> UndoResponse:
+    """Undo a history item if possible."""
+    try:
+        item = await history_service.undo_item(profile, item_id)
+        return UndoResponse(item=item)
+    except ValueError as e:
+        raise HTTPException(404, str(e)) from e
+    except Exception as e:  # pragma: no cover
+        raise HTTPException(500, f"Undo failed: {e}") from e

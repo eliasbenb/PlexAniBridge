@@ -70,6 +70,7 @@ class SyncOutcome(StrEnum):
     NOT_FOUND = "not_found"  # No matching AniList entry could be found
     DELETED = "deleted"  # Item was deleted from AniList (destructive sync)
     PENDING = "pending"  # Item was identified for processing but not yet processed
+    UNDONE = "undone"  # Resulting entry produced by an explicit user undo action
 
 
 class SyncHistory(Base):
