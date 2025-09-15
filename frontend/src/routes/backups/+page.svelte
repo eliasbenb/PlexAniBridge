@@ -62,7 +62,7 @@
                             <span class="truncate font-medium">{p}</span>
                         </div>
                         <p class="mt-2 text-[11px] text-slate-500">
-                            View backups for profile.
+                            View profile backups.
                         </p>
                     </a>
                 </li>

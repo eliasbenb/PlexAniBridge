@@ -533,7 +533,7 @@
                         </select>
                         <button
                             type="button"
-                            aria-label="Reload"
+                            aria-label="Refresh"
                             onclick={() => currentFile && loadFile(currentFile, true)}
                             class="inline-flex h-7 w-7 items-center justify-center rounded-md bg-slate-800 text-slate-300 hover:bg-slate-700"
                             ><RefreshCw class="inline h-4 w-4" /></button

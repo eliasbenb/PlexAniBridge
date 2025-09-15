@@ -429,7 +429,7 @@
                 <h2 class="text-lg font-semibold">Mappings</h2>
             </div>
             <p class="text-xs text-slate-400">
-                Browse & override external ID relationships
+                Browse and override external ID mappings
             </p>
         </div>
         <div class="flex items-center gap-2 text-[11px]">

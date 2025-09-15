@@ -270,15 +270,15 @@
                     >
                     {#if p.config?.sync_modes?.includes("periodic")}<span
                             class="rounded-md bg-blue-900/50 px-2 py-1 text-blue-200"
-                            >Periodic Scan</span
+                            >Periodic Sync</span
                         >{/if}
                     {#if p.config?.sync_modes?.includes("poll")}<span
                             class="rounded-md bg-blue-900/50 px-2 py-1 text-blue-200"
-                            >Poll Scan</span
+                            >Poll Sync</span
                         >{/if}
                     {#if p.config?.sync_modes?.includes("webhook")}<span
                             class="rounded-md bg-blue-900/50 px-2 py-1 text-blue-200"
-                            >Webhook Scan</span
+                            >Webhook Sync</span
                         >{/if}
                 </div>
             </button>

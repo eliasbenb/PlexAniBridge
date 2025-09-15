@@ -149,7 +149,7 @@
                 type="button"
                 class="inline-flex items-center gap-1 rounded-md border border-slate-600/60 bg-slate-700/40 px-2 py-1 font-medium text-slate-200 hover:bg-slate-600/50"
             >
-                <RefreshCcw class="inline h-4 w-4 text-[14px]" /> Reload
+                <RefreshCcw class="inline h-4 w-4 text-[14px]" /> Refresh
             </button>
         </div>
     </div>

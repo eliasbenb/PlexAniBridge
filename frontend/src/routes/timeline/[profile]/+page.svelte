@@ -536,7 +536,7 @@
                 onclick={() => loadFirst()}
                 type="button"
                 class="inline-flex items-center gap-1 rounded-md border border-slate-600/60 bg-slate-700/40 px-2 py-1 font-medium text-slate-200 hover:bg-slate-600/50"
-                ><RotateCw class="inline h-4 w-4 text-[14px]" /> Reload</button
+                ><RotateCw class="inline h-4 w-4 text-[14px]" /> Refresh</button
             >
         </div>
     </div>
@@ -548,7 +548,7 @@
                 class={`group relative cursor-pointer overflow-hidden rounded-md p-3 text-left transition select-none ${outcomeFilter === k ? "border-sky-500 bg-sky-950/40 ring-1 ring-sky-400/60" : "border border-slate-800 bg-gradient-to-br from-slate-900/70 to-slate-800/30 hover:border-slate-700"}`}
                 title={outcomeFilter === k
                     ? "Click to remove filter"
-                    : "Funnel by " + meta.label}
+                    : "Filter by " + meta.label}
             >
                 <div
                     class="text-[10px] font-medium tracking-wide text-slate-400 uppercase"
@@ -791,7 +791,7 @@
                                     />
                                     <input
                                         bind:value={ui.filter}
-                                        placeholder="Funnel path…"
+                                        placeholder="Filter path…"
                                         class="w-full rounded-md border border-slate-700/70 bg-slate-900/60 py-1 pr-2 pl-6 placeholder:text-slate-600 focus:border-sky-500 focus:outline-none"
                                     />
                                 </div>
