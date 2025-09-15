@@ -23,6 +23,7 @@ plex_url: ...
 #== Global Settings ==#
 # data_path: "./data"
 # log_level: "INFO"
+# mappings_url: "https://raw.githubusercontent.com/eliasbenb/PlexAniBridge-Mappings/v2/mappings.json"
 # web_enabled: true
 # web_host: "0.0.0.0"
 # web_port: 4848
