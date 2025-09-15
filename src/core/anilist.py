@@ -44,17 +44,25 @@ class AniListClient:
     API_URL = "https://graphql.anilist.co"
     BACKUP_RETENTION_DAYS = 7
 
-    def __init__(self, anilist_token: str, backup_dir: Path, dry_run: bool) -> None:
+    def __init__(
+        self,
+        anilist_token: str,
+        backup_dir: Path,
+        dry_run: bool,
+        profile_name: str,
+    ) -> None:
         """Initialize the AniList client.
 
         Args:
             anilist_token (str): Authentication token for AniList API
             backup_dir (Path): Directory path where backup files will be stored
             dry_run (bool): If True, simulates API calls without making actual changes
+            profile_name (str): Owning profile name
         """
         self.anilist_token = anilist_token
         self.backup_dir = backup_dir
         self.dry_run = dry_run
+        self.profile_name = profile_name
         self._session: aiohttp.ClientSession | None = None
 
         self.offline_anilist_entries: dict[int, Media] = {}
@@ -584,9 +592,8 @@ class AniListClient:
                     )
 
         timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-        backup_file = (
-            self.backup_dir / f"plexanibridge-{self.user.name}.{timestamp}.json"
-        )
+        backup_filename = f"plexanibridge-{self.profile_name}.{timestamp}.json"
+        backup_file = self.backup_dir / backup_filename
 
         if not backup_file.parent.exists():
             backup_file.parent.mkdir(parents=True)
@@ -607,7 +614,8 @@ class AniListClient:
 
         cutoff_date = datetime.now() - timedelta(days=self.BACKUP_RETENTION_DAYS)
 
-        for file in self.backup_dir.glob("plexanibridge-*.json"):
+        retention_pattern = f"plexanibridge-{self.profile_name}.*.json"
+        for file in self.backup_dir.glob(retention_pattern):
             file_mtime = datetime.fromtimestamp(file.stat().st_mtime)
             if file_mtime < cutoff_date:
                 file.unlink()

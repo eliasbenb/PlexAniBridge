@@ -71,6 +71,7 @@ class BridgeClient:
             anilist_token=profile_config.anilist_token,
             backup_dir=profile_config.data_path / "backups",
             dry_run=profile_config.dry_run,
+            profile_name=profile_name,
         )
 
         self.plex_client = PlexClient(

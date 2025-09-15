@@ -75,7 +75,10 @@ class BackupService:
             return []
         metas: list[BackupMeta] = []
         now = datetime.now(UTC)
-        for f in sorted(bdir.glob("plexanibridge-*.json")):
+
+        anilist_client = self._get_profile_bridge(profile).anilist_client
+
+        for f in sorted(bdir.glob(f"plexanibridge-{profile}.*.json")):
             try:
                 parts = f.name.split(".")
                 ts_raw = parts[-2] if len(parts) >= 2 else None
@@ -95,11 +98,7 @@ class BackupService:
                         created_at=dt,
                         size_bytes=f.stat().st_size,
                         entries=None,  # Can be populated on demand
-                        user=(
-                            f.name.split("-")[1].split(".")[0]
-                            if "-" in f.name
-                            else None
-                        ),
+                        user=anilist_client.user.name,
                         age_seconds=(now - dt).total_seconds(),
                     )
                 )
