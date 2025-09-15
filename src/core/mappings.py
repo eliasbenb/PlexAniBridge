@@ -21,17 +21,23 @@ AniMapDict: TypeAlias = dict[str, dict[str, Any]]
 class MappingsClient:
     """Load mappings from files or URLs and merge them together."""
 
-    SCHEMA_VERSION = "v2"
-    CDN_URL = f"https://raw.githubusercontent.com/eliasbenb/PlexAniBridge-Mappings/{SCHEMA_VERSION}/mappings.json"
     MAPPING_FILES: ClassVar[list[str]] = [
         "mappings.custom.json",
         "mappings.custom.yaml",
         "mappings.custom.yml",
     ]
 
-    def __init__(self, data_path: Path) -> None:
-        """Initialize the MappingsClient with the data path."""
+    def __init__(self, data_path: Path, upstream_url: str | None) -> None:
+        """Initialize the MappingsClient with the data path.
+
+        Args:
+            data_path (Path): Path to the data directory for storing mappings and cache
+                              files.
+            upstream_url (str | None): URL to the upstream mappings source JSON or YAML
+                                      file. If None, no upstream mappings will be used.
+        """
         self.data_path = data_path
+        self.upstream_url = upstream_url
         self._loaded_sources: set[str] = set()
         self._session: aiohttp.ClientSession | None = None
 
@@ -398,6 +404,19 @@ class MappingsClient:
         """
         self._loaded_sources = set()
 
+        if self.upstream_url is not None:
+            log.debug(
+                f"{self.__class__.__name__}: Using upstream mappings URL "
+                f"$$'{self.upstream_url}'$$"
+            )
+            db_mappings = await self._load_mappings(str(self.upstream_url))
+        else:
+            log.debug(
+                f"{self.__class__.__name__}: No upstream mappings URL configured, "
+                f"skipping"
+            )
+            db_mappings = {}
+
         existing_custom_mapping_files = [
             f for f in self.MAPPING_FILES if (self.data_path / f).exists()
         ]
@@ -418,7 +437,6 @@ class MappingsClient:
                 f"at a time. Defaulting to $$'{custom_mappings_path}'$$"
             )
 
-        db_mappings = await self._load_mappings(self.CDN_URL)
         merged_mappings = self._deep_merge(db_mappings, custom_mappings)
 
         return {k: v for k, v in merged_mappings.items() if not k.startswith("$")}

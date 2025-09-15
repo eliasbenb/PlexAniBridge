@@ -317,6 +317,24 @@ Sets logging verbosity for the entire application.
 
 ---
 
+### `PAB_MAPPINGS_URL`
+
+`str` (Optional, default: `https://raw.githubusercontent.com/eliasbenb/PlexAniBridge-Mappings/v2/mappings.json`)
+
+URL to the upstream mappings source. This can be a JSON or YAML file.
+
+This option is only intended for advanced users who want to use their own upstream mappings source or disable upstream mappings entirely. For most users, it is recommended to keep the default value.
+
+!!! note "Custom Mappings"
+
+    This setting works in tandem with custom mappings stored in the `mappings/` directory inside the data path. Custom mappings will override any upstream mappings.
+
+??? tip "Disabling Upstream Mappings"
+
+    To disable upstream mappings, set this to an empty string: `""`.
+
+---
+
 ### `PAB_WEB_ENABLED`
 
 `bool` (Optional, default: `True`)

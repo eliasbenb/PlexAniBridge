@@ -34,15 +34,18 @@ class AniMapClient:
         https://github.com/eliasbenb/PlexAniBridge-Mappings
     """
 
-    def __init__(self, data_path: Path) -> None:
+    def __init__(self, data_path: Path, upstream_url: str | None) -> None:
         """Initializes the AniMapClient.
 
         Args:
             data_path (Path): Path to the data directory for storing mappings and cache
                               files.
+            upstream_url (str | None): URL to the upstream mappings source JSON or YAML
+                                    file. If None, no upstream mappings will be used.
         """
-        self.mappings_client = MappingsClient(data_path)
         self.data_path = data_path
+        self.upstream_url = upstream_url
+        self.mappings_client = MappingsClient(data_path, upstream_url)
 
     async def initialize(self) -> None:
         """Initialize the client by syncing the database.

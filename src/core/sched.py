@@ -197,7 +197,9 @@ class SchedulerClient:
             global_config: Global application configuration
         """
         self.global_config = global_config
-        self.shared_animap_client = AniMapClient(global_config.data_path)
+        self.shared_animap_client = AniMapClient(
+            global_config.data_path, global_config.mappings_url
+        )
         self.bridge_clients: dict[str, BridgeClient] = {}
         self.profile_schedulers: dict[str, ProfileScheduler] = {}
         self.stop_event = asyncio.Event()
