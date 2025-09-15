@@ -6,7 +6,13 @@ import os
 from enum import StrEnum
 from pathlib import Path
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_validator,
+)
 from pydantic.alias_generators import to_camel
 from pydantic_settings import (
     BaseSettings,
@@ -370,6 +376,25 @@ class PlexAnibridgeConfig(BaseSettings):
         default=LogLevel.INFO,
         description="Logging level for the application",
     )
+    mappings_url: str | None = Field(
+        default="https://raw.githubusercontent.com/eliasbenb/PlexAniBridge-Mappings/v2/mappings.json",
+        description=(
+            "URL to JSON or YAML file to use as the upstream mappings source. "
+            "If not set, no upstream mappings will be used."
+        ),
+    )
+    web_enabled: bool = Field(
+        default=True,
+        description="Enable embedded FastAPI web UI server",
+    )
+    web_host: str = Field(
+        default="0.0.0.0",
+        description="Web server listen host",
+    )
+    web_port: int = Field(
+        default=4848,
+        description="Web server listen port",
+    )
 
     anilist_token: str | None = Field(
         default=None,
@@ -439,18 +464,6 @@ class PlexAnibridgeConfig(BaseSettings):
         le=100,
         description="Global default search fallback threshold",
     )
-    web_enabled: bool = Field(
-        default=True,
-        description="Enable embedded FastAPI web UI server",
-    )
-    web_host: str = Field(
-        default="0.0.0.0",
-        description="Web server listen host",
-    )
-    web_port: int = Field(
-        default=4848,
-        description="Web server listen port",
-    )
 
     @staticmethod
     def _shared_profile_fields() -> set[str]:
@@ -481,6 +494,18 @@ class PlexAnibridgeConfig(BaseSettings):
                 raise ValueError(
                     f"Invalid configuration for profile '{profile_name}': {e}"
                 ) from e
+
+    @field_validator("mappings_url")
+    @classmethod
+    def validate_mappings_url(cls, v: str | None) -> str | None:
+        """Validate the mappings_url field format."""
+        if not v:
+            return None
+        if not (v.startswith("http://") or v.startswith("https://")):
+            raise ValueError("mappings_url must start with http:// or https://")
+        if not (v.endswith(".json") or v.endswith(".yaml") or v.endswith(".yml")):
+            raise ValueError("mappings_url must point to a .json, .yaml, or .yml file")
+        return v
 
     @field_validator("profiles", mode="before")
     @classmethod
