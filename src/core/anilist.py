@@ -21,6 +21,7 @@ from src.models.schemas.anilist import (
     MediaList,
     MediaListCollection,
     MediaListCollectionWithMedia,
+    MediaListGroup,
     MediaListWithMedia,
     MediaStatus,
     User,
@@ -599,12 +600,33 @@ class AniListClient:
             backup_file.parent.mkdir(parents=True)
 
         # To compress the backup file, remove the unecessary media field from each entry
+        sanitized_lists: list[MediaListGroup] = []
+        for li in data.lists:
+            sanitized_entries: list[MediaList] = []
+            for entry in li.entries:
+                sanitized_entry = MediaList(
+                    **{
+                        field: getattr(entry, field)
+                        for field in MediaList.model_fields
+                        if hasattr(entry, field)
+                    }
+                )
+                sanitized_entries.append(sanitized_entry)
+
+            sanitized_lists.append(
+                MediaListGroup(
+                    entries=sanitized_entries,
+                    name=li.name,
+                    is_custom_list=li.is_custom_list,
+                    is_split_completed_list=li.is_split_completed_list,
+                    status=li.status,
+                )
+            )
+
         data_without_media = MediaListCollection(
-            **{
-                field: getattr(data, field)
-                for field in MediaListCollection.model_fields
-                if hasattr(data, field)
-            }
+            user=data.user,
+            lists=sanitized_lists,
+            has_next_chunk=data.has_next_chunk,
         )
 
         backup_file.write_text(data_without_media.model_dump_json())
