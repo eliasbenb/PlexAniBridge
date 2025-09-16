@@ -48,6 +48,8 @@
     let lastHistoryLinesLoaded: number | null = $state(null);
     let historyScroller: HTMLDivElement | null = $state(null);
     let liveScroller: HTMLDivElement | null = $state(null);
+    let showFiles = $state(true);
+    let isMobile = $state(false);
 
     const LEVEL_ORDER: Record<string, number> = {
         DEBUG: 10,
@@ -118,10 +120,6 @@
                 levelRank(l.level) >= minRank &&
                 (!q || (l.message || "").toLowerCase().includes(q)),
         );
-    }
-
-    function countLevel(l: string) {
-        return logs.filter((e) => e.level === l).length;
     }
 
     function scrollToBottom(which: "live" | "history") {
@@ -252,7 +250,6 @@
         }
         return v.toFixed(v < 10 ? 1 : 0) + " " + units[i];
     }
-
     function highlight(msg: string) {
         if (msg == null) return "";
         let safe = String(msg)
@@ -265,7 +262,7 @@
             (_m, inner) => `'${inner}'`,
         );
         safe = safe.replace(/\$\$\{(.*?)\}\$\$/g, (_m, inner) => `{${inner}}`);
-        return safe; // now plain text markers, no styling spans
+        return safe;
     }
 
     function switchTab(t: "live" | "history") {
@@ -301,6 +298,15 @@
         loadPrefs();
         openWs();
         refreshFiles();
+        const updateIsMobile = () => {
+            isMobile = window.innerWidth < 640; // Tailwind sm breakpoint
+            if (isMobile && tab === "history" && showFiles) {
+                showFiles = false;
+            }
+        };
+        updateIsMobile();
+        window.addEventListener("resize", updateIsMobile);
+        return () => window.removeEventListener("resize", updateIsMobile);
     });
 
     $effect(() => {
@@ -310,123 +316,84 @@
 </script>
 
 <div class="space-y-6">
-    <div
-        class="flex items-center gap-2 border-b border-slate-800/70 text-sm font-medium"
-    >
-        <button
-            type="button"
-            onclick={() => switchTab("live")}
-            class={`inline-flex h-9 items-center gap-1 rounded-t-md px-4 text-xs font-medium ${tab === "live" ? "bg-slate-800/80 text-slate-100" : "text-slate-400 hover:text-slate-200"}`}
-        >
-            <Activity class="inline h-4 w-4 text-[13px]" /> Live
-            <span
-                class="ml-1 h-1.5 w-1.5 rounded-full"
-                class:bg-emerald-400={isWsOpen}
-                class:bg-amber-400={!isWsOpen}
-            ></span>
-        </button>
-        <button
-            type="button"
-            onclick={() => switchTab("history")}
-            class={`inline-flex h-9 items-center gap-1 rounded-t-md px-4 text-xs font-medium ${tab === "history" ? "bg-slate-800/80 text-slate-100" : "text-slate-400 hover:text-slate-200"}`}
-        >
-            <FolderSearch class="inline h-4 w-4 text-[13px]" /> History
-        </button>
-        <div class="flex-1"></div>
-        <!-- Shared controls -->
-        <div class="flex items-center gap-2 py-1">
-            <div>
-                <label for="log-level" class="sr-only">Min level</label>
-                <select
-                    id="log-level"
-                    bind:value={level}
-                    onchange={applyFilter}
-                    class="h-8 rounded-md border border-slate-700/70 bg-slate-900/70 pr-7 pl-2 text-[11px] shadow-sm focus:border-slate-600 focus:bg-slate-900"
-                >
-                    <option>DEBUG</option><option>INFO</option><option>SUCCESS</option
-                    ><option>WARNING</option><option>ERROR</option>
-                </select>
-            </div>
-            <div class="relative w-56">
-                <label for="log-search" class="sr-only">Search</label>
-                <input
-                    id="log-search"
-                    bind:value={search}
-                    oninput={() => applyFilter()}
-                    placeholder="Search..."
-                    class="h-8 w-full rounded-md border border-slate-700/70 bg-slate-900/70 pr-8 pl-8 text-[11px] shadow-sm placeholder:text-slate-500 focus:border-slate-600 focus:bg-slate-900"
-                />
-                <Search
-                    class="absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-slate-500"
-                />
-                {#if search}
-                    <button
-                        aria-label="Clear search"
-                        type="button"
-                        onclick={() => ((search = ""), applyFilter())}
-                        class="absolute top-1/2 right-1 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md bg-slate-800 text-slate-300 hover:bg-slate-700"
+    <!-- Toolbar -->
+    <div class="space-y-2 border-b border-slate-800/70 py-2 text-sm font-medium">
+        <!-- Tabs -->
+        <div class="flex items-center gap-2">
+            <button
+                type="button"
+                onclick={() => switchTab("live")}
+                class={`inline-flex h-9 items-center gap-1 rounded-md px-4 text-xs font-medium ${tab === "live" ? "bg-slate-800/80 text-slate-100" : "text-slate-400 hover:text-slate-200"}`}
+            >
+                <Activity class="inline h-4 w-4 text-[13px]" /> Live
+                <span
+                    class="ml-1 h-1.5 w-1.5 rounded-full"
+                    class:bg-emerald-400={isWsOpen}
+                    class:bg-amber-400={!isWsOpen}
+                ></span>
+            </button>
+            <button
+                type="button"
+                onclick={() => switchTab("history")}
+                class={`inline-flex h-9 items-center gap-1 rounded-md px-4 text-xs font-medium ${tab === "history" ? "bg-slate-800/80 text-slate-100" : "text-slate-400 hover:text-slate-200"}`}
+            >
+                <FolderSearch class="inline h-4 w-4 text-[13px]" /> History
+            </button>
+        </div>
+        <div class="flex flex-wrap items-center justify-between gap-2">
+            <!-- Log Level + Search -->
+            <div class="flex items-center gap-2">
+                <div>
+                    <label for="log-level" class="sr-only">Min level</label>
+                    <select
+                        id="log-level"
+                        bind:value={level}
+                        onchange={applyFilter}
+                        class="h-8 rounded-md border border-slate-700/70 bg-slate-900/70 pl-2 text-[11px] shadow-sm focus:border-slate-600 focus:bg-slate-900"
                     >
-                        <X class="h-3.5 w-3.5 text-[14px]" />
+                        <option>DEBUG</option><option>INFO</option><option
+                            >SUCCESS</option
+                        ><option>WARNING</option><option>ERROR</option>
+                    </select>
+                </div>
+                <div class="relative w-full max-w-xs sm:max-w-sm md:max-w-md">
+                    <label for="log-search" class="sr-only">Search</label>
+                    <input
+                        id="log-search"
+                        bind:value={search}
+                        oninput={() => applyFilter()}
+                        placeholder="Search..."
+                        class="h-8 w-full rounded-md border border-slate-700/70 bg-slate-900/70 pr-8 pl-8 text-[11px] shadow-sm placeholder:text-slate-500 focus:border-slate-600 focus:bg-slate-900"
+                    />
+                    <Search
+                        class="absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-slate-500"
+                    />
+                    {#if search}
+                        <button
+                            aria-label="Clear search"
+                            type="button"
+                            onclick={() => ((search = ""), applyFilter())}
+                            class="absolute top-1/2 right-1 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md bg-slate-800 text-slate-300 hover:bg-slate-700"
+                        >
+                            <X class="h-3.5 w-3.5 text-[14px]" />
+                        </button>
+                    {/if}
+                </div>
+            </div>
+            <!-- Icon Buttons -->
+            <div class="flex flex-wrap items-center gap-2">
+                {#if tab === "history" && isMobile}
+                    <button
+                        type="button"
+                        aria-label="Toggle files sidebar"
+                        title={showFiles ? "Hide files list" : "Show files list"}
+                        onclick={() => (showFiles = !showFiles)}
+                        class={`inline-flex h-8 w-8 items-center justify-center rounded-md ring-1 ring-slate-700/60 transition-colors ${showFiles ? "bg-amber-600 text-white hover:bg-amber-500" : "bg-slate-800 text-amber-300 hover:bg-slate-700"}`}
+                    >
+                        <FolderSearch class="inline h-4 w-4" />
                     </button>
                 {/if}
             </div>
-            <button
-                type="button"
-                aria-label="Toggle wrap"
-                title={wrap ? "Disable wrap" : "Enable wrap"}
-                onclick={() => ((wrap = !wrap), persistPrefs())}
-                class={`inline-flex h-8 w-8 items-center justify-center rounded-md ring-1 ring-slate-700/60 ${wrap ? "bg-slate-700/80 text-slate-100" : "bg-slate-800 text-slate-300 hover:bg-slate-700"}`}
-            >
-                {#if wrap}
-                    <TextWrap class="inline h-4 w-4" />
-                {:else}
-                    <TextAlignStart class="inline h-4 w-4" />
-                {/if}
-            </button>
-            {#if tab === "live"}
-                <button
-                    type="button"
-                    aria-label="Toggle auto scroll"
-                    title={autoScroll ? "Auto-scroll enabled" : "Auto-scroll paused"}
-                    onclick={() => ((autoScroll = !autoScroll), persistPrefs())}
-                    class={`inline-flex h-8 w-8 items-center justify-center rounded-md ring-1 ring-slate-700/60 ${autoScroll ? "bg-emerald-600/90 text-white hover:bg-emerald-500" : "bg-slate-800 text-slate-300 hover:bg-slate-700"}`}
-                >
-                    {#if autoScroll}
-                        <ChevronsDown class="inline h-4 w-4" />
-                    {:else}
-                        <Pause class="inline h-4 w-4" />
-                    {/if}
-                </button>
-                <button
-                    type="button"
-                    aria-label="Download live logs"
-                    title="Download live logs"
-                    onclick={downloadLive}
-                    class="inline-flex h-8 w-8 items-center justify-center rounded-md bg-emerald-700/70 text-emerald-50 hover:bg-emerald-600"
-                >
-                    <Download class="inline h-4 w-4" />
-                </button>
-                <button
-                    type="button"
-                    aria-label="Clear live logs"
-                    title="Clear live logs"
-                    onclick={clearLive}
-                    class="inline-flex h-8 w-8 items-center justify-center rounded-md bg-slate-800 text-slate-300 hover:bg-slate-700"
-                >
-                    <Trash2 class="inline h-4 w-4" />
-                </button>
-            {/if}
-            {#if tab === "history"}
-                <button
-                    type="button"
-                    aria-label="Refresh file list"
-                    title="Refresh file list"
-                    onclick={refreshFiles}
-                    class="inline-flex h-8 w-8 items-center justify-center rounded-md bg-slate-800 text-slate-300 hover:bg-slate-700"
-                >
-                    <RefreshCw class="inline h-4 w-4" />
-                </button>
-            {/if}
         </div>
     </div>
     <div
@@ -436,25 +403,72 @@
         {#if tab === "live"}
             <div class="flex h-full flex-col">
                 <div
-                    class="flex items-center gap-2 border-b border-slate-800/60 bg-slate-950/60 px-3 py-2 text-[11px]"
+                    class="flex items-center justify-between gap-3 border-b border-slate-800/60 bg-slate-950/60 px-3 py-2 text-[11px]"
                 >
-                    <span class="text-slate-400"
-                        >Showing <span class="font-medium text-slate-200"
-                            >{filtered.length}</span
-                        >/<span class="text-slate-500">{logs.length}</span></span
-                    >
-                    <div class="ml-auto flex items-center gap-2 text-slate-500">
-                        <span class="hidden sm:inline"
-                            >{autoScroll ? "Auto-scroll on" : "Auto-scroll off"}</span
+                    <div class="flex items-center gap-3">
+                        <span class="font-medium text-slate-400">Live stream</span>
+                        <span class="text-slate-500"
+                            >{filtered.length}/{logs.length} shown</span
                         >
                         <span
                             class="h-1.5 w-1.5 rounded-md"
                             class:bg-emerald-400={isWsOpen}
                             class:bg-amber-400={!isWsOpen}
+                            title={isWsOpen ? "Connected" : "Reconnecting..."}
                         ></span>
-                        {#if lastReceived}<span class="hidden md:inline"
+                        {#if lastReceived}
+                            <span class="hidden text-slate-500 md:inline"
                                 >Updated {formatTimeAgo(lastReceived)}</span
-                            >{/if}
+                            >
+                        {/if}
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button
+                            type="button"
+                            aria-label="Clear live logs"
+                            title="Clear live logs"
+                            onclick={clearLive}
+                            class="inline-flex h-7 w-7 items-center justify-center rounded-md bg-slate-800 text-slate-300 hover:bg-slate-700"
+                        >
+                            <Trash2 class="inline h-4 w-4" />
+                        </button>
+                        <button
+                            type="button"
+                            aria-label="Toggle auto scroll"
+                            title={autoScroll
+                                ? "Auto-scroll enabled"
+                                : "Auto-scroll paused"}
+                            onclick={() => ((autoScroll = !autoScroll), persistPrefs())}
+                            class="inline-flex h-7 w-7 items-center justify-center rounded-md bg-slate-800 text-slate-300 hover:bg-slate-700"
+                        >
+                            {#if autoScroll}
+                                <ChevronsDown class="inline h-4 w-4" />
+                            {:else}
+                                <Pause class="inline h-4 w-4" />
+                            {/if}
+                        </button>
+                        <button
+                            type="button"
+                            aria-label="Toggle wrap"
+                            title={wrap ? "Disable wrap" : "Enable wrap"}
+                            onclick={() => ((wrap = !wrap), persistPrefs())}
+                            class="inline-flex h-7 w-7 items-center justify-center rounded-md bg-slate-800 text-slate-300 hover:bg-slate-700"
+                        >
+                            {#if wrap}
+                                <TextWrap class="inline h-4 w-4" />
+                            {:else}
+                                <TextAlignStart class="inline h-4 w-4" />
+                            {/if}
+                        </button>
+                        <button
+                            type="button"
+                            aria-label="Download live logs"
+                            title="Download live logs"
+                            onclick={downloadLive}
+                            class="inline-flex h-7 w-7 items-center justify-center rounded-md bg-slate-800 text-slate-300 hover:bg-slate-700"
+                        >
+                            <Download class="inline h-4 w-4" />
+                        </button>
                     </div>
                 </div>
                 <div
@@ -489,23 +503,6 @@
                             No log entries.
                         </p>{/if}
                 </div>
-                <div
-                    class="flex flex-wrap gap-2 border-t border-slate-800/60 bg-slate-950/50 p-2 text-[11px] text-slate-400"
-                    class:hidden={!logs.length}
-                >
-                    <span
-                        >Total: <span class="font-medium text-slate-200"
-                            >{logs.length}</span
-                        ></span
-                    >
-                    {#each ["DEBUG", "INFO", "SUCCESS", "WARNING", "ERROR"] as lvl (lvl)}
-                        <span
-                            class={`inline-flex items-center gap-1 rounded-md border border-slate-700/60 bg-slate-800/70 px-1.5 py-0.5 ${lvl === level ? "ring-1 ring-emerald-500/40" : ""}`}
-                            >{lvl}<span class="text-slate-500">{countLevel(lvl)}</span
-                            ></span
-                        >
-                    {/each}
-                </div>
             </div>
         {/if}
         <!-- History Tab -->
@@ -536,6 +533,19 @@
                         </select>
                         <button
                             type="button"
+                            aria-label="Toggle wrap"
+                            title={wrap ? "Disable wrap" : "Enable wrap"}
+                            onclick={() => ((wrap = !wrap), persistPrefs())}
+                            class="inline-flex h-7 w-7 items-center justify-center rounded-md bg-slate-800 text-slate-300 hover:bg-slate-700"
+                        >
+                            {#if wrap}
+                                <TextWrap class="inline h-4 w-4" />
+                            {:else}
+                                <TextAlignStart class="inline h-4 w-4" />
+                            {/if}
+                        </button>
+                        <button
+                            type="button"
                             aria-label="Refresh"
                             onclick={() => currentFile && loadFile(currentFile, true)}
                             class="inline-flex h-7 w-7 items-center justify-center rounded-md bg-slate-800 text-slate-300 hover:bg-slate-700"
@@ -552,11 +562,30 @@
                     </div>
                 </div>
                 <div class="flex flex-1 overflow-hidden">
-                    <div class="flex w-64 flex-col border-r border-slate-800/60">
+                    <div
+                        class={`flex w-64 flex-col border-r border-slate-800/60 transition-transform duration-300 ease-out md:translate-x-0 ${isMobile ? "absolute inset-y-0 left-0 z-30 bg-slate-950/95 backdrop-blur-sm" : ""}`}
+                        class:-translate-x-full={!showFiles}
+                    >
                         <div
                             class="border-b border-slate-800/60 px-3 py-1 text-[10px] text-slate-500"
                         >
-                            {files.length} file{files.length === 1 ? "" : "s"}
+                            <div class="flex items-center gap-2">
+                                <span
+                                    >{files.length} file{files.length === 1
+                                        ? ""
+                                        : "s"}</span
+                                >
+                                {#if isMobile}
+                                    <button
+                                        type="button"
+                                        aria-label="Close file list"
+                                        class="ml-auto inline-flex h-6 w-6 items-center justify-center rounded-md bg-slate-800 text-slate-300 hover:bg-slate-700 sm:hidden"
+                                        onclick={() => (showFiles = false)}
+                                    >
+                                        <X class="h-3.5 w-3.5" />
+                                    </button>
+                                {/if}
+                            </div>
                         </div>
                         <div class="flex-1 divide-y divide-slate-800/60 overflow-auto">
                             {#each files as f (f.name)}
@@ -593,6 +622,13 @@
                                 </p>{/if}
                         </div>
                     </div>
+                    {#if isMobile && showFiles}
+                        <div
+                            class="fixed inset-0 z-20 bg-black/50 md:hidden"
+                            onclick={() => (showFiles = false)}
+                            aria-hidden="true"
+                        ></div>
+                    {/if}
                     <div class="flex flex-1 flex-col">
                         <div
                             bind:this={historyScroller}
