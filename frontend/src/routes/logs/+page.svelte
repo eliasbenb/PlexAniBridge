@@ -466,7 +466,7 @@
                             class={`group flex items-start gap-2 border-l-2 px-2 py-0.5 pr-3 ${entryClass(entry.level)}`}
                         >
                             <span
-                                class="w-[54px] shrink-0 text-right text-[10px] text-slate-500 tabular-nums"
+                                class="hidden w-[54px] shrink-0 text-right text-[10px] text-slate-500 tabular-nums sm:inline-block"
                                 >{formatTime(entry)}</span
                             >
                             <span
@@ -479,6 +479,9 @@
                                 class:break-words={wrap}
                                 class:whitespace-pre={!wrap}
                                 >{highlight(entry.message)}</span
+                            >
+                            <span class="text-[10px] text-slate-500 sm:hidden"
+                                >{formatTime(entry)}</span
                             >
                         </div>
                     {/each}
@@ -600,7 +603,7 @@
                                     class={`group flex items-start gap-2 border-l-2 px-2 py-0.5 pr-3 ${entryClass(entry.level)}`}
                                 >
                                     <span
-                                        class="w-[54px] shrink-0 text-right text-[10px] text-slate-500 tabular-nums"
+                                        class="hidden w-[54px] shrink-0 text-right text-[10px] text-slate-500 tabular-nums sm:inline-block"
                                         >{formatTime(entry)}</span
                                     >
                                     <span
@@ -613,6 +616,9 @@
                                         class:break-words={wrap}
                                         class:whitespace-pre={!wrap}
                                         >{highlight(entry.message)}</span
+                                    >
+                                    <span class="text-[10px] text-slate-500 sm:hidden"
+                                        >{formatTime(entry)}</span
                                     >
                                 </div>
                             {/each}

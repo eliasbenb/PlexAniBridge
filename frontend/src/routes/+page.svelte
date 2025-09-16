@@ -129,8 +129,8 @@
 
 <div class="space-y-6">
     <div class="space-y-2">
-        <div class="flex items-center justify-between">
-            <div class="space-y-1">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div class="space-y-1 sm:flex-1">
                 <div class="flex items-center gap-2">
                     <Users class="inline h-4 w-4 text-slate-300" />
                     <h2 class="text-lg font-semibold">Profiles</h2>
@@ -143,7 +143,7 @@
                 </div>
                 <p class="text-xs text-slate-400">Browse your configured profiles.</p>
             </div>
-            <div class="flex gap-2">
+            <div class="flex flex-wrap gap-2 sm:justify-end">
                 <button
                     class="inline-flex items-center gap-1 rounded-md border border-amber-600/60 bg-amber-600/30 px-3 py-1.5 text-sm font-medium text-amber-200 shadow-sm backdrop-blur-sm transition-colors hover:bg-amber-600/40 focus:ring-2 focus:ring-amber-500/40 focus:outline-none"
                     onclick={syncDatabase}
@@ -170,7 +170,7 @@
             </div>
         </div>
     </div>
-    <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+    <div class="grid grid-cols-[repeat(auto-fill,minmax(min(100%,22rem),1fr))] gap-4">
         {#if isLoading && Object.keys(profiles).length === 0}
             {#each Array(3) as _, i (i)}<!-- eslint-disable-line @typescript-eslint/no-unused-vars -->
                 <div
@@ -193,7 +193,9 @@
                 onclick={() => goTimeline(name)}
                 title={`Open timeline for ${name}`}
             >
-                <div class="flex items-start justify-between gap-2">
+                <div
+                    class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"
+                >
                     <div>
                         <div class="font-medium text-slate-100">{name}</div>
                         <div class="mt-1 text-xs text-slate-400">
@@ -211,7 +213,7 @@
                             {/if}
                         </div>
                     </div>
-                    <div class="flex shrink-0 items-start gap-2">
+                    <div class="flex flex-wrap items-start gap-2">
                         <a
                             href={resolve(`/timeline/${name}`)}
                             onclick={(e) => {

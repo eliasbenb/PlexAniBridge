@@ -85,7 +85,7 @@
 </svelte:head>
 
 <div
-    class="min-h-dvh bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-950 via-slate-950 to-slate-900 text-slate-100 antialiased selection:bg-blue-600/40 selection:text-white"
+    class="min-h-dvh overflow-x-hidden bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-950 via-slate-950 to-slate-900 text-slate-100 antialiased selection:bg-blue-600/40 selection:text-white"
 >
     <!-- Toasts -->
     <ToastHost />
@@ -182,7 +182,7 @@
     <div class="flex min-h-dvh w-full flex-col lg:pl-64">
         <!-- Top bar -->
         <header
-            class="sticky top-0 z-20 flex h-14 w-full items-center gap-3 border-b border-slate-800/80 bg-slate-950/80 px-4 backdrop-blur supports-[backdrop-filter]:bg-slate-950/65"
+            class="sticky top-0 z-20 flex h-14 w-full items-center gap-3 border-b border-slate-800/80 bg-slate-950/80 px-4 pb-[env(safe-area-inset-top)] backdrop-blur supports-[backdrop-filter]:bg-slate-950/65"
         >
             <button
                 type="button"
@@ -229,7 +229,7 @@
         </main>
         <!-- Footer -->
         <footer
-            class="mt-auto border-t border-slate-800/80 bg-slate-950/70 px-4 py-4 text-[11px] text-slate-500 backdrop-blur"
+            class="mt-auto border-t border-slate-800/80 bg-slate-950/70 px-4 py-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] text-[11px] text-slate-500 backdrop-blur"
         >
             <div
                 class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"

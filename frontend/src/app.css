@@ -46,7 +46,7 @@ body {
     @apply inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors;
 }
 .nav-link {
-    @apply flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-slate-400 transition-colors hover:bg-slate-700/40 hover:text-white;
+    @apply flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium whitespace-nowrap text-slate-400 transition-colors hover:bg-slate-700/40 hover:text-white;
 }
 .nav-link-active {
     @apply bg-slate-700/50 text-white;

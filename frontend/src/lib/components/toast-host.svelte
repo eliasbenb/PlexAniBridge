@@ -19,7 +19,7 @@
 </script>
 
 <div
-    class="pointer-events-none fixed top-16 right-4 z-[60] flex w-80 max-w-[90vw] flex-col gap-2"
+    class="pointer-events-none fixed top-20 right-2 z-[60] flex w-80 max-w-[92vw] flex-col gap-2 sm:top-16 sm:right-4"
     aria-live="assertive"
     aria-relevant="additions removals"
 >

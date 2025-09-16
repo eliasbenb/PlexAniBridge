@@ -422,8 +422,8 @@
 </script>
 
 <div class="space-y-6">
-    <div class="flex flex-wrap items-end justify-between gap-4">
-        <div class="space-y-1">
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div class="space-y-1 sm:flex-1">
             <div class="flex items-center gap-2">
                 <List class="inline h-4 w-4 text-slate-300" />
                 <h2 class="text-lg font-semibold">Mappings</h2>
@@ -432,7 +432,7 @@
                 Browse and override external ID mappings
             </p>
         </div>
-        <div class="flex items-center gap-2 text-[11px]">
+        <div class="hidden items-center gap-2 text-[11px] sm:flex">
             <div class="relative">
                 <input
                     bind:value={query}
