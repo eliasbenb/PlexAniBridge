@@ -250,20 +250,6 @@
         }
         return v.toFixed(v < 10 ? 1 : 0) + " " + units[i];
     }
-    function highlight(msg: string) {
-        if (msg == null) return "";
-        let safe = String(msg)
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;");
-        // $$'text'$$ => blue quoted text
-        safe = safe.replace(
-            /\$\$'((?:[^']|'(?!\$\$))*)'\$\$/g,
-            (_m, inner) => `'${inner}'`,
-        );
-        safe = safe.replace(/\$\$\{(.*?)\}\$\$/g, (_m, inner) => `{${inner}}`);
-        return safe;
-    }
 
     function switchTab(t: "live" | "history") {
         tab = t;
@@ -491,8 +477,7 @@
                                 class="min-w-0 flex-1 text-slate-200"
                                 class:whitespace-pre-wrap={wrap}
                                 class:break-words={wrap}
-                                class:whitespace-pre={!wrap}
-                                >{highlight(entry.message)}</span
+                                class:whitespace-pre={!wrap}>{entry.message}</span
                             >
                             <span class="text-[10px] text-slate-500 sm:hidden"
                                 >{formatTime(entry)}</span
@@ -651,7 +636,7 @@
                                         class:whitespace-pre-wrap={wrap}
                                         class:break-words={wrap}
                                         class:whitespace-pre={!wrap}
-                                        >{highlight(entry.message)}</span
+                                        >{entry.message}</span
                                     >
                                     <span class="text-[10px] text-slate-500 sm:hidden"
                                         >{formatTime(entry)}</span
