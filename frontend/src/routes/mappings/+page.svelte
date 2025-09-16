@@ -478,18 +478,65 @@
                 <span>Custom Only</span>
             </button>
             <div class="ml-auto flex items-center gap-2">
-                <label for="perPage" class="text-[11px] text-slate-400">Per Page</label>
-                <select
-                    id="perPage"
-                    bind:value={perPage}
-                    class="h-8 rounded-md border border-slate-700/70 bg-slate-950/70 px-2 text-[11px] shadow-sm focus:border-slate-600 focus:bg-slate-950"
-                    onchange={() => ((page = 1), load())}
+                <button
+                    title="New Override"
+                    aria-label="New Override"
+                    class="inline-flex h-8 items-center gap-1 rounded-md bg-emerald-600/90 px-3 text-[11px] font-medium text-emerald-50 hover:bg-emerald-500"
+                    onclick={openNew}
                 >
-                    <option value={10}>10</option>
-                    <option value={25}>25</option>
-                    <option value={50}>50</option>
-                    <option value={100}>100</option>
-                </select>
+                    <Plus class="inline h-3.5 w-3.5 text-[14px]" />
+                </button>
+            </div>
+        </div>
+        <!-- Mobile filters -->
+        <div
+            class="flex flex-col gap-3 rounded-md border border-slate-800/70 bg-slate-900/60 p-3 text-[11px] sm:hidden"
+        >
+            <div class="relative">
+                <input
+                    bind:value={query}
+                    placeholder="Search (AniList, TMDB, IMDB, etc)"
+                    aria-label="Search mappings"
+                    class="h-9 w-full rounded-md border border-slate-700/70 bg-slate-900/70 pr-10 pl-9 text-[11px] shadow-sm placeholder:text-slate-500 focus:border-slate-600 focus:bg-slate-900"
+                    onkeydown={(e) => e.key === "Enter" && ((page = 1), load())}
+                />
+                <Search
+                    class="pointer-events-none absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2 text-slate-500"
+                />
+                <button
+                    class="absolute top-1/2 right-1 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md bg-slate-800 text-slate-300 hover:bg-slate-700"
+                    aria-label="Run search"
+                    onclick={() => ((page = 1), load())}
+                >
+                    <ArrowRight class="inline h-3.5 w-3.5" />
+                </button>
+            </div>
+            <div class="flex flex-wrap items-center justify-between">
+                <button
+                    onclick={() => {
+                        customOnly = !customOnly;
+                        page = 1;
+                        load();
+                    }}
+                    class={`inline-flex h-8 items-center gap-1 rounded-md px-3 text-[11px] font-medium ring-1 ${customOnly ? "bg-emerald-600/90 text-white ring-emerald-500/40 hover:bg-emerald-500" : "bg-slate-800 text-slate-300 ring-slate-700/60 hover:bg-slate-700"}`}
+                >
+                    {#if customOnly}
+                        <Check class="inline h-3.5 w-3.5" />
+                    {:else}
+                        <svg
+                            class="inline h-3.5 w-3.5"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            ><rect x="3" y="3" width="18" height="18" rx="2" ry="2"
+                            ></rect></svg
+                        >
+                    {/if}
+                    <span>Custom Only</span>
+                </button>
                 <button
                     title="New Override"
                     aria-label="New Override"
@@ -517,185 +564,193 @@
                 >{/if}
         </div>
         <div class="flex-1 overflow-auto">
-            <table class="min-w-full align-middle text-xs">
-                <thead
-                    class="sticky top-0 z-10 bg-gradient-to-b from-slate-900/70 to-slate-900/40 text-slate-300"
-                >
-                    <tr class="divide-x divide-slate-800/70 whitespace-nowrap">
-                        <th class="px-3 py-2 text-left font-medium">Title</th>
-                        <th class="px-3 py-2 text-left font-medium">AniList</th>
-                        <th class="px-3 py-2 text-left font-medium">AniDB</th>
-                        <th class="px-3 py-2 text-left font-medium">IMDB</th>
-                        <th class="px-3 py-2 text-left font-medium">TMDB (Movie)</th>
-                        <th class="px-3 py-2 text-left font-medium">TMDB (Show)</th>
-                        <th class="px-3 py-2 text-left font-medium">TVDB</th>
-                        <th class="px-3 py-2 text-left font-medium">MAL</th>
-                        <th class="px-3 py-2 text-left font-medium">Seasons</th>
-                        <th class="px-3 py-2 text-right font-medium">Actions</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-800/60">
-                    {#each items as m (m.anilist_id)}
-                        {@const coverImage =
-                            m.anilist?.coverImage?.medium ??
-                            m.anilist?.coverImage?.large ??
-                            m.anilist?.coverImage?.extraLarge ??
-                            null}
-                        <tr class="align-top transition-colors hover:bg-slate-800/40">
-                            <td class="w-64 px-3 py-2">
-                                <div class="flex items-start gap-2">
-                                    <a
-                                        href={`https://anilist.co/anime/${m.anilist_id}`}
-                                        rel="noopener noreferrer"
-                                        target="_blank"
-                                        class="w-12 shrink-0"
-                                    >
-                                        {#if coverImage}
-                                            <img
-                                                alt={(preferredTitle(
-                                                    m.anilist?.title,
-                                                ) || "Cover") + " cover"}
-                                                loading="lazy"
-                                                src={coverImage}
-                                                class="h-16 w-12 rounded-md object-cover ring-1 ring-slate-700/60"
-                                            />
-                                        {:else}
-                                            <div
-                                                class="flex h-16 w-12 shrink-0 items-center justify-center rounded-md border border-dashed border-slate-700 bg-slate-800/30 text-[9px] text-slate-500 select-none"
-                                            >
-                                                No Art
-                                            </div>
-                                        {/if}
-                                    </a>
-                                    <div class="min-w-0 space-y-0.5">
-                                        <div class="truncate font-medium">
-                                            {#if m?.anilist?.title}
-                                                {preferredTitle(m.anilist.title)}
-                                            {:else}AniList {m.anilist_id}{/if}
-                                        </div>
-                                        {#if m.anilist && (m.anilist.format || m.anilist.status || m.anilist.episodes)}
-                                            <div
-                                                class="flex flex-wrap gap-1 text-[9px] text-slate-400"
-                                            >
-                                                {#if m.anilist.format}<span
-                                                        class="rounded bg-slate-800/70 px-1 py-0.5 tracking-wide uppercase"
-                                                        >{m.anilist.format}</span
-                                                    >{/if}
-                                                {#if m.anilist.status}<span
-                                                        class="rounded bg-slate-800/70 px-1 py-0.5 tracking-wide uppercase"
-                                                        >{m.anilist.status}</span
-                                                    >{/if}
-                                                {#if m.anilist.episodes}<span
-                                                        class="rounded bg-slate-800/70 px-1 py-0.5"
-                                                        >EP {m.anilist.episodes}</span
-                                                    >{/if}
-                                            </div>
-                                        {/if}
-                                    </div>
-                                </div>
-                            </td>
-                            <td class="px-3 py-2 font-mono"
-                                >{#if m.anilist_id}<a
-                                        rel="noopener"
-                                        target="_blank"
-                                        class="text-emerald-400 hover:underline"
-                                        href={"https://anilist.co/anime/" +
-                                            m.anilist_id}>{m.anilist_id}</a
-                                    >{:else}-{/if}</td
+            <div class="min-w-[1000px] sm:min-w-0">
+                <table class="w-full align-middle text-xs">
+                    <thead
+                        class="sticky top-0 z-10 bg-gradient-to-b from-slate-900/70 to-slate-900/40 text-slate-300"
+                    >
+                        <tr class="divide-x divide-slate-800/70 whitespace-nowrap">
+                            <th class="px-3 py-2 text-left font-medium">Title</th>
+                            <th class="px-3 py-2 text-left font-medium">AniList</th>
+                            <th class="px-3 py-2 text-left font-medium">AniDB</th>
+                            <th class="px-3 py-2 text-left font-medium">IMDB</th>
+                            <th class="px-3 py-2 text-left font-medium">TMDB (Movie)</th
                             >
-                            <td class="px-3 py-2 font-mono"
-                                >{#if m.anidb_id}<a
-                                        rel="noopener"
-                                        target="_blank"
-                                        class="text-emerald-400 hover:underline"
-                                        href={"https://anidb.net/anime/" + m.anidb_id}
-                                        >{m.anidb_id}</a
-                                    >{:else}-{/if}</td
-                            >
-                            <td class="px-3 py-2 font-mono">
-                                {#if m.imdb_id && m.imdb_id.length}{#each m.imdb_id as imdb, i (imdb)}<a
-                                            rel="noopener"
-                                            target="_blank"
-                                            class="text-emerald-400 hover:underline"
-                                            href={"https://www.imdb.com/title/" +
-                                                imdb +
-                                                "/"}>{imdb}</a
-                                        >{#if m.imdb_id && i < m.imdb_id.length - 1},
-                                        {/if}{/each}{:else}-{/if}</td
-                            >
-                            <td class="px-3 py-2 font-mono">
-                                {#if m.tmdb_movie_id && m.tmdb_movie_id.length}{#each m.tmdb_movie_id as id, i (id)}<a
-                                            rel="noopener"
-                                            target="_blank"
-                                            class="text-emerald-400 hover:underline"
-                                            href={"https://www.themoviedb.org/movie/" +
-                                                id}>{id}</a
-                                        >{#if m.tmdb_movie_id && i < m.tmdb_movie_id.length - 1},
-                                        {/if}{/each}{:else}-{/if}</td
-                            >
-                            <td class="px-3 py-2 font-mono">
-                                {#if m.tmdb_show_id && m.tmdb_show_id.length}{#each m.tmdb_show_id as id, i (id)}<a
-                                            rel="noopener"
-                                            target="_blank"
-                                            class="text-emerald-400 hover:underline"
-                                            href={"https://www.themoviedb.org/tv/" + id}
-                                            >{id}</a
-                                        >{#if m.tmdb_show_id && i < m.tmdb_show_id.length - 1},
-                                        {/if}{/each}{:else}-{/if}</td
-                            >
-                            <td class="px-3 py-2 font-mono"
-                                >{#if m.tvdb_id}<a
-                                        rel="noopener"
-                                        target="_blank"
-                                        class="text-emerald-400 hover:underline"
-                                        href={"https://thetvdb.com/?tab=series&id=" +
-                                            m.tvdb_id}>{m.tvdb_id}</a
-                                    >{:else}-{/if}</td
-                            >
-                            <td class="px-3 py-2 font-mono">
-                                {#if m.mal_id && m.mal_id.length}{#each m.mal_id as id, i (id)}<a
-                                            rel="noopener"
-                                            target="_blank"
-                                            class="text-emerald-400 hover:underline"
-                                            href={"https://myanimelist.net/anime/" + id}
-                                            >{id}</a
-                                        >{#if m.mal_id && i < m.mal_id.length - 1},
-                                        {/if}{/each}{:else}-{/if}</td
-                            >
-                            <td class="px-3 py-2 font-mono">{fmtSeasons(m)}</td>
-                            <td class="px-3 py-2 text-right whitespace-nowrap">
-                                <div class="flex justify-end gap-1">
-                                    <button
-                                        onclick={() => openEdit(m)}
-                                        class="inline-flex h-6 items-center rounded-md bg-slate-800 px-2 text-[11px] text-slate-200 hover:bg-slate-700"
-                                        >Edit</button
-                                    >
-                                    <button
-                                        onclick={() => remove(m)}
-                                        disabled={m.custom === false}
-                                        title={m.custom === false
-                                            ? "Not deletable"
-                                            : "Delete mapping"}
-                                        class="inline-flex h-6 items-center rounded-md bg-rose-700/70 px-2 text-[11px] text-rose-200 hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-35"
-                                        >Del</button
-                                    >
-                                </div>
-                            </td>
+                            <th class="px-3 py-2 text-left font-medium">TMDB (Show)</th>
+                            <th class="px-3 py-2 text-left font-medium">TVDB</th>
+                            <th class="px-3 py-2 text-left font-medium">MAL</th>
+                            <th class="px-3 py-2 text-left font-medium">Seasons</th>
+                            <th class="px-3 py-2 text-right font-medium">Actions</th>
                         </tr>
-                    {/each}
-                    {#if !items.length && !loading}
-                        <tr
-                            ><td colspan="10" class="py-8 text-center text-slate-500"
-                                >No mappings found</td
-                            ></tr
-                        >
-                    {/if}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody class="divide-y divide-slate-800/60">
+                        {#each items as m (m.anilist_id)}
+                            {@const coverImage =
+                                m.anilist?.coverImage?.medium ??
+                                m.anilist?.coverImage?.large ??
+                                m.anilist?.coverImage?.extraLarge ??
+                                null}
+                            <tr
+                                class="align-top transition-colors hover:bg-slate-800/40"
+                            >
+                                <td class="w-64 px-3 py-2">
+                                    <div class="flex items-start gap-2">
+                                        <a
+                                            href={`https://anilist.co/anime/${m.anilist_id}`}
+                                            rel="noopener noreferrer"
+                                            target="_blank"
+                                            class="w-12 shrink-0"
+                                        >
+                                            {#if coverImage}
+                                                <img
+                                                    alt={(preferredTitle(
+                                                        m.anilist?.title,
+                                                    ) || "Cover") + " cover"}
+                                                    loading="lazy"
+                                                    src={coverImage}
+                                                    class="h-16 w-12 rounded-md object-cover ring-1 ring-slate-700/60"
+                                                />
+                                            {:else}
+                                                <div
+                                                    class="flex h-16 w-12 shrink-0 items-center justify-center rounded-md border border-dashed border-slate-700 bg-slate-800/30 text-[9px] text-slate-500 select-none"
+                                                >
+                                                    No Art
+                                                </div>
+                                            {/if}
+                                        </a>
+                                        <div class="min-w-0 space-y-0.5">
+                                            <div class="truncate font-medium">
+                                                {#if m?.anilist?.title}
+                                                    {preferredTitle(m.anilist.title)}
+                                                {:else}AniList {m.anilist_id}{/if}
+                                            </div>
+                                            {#if m.anilist && (m.anilist.format || m.anilist.status || m.anilist.episodes)}
+                                                <div
+                                                    class="flex flex-wrap gap-1 text-[9px] text-slate-400"
+                                                >
+                                                    {#if m.anilist.format}<span
+                                                            class="rounded bg-slate-800/70 px-1 py-0.5 tracking-wide uppercase"
+                                                            >{m.anilist.format}</span
+                                                        >{/if}
+                                                    {#if m.anilist.status}<span
+                                                            class="rounded bg-slate-800/70 px-1 py-0.5 tracking-wide uppercase"
+                                                            >{m.anilist.status}</span
+                                                        >{/if}
+                                                    {#if m.anilist.episodes}<span
+                                                            class="rounded bg-slate-800/70 px-1 py-0.5"
+                                                            >EP {m.anilist
+                                                                .episodes}</span
+                                                        >{/if}
+                                                </div>
+                                            {/if}
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-3 py-2 font-mono"
+                                    >{#if m.anilist_id}<a
+                                            rel="noopener"
+                                            target="_blank"
+                                            class="text-emerald-400 hover:underline"
+                                            href={"https://anilist.co/anime/" +
+                                                m.anilist_id}>{m.anilist_id}</a
+                                        >{:else}-{/if}</td
+                                >
+                                <td class="px-3 py-2 font-mono"
+                                    >{#if m.anidb_id}<a
+                                            rel="noopener"
+                                            target="_blank"
+                                            class="text-emerald-400 hover:underline"
+                                            href={"https://anidb.net/anime/" +
+                                                m.anidb_id}>{m.anidb_id}</a
+                                        >{:else}-{/if}</td
+                                >
+                                <td class="px-3 py-2 font-mono">
+                                    {#if m.imdb_id && m.imdb_id.length}{#each m.imdb_id as imdb, i (imdb)}<a
+                                                rel="noopener"
+                                                target="_blank"
+                                                class="text-emerald-400 hover:underline"
+                                                href={"https://www.imdb.com/title/" +
+                                                    imdb +
+                                                    "/"}>{imdb}</a
+                                            >{#if m.imdb_id && i < m.imdb_id.length - 1},
+                                            {/if}{/each}{:else}-{/if}</td
+                                >
+                                <td class="px-3 py-2 font-mono">
+                                    {#if m.tmdb_movie_id && m.tmdb_movie_id.length}{#each m.tmdb_movie_id as id, i (id)}<a
+                                                rel="noopener"
+                                                target="_blank"
+                                                class="text-emerald-400 hover:underline"
+                                                href={"https://www.themoviedb.org/movie/" +
+                                                    id}>{id}</a
+                                            >{#if m.tmdb_movie_id && i < m.tmdb_movie_id.length - 1},
+                                            {/if}{/each}{:else}-{/if}</td
+                                >
+                                <td class="px-3 py-2 font-mono">
+                                    {#if m.tmdb_show_id && m.tmdb_show_id.length}{#each m.tmdb_show_id as id, i (id)}<a
+                                                rel="noopener"
+                                                target="_blank"
+                                                class="text-emerald-400 hover:underline"
+                                                href={"https://www.themoviedb.org/tv/" +
+                                                    id}>{id}</a
+                                            >{#if m.tmdb_show_id && i < m.tmdb_show_id.length - 1},
+                                            {/if}{/each}{:else}-{/if}</td
+                                >
+                                <td class="px-3 py-2 font-mono"
+                                    >{#if m.tvdb_id}<a
+                                            rel="noopener"
+                                            target="_blank"
+                                            class="text-emerald-400 hover:underline"
+                                            href={"https://thetvdb.com/?tab=series&id=" +
+                                                m.tvdb_id}>{m.tvdb_id}</a
+                                        >{:else}-{/if}</td
+                                >
+                                <td class="px-3 py-2 font-mono">
+                                    {#if m.mal_id && m.mal_id.length}{#each m.mal_id as id, i (id)}<a
+                                                rel="noopener"
+                                                target="_blank"
+                                                class="text-emerald-400 hover:underline"
+                                                href={"https://myanimelist.net/anime/" +
+                                                    id}>{id}</a
+                                            >{#if m.mal_id && i < m.mal_id.length - 1},
+                                            {/if}{/each}{:else}-{/if}</td
+                                >
+                                <td class="px-3 py-2 font-mono">{fmtSeasons(m)}</td>
+                                <td class="px-3 py-2 text-right whitespace-nowrap">
+                                    <div class="flex justify-end gap-1">
+                                        <button
+                                            onclick={() => openEdit(m)}
+                                            class="inline-flex h-6 items-center rounded-md bg-slate-800 px-2 text-[11px] text-slate-200 hover:bg-slate-700"
+                                            >Edit</button
+                                        >
+                                        <button
+                                            onclick={() => remove(m)}
+                                            disabled={m.custom === false}
+                                            title={m.custom === false
+                                                ? "Not deletable"
+                                                : "Delete mapping"}
+                                            class="inline-flex h-6 items-center rounded-md bg-rose-700/70 px-2 text-[11px] text-rose-200 hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-35"
+                                            >Del</button
+                                        >
+                                    </div>
+                                </td>
+                            </tr>
+                        {/each}
+                        {#if !items.length && !loading}
+                            <tr
+                                ><td
+                                    colspan="10"
+                                    class="py-8 text-center text-slate-500"
+                                    >No mappings found</td
+                                ></tr
+                            >
+                        {/if}
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
-    {#if pages > 1}
-        <div class="flex flex-wrap items-center gap-2 text-xs">
+    <div class="mt-3 flex flex-wrap items-center gap-2 text-xs">
+        {#if pages > 1}
             <button
                 onclick={() => page > 1 && (page--, load())}
                 disabled={page === 1}
@@ -719,8 +774,24 @@
                 class="rounded-md bg-slate-800 px-3 py-1.5 hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
                 >Next</button
             >
-        </div>
-    {/if}
+        {/if}
+        <span class="ml-auto flex items-center gap-2">
+            <label for="perPageBottom" class="text-[11px] text-slate-400"
+                >Per Page</label
+            >
+            <select
+                id="perPageBottom"
+                bind:value={perPage}
+                class="h-8 rounded-md border border-slate-700/70 bg-slate-950/70 px-2 text-[11px] shadow-sm focus:border-slate-600 focus:bg-slate-950"
+                onchange={() => ((page = 1), load())}
+            >
+                <option value={10}>10</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+            </select>
+        </span>
+    </div>
 
     {#if modal}
         <div
