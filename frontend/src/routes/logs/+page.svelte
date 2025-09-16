@@ -250,6 +250,27 @@
         }
         return v.toFixed(v < 10 ? 1 : 0) + " " + units[i];
     }
+    function highlightLog(msg: string) {
+        if (msg == null) return "";
+        let safe = String(msg)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;");
+
+        // $$'text'$$ => highlighted (light up)
+        safe = safe.replace(
+            /\$\$'((?:[^']|'(?!\$\$))*)'\$\$/g,
+            (_m, inner) => `<span class="text-sky-300 font-semibold">'${inner}'</span>`,
+        );
+
+        // $${...}$$ => greyed out
+        safe = safe.replace(
+            /\$\$\{((?:[^}]|\}(?!\$\$))*)\}\$\$/g,
+            (_m, inner) => `<span class="text-slate-500">{${inner}}</span>`,
+        );
+
+        return safe;
+    }
 
     function switchTab(t: "live" | "history") {
         tab = t;
@@ -477,7 +498,10 @@
                                 class="min-w-0 flex-1 text-slate-200"
                                 class:whitespace-pre-wrap={wrap}
                                 class:break-words={wrap}
-                                class:whitespace-pre={!wrap}>{entry.message}</span
+                                class:whitespace-pre={!wrap}
+                            >
+                                <!-- eslint-disable-next-line svelte/no-at-html-tags -->
+                                {@html highlightLog(entry.message)}</span
                             >
                             <span class="text-[10px] text-slate-500 sm:hidden"
                                 >{formatTime(entry)}</span
