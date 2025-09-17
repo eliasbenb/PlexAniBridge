@@ -68,61 +68,28 @@ router = APIRouter()
 
 @router.get(
     "/settings",
-    summary="Return sanitized configuration",
+    summary="Return serialized configuration",
     response_model=SettingsResponse,
 )
 async def api_settings() -> SettingsResponse:
-    """Get sanitized configuration.
-
-    Sensitive token-like fields are masked. Private/underscore keys and some
-    large raw fields are omitted to keep the payload lean.
+    """Return the current application configuration as JSON.
 
     Returns:
-        dict[str, Any]: The sanitized configuration.
+        dict[str, Any]: The serialized configuration.
     """
     scheduler = app_state.scheduler
     if not scheduler:
         return SettingsResponse(global_config={}, profiles=[])
 
-    secret_keys = {"anilist_token", "plex_token"}
-    skip_keys = {"raw_profiles"}
-
-    def _sanitize_mapping(d: dict[str, Any]) -> dict[str, Any]:
-        cleaned: dict[str, Any] = {}
-        for k, v in d.items():
-            if k in skip_keys or k.startswith("_"):
-                continue
-
-            if k in secret_keys:
-                _v = str(v)
-                if not _v:
-                    cleaned[k] = None
-                elif len(_v) > 6:
-                    cleaned[k] = _v[:3] + "************************"
-                continue
-
-            cleaned[k] = None if v in (None, "") else v
-
-        return cleaned
-
-    raw_dump = scheduler.global_config.model_dump(mode="json")
-
-    global_config = {
-        k: v for k, v in _sanitize_mapping(raw_dump).items() if k not in {"profiles"}
-    }
-
-    profiles: list[dict[str, Any]] = []
-    for name, pdata in raw_dump.get("profiles", {}).items():
-        prof = {"name": name, "settings": _sanitize_mapping(pdata)}
-        prof["settings"] = dict(sorted(prof["settings"].items(), key=lambda kv: kv[0]))
-        profiles.append(prof)
-
-    global_config = dict(sorted(global_config.items(), key=lambda kv: kv[0]))
-    profiles.sort(key=lambda p: p["name"])
-    return SettingsResponse(
-        global_config=global_config,
-        profiles=[SettingsProfileModel(**p) for p in profiles],
+    global_config = scheduler.global_config.model_dump(
+        mode="json", exclude={"profiles"}
     )
+    profiles = [
+        SettingsProfileModel(name=name, settings=pdata.model_dump(mode="json"))
+        for name, pdata in scheduler.global_config.profiles.items()
+    ]
+
+    return SettingsResponse(global_config=global_config, profiles=profiles)
 
 
 @router.get(
