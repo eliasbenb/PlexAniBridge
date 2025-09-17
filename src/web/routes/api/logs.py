@@ -108,13 +108,18 @@ def _tail_lines(path: Path, max_lines: int) -> list[str]:
 
     Args:
         path (Path): The path to the log file.
-        max_lines (int): The maximum number of lines to return.
+        max_lines (int): The maximum number of lines to return. If 0, return all lines.
 
     Returns:
-        list[str]: The last max_lines lines of the file.
+        list[str]: The last max_lines lines of the file (oldest first). If
+                   max_lines == 0, return all lines.
     """
-    if max_lines <= 0:
+    if max_lines < 0:
         return []
+
+    if max_lines == 0:
+        with path.open("r", encoding="utf-8", errors="replace") as fh:
+            return [ln.rstrip("\n\r") for ln in fh.readlines()]
 
     # Read in binary for efficiency, then decode assuming UTF-8.
     chunk_size = 8192
@@ -126,7 +131,7 @@ def _tail_lines(path: Path, max_lines: int) -> list[str]:
         buffer = b""
         pos = file_size
 
-        while pos > 0 and len(lines) <= max_lines:
+        while pos > 0 and len(lines) < max_lines:
             read_size = min(chunk_size, pos)
             pos -= read_size
             fh.seek(pos)
@@ -147,7 +152,7 @@ def _tail_lines(path: Path, max_lines: int) -> list[str]:
             except Exception:
                 lines.append("")
 
-    return list(reversed(lines[-max_lines:]))
+    return list(reversed(lines[:max_lines]))
 
 
 @router.get(
@@ -156,7 +161,7 @@ def _tail_lines(path: Path, max_lines: int) -> list[str]:
     response_model=list[LogEntryModel],
 )
 async def get_log_file(
-    name: str, lines: int = Query(500, ge=1, le=10000)
+    name: str, lines: int = Query(500, ge=0, le=2000)
 ) -> list[LogEntryModel]:
     """Return the last N lines of a log file parsed into JSON entries.
 

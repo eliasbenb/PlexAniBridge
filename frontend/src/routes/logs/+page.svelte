@@ -349,7 +349,7 @@
         </div>
         <div class="flex flex-wrap items-center justify-between gap-2">
             <!-- Log Level + Search -->
-            <div class="flex items-center gap-2">
+            <div class="flex w-full items-center gap-2">
                 <div>
                     <label for="log-level" class="sr-only">Min level</label>
                     <select
@@ -536,6 +536,7 @@
                             onchange={() => currentFile && loadFile(currentFile)}
                             class="h-7 rounded-md border border-slate-700/60 bg-slate-900/70 px-1 text-[11px]"
                         >
+                            <option value={0}>All lines</option>
                             {#each [100, 250, 500, 1000, 2000] as n (n)}
                                 <option value={n}>{n} lines</option>
                             {/each}
