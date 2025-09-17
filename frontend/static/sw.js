@@ -1,7 +1,5 @@
 const CACHE_NAME = "pab-cache-v1";
 const ASSETS = [
-    "/",
-    "/index.html",
     "/pwa-192x192.png",
     "/pwa-512x512.png",
     "/pwa-maskable-192x192.png",
