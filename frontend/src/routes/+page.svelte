@@ -216,9 +216,6 @@
                     <div class="flex flex-wrap items-start gap-2">
                         <a
                             href={resolve(`/timeline/${name}`)}
-                            onclick={(e) => {
-                                e.stopPropagation();
-                            }}
                             class="inline-flex items-center gap-1 rounded-md border border-indigo-600/60 bg-indigo-600/30 px-2 py-1 text-[11px] font-medium text-indigo-200 shadow-sm hover:bg-indigo-600/40"
                         >
                             <span>Timeline</span>
