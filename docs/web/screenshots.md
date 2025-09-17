@@ -14,12 +14,7 @@ icon: material/monitor-shimmer
 ## Mappings
 
 ![Mappings Screenshot](../img/screenshots/mappings.png)
-![Mappings Edit Screenshot](../img/screenshots/mappings-edit.png)
 
 ## Logs
 
 ![Logs Screenshot](../img/screenshots/logs.png)
-
-## Settings
-
-![Settings Screenshot](../img/screenshots/settings.png)
