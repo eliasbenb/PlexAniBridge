@@ -359,8 +359,11 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         if is_all_watched:
             return MediaListStatus.COMPLETED
         # We've watched some episodes recently and have more remaining
-        if is_on_continue_watching:
+        if is_partially_watched and is_on_continue_watching:
             return MediaListStatus.CURRENT
+        # We've not watched any episodes but the season is next up in continue watching
+        if is_on_continue_watching:
+            return MediaListStatus.PLANNING
 
         is_in_deck_window = any(
             e.lastViewedAt + self.plex_client.on_deck_window > datetime.now()
