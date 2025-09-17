@@ -339,6 +339,12 @@
     let undoLoading: Record<number, boolean> = $state({});
 
     async function undoHistory(item: HistoryItem) {
+        if (
+            !confirm(
+                "Undo this history entry? This will revert the changes made by this entry on AniList.",
+            )
+        )
+            return;
         if (undoLoading[item.id]) return;
         if (!canUndo(item)) return toast("Undo not available for this entry", "warn");
         undoLoading[item.id] = true;
