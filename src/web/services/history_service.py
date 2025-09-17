@@ -114,7 +114,7 @@ class HistoryService:
         # Use proper Plex API headers schema
         headers = {
             "Accept": "application/json",
-            "X-Plex-Token": bridge.profile_config.plex_token,
+            "X-Plex-Token": bridge.profile_config.plex_token.get_secret_value(),
         }
 
         try:
