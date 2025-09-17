@@ -10,6 +10,7 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
+    SecretStr,
     field_validator,
     model_validator,
 )
@@ -187,11 +188,11 @@ class PlexAnibridgeProfileConfig(BaseModel):
     Represents one sync profile with one Plex user and one AniList account.
     """
 
-    anilist_token: str = Field(
+    anilist_token: SecretStr = Field(
         ...,
         description="AniList API token for authentication",
     )
-    plex_token: str = Field(
+    plex_token: SecretStr = Field(
         ...,
         description="Plex API token for authentication",
     )
@@ -284,27 +285,6 @@ class PlexAnibridgeProfileConfig(BaseModel):
         """Get the global log level from parent config."""
         return self.parent.log_level
 
-    def __str__(self) -> str:
-        """Creates a human-readable representation of the configuration.
-
-        Returns:
-            str: Comma-separated list of key-value pairs with sensitive
-                 values masked
-        """
-        secrets = ["anilist_token", "plex_token"]
-        values: list[str] = []
-        for key in self.__class__.model_fields:
-            if key.startswith("_"):
-                continue
-            value = getattr(self, key)
-            if value is None:
-                continue
-            if key in secrets:
-                values.append(f"{key}: {'*' * 16}")
-            else:
-                values.append(f"{key}: {value}")
-        return ", ".join(values)
-
     model_config = ConfigDict(extra="forbid")
 
     @model_validator(mode="before")
@@ -396,11 +376,11 @@ class PlexAnibridgeConfig(BaseSettings):
         description="Web server listen port",
     )
 
-    anilist_token: str | None = Field(
+    anilist_token: SecretStr | None = Field(
         default=None,
         description="Global default AniList API token",
     )
-    plex_token: str | None = Field(
+    plex_token: SecretStr | None = Field(
         default=None,
         description="Global default Plex API token",
     )

@@ -68,14 +68,14 @@ class BridgeClient:
         self.animap_client = shared_animap_client
 
         self.anilist_client = AniListClient(
-            anilist_token=profile_config.anilist_token,
+            anilist_token=profile_config.anilist_token.get_secret_value(),
             backup_dir=profile_config.data_path / "backups",
             dry_run=profile_config.dry_run,
             profile_name=profile_name,
         )
 
         self.plex_client = PlexClient(
-            plex_token=profile_config.plex_token,
+            plex_token=profile_config.plex_token.get_secret_value(),
             plex_user=profile_config.plex_user,
             plex_url=profile_config.plex_url,
             plex_sections=profile_config.plex_sections,
