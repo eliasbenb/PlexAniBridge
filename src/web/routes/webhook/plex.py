@@ -94,7 +94,7 @@ async def plex_webhook(
     log.info(
         f"Webhook: Received Plex event {payload.event} with "
         f"rating_key={payload.top_level_rating_key} "
-        f"target_profiles={profiles}"
+        f"target_profiles={', '.join(p[0] for p in profiles)}",
     )
 
     success = False
