@@ -3,7 +3,7 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from src.web.state import app_state
+from src.web.state import get_app_state
 
 __all__ = ["router"]
 
@@ -41,7 +41,7 @@ async def status() -> StatusResponse:
     Returns:
         dict[str, Any]: The status of the application.
     """
-    scheduler = app_state.scheduler
+    scheduler = get_app_state().scheduler
     if not scheduler:
         return StatusResponse(profiles={})
     raw = await scheduler.get_status()

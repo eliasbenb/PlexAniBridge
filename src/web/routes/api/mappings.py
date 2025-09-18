@@ -10,7 +10,7 @@ from src.config.database import db
 from src.models.db.animap import AniMap
 from src.models.schemas.anilist import MediaWithoutList as AniListMetadata
 from src.web.services.mappings_store import get_mappings_store
-from src.web.state import app_state
+from src.web.state import get_app_state
 
 __all__ = ["router"]
 
@@ -114,7 +114,7 @@ async def list_mappings(
             )
         where_clauses.append(AniMap.anilist_id.in_(custom_ids))
 
-    with db as ctx:
+    with db() as ctx:
         base_query = select(AniMap)
         count_query = select(func.count()).select_from(AniMap)
         if where_clauses:
@@ -130,13 +130,15 @@ async def list_mappings(
         )
         rows = ctx.session.execute(base_query).scalars().all()
 
+    scheduler = get_app_state().scheduler
+
     items = list(rows)
 
     enriched_map: dict[int, AniListMetadata] = {}
-    if with_anilist and app_state.scheduler and app_state.scheduler.bridge_clients:
-        first_bridge = next(iter(app_state.scheduler.bridge_clients.values()))
+    if with_anilist and scheduler and scheduler.bridge_clients:
+        first_bridge = next(iter(scheduler.bridge_clients.values()))
         try:
-            medias = await first_bridge.anilist_client.batch_get_anime(  # type: ignore[arg-type]
+            medias = await first_bridge.anilist_client.batch_get_anime(
                 [it.anilist_id for it in items if it.anilist_id]
             )
             for m in medias:
@@ -192,10 +194,11 @@ async def create_mapping(mapping: dict[str, Any]) -> MappingItemModel:
         dict[str, Any]: The created mapping.
     """
     store = get_mappings_store()
+    scheduler = get_app_state().scheduler
     res = store.upsert(mapping)
-    if not app_state.scheduler:
+    if not scheduler:
         raise HTTPException(503, "Scheduler not available")
-    await app_state.scheduler.shared_animap_client._sync_db()
+    await scheduler.shared_animap_client._sync_db()
 
     res_obj = MappingItemModel(**res)
     return res_obj
@@ -213,11 +216,12 @@ async def update_mapping(mapping_id: int, mapping: dict[str, Any]) -> MappingIte
         dict[str, Any]: The updated mapping.
     """
     store = get_mappings_store()
+    scheduler = get_app_state().scheduler
     mapping["anilist_id"] = mapping_id
     res = store.upsert(mapping)
-    if not app_state.scheduler:
+    if not scheduler:
         raise HTTPException(503, "Scheduler not available")
-    await app_state.scheduler.shared_animap_client._sync_db()
+    await scheduler.shared_animap_client._sync_db()
     return MappingItemModel(**res)
 
 
@@ -249,9 +253,10 @@ async def delete_mapping(mapping_id: int) -> DeleteMappingResponse:
         dict[str, Any]: A confirmation message.
     """
     store = get_mappings_store()
+    scheduler = get_app_state().scheduler
     if not store.delete(mapping_id):
         raise HTTPException(404, "Not found")
-    if not app_state.scheduler:
+    if not scheduler:
         raise HTTPException(503, "Scheduler not available")
-    await app_state.scheduler.shared_animap_client._sync_db()
+    await scheduler.shared_animap_client._sync_db()
     return DeleteMappingResponse(ok=True)

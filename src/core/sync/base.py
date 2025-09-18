@@ -218,7 +218,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             _after_state.model_dump(mode="json") if _after_state is not None else None
         )
 
-        with db as ctx:
+        with db() as ctx:
             if outcome == SyncOutcome.SKIPPED:
                 # If skipped, no need to create a history record
                 return

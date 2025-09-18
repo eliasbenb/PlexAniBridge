@@ -116,7 +116,7 @@ class AniMapClient:
                 return None
             return [value] if not isinstance(value, list) else value
 
-        with db as ctx:
+        with db() as ctx:
             last_mappings_hash = ctx.session.get(Housekeeping, "animap_mappings_hash")
 
             animap_defaults = {column.name: None for column in AniMap.__table__.columns}
@@ -323,7 +323,7 @@ class AniMapClient:
             """
             return func.json_type(field, f"$.{key}").is_not(None)
 
-        with db as ctx:
+        with db() as ctx:
             or_conditions = []
             and_conditions = []
 

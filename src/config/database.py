@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from functools import lru_cache
 from pathlib import Path
 from types import TracebackType
 
 from sqlalchemy import create_engine, event
+from sqlalchemy.connectors.aioodbc import AsyncAdapt_aioodbc_connection
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -88,7 +90,8 @@ class PlexAniBridgeDB:
         )
 
         @event.listens_for(engine, "connect")
-        def _set_sqlite_pragma(dbapi_connection, _connection_record):
+        def _set_sqlite_pragma(dbapi_connection: AsyncAdapt_aioodbc_connection, _):
+            """Set SQLite PRAGMA settings on new connections."""
             cur = dbapi_connection.cursor()
             try:
                 cur.execute("PRAGMA journal_mode=WAL;")
@@ -148,4 +151,13 @@ class PlexAniBridgeDB:
         return self._session
 
 
-db = PlexAniBridgeDB(config.data_path)
+@lru_cache(maxsize=1)
+def db() -> PlexAniBridgeDB:
+    """Get the singleton instance of the PlexAniBridgeDB.
+
+    Uses LRU caching to ensure only one instance is created and reused.
+
+    Returns:
+        PlexAniBridgeDB: The singleton database manager instance
+    """
+    return PlexAniBridgeDB(config.data_path)

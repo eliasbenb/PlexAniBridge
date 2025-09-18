@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from src import log
 from src.config.settings import SyncMode
 from src.models.schemas.plex import PlexWebhook, PlexWebhookEventType
-from src.web.state import app_state
+from src.web.state import get_app_state
 
 __all__ = ["router"]
 
@@ -56,7 +56,7 @@ async def plex_webhook(
     Returns:
         A dictionary containing the result of the webhook processing.
     """
-    scheduler = app_state.scheduler
+    scheduler = get_app_state().scheduler
     if not scheduler:
         log.warning("Webhook: Scheduler not available")
         raise HTTPException(503, "Scheduler not available")

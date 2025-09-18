@@ -9,14 +9,16 @@ from __future__ import annotations
 
 import contextlib
 import json
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, ClassVar
 
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
 
-from src import log
-from src.config import config
+from src import config, log
+
+__all__ = ["MappingsStore", "get_mappings_store"]
 
 
 class MappingsStore:
@@ -217,16 +219,11 @@ class MappingsStore:
         return [int(k) for k in self._cache]
 
 
-_mappings_store: MappingsStore | None = None
-
-
+@lru_cache(maxsize=1)
 def get_mappings_store() -> MappingsStore:
-    """Get the global mappings store instance.
+    """Get the singleton MappingsStore instance.
 
     Returns:
-        MappingsStore: The global mappings store instance.
+        MappingsStore: The mappings store instance.
     """
-    global _mappings_store
-    if _mappings_store is None:
-        _mappings_store = MappingsStore(config.data_path)
-    return _mappings_store
+    return MappingsStore(config.data_path)

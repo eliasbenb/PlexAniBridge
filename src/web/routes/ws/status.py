@@ -4,7 +4,9 @@ import asyncio
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from src.web.state import app_state
+from src.web.state import get_app_state
+
+__all__ = ["router"]
 
 router = APIRouter()
 
@@ -19,7 +21,7 @@ async def status_ws(ws: WebSocket) -> None:
     await ws.accept()
     try:
         while True:
-            scheduler = app_state.scheduler
+            scheduler = get_app_state().scheduler
             data = (
                 {"profiles": await scheduler.get_status()}
                 if scheduler

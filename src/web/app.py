@@ -17,8 +17,8 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from src import log
 from src.core.sched import SchedulerClient
 from src.web.routes import router
-from src.web.services.logging_handler import log_ws_handler
-from src.web.state import app_state
+from src.web.services.logging_handler import get_log_ws_handler
+from src.web.state import get_app_state
 
 FRONTEND_BUILD_DIR = Path(__file__).parent.parent.parent / "frontend" / "build"
 
@@ -93,19 +93,20 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
     if scheduler is None:
         log.info("Web: No scheduler passed; external lifecycle management expected")
     else:
-        app_state.set_scheduler(scheduler)
+        get_app_state().set_scheduler(scheduler)
         if not scheduler._running:
             await scheduler.initialize()
             await scheduler.start()
             log.success("Web: Scheduler started for web UI")
 
     root_logger = log
+    log_ws_handler = get_log_ws_handler()
     if log_ws_handler not in root_logger.handlers:
         root_logger.addHandler(log_ws_handler)
     try:
         yield
     finally:
-        await app_state.shutdown()
+        await get_app_state().shutdown()
         if scheduler and scheduler._running:
             await scheduler.stop()
 
