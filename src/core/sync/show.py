@@ -1,5 +1,6 @@
 """Sync client for Plex shows to AniList."""
 
+import contextlib
 import sys
 from collections import Counter
 from collections.abc import AsyncIterator
@@ -10,7 +11,7 @@ from tzlocal import get_localzone
 
 from src import log
 from src.core.sync.base import BaseSyncClient, ParsedGuids
-from src.core.sync.stats import ItemIdentifier
+from src.core.sync.stats import ItemIdentifier, SyncOutcome
 from src.models.db.animap import AniMap
 from src.models.schemas.anilist import FuzzyDate, Media, MediaListStatus
 from src.utils.cache import gattl_cache, glru_cache
@@ -155,12 +156,24 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
                     ]
                 # A positive ratio means 1 Plex episode covers multiple AniList episodes
                 elif tvdb_mapping.ratio > 0:
-                    # Skip every ratio-th episode
-                    filtered_episodes = [
-                        e
-                        for i, e in enumerate(filtered_episodes)
-                        if i % tvdb_mapping.ratio == 0
-                    ]
+                    # We include only the "representative" episodes (every ratio-th),
+                    # but at the same time we need to mark the other episodes as
+                    # SKIPPED to reflect that they are intentionally aggregated into
+                    # another episode's mapping so coverage/logging remains accurate.
+                    included: list[Episode] = []
+                    suppressed: list[Episode] = []
+                    for i, e in enumerate(filtered_episodes):
+                        if i % tvdb_mapping.ratio == 0:
+                            included.append(e)
+                        else:
+                            suppressed.append(e)
+                    if suppressed:
+                        with contextlib.suppress(Exception):
+                            self.sync_stats.track_items(
+                                ItemIdentifier.from_items(suppressed),
+                                SyncOutcome.SKIPPED,
+                            )
+                    filtered_episodes = included
 
                 episodes.extend(filtered_episodes)
                 season_episode_counts.update({season_idx: len(filtered_episodes)})
