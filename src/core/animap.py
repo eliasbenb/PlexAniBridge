@@ -7,15 +7,16 @@ from pathlib import Path
 from typing import Any
 
 from pydantic import ValidationError
-from sqlalchemy import and_, column, delete, exists, false, func, or_, select
-from sqlalchemy.orm.base import Mapped
-from sqlalchemy.sql.elements import BinaryExpression, ColumnElement
+from sqlalchemy.sql import and_, delete, or_, select
+from sqlalchemy.sql.elements import ColumnElement
 
 from src import log
 from src.config.database import db
 from src.core.mappings import MappingsClient
 from src.models.db.animap import AniMap
 from src.models.db.housekeeping import Housekeeping
+from src.models.db.provenance import AniMapProvenance
+from src.utils.sql import json_array_contains, json_dict_has_key
 
 __all__ = ["AniMapClient"]
 
@@ -116,7 +117,7 @@ class AniMapClient:
                 return None
             return [value] if not isinstance(value, list) else value
 
-        with db as ctx:
+        with db() as ctx:
             last_mappings_hash = ctx.session.get(Housekeeping, "animap_mappings_hash")
 
             animap_defaults = {column.name: None for column in AniMap.__table__.columns}
@@ -124,6 +125,7 @@ class AniMapClient:
             invalid_count = 0
 
             mappings = await self.mappings_client.load_mappings()
+            provenance_map = self.mappings_client.get_provenance()
             tmp_mappings = mappings.copy()
 
             for key, entry in tmp_mappings.items():
@@ -226,6 +228,11 @@ class AniMapClient:
                 ctx.session.execute(
                     delete(AniMap).where(AniMap.anilist_id.in_(to_delete))
                 )
+                ctx.session.execute(
+                    delete(AniMapProvenance).where(
+                        AniMapProvenance.anilist_id.in_(to_delete)
+                    )
+                )
 
             if to_insert:
                 new_entries = [
@@ -233,9 +240,35 @@ class AniMapClient:
                 ]
                 ctx.session.add_all(new_entries)
 
+                # Insert provenance rows (one per source with order 'n')
+                prov_rows = []
+                for anilist_id in to_insert:
+                    sources = provenance_map.get(anilist_id, [])
+                    for i, src in enumerate(sources):
+                        prov_rows.append(
+                            AniMapProvenance(anilist_id=anilist_id, n=i, source=src)
+                        )
+
+                if prov_rows:
+                    ctx.session.add_all(prov_rows)
+
             if to_update:
                 for entry in to_update:
                     ctx.session.merge(entry)
+                    anilist_id = entry.anilist_id
+                    sources = provenance_map.get(anilist_id, [])
+                    ctx.session.execute(
+                        delete(AniMapProvenance).where(
+                            AniMapProvenance.anilist_id == anilist_id
+                        )
+                    )
+                    if sources:
+                        ctx.session.add_all(
+                            [
+                                AniMapProvenance(anilist_id=anilist_id, n=i, source=src)
+                                for i, src in enumerate(sources)
+                            ]
+                        )
 
             ctx.session.merge(
                 Housekeeping(key="animap_mappings_hash", value=curr_mappings_hash)
@@ -283,47 +316,7 @@ class AniMapClient:
             [tvdb] if isinstance(tvdb, int) else tvdb if isinstance(tvdb, list) else []
         )
 
-        def json_array_contains(
-            field: Mapped, values: list[Any]
-        ) -> ColumnElement[bool]:
-            """Generates a JSON_CONTAINS function for the given field.
-
-            Creates SQL conditions to check if any of the provided values exist
-            within a JSON array field using SQLite's json_each function.
-
-            Args:
-                field (Mapped): SQLAlchemy mapped field representing a JSON array column
-                values (list[Any]): List of values to search for within the JSON array
-
-            Returns:
-                ColumnElement[bool]: SQL condition that evaluates to True if any value
-                                     is found
-            """
-            if not values:
-                return false()
-
-            return exists(
-                select(1)
-                .select_from(func.json_each(field))
-                .where(column("value").in_(values))
-            )
-
-        def json_dict_contains(field: Mapped, key: str) -> BinaryExpression:
-            """Generate a SQL expression for checking if a JSON field contains a key.
-
-            Uses SQLite's json_type function to check if a specific key exists
-            in a JSON object field.
-
-            Args:
-                field (Mapped): SQLAlchemy mapped field representing a JSON column
-                key (str): JSON object key to search for (e.g., "s1" for season 1)
-
-            Returns:
-                BinaryExpression: SQL condition that evaluates to True if key exists
-            """
-            return func.json_type(field, f"$.{key}").is_not(None)
-
-        with db as ctx:
+        with db() as ctx:
             or_conditions = []
             and_conditions = []
 
@@ -349,7 +342,7 @@ class AniMapClient:
                         or_conditions.append(AniMap.tvdb_id.in_(tvdb_list))
                 if season:
                     and_conditions.append(
-                        json_dict_contains(AniMap.tvdb_mappings, f"s{season}")
+                        json_dict_has_key(AniMap.tvdb_mappings, f"s{season}")
                     )
 
             merged_conditions: list[ColumnElement[bool]] = []

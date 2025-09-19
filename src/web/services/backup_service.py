@@ -4,6 +4,7 @@ import contextlib
 import json
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from functools import lru_cache
 from pathlib import Path
 from time import perf_counter
 from typing import Any
@@ -11,7 +12,9 @@ from typing import Any
 from pydantic import BaseModel
 
 from src.models.schemas.anilist import MediaList
-from src.web.state import app_state
+from src.web.state import get_app_state
+
+__all__ = ["BackupService", "get_backup_service"]
 
 
 class BackupMeta(BaseModel):
@@ -49,9 +52,10 @@ class BackupService:
 
     def _get_profile_bridge(self, profile: str):
         """Get the scheduler bridge client for a profile."""
-        if not app_state.scheduler:
+        scheduler = get_app_state().scheduler
+        if not scheduler:
             raise ValueError("Scheduler not initialised")
-        bridge = app_state.scheduler.bridge_clients.get(profile)
+        bridge = scheduler.bridge_clients.get(profile)
         if not bridge:
             raise ValueError(f"Unknown profile: {profile}")
         return bridge
@@ -194,4 +198,11 @@ class BackupService:
         )
 
 
-backup_service = BackupService()
+@lru_cache(maxsize=1)
+def get_backup_service() -> BackupService:
+    """Get the singleton BackupService instance.
+
+    Returns:
+        BackupService: The singleton BackupService instance.
+    """
+    return BackupService()

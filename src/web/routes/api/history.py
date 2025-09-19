@@ -3,8 +3,11 @@
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
-from src.web.services.history_service import HistoryItem as ServiceHistoryItem
-from src.web.services.history_service import HistoryPage, history_service
+from src.web.services.history_service import (
+    HistoryItem,
+    HistoryPage,
+    get_history_service,
+)
 
 router = APIRouter()
 
@@ -12,7 +15,7 @@ router = APIRouter()
 class GetHistoryResponse(BaseModel):
     """Paginated history response (flattened)."""
 
-    items: list[ServiceHistoryItem]
+    items: list[HistoryItem]
     page: int
     per_page: int
     total: int
@@ -29,7 +32,7 @@ class OkResponse(BaseModel):
 class UndoResponse(BaseModel):
     """Response model for undo operation."""
 
-    item: ServiceHistoryItem
+    item: HistoryItem
 
 
 @router.get("/{profile}", response_model=GetHistoryResponse)
@@ -51,7 +54,7 @@ async def get_history(
         GetHistoryResponse: The paginated history response.
     """
     try:
-        hp: HistoryPage = await history_service.get_page(
+        hp: HistoryPage = await get_history_service().get_page(
             profile=profile,
             page=page,
             per_page=per_page,
@@ -74,7 +77,7 @@ async def delete_history(profile: str, item_id: int) -> OkResponse:
         OkResponse: The response indicating success.
     """
     try:
-        await history_service.delete_item(profile, item_id)
+        await get_history_service().delete_item(profile, item_id)
     except ValueError as e:
         raise HTTPException(404, str(e)) from e
     return OkResponse()
@@ -84,7 +87,7 @@ async def delete_history(profile: str, item_id: int) -> OkResponse:
 async def undo_history(profile: str, item_id: int) -> UndoResponse:
     """Undo a history item if possible."""
     try:
-        item = await history_service.undo_item(profile, item_id)
+        item = await get_history_service().undo_item(profile, item_id)
         return UndoResponse(item=item)
     except ValueError as e:
         raise HTTPException(404, str(e)) from e

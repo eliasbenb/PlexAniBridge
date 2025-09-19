@@ -3,8 +3,8 @@
 import os
 import uuid
 
-from src.config import config
-from src.utils.logging import Logger, get_logger
+from src.config.settings import get_config
+from src.utils.logging import get_logger
 from src.utils.terminal import supports_utf8
 from src.utils.version import get_docker_status, get_git_hash, get_pyproject_version
 
@@ -16,6 +16,9 @@ __email__ = "eliasbenbourenane@gmail.com"
 __version__ = get_pyproject_version()
 __git_hash__ = get_git_hash()
 
+
+config = get_config()
+log = get_logger()
 
 if supports_utf8():
     PLEXANIBDRIGE_HEADER = f"""
@@ -49,12 +52,6 @@ else:
 |                                                                               |
 +-------------------------------------------------------------------------------+
     """.strip()
-
-log: Logger = get_logger(
-    log_name="PlexAniBridge",
-    log_level=config.log_level,
-    log_dir=str(config.data_path / "logs"),
-)
 
 # The below environment variables are consumed by the python-plexapi library
 # and are used to identify the client making the requests to the Plex server.

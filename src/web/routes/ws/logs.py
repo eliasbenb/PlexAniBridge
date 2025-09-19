@@ -2,7 +2,9 @@
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from src.web.services.logging_handler import log_ws_handler
+from src.web.services.logging_handler import get_log_ws_handler
+
+__all__ = ["router"]
 
 router = APIRouter()
 
@@ -14,6 +16,8 @@ async def logs_ws(ws: WebSocket) -> None:
     Args:
         ws (WebSocket): The WebSocket connection instance.
     """
+    log_ws_handler = get_log_ws_handler()
+
     await ws.accept()
     await log_ws_handler.add(ws)
     try:

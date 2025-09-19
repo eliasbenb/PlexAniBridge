@@ -8,7 +8,7 @@ import uvicorn
 from pydantic import ValidationError
 
 from src import PLEXANIBDRIGE_HEADER, log
-from src.config import config
+from src.config.settings import get_config
 from src.core.sched import SchedulerClient
 from src.web.app import create_app
 
@@ -47,6 +47,7 @@ def validate_configuration():
     Returns:
         bool: True if configuration is valid, False otherwise
     """
+    config = get_config()
     try:
         profile_count = len(config.profiles)
         profile_names = list(config.profiles.keys())
@@ -109,6 +110,7 @@ async def run() -> int:
     """
     app_scheduler: SchedulerClient | None = None
     server_task: asyncio.Task | None = None
+    config = get_config()
 
     try:
         log.info("\n" + PLEXANIBDRIGE_HEADER)

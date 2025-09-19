@@ -3,6 +3,7 @@
 import logging
 import re
 import sys
+from functools import lru_cache
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import ClassVar
@@ -11,6 +12,8 @@ import colorama
 from colorama import Fore, Style
 
 from src.utils.terminal import supports_color
+
+__all__ = ["Logger", "get_logger"]
 
 
 class ColorFormatter(logging.Formatter):
@@ -153,7 +156,7 @@ class Logger(logging.Logger):
 
         Args:
             log_level (str): Logging level ('DEBUG', 'INFO', 'SUCCESS', etc.)
-            log_dir (str | None, optional): Directory where log files will be stored
+            log_dir (str | None, optional): Directory where log files will be stored.
         """
         has_color_support = False
         if supports_color():
@@ -223,25 +226,44 @@ class Logger(logging.Logger):
 logging.setLoggerClass(Logger)
 
 
-def get_logger(
-    log_name: str, log_level: str = "INFO", log_dir: str | None = None
+def _get_logger(
+    log_name: str, log_level: str = "INFO", log_dir: str | Path | None = None
 ) -> Logger:
     """Get a configured instance of Logger.
 
     Args:
-        log_name (str): Name of the logger and base name for log file
-        log_level (str, optional): Logging level. Defaults to "INFO".
-        log_dir (str | None, optional): Directory where log files will be stored
+        log_name (str): Name of the logger and base name for log file.
+        log_level (str): Logging level. Defaults to "INFO".
+        log_dir (str | Path | None): Directory where log files will be stored.
 
     Returns:
         Logger: Configured logger instance
     """
     logger = logging.getLogger(log_name)
+    _log_dir = str(log_dir) if log_dir is not None else None
 
     if isinstance(logger, Logger):
-        logger.setup(log_level, log_dir)
+        logger.setup(log_level, _log_dir)
     else:
         logger = Logger(log_name)
-        logger.setup(log_level, log_dir)
+        logger.setup(log_level, _log_dir)
 
     return logger
+
+
+@lru_cache(maxsize=1)
+def get_logger() -> Logger:
+    """Get the main application logger.
+
+    Returns:
+        Logger: Main application logger instance
+    """
+    from src.config.settings import get_config
+
+    config = get_config()
+
+    return _get_logger(
+        log_name="PlexAniBridge",
+        log_level=config.log_level,
+        log_dir=config.data_path / "logs",
+    )

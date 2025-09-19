@@ -3,7 +3,7 @@
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
-from src.web.state import app_state
+from src.web.state import get_app_state
 
 __all__ = ["router"]
 
@@ -25,7 +25,7 @@ async def sync_all(poll: bool = Query(False)) -> OkResponse:
     Returns:
         OkResponse: The response containing the sync status.
     """
-    scheduler = app_state.scheduler
+    scheduler = get_app_state().scheduler
     if not scheduler:
         raise HTTPException(503, "Scheduler not available")
     await scheduler.trigger_sync(poll=poll)
@@ -39,7 +39,7 @@ async def sync_database() -> OkResponse:
     Returns:
         OkResponse: The response containing the sync status.
     """
-    scheduler = app_state.scheduler
+    scheduler = get_app_state().scheduler
     if not scheduler:
         raise HTTPException(503, "Scheduler not available")
     await scheduler.shared_animap_client._sync_db()
@@ -57,7 +57,7 @@ async def sync_profile(profile: str, poll: bool = Query(False)) -> OkResponse:
     Returns:
         OkResponse: The response containing the sync status.
     """
-    scheduler = app_state.scheduler
+    scheduler = get_app_state().scheduler
     if not scheduler:
         raise HTTPException(503, "Scheduler not available")
     try:

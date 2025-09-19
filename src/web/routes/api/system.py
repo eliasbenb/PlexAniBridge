@@ -8,7 +8,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from src import __git_hash__, __version__
-from src.web.state import app_state
+from src.web.state import get_app_state
 
 __all__ = ["router"]
 
@@ -77,7 +77,7 @@ async def api_settings() -> SettingsResponse:
     Returns:
         dict[str, Any]: The serialized configuration.
     """
-    scheduler = app_state.scheduler
+    scheduler = get_app_state().scheduler
     if not scheduler:
         return SettingsResponse(global_config={}, profiles=[])
 
@@ -103,7 +103,7 @@ async def api_about() -> AboutResponse:
     Returns:
         dict[str, Any]: The runtime metadata.
     """
-    scheduler = app_state.scheduler
+    scheduler = get_app_state().scheduler
     status: dict[str, Any] = {}
 
     if scheduler:
@@ -112,7 +112,7 @@ async def api_about() -> AboutResponse:
         except Exception as e:
             status = {"error": f"Unable to fetch scheduler status: {e}"}
 
-    started_at = app_state.started_at
+    started_at = get_app_state().started_at
     now = datetime.now(UTC)
     uptime_seconds: int | None = None
     human_uptime: str | None = None

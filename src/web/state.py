@@ -6,13 +6,14 @@ route handlers and websocket endpoints.
 
 from collections.abc import Callable
 from datetime import UTC, datetime
+from functools import lru_cache
 from typing import Any
 
 from plexapi.server import PlexServer
 
 from src.core.sched import SchedulerClient
 
-__all__ = ["AppState", "app_state"]
+__all__ = ["AppState", "get_app_state"]
 
 
 class AppState:
@@ -56,4 +57,11 @@ class AppState:
                 pass
 
 
-app_state = AppState()
+@lru_cache(maxsize=1)
+def get_app_state() -> AppState:
+    """Get the singleton application state instance.
+
+    Returns:
+        AppState: The application state instance.
+    """
+    return AppState()

@@ -7,7 +7,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
-from src.config import config
+from src import config
 
 __all__ = ["router"]
 

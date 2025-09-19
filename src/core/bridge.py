@@ -148,7 +148,7 @@ class BridgeClient:
             Used to determine whether polling scanning is possible and
             to filter items for incremental syncs
         """
-        with db as ctx:
+        with db() as ctx:
             last_synced = ctx.session.get(Housekeeping, self._get_last_synced_key())
             if last_synced is None or last_synced.value is None:
                 return None
@@ -164,7 +164,7 @@ class BridgeClient:
             Only called after a completely successful sync operation
         """
         self.last_synced = last_synced
-        with db as ctx:
+        with db() as ctx:
             ctx.session.merge(
                 Housekeeping(
                     key=self._get_last_synced_key(), value=last_synced.isoformat()

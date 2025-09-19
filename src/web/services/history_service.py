@@ -2,6 +2,7 @@
 
 import logging
 import re
+from functools import lru_cache
 from typing import Any
 
 import aiohttp
@@ -13,7 +14,9 @@ from src.config.database import db
 from src.core.anilist import AniListClient
 from src.models.db.sync_history import SyncHistory, SyncOutcome
 from src.models.schemas.anilist import MediaList as AniMediaList
-from src.web.state import app_state
+from src.web.state import get_app_state
+
+__all__ = ["HistoryService", "get_history_service"]
 
 logger = logging.getLogger(__name__)
 
@@ -53,9 +56,10 @@ class HistoryService:
 
     def _get_bridge(self, profile: str):
         """Get the bridge client for a specific profile."""
-        if not app_state.scheduler:
+        scheduler = get_app_state().scheduler
+        if not scheduler:
             raise ValueError("Scheduler not initialised")
-        bridge = app_state.scheduler.bridge_clients.get(profile)
+        bridge = scheduler.bridge_clients.get(profile)
         if not bridge:
             raise ValueError(f"Unknown profile: {profile}")
         return bridge
@@ -192,7 +196,7 @@ class HistoryService:
         Returns:
             Dictionary mapping outcome to count
         """
-        with db as ctx:
+        with db() as ctx:
             stats_rows = (
                 ctx.session.query(SyncHistory.outcome, func.count(SyncHistory.id))
                 .filter(SyncHistory.profile_name == profile)
@@ -230,7 +234,7 @@ class HistoryService:
         if outcome:
             base_filters.append(SyncHistory.outcome == outcome)
 
-        with db as ctx:
+        with db() as ctx:
             # Get cached stats
             stats = await self._fetch_profile_stats(profile)
 
@@ -300,7 +304,7 @@ class HistoryService:
             profile (str): The profile name.
             item_id (int): The ID of the history item to delete.
         """
-        with db as ctx:
+        with db() as ctx:
             row = (
                 ctx.session.query(SyncHistory)
                 .filter(SyncHistory.profile_name == profile, SyncHistory.id == item_id)
@@ -325,7 +329,7 @@ class HistoryService:
             HistoryItem: Newly created history record representing the undo action.
         """
         bridge = self._get_bridge(profile)
-        with db as ctx:
+        with db() as ctx:
             row: SyncHistory | None = (
                 ctx.session.query(SyncHistory)
                 .filter(
@@ -397,7 +401,7 @@ class HistoryService:
         except Exception as e:
             error_message = f"Undo failed: {e}"
 
-        with db as ctx:
+        with db() as ctx:
             new_row = SyncHistory(
                 profile_name=profile,
                 plex_guid=row.plex_guid,
@@ -459,4 +463,11 @@ class HistoryService:
         }
 
 
-history_service = HistoryService()
+@lru_cache(maxsize=1)
+def get_history_service() -> HistoryService:
+    """Get the singleton HistoryService instance.
+
+    Returns:
+        HistoryService: The history service instance.
+    """
+    return HistoryService()

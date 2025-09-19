@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from src.web.services.backup_service import (
     BackupMeta,
     RestoreSummary,
-    backup_service,
+    get_backup_service,
 )
 
 router = APIRouter()
@@ -37,7 +37,7 @@ def list_backups(profile: str) -> ListBackupsResponse:
         ListBackupsResponse: List of available backups
     """
     try:
-        backups = backup_service.list_backups(profile)
+        backups = get_backup_service().list_backups(profile)
         return ListBackupsResponse(backups=backups)
     except ValueError as e:
         raise HTTPException(400, str(e)) from e
@@ -47,7 +47,7 @@ def list_backups(profile: str) -> ListBackupsResponse:
 async def restore_backup(profile: str, req: RestoreRequest) -> RestoreSummary:
     """Restore a backup file (no dry-run mode)."""
     try:
-        return await backup_service.restore_backup(
+        return await get_backup_service().restore_backup(
             profile=profile,
             filename=req.filename,
         )
@@ -66,7 +66,7 @@ def get_backup_raw(profile: str, filename: str) -> dict[str, Any]:
     The response is unvalidated JSON so the UI can present a preview.
     """
     try:
-        return backup_service.read_backup_raw(profile, filename)
+        return get_backup_service().read_backup_raw(profile, filename)
     except FileNotFoundError as e:
         raise HTTPException(404, str(e)) from e
     except ValueError as e:

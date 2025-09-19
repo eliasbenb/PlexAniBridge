@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from enum import StrEnum
+from functools import lru_cache
 from pathlib import Path
 
 from pydantic import (
@@ -24,7 +25,7 @@ from pydantic_settings import (
     YamlConfigSettingsSource,
 )
 
-from src.utils.logging import get_logger
+from src.utils.logging import _get_logger
 
 __all__ = [
     "LogLevel",
@@ -33,9 +34,10 @@ __all__ = [
     "PlexMetadataSource",
     "SyncField",
     "SyncMode",
+    "get_config",
 ]
 
-_log = get_logger(log_name="PlexAniBridge", log_level="INFO")
+_log = _get_logger(__name__)
 
 
 def find_yaml_config_file() -> Path | None:
@@ -616,3 +618,13 @@ class PlexAnibridgeConfig(BaseSettings):
         case_sensitive=False,
         extra="forbid",
     )
+
+
+@lru_cache(maxsize=1)
+def get_config() -> PlexAnibridgeConfig:
+    """Get the singleton instance of PlexAnibridgeConfig.
+
+    Returns:
+        PlexAnibridgeConfig: The singleton configuration instance
+    """
+    return PlexAnibridgeConfig()

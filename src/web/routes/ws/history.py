@@ -4,7 +4,9 @@ import asyncio
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from src.web.services.history_service import history_service
+from src.web.services.history_service import get_history_service
+
+__all__ = ["router"]
 
 router = APIRouter()
 
@@ -21,7 +23,7 @@ async def history_websocket(websocket: WebSocket, profile: str) -> None:
 
     try:
         while True:
-            page_data = await history_service.get_page(
+            page_data = await get_history_service().get_page(
                 profile=profile,
                 page=1,
                 per_page=25,

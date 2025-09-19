@@ -16,8 +16,9 @@
         tmdb_movie_id?: number[] | null;
         tmdb_show_id?: number[] | null;
         tvdb_id?: number | null;
-        custom?: boolean;
         tvdb_mappings?: Record<string, string> | null;
+        custom?: boolean;
+        sources?: string[];
     };
 
     interface AniListMediaLite {
@@ -383,7 +384,7 @@
     }
 
     async function remove(m: Mapping) {
-        if (!confirm("Delete override for AniList " + m.anilist_id + "?")) return;
+        if (!confirm("Delete mapping for AniList ID " + m.anilist_id + "?")) return;
         try {
             const r = await apiFetch(
                 "/api/mappings/" + m.anilist_id,
@@ -396,10 +397,6 @@
             console.error("delete failed", e);
             toast("Delete failed", "error");
         }
-    }
-
-    function fmtSeasons(m: Mapping) {
-        return Object.keys(m.tvdb_mappings || {}).length;
     }
 
     function preferredTitle(t?: {
@@ -580,6 +577,7 @@
                             <th class="px-3 py-2 text-left font-medium">TVDB</th>
                             <th class="px-3 py-2 text-left font-medium">MAL</th>
                             <th class="px-3 py-2 text-left font-medium">Seasons</th>
+                            <th class="px-3 py-2 text-left font-medium">Source</th>
                             <th class="px-3 py-2 text-right font-medium">Actions</th>
                         </tr>
                     </thead>
@@ -714,7 +712,97 @@
                                             >{#if m.mal_id && i < m.mal_id.length - 1},
                                             {/if}{/each}{:else}-{/if}</td
                                 >
-                                <td class="px-3 py-2 font-mono">{fmtSeasons(m)}</td>
+                                <td class="px-3 py-2">
+                                    {#key JSON.stringify(m.tvdb_mappings ?? {})}
+                                        {@const entries = Object.entries(
+                                            m.tvdb_mappings ?? {},
+                                        )}
+                                        {@const totalSeasons = entries.length}
+                                        {#if totalSeasons > 0}
+                                            <div class="group relative inline-block">
+                                                <span
+                                                    class={`inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded px-1.5 text-[10px] ring-1 ${totalSeasons > 1 ? "bg-amber-600/30 text-amber-100 ring-amber-700/40" : "bg-slate-800/60 text-slate-300 ring-slate-700/50"}`}
+                                                    >{totalSeasons}</span
+                                                >
+                                                <div
+                                                    class="invisible absolute left-0 z-20 mt-1 w-64 rounded-md border border-slate-800/70 bg-slate-900/95 p-2 opacity-0 shadow-xl transition-opacity group-hover:visible group-hover:opacity-100"
+                                                >
+                                                    <div
+                                                        class="mb-1 text-[10px] font-medium text-slate-400"
+                                                    >
+                                                        TVDB Seasons
+                                                    </div>
+                                                    <ol
+                                                        class="max-h-52 space-y-1 overflow-auto text-[11px]"
+                                                    >
+                                                        {#each entries as e (e[0])}
+                                                            <li
+                                                                class="flex items-start gap-1"
+                                                            >
+                                                                <span
+                                                                    class="text-slate-500"
+                                                                    >{e[0]}</span
+                                                                >
+                                                                <span
+                                                                    class="truncate text-slate-300"
+                                                                    title={e[1]}
+                                                                    >{e[1] ||
+                                                                        "All episodes"}</span
+                                                                >
+                                                            </li>
+                                                        {/each}
+                                                    </ol>
+                                                </div>
+                                            </div>
+                                        {:else}
+                                            <span class="text-[10px] text-slate-500"
+                                                >-</span
+                                            >
+                                        {/if}
+                                    {/key}
+                                </td>
+                                <td class="px-3 py-2">
+                                    {#key (m.sources ?? []).join("|") + ":" + String(m.custom)}
+                                        {@const total = (m.sources ?? []).length}
+                                        {#if total > 0}
+                                            <div class="group relative inline-block">
+                                                <span
+                                                    class={`inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded px-1.5 text-[10px] ring-1 ${total > 1 ? "bg-amber-600/30 text-amber-100 ring-amber-700/40" : "bg-slate-800/60 text-slate-300 ring-slate-700/50"}`}
+                                                    >{total}</span
+                                                >
+                                                <div
+                                                    class="invisible absolute left-0 z-20 mt-1 w-56 rounded-md border border-slate-800/70 bg-slate-900/95 p-2 opacity-0 shadow-xl transition-opacity group-hover:visible group-hover:opacity-100"
+                                                >
+                                                    <div
+                                                        class="mb-1 text-[10px] font-medium text-slate-400"
+                                                    >
+                                                        Provenance
+                                                    </div>
+                                                    <ol class="space-y-1 text-[11px]">
+                                                        {#each m.sources ?? [] as s, i (i)}
+                                                            <li
+                                                                class="flex items-start gap-1"
+                                                            >
+                                                                <span
+                                                                    class="text-slate-500"
+                                                                    >{i + 1}.</span
+                                                                >
+                                                                <span
+                                                                    class="truncate"
+                                                                    title={s}>{s}</span
+                                                                >
+                                                            </li>
+                                                        {/each}
+                                                    </ol>
+                                                </div>
+                                            </div>
+                                        {:else}
+                                            <span class="text-[10px] text-slate-500"
+                                                >-</span
+                                            >
+                                        {/if}
+                                    {/key}
+                                </td>
                                 <td class="px-3 py-2 text-right whitespace-nowrap">
                                     <div class="flex justify-end gap-1">
                                         <button
@@ -724,10 +812,7 @@
                                         >
                                         <button
                                             onclick={() => remove(m)}
-                                            disabled={m.custom === false}
-                                            title={m.custom === false
-                                                ? "Not deletable"
-                                                : "Delete mapping"}
+                                            title="Delete mapping"
                                             class="inline-flex h-6 items-center rounded-md bg-rose-700/70 px-2 text-[11px] text-rose-200 hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-35"
                                             >Del</button
                                         >
@@ -738,7 +823,7 @@
                         {#if !items.length && !loading}
                             <tr
                                 ><td
-                                    colspan="10"
+                                    colspan="11"
                                     class="py-8 text-center text-slate-500"
                                     >No mappings found</td
                                 ></tr
