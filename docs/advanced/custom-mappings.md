@@ -13,36 +13,31 @@ PlexAniBridge allows you to define custom mappings for Plex content to AniList, 
 
 Below is an example mappings file. You can use [the JSON schema](https://github.com/eliasbenb/PlexAniBridge-Mappings/blob/HEAD/mappings.schema.json) or the [PlexAniBridge-Mappings database](https://github.com/eliasbenb/PlexAniBridge-Mappings) as reference.
 
-```json title="mappings.custom.json"
---8<-- "data/mappings.example.json"
+```yaml title="mappings.custom.yaml"
+--8<-- "data/mappings.example.yaml"
 ```
 
-??? tip "YAML Format for Mappings"
+??? tip "JSON Format for Mappings"
 
-    The mappings file can also be written in YAML format. Here is the same example in YAML:
+    The mappings file can also be written in JSON format. Here is the same example in JSON:
 
-    ```yaml title="mappings.custom.yaml"
-    --8<-- "data/mappings.example.yaml"
+    ```json title="mappings.custom.json"
+    --8<-- "data/mappings.example.json"
     ```
 
 
 !!! tip "Including External Mappings"
 
-    To include external mappings within a mappings file, you can use the `$includes` key. This key should contain an array of paths or HTTP URLs to other mappings files. The included mappings will be merged with the current mappings file in the order they are specified.
-
-    ```json title="mappings.custom.json"
-    {
-      "$includes": [
-        "https://example.com/mappings.json",
-        "/path/to/mappings.json",
-        "./relative/path/to/mappings.json"
-      ]
-    }
+    ```yaml title="mappings.custom.yaml"
+    $includes:
+        - "https://example.com/mappings.json"
+        - "/path/to/mappings.yaml"
+        - "./relative/path/to/mappings.yml"
     ```
 
 ## Local Custom Mappings
 
-PlexAniBridge will look for a custom mappings file with the name `mappings.custom.(json|yaml|yml)` in the `PAB_DATA_PATH` directory. The file extension determines the format of the file (JSON or YAML).
+PlexAniBridge will look for a custom mappings file with the name `mappings.custom.(json|yaml|yml)` in the `PAB_DATA_PATH` directory. The file extension determines the format of the file (YAML or JSON).
 
 ## Community Custom Mappings
 
@@ -55,4 +50,4 @@ There are community maintained mappings repositories that you can use to get pre
 
 ## Default Mappings
 
-If you want to contribute your custom mappings to the community, you can submit a pull request to the [PlexAniBridge-Mappings](https://github.com/eliasbenb/PlexAniBridge-Mappings) repository. Your pull request should modify the [`mappings.edits.json`](https://github.com/eliasbenb/PlexAniBridge-Mappings/blob/HEAD/mappings.edits.json) and **not** the [`mappings.json`](https://github.com/eliasbenb/PlexAniBridge-Mappings/blob/HEAD/mappings.json) file.
+If you want to contribute your custom mappings to the community, you can submit a pull request to the [PlexAniBridge-Mappings](https://github.com/eliasbenb/PlexAniBridge-Mappings) repository. Your pull request should modify the [`mappings.edits.yaml`](https://github.com/eliasbenb/PlexAniBridge-Mappings/blob/HEAD/mappings.edits.yaml) and **not** the [`mappings.json`](https://github.com/eliasbenb/PlexAniBridge-Mappings/blob/HEAD/mappings.json) file.

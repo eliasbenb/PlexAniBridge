@@ -22,9 +22,9 @@ class MappingsClient:
     """Load mappings from files or URLs and merge them together."""
 
     MAPPING_FILES: ClassVar[list[str]] = [
-        "mappings.custom.json",
         "mappings.custom.yaml",
         "mappings.custom.yml",
+        "mappings.custom.json",
     ]
 
     def __init__(self, data_path: Path, upstream_url: str | None) -> None:
