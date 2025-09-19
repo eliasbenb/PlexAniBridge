@@ -3,6 +3,8 @@
     "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
     "features": {
         "ghcr.io/devcontainers/features/python:1": {
+            "toolsToInstall": "virtualenv",
+            "optimize": true,
             "version": "3.13"
         },
         "ghcr.io/devcontainers/features/node:1": {
