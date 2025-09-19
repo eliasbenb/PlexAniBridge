@@ -39,6 +39,7 @@ class MappingsClient:
         self.data_path = data_path
         self.upstream_url = upstream_url
         self._loaded_sources: set[str] = set()
+        self._provenance: dict[str, list[str]] = {}
         self._session: aiohttp.ClientSession | None = None
 
     async def _get_session(self) -> aiohttp.ClientSession:
@@ -241,10 +242,20 @@ class MappingsClient:
                 f"$$'{file_path.resolve()!s}'$$ is not a list, ignoring all entries"
             )
 
-        return self._deep_merge(
+        merged = self._deep_merge(
             await self._load_includes(includes, loaded_chain, str(file_path)),
             mappings,
         )
+
+        # Record provenance for keys present in this file or its includes
+        for key in merged:
+            if not str(key).startswith("$"):
+                k = str(key)
+                src = str(file_path)
+                lst = self._provenance.setdefault(k, [])
+                if src not in lst:
+                    lst.append(src)
+        return merged
 
     async def _load_mappings_url(
         self, url: str, loaded_chain: set[str], retry_count: int = 0
@@ -329,10 +340,21 @@ class MappingsClient:
                 f"{self.__class__.__name__}: $includes in {url} is not a list, ignoring"
             )
 
-        return self._deep_merge(
+        merged = self._deep_merge(
             await self._load_includes(includes, loaded_chain, url),
             mappings,
         )
+
+        # Record provenance for keys present at this URL or its includes
+        for key in merged:
+            if not str(key).startswith("$"):
+                k = str(key)
+                src = str(url)
+                lst = self._provenance.setdefault(k, [])
+                if src not in lst:
+                    lst.append(src)
+
+        return merged
 
     async def _load_mappings(
         self, src: str, loaded_chain: set[str] | None = None
@@ -403,6 +425,7 @@ class MappingsClient:
             AniMapDict: Merged mappings with system keys removed
         """
         self._loaded_sources = set()
+        self._provenance = {}
 
         if self.upstream_url is not None:
             log.debug(
@@ -440,3 +463,23 @@ class MappingsClient:
         merged_mappings = self._deep_merge(db_mappings, custom_mappings)
 
         return {k: v for k, v in merged_mappings.items() if not k.startswith("$")}
+
+    def get_provenance(self) -> dict[int, list[str]]:
+        """Return a copy of the provenance map collected during the last load.
+
+        Returns:
+            dict[int, list[str]]: Mapping of anilist_id to list of unique sources
+        """
+        result: dict[int, list[str]] = {}
+        for k, sources in self._provenance.items():
+            try:
+                anilist_id = int(k)
+            except ValueError:
+                log.warning(
+                    f"{self.__class__.__name__}: Skipping invalid anilist_id in "
+                    f"provenance: $$'{k}'$$"
+                )
+                continue
+            result[anilist_id] = [str(s) for s in sources]
+
+        return result

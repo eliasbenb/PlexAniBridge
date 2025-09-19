@@ -16,6 +16,7 @@ from src.config.database import db
 from src.core.mappings import MappingsClient
 from src.models.db.animap import AniMap
 from src.models.db.housekeeping import Housekeeping
+from src.models.db.provenance import AniMapProvenance
 
 __all__ = ["AniMapClient"]
 
@@ -124,6 +125,7 @@ class AniMapClient:
             invalid_count = 0
 
             mappings = await self.mappings_client.load_mappings()
+            provenance_map = self.mappings_client.get_provenance()
             tmp_mappings = mappings.copy()
 
             for key, entry in tmp_mappings.items():
@@ -226,6 +228,11 @@ class AniMapClient:
                 ctx.session.execute(
                     delete(AniMap).where(AniMap.anilist_id.in_(to_delete))
                 )
+                ctx.session.execute(
+                    delete(AniMapProvenance).where(
+                        AniMapProvenance.anilist_id.in_(to_delete)
+                    )
+                )
 
             if to_insert:
                 new_entries = [
@@ -233,9 +240,35 @@ class AniMapClient:
                 ]
                 ctx.session.add_all(new_entries)
 
+                # Insert provenance rows (one per source with order 'n')
+                prov_rows = []
+                for anilist_id in to_insert:
+                    sources = provenance_map.get(anilist_id, [])
+                    for i, src in enumerate(sources):
+                        prov_rows.append(
+                            AniMapProvenance(anilist_id=anilist_id, n=i, source=src)
+                        )
+
+                if prov_rows:
+                    ctx.session.add_all(prov_rows)
+
             if to_update:
                 for entry in to_update:
                     ctx.session.merge(entry)
+                    anilist_id = entry.anilist_id
+                    sources = provenance_map.get(anilist_id, [])
+                    ctx.session.execute(
+                        delete(AniMapProvenance).where(
+                            AniMapProvenance.anilist_id == anilist_id
+                        )
+                    )
+                    if sources:
+                        ctx.session.add_all(
+                            [
+                                AniMapProvenance(anilist_id=anilist_id, n=i, source=src)
+                                for i, src in enumerate(sources)
+                            ]
+                        )
 
             ctx.session.merge(
                 Housekeeping(key="animap_mappings_hash", value=curr_mappings_hash)
