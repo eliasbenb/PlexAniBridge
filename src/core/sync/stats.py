@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+from typing import Literal
+
 from plexapi.video import Episode, Movie, Season, Show
 from pydantic import BaseModel
 
 from src.exceptions import UnsupportedMediaTypeError
 from src.models.db.sync_history import SyncOutcome
+
+__all__ = ["ItemIdentifier", "SyncProgress", "SyncStats"]
 
 
 class ItemIdentifier(BaseModel):
@@ -281,3 +286,19 @@ class SyncStats(BaseModel):
     def __add__(self, other: SyncStats) -> SyncStats:
         """Combine statistics using the + operator."""
         return self.combine(other)
+
+
+class SyncProgress(BaseModel):
+    """Live sync progress snapshot exposed to the web UI.
+
+    Fields are serialized to JSON in scheduler status responses.
+    """
+
+    state: Literal["running", "idle"]
+    started_at: datetime
+    section_index: int
+    section_count: int
+    section_title: str | None
+    stage: str
+    section_items_total: int
+    section_items_processed: int

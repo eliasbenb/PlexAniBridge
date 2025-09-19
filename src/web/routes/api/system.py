@@ -9,28 +9,14 @@ from pydantic import BaseModel
 
 from src import __git_hash__, __version__
 from src.exceptions import PlexAniBridgeError, SchedulerUnavailableError
+from src.web.routes.api.status import (
+    ProfileConfigModel,
+    ProfileRuntimeStatusModel,
+    ProfileStatusModel,
+)
 from src.web.state import get_app_state
 
 __all__ = ["router"]
-
-
-class ProfileConfigModel(BaseModel):
-    plex_user: str | None = None
-    anilist_user: str | None = None
-    sync_interval: int | None = None
-    sync_modes: list[str] = []
-    full_scan: bool | None = None
-    destructive_sync: bool | None = None
-
-
-class ProfileRuntimeStatusModel(BaseModel):
-    running: bool
-    last_synced: str | None = None
-
-
-class ProfileStatusModel(BaseModel):
-    config: ProfileConfigModel
-    status: ProfileRuntimeStatusModel
 
 
 class SettingsProfileModel(BaseModel):

@@ -16,7 +16,7 @@ from src.core.sync import (
     ShowSyncClient,
 )
 from src.core.sync.base import ParsedGuids
-from src.core.sync.stats import SyncStats
+from src.core.sync.stats import SyncProgress, SyncStats
 from src.models.db.housekeeping import Housekeeping
 from src.models.db.sync_history import SyncOutcome
 
@@ -84,6 +84,7 @@ class BridgeClient:
         )
 
         self.last_synced = self._get_last_synced()
+        self.current_sync: SyncProgress | None = None
 
     async def initialize(self) -> None:
         """Initialize the bridge client with async setup.
@@ -222,12 +223,40 @@ class BridgeClient:
         )
 
         plex_sections = self.plex_client.get_sections()
+
+        self.current_sync = SyncProgress(
+            state="running",
+            started_at=sync_start_time,
+            section_index=0,
+            section_count=len(plex_sections),
+            section_title=None,
+            stage="initializing",
+            section_items_total=0,
+            section_items_processed=0,
+        )
         sync_stats = SyncStats()
 
         try:
-            for section in plex_sections:
+            for idx, section in enumerate(plex_sections, start=1):
+                if self.current_sync is not None:
+                    self.current_sync = self.current_sync.model_copy(
+                        update={
+                            "section_index": idx,
+                            "section_title": section.title,
+                            "stage": "enumerating",
+                            "section_items_total": 0,
+                            "section_items_processed": 0,
+                        }
+                    )
+
                 section_stats = await self._sync_section(
-                    section, poll, movie_sync, show_sync, rating_keys=rating_keys
+                    section,
+                    poll,
+                    movie_sync,
+                    show_sync,
+                    rating_keys=rating_keys,
+                    section_index=idx,
+                    section_count=len(plex_sections),
                 )
                 sync_stats = sync_stats.combine(section_stats)
 
@@ -266,6 +295,11 @@ class BridgeClient:
                 exc_info=True,
             )
             raise
+        finally:
+            if self.current_sync is not None:
+                self.current_sync = self.current_sync.model_copy(
+                    update={"stage": "completed", "state": "idle"}
+                )
 
     async def _sync_section(
         self,
@@ -274,6 +308,9 @@ class BridgeClient:
         movie_sync: MovieSyncClient,
         show_sync: ShowSyncClient,
         rating_keys: list[str] | None = None,
+        *,
+        section_index: int,
+        section_count: int,
     ) -> SyncStats:
         """Synchronizes a single Plex library section.
 
@@ -284,6 +321,8 @@ class BridgeClient:
             show_sync (ShowSyncClient): Show sync client
             rating_keys (list[str] | None): Optional list of Plex rating keys to
                 restrict sync to for this section.
+            section_index (int): 1-based index of the current section being processed.
+            section_count (int): Total number of sections to process.
 
         Returns:
             SyncStats: Statistics about the sync operation for the section
@@ -306,6 +345,22 @@ class BridgeClient:
             )
         )
 
+        if self.current_sync is not None:
+            self.current_sync = self.current_sync.model_copy(
+                update={
+                    "section_index": section_index,
+                    "section_count": section_count,
+                    "section_title": section.title,
+                    "section_items_total": len(items),
+                    "section_items_processed": 0,
+                    "stage": (
+                        "prefetching"
+                        if self.profile_config.batch_requests
+                        else "processing"
+                    ),
+                }
+            )
+
         if self.profile_config.batch_requests:
             parsed_guids = [ParsedGuids.from_guids(item.guids) for item in items]
             imdb_ids = [guid.imdb for guid in parsed_guids if guid.imdb is not None]
@@ -327,6 +382,11 @@ class BridgeClient:
                 f"(this may take a while)"
             )
 
+            if self.current_sync is not None:
+                self.current_sync = self.current_sync.model_copy(
+                    update={"stage": "prefetching"}
+                )
+
             await self.anilist_client.batch_get_anime(anilist_ids)
 
         sync_client: BaseSyncClient = {
@@ -338,6 +398,16 @@ class BridgeClient:
             try:
                 await sync_client.process_media(item)
 
+                if self.current_sync is not None:
+                    self.current_sync = self.current_sync.model_copy(
+                        update={
+                            "stage": "processing",
+                            "section_items_processed": (
+                                self.current_sync.section_items_processed + 1
+                            ),
+                        }
+                    )
+
             except Exception:
                 log.error(
                     f"{self.__class__.__name__}: [{self.profile_name}] Failed "
@@ -346,6 +416,10 @@ class BridgeClient:
                 )
 
         if self.profile_config.batch_requests:
+            if self.current_sync is not None:
+                self.current_sync = self.current_sync.model_copy(
+                    update={"stage": "finalizing"}
+                )
             await sync_client.batch_sync()
 
         return sync_client.sync_stats

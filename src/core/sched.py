@@ -437,6 +437,11 @@ class SchedulerClient:
                     "last_synced": bridge_client.last_synced.isoformat()
                     if bridge_client and bridge_client.last_synced
                     else None,
+                    "current_sync": (
+                        bridge_client.current_sync.model_dump(mode="json")
+                        if bridge_client and bridge_client.current_sync is not None
+                        else None
+                    ),
                 },
             }
 

@@ -14,8 +14,19 @@
     import { apiFetch } from "$lib/api";
     import { toast } from "$lib/notify";
 
+    type CurrentSync = {
+        state?: string;
+        started_at?: string;
+        section_index?: number;
+        section_count?: number;
+        section_title?: string | null;
+        stage?: string;
+        section_items_total?: number;
+        section_items_processed?: number;
+    };
+
     type ProfileStatus = {
-        status?: { last_synced?: string };
+        status?: { last_synced?: string; current_sync?: CurrentSync };
         config?: {
             anilist_user?: string;
             sync_interval?: string | number;
@@ -30,6 +41,17 @@
 
     function profileEntries() {
         return Object.entries(profiles).sort((a, b) => a[0].localeCompare(b[0]));
+    }
+
+    function isProfileRunning(p?: ProfileStatus): boolean {
+        return p?.status?.current_sync?.state === "running";
+    }
+
+    function anyRunning(): boolean {
+        for (const [, p] of Object.entries(profiles)) {
+            if (isProfileRunning(p)) return true;
+        }
+        return false;
     }
 
     function formatTimeAgo(ts?: string) {
@@ -121,6 +143,18 @@
         goto(resolve(`/timeline/${name}`));
     }
 
+    function progressPercent(p: ProfileStatus): number | null {
+        const c = p.status?.current_sync;
+        if (!c || c.state !== "running") return null;
+        const secIdx = Math.max(0, (c.section_index || 1) - 1);
+        const secCount = Math.max(1, c.section_count || 1);
+        const total = Math.max(1, c.section_items_total || 1);
+        const done = Math.min(total, c.section_items_processed || 0);
+        const sectionFrac = total > 0 ? done / total : 0;
+        const overall = (secIdx + sectionFrac) / secCount;
+        return Math.max(0, Math.min(1, overall));
+    }
+
     onMount(() => {
         refresh();
         openWs();
@@ -152,17 +186,23 @@
                     <span>Sync Database</span>
                 </button>
                 <button
-                    class="inline-flex items-center gap-1 rounded-md border border-emerald-600/60 bg-emerald-600/30 px-3 py-1.5 text-sm font-medium text-emerald-200 shadow-sm backdrop-blur-sm transition-colors hover:bg-emerald-600/40 focus:ring-2 focus:ring-emerald-500/40 focus:outline-none"
+                    class="inline-flex items-center gap-1 rounded-md border border-emerald-600/60 bg-emerald-600/30 px-3 py-1.5 text-sm font-medium text-emerald-200 shadow-sm backdrop-blur-sm transition-colors hover:bg-emerald-600/40 focus:ring-2 focus:ring-emerald-500/40 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                     onclick={() => syncAll(false)}
-                    title="Trigger a full sync for all profiles"
+                    disabled={anyRunning()}
+                    title={anyRunning()
+                        ? "A sync is currently running. Please wait."
+                        : "Trigger a full sync for all profiles"}
                 >
                     <RefreshCcw class="inline h-4 w-4" />
                     <span>Full Sync All</span>
                 </button>
                 <button
-                    class="inline-flex items-center gap-1 rounded-md border border-sky-600/60 bg-sky-600/30 px-3 py-1.5 text-sm font-medium text-sky-200 shadow-sm backdrop-blur-sm transition-colors hover:bg-sky-600/40 focus:ring-2 focus:ring-sky-500/40 focus:outline-none"
+                    class="inline-flex items-center gap-1 rounded-md border border-sky-600/60 bg-sky-600/30 px-3 py-1.5 text-sm font-medium text-sky-200 shadow-sm backdrop-blur-sm transition-colors hover:bg-sky-600/40 focus:ring-2 focus:ring-sky-500/40 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                     onclick={() => syncAll(true)}
-                    title="Trigger a poll sync for all profiles"
+                    disabled={anyRunning()}
+                    title={anyRunning()
+                        ? "A sync is currently running. Please wait."
+                        : "Trigger a poll sync for all profiles"}
                 >
                     <CloudDownload class="inline h-4 w-4" />
                     <span>Poll Sync All</span>
@@ -224,17 +264,22 @@
                         <span
                             role="button"
                             tabindex="0"
+                            aria-disabled={isProfileRunning(p)}
                             onclick={(e) => {
                                 e.stopPropagation();
-                                syncProfile(name, false);
+                                if (!isProfileRunning(p)) syncProfile(name, false);
                             }}
                             onkeydown={(e) =>
                                 (e.key === "Enter" || e.key === " ") &&
                                 (e.preventDefault(),
                                 e.stopPropagation(),
-                                syncProfile(name, false))}
+                                !isProfileRunning(p) && syncProfile(name, false))}
                             class="inline-flex items-center gap-1 rounded-md border border-emerald-600/60 bg-emerald-600/30 px-2 py-1 text-[11px] font-medium text-emerald-200 hover:bg-emerald-600/40"
-                            title="Full sync this profile"
+                            class:opacity-50={isProfileRunning(p)}
+                            class:cursor-not-allowed={isProfileRunning(p)}
+                            title={isProfileRunning(p)
+                                ? "Sync in progress. Please wait."
+                                : "Full sync this profile"}
                         >
                             <RefreshCcw class="inline h-3 w-3" />
                             <span>Full</span>
@@ -242,23 +287,61 @@
                         <span
                             role="button"
                             tabindex="0"
+                            aria-disabled={isProfileRunning(p)}
                             onclick={(e) => {
                                 e.stopPropagation();
-                                syncProfile(name, true);
+                                if (!isProfileRunning(p)) syncProfile(name, true);
                             }}
                             onkeydown={(e) =>
                                 (e.key === "Enter" || e.key === " ") &&
                                 (e.preventDefault(),
                                 e.stopPropagation(),
-                                syncProfile(name, true))}
+                                !isProfileRunning(p) && syncProfile(name, true))}
                             class="inline-flex items-center gap-1 rounded-md border border-sky-600/60 bg-sky-600/30 px-2 py-1 text-[11px] font-medium text-sky-200 hover:bg-sky-600/40"
-                            title="Poll sync this profile"
+                            class:opacity-50={isProfileRunning(p)}
+                            class:cursor-not-allowed={isProfileRunning(p)}
+                            title={isProfileRunning(p)
+                                ? "Sync in progress. Please wait."
+                                : "Poll sync this profile"}
                         >
                             <CloudDownload class="inline h-3 w-3" />
                             <span>Poll</span>
                         </span>
                     </div>
                 </div>
+                {#if p.status?.current_sync?.state === "running"}
+                    <div class="mt-3 space-y-2">
+                        <div
+                            class="flex items-center justify-between text-[11px] text-slate-400"
+                        >
+                            <div class="truncate">
+                                {#if p.status.current_sync.section_title}
+                                    <span class="text-slate-300"
+                                        >{p.status.current_sync.section_title}</span
+                                    >
+                                    <span class="mx-1">•</span>
+                                {/if}
+                                <span class="tracking-wide uppercase"
+                                    >{p.status.current_sync.stage || "processing"}</span
+                                >
+                            </div>
+                            <div>
+                                {p.status.current_sync.section_items_processed || 0}/{p
+                                    .status.current_sync.section_items_total || 0}
+                            </div>
+                        </div>
+                        {#key p.status.current_sync.section_index}
+                            <div
+                                class="h-2 w-full overflow-hidden rounded bg-slate-800/80"
+                            >
+                                <div
+                                    class="h-full bg-gradient-to-r from-indigo-500 via-sky-500 to-cyan-400 transition-[width] duration-300 ease-out"
+                                    style={`width: ${Math.round((progressPercent(p) ?? 0) * 100)}%`}
+                                ></div>
+                            </div>
+                        {/key}
+                    </div>
+                {/if}
                 <div class="mt-3 flex flex-wrap gap-2 text-xs">
                     {#if p.config?.anilist_user}<span
                             class="rounded-md bg-slate-800/80 px-2 py-1 text-slate-200"
