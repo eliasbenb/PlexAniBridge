@@ -27,6 +27,11 @@ from tzlocal import get_localzone
 
 from src import log
 from src.config.settings import PlexMetadataSource
+from src.exceptions import (
+    InvalidGuidError,
+    PlexClientNotInitializedError,
+    PlexUserNotFoundError,
+)
 from src.plexapi.community import PlexCommunityClient
 from src.plexapi.metadata import PlexMetadataServer
 from src.utils.requests import SelectiveVerifySession
@@ -184,7 +189,7 @@ class PlexClient:
                     self.plex_user, admin_account.users()
                 ).id
             except Exception as e:
-                raise ValueError(
+                raise PlexUserNotFoundError(
                     f"{self.__class__.__name__}: Failed to switch to user "
                     f"'{self.plex_user}'"
                 ) from e
@@ -231,7 +236,7 @@ class PlexClient:
             ):
                 return u
 
-        raise ValueError(
+        raise PlexUserNotFoundError(
             f"{self.__class__.__name__}: User $$'{self.plex_user}'$$ not found "
             f"in Plex users list"
         )
@@ -256,7 +261,9 @@ class PlexClient:
             str: GUID rating key
         """
         if not guid:
-            raise ValueError(f"{self.__class__.__name__}: GUID cannot be None or empty")
+            raise InvalidGuidError(
+                f"{self.__class__.__name__}: GUID cannot be None or empty"
+            )
         return guid.rsplit("/", 1)[-1]
 
     def get_sections(self) -> list[Section]:
@@ -272,7 +279,7 @@ class PlexClient:
         log.debug(f"{self.__class__.__name__}: Getting all sections")
 
         if not self.user_client:
-            raise ValueError(
+            raise PlexClientNotInitializedError(
                 f"{self.__class__.__name__}: User client is not initialized."
             )
 

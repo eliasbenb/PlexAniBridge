@@ -2,12 +2,12 @@
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Query
 from pydantic import BaseModel
 from sqlalchemy import and_, func, or_, select
-from sqlalchemy.orm import aliased
 
 from src.config.database import db
+from src.exceptions import MappingIdMismatchError, MappingNotFoundError
 from src.models.db.animap import AniMap
 from src.models.db.provenance import AniMapProvenance
 from src.models.schemas.anilist import MediaWithoutList as AniListMetadata
@@ -239,12 +239,14 @@ async def create_mapping(mapping: dict[str, Any]) -> MappingItemModel:
 
     Returns:
         dict[str, Any]: The created mapping.
+
+    Raises:
+        MissingAnilistIdError: If anilist_id is not provided.
+        UnsupportedMappingFileExtensionError: If the custom file extension is
+            unsupported.
     """
     svc = get_mappings_service()
-    try:
-        obj = svc.replace_mapping(mapping)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+    obj = svc.replace_mapping(mapping)
 
     # Compute provenance to set flags
     scheduler = get_app_state().scheduler
@@ -260,13 +262,17 @@ async def create_mapping(mapping: dict[str, Any]) -> MappingItemModel:
             .group_by(AniMapProvenance.anilist_id)
             .subquery()
         )
-        prov = aliased(AniMapProvenance)
+
         src = ctx.session.execute(
-            select(prov.source).join(
+            select(AniMapProvenance.source).join(
                 sub,
-                and_(prov.anilist_id == sub.c.anilist_id, prov.n == sub.c.maxn),
+                and_(
+                    AniMapProvenance.anilist_id == sub.c.anilist_id,
+                    AniMapProvenance.n == sub.c.maxn,
+                ),
             )
         ).scalar_one_or_none()
+
         # Fetch full ordered sources for this mapping
         prov_list = (
             ctx.session.execute(
@@ -302,17 +308,17 @@ async def update_mapping(mapping_id: int, mapping: dict[str, Any]) -> MappingIte
 
     Returns:
         dict[str, Any]: The updated mapping.
+
+    Raises:
+        MappingIdMismatchError: If anilist_id in the body does not match the URL.
+        UnsupportedMappingFileExtensionError: If the custom file extension is
+            unsupported.
     """
     if mapping.get("anilist_id") and int(mapping["anilist_id"]) != mapping_id:
-        raise HTTPException(
-            status_code=400, detail="anilist_id in body does not match URL"
-        )
+        raise MappingIdMismatchError("anilist_id in body does not match URL")
 
     svc = get_mappings_service()
-    try:
-        obj = svc.upsert_mapping(mapping_id, mapping)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+    obj = svc.upsert_mapping(mapping_id, mapping)
 
     scheduler = get_app_state().scheduler
     upstream_url = scheduler.global_config.mappings_url if scheduler else None
@@ -326,13 +332,17 @@ async def update_mapping(mapping_id: int, mapping: dict[str, Any]) -> MappingIte
             .group_by(AniMapProvenance.anilist_id)
             .subquery()
         )
-        prov = aliased(AniMapProvenance)
+
         src = ctx.session.execute(
-            select(prov.source).join(
+            select(AniMapProvenance.source).join(
                 sub,
-                and_(prov.anilist_id == sub.c.anilist_id, prov.n == sub.c.maxn),
+                and_(
+                    AniMapProvenance.anilist_id == sub.c.anilist_id,
+                    AniMapProvenance.n == sub.c.maxn,
+                ),
             )
         ).scalar_one_or_none()
+
         prov_list = (
             ctx.session.execute(
                 select(AniMapProvenance.source)
@@ -366,11 +376,14 @@ async def get_mapping(mapping_id: int) -> MappingItemModel:
 
     Returns:
         dict[str, Any]: The mapping data.
+
+    Raises:
+        MappingNotFoundError: If the mapping does not exist.
     """
     with db() as ctx:
         obj = ctx.session.get(AniMap, mapping_id)
         if not obj:
-            raise HTTPException(status_code=404, detail="Mapping not found")
+            raise MappingNotFoundError("Mapping not found")
 
         sub = (
             select(
@@ -381,11 +394,14 @@ async def get_mapping(mapping_id: int) -> MappingItemModel:
             .group_by(AniMapProvenance.anilist_id)
             .subquery()
         )
-        prov = aliased(AniMapProvenance)
+
         src = ctx.session.execute(
-            select(prov.source).join(
+            select(AniMapProvenance.source).join(
                 sub,
-                and_(prov.anilist_id == sub.c.anilist_id, prov.n == sub.c.maxn),
+                and_(
+                    AniMapProvenance.anilist_id == sub.c.anilist_id,
+                    AniMapProvenance.n == sub.c.maxn,
+                ),
             )
         ).scalar_one_or_none()
 
@@ -425,10 +441,11 @@ async def delete_mapping(mapping_id: int) -> DeleteMappingResponse:
 
     Returns:
         dict[str, Any]: A confirmation message.
+
+    Raises:
+        UnsupportedMappingFileExtensionError: If the custom file extension is
+            unsupported.
     """
     svc = get_mappings_service()
-    try:
-        svc.delete_mapping(mapping_id)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+    svc.delete_mapping(mapping_id)
     return DeleteMappingResponse(ok=True)

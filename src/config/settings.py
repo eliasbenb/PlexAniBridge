@@ -25,6 +25,12 @@ from pydantic_settings import (
     YamlConfigSettingsSource,
 )
 
+from src.exceptions import (
+    InvalidMappingsURLError,
+    NoProfilesConfiguredError,
+    ProfileConfigError,
+    ProfileNotFoundError,
+)
 from src.utils.logging import _get_logger
 
 __all__ = [
@@ -269,10 +275,10 @@ class PlexAnibridgeProfileConfig(BaseModel):
             PlexAnibridgeConfig: Parent configuration
 
         Raises:
-            ValueError: If this config is not part of a multi-config
+            ProfileConfigError: If this config is not part of a multi-config
         """
         if not self._parent:
-            raise ValueError(
+            raise ProfileConfigError(
                 "This configuration is not part of a multi-config instance"
             )
         return self._parent
@@ -473,7 +479,7 @@ class PlexAnibridgeConfig(BaseSettings):
                     f"{self.__class__.__name__}: Failed to create profile "
                     f"$$'{profile_name}'$$: {e}"
                 )
-                raise ValueError(
+                raise ProfileConfigError(
                     f"Invalid configuration for profile '{profile_name}': {e}"
                 ) from e
 
@@ -484,9 +490,13 @@ class PlexAnibridgeConfig(BaseSettings):
         if not v:
             return None
         if not (v.startswith("http://") or v.startswith("https://")):
-            raise ValueError("mappings_url must start with http:// or https://")
+            raise InvalidMappingsURLError(
+                "mappings_url must start with http:// or https://"
+            )
         if not (v.endswith(".json") or v.endswith(".yaml") or v.endswith(".yml")):
-            raise ValueError("mappings_url must point to a .json, .yaml, or .yml file")
+            raise InvalidMappingsURLError(
+                "mappings_url must point to a .json, .yaml, or .yml file"
+            )
         return v
 
     @field_validator("profiles", mode="before")
@@ -538,7 +548,7 @@ class PlexAnibridgeConfig(BaseSettings):
                         default_config[field_name] = value
                 self.raw_profiles["default"] = default_config
             else:
-                raise ValueError(
+                raise NoProfilesConfiguredError(
                     "No sufficiently populated sync profiles are configured. Either "
                     "define at least one profile via PAB_PROFILES__${PROFILE}__* or "
                     "set global PAB_ANILIST_TOKEN, PAB_PLEX_TOKEN, PAB_PLEX_USER, and "
@@ -560,7 +570,7 @@ class PlexAnibridgeConfig(BaseSettings):
             KeyError: If profile doesn't exist
         """
         if name not in self.profiles:
-            raise KeyError(
+            raise ProfileNotFoundError(
                 f"Profile '{name}' not found. Available profiles: "
                 f"{list(self.profiles.keys())}"
             )

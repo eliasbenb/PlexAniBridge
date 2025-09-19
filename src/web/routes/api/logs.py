@@ -4,10 +4,14 @@ import logging
 import re
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Query
 from pydantic import BaseModel
 
 from src import config
+from src.exceptions import (
+    InvalidLogFileNameError,
+    LogFileNotFoundError,
+)
 
 __all__ = ["router"]
 
@@ -87,18 +91,19 @@ def _safe_resolve(name: str) -> Path:
         name (str): The file name to resolve.
 
     Raises:
-        HTTPException: If the file name is invalid or not found.
+        InvalidLogFileNameError: If the file name is invalid or attempts traversal.
+        LogFileNotFoundError: If the file does not exist.
     """
     if "/" in name or ".." in name:
-        raise HTTPException(status_code=400, detail="Invalid log file name")
+        raise InvalidLogFileNameError("Invalid log file name")
 
     target = (LOG_DIR / name).resolve()
 
     if not str(target).startswith(str(LOG_DIR)):
-        raise HTTPException(status_code=400, detail="Invalid log file name")
+        raise InvalidLogFileNameError("Invalid log file name")
 
     if not target.exists() or not target.is_file():
-        raise HTTPException(status_code=404, detail="Log file not found")
+        raise LogFileNotFoundError("Log file not found")
 
     return target
 
@@ -171,6 +176,10 @@ async def get_log_file(
 
     Returns:
         JSONResponse: Ordered list (oldest first) of parsed log entries.
+
+    Raises:
+        InvalidLogFileNameError: If the file name is invalid.
+        LogFileNotFoundError: If the requested log file does not exist.
     """
     path = _safe_resolve(name)
     raw_lines = _tail_lines(path, lines)

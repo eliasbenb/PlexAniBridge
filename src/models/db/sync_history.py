@@ -10,6 +10,7 @@ from plexapi.video import Episode, Movie, Season, Show
 from sqlalchemy import JSON, DateTime, Enum, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
+from src.exceptions import UnsupportedMediaTypeError
 from src.models.db.base import Base
 
 
@@ -40,7 +41,7 @@ class MediaType(StrEnum):
         elif isinstance(item, Episode):
             return cls.EPISODE
         else:
-            raise ValueError(f"Unsupported media type: {type(item)}")
+            raise UnsupportedMediaTypeError(f"Unsupported media type: {type(item)}")
 
     def to_cls(self) -> type[Movie | Show | Season | Episode]:
         """Get the corresponding Plex class for this media type.
@@ -58,7 +59,7 @@ class MediaType(StrEnum):
             case self.EPISODE:
                 return Episode
             case _:
-                raise ValueError(f"Unsupported media type: {self}")
+                raise UnsupportedMediaTypeError(f"Unsupported media type: {self}")
 
 
 class SyncOutcome(StrEnum):

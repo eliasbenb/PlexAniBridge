@@ -9,13 +9,14 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.exception_handlers import http_exception_handler
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from src import log
 from src.core.sched import SchedulerClient
+from src.exceptions import PlexAniBridgeError
 from src.web.routes import router
 from src.web.services.logging_handler import get_log_ws_handler
 from src.web.state import get_app_state
@@ -147,7 +148,18 @@ def create_app(scheduler: SchedulerClient | None = None) -> FastAPI:
     api_prefixes = ("/api/", "/ws/", "/webhook/")
 
     @app.exception_handler(StarletteHTTPException)
-    async def spa_404_handler(request: Request, exc: StarletteHTTPException):
+    async def spa_404_handler(
+        request: Request, exc: StarletteHTTPException
+    ) -> Response:
+        """Serve SPA index.html for unknown routes.
+
+        Args:
+            request (Request): The incoming HTTP request.
+            exc (StarletteHTTPException): The exception instance.
+
+        Returns:
+            Response: The response to return.
+        """
         if (
             exc.status_code == 404
             and not request.url.path.startswith(api_prefixes)
@@ -155,6 +167,27 @@ def create_app(scheduler: SchedulerClient | None = None) -> FastAPI:
         ):
             return FileResponse(index_file)
         return await http_exception_handler(request, exc)
+
+    @app.exception_handler(PlexAniBridgeError)
+    async def domain_exception_handler(
+        request: Request, exc: PlexAniBridgeError
+    ) -> JSONResponse:
+        """Handle PlexAniBridge errors with structured JSON responses.
+
+        Args:
+            request (Request): The incoming HTTP request.
+            exc (PlexAniBridgeError): The exception instance.
+
+        Returns:
+            JSONResponse: Structured JSON response with error details.
+        """
+        cls = exc.__class__
+        payload = {
+            "error": cls.__name__,
+            "detail": str(exc) or cls.__doc__ or "",
+            "path": request.url.path,
+        }
+        return JSONResponse(status_code=cls.status_code, content=payload)
 
     return app
 

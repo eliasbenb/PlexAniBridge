@@ -5,6 +5,7 @@ from __future__ import annotations
 from plexapi.video import Episode, Movie, Season, Show
 from pydantic import BaseModel
 
+from src.exceptions import UnsupportedMediaTypeError
 from src.models.db.sync_history import SyncOutcome
 
 
@@ -53,7 +54,7 @@ class ItemIdentifier(BaseModel):
         elif isinstance(item, Movie | Show):
             pass
         else:
-            raise ValueError(f"Unsupported media type: {type(item)}")
+            raise UnsupportedMediaTypeError(f"Unsupported media type: {type(item)}")
 
         return cls(**kwargs)
 

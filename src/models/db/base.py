@@ -7,6 +7,8 @@ from typing import Any, Literal
 from pydantic.main import IncEx
 from sqlalchemy.orm import DeclarativeBase
 
+from src.exceptions import UnsupportedModeError
+
 
 def generic_serialize(obj: Any) -> Any:
     """Recursively convert an object to a JSON-serializable format.
@@ -61,4 +63,4 @@ class Base(DeclarativeBase):
             return result
         if mode == "json":
             return json.loads(json.dumps(result, default=generic_serialize))
-        raise ValueError(f"Unsupported mode: {mode}")
+        raise UnsupportedModeError(f"Unsupported mode: {mode}")

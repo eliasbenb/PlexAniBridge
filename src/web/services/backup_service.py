@@ -11,6 +11,12 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from src.exceptions import (
+    BackupFileNotFoundError,
+    InvalidBackupFilenameError,
+    ProfileNotFoundError,
+    SchedulerNotInitializedError,
+)
 from src.models.schemas.anilist import MediaList
 from src.web.state import get_app_state
 
@@ -54,10 +60,10 @@ class BackupService:
         """Get the scheduler bridge client for a profile."""
         scheduler = get_app_state().scheduler
         if not scheduler:
-            raise ValueError("Scheduler not initialised")
+            raise SchedulerNotInitializedError("Scheduler not initialised")
         bridge = scheduler.bridge_clients.get(profile)
         if not bridge:
-            raise ValueError(f"Unknown profile: {profile}")
+            raise ProfileNotFoundError(f"Unknown profile: {profile}")
         return bridge
 
     def _backup_dir(self, profile: str) -> Path:
@@ -73,6 +79,10 @@ class BackupService:
 
         Returns:
             list[BackupMeta]: List of backup metadata, newest first.
+
+        Raises:
+            SchedulerNotInitializedError: If the scheduler is not running.
+            ProfileNotFoundError: If the profile is unknown.
         """
         bdir = self._backup_dir(profile)
         if not bdir.exists():
@@ -119,13 +129,19 @@ class BackupService:
 
         Returns:
             dict[str, Any]: Parsed JSON content.
+
+        Raises:
+            SchedulerNotInitializedError: If the scheduler is not running.
+            ProfileNotFoundError: If the profile is unknown.
+            InvalidBackupFilenameError: If the filename is invalid.
+            BackupFileNotFoundError: If the file does not exist.
         """
         bdir = self._backup_dir(profile)
         path = (bdir / filename).resolve()
         if path.parent != bdir.resolve():  # Path traversal protection
-            raise ValueError("Invalid backup filename")
+            raise InvalidBackupFilenameError("Invalid backup filename")
         if not path.exists():
-            raise FileNotFoundError("Backup file not found")
+            raise BackupFileNotFoundError("Backup file not found")
 
         with path.open("r", encoding="utf-8") as fh:
             return json.load(fh)
@@ -136,9 +152,9 @@ class BackupService:
         path = (bdir / filename).resolve()
 
         if path.parent != bdir.resolve():
-            raise ValueError("Invalid backup filename")
+            raise InvalidBackupFilenameError("Invalid backup filename")
         if not path.exists():
-            raise FileNotFoundError("Backup file not found")
+            raise BackupFileNotFoundError("Backup file not found")
 
         raw = json.loads(path.read_text())
         user = None
@@ -163,6 +179,12 @@ class BackupService:
         Args:
             profile: Profile name
             filename: Backup filename (basename only)
+
+        Raises:
+            SchedulerNotInitializedError: If the scheduler is not running.
+            ProfileNotFoundError: If the profile is unknown.
+            InvalidBackupFilenameError: If the filename is invalid.
+            BackupFileNotFoundError: If the file does not exist.
         """
         bridge = self._get_profile_bridge(profile)
         parsed = self._parse_backup(profile, filename)

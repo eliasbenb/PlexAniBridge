@@ -12,6 +12,11 @@ from sqlalchemy import func, select
 
 from src.config.database import db
 from src.core.anilist import AniListClient
+from src.exceptions import (
+    HistoryItemNotFoundError,
+    ProfileNotFoundError,
+    SchedulerNotInitializedError,
+)
 from src.models.db.sync_history import SyncHistory, SyncOutcome
 from src.models.schemas.anilist import MediaList as AniMediaList
 from src.web.state import get_app_state
@@ -55,13 +60,18 @@ class HistoryService:
     """Service to paginate and enrich sync history records."""
 
     def _get_bridge(self, profile: str):
-        """Get the bridge client for a specific profile."""
+        """Get the bridge client for a specific profile.
+
+        Raises:
+            SchedulerNotInitializedError: If the scheduler is not running.
+            ProfileNotFoundError: If the profile is unknown.
+        """
         scheduler = get_app_state().scheduler
         if not scheduler:
-            raise ValueError("Scheduler not initialised")
+            raise SchedulerNotInitializedError("Scheduler not initialised")
         bridge = scheduler.bridge_clients.get(profile)
         if not bridge:
-            raise ValueError(f"Unknown profile: {profile}")
+            raise ProfileNotFoundError(f"Unknown profile: {profile}")
         return bridge
 
     @alru_cache(maxsize=128, ttl=300)  # Cache for 5 minutes
@@ -226,6 +236,10 @@ class HistoryService:
 
         Returns:
             HistoryPage: The paginated history entries.
+
+        Raises:
+            SchedulerNotInitializedError: If the scheduler is not running.
+            ProfileNotFoundError: If the profile is unknown.
         """
         page = max(1, page)
         per_page = max(1, min(per_page, 250))
@@ -303,6 +317,9 @@ class HistoryService:
         Args:
             profile (str): The profile name.
             item_id (int): The ID of the history item to delete.
+
+        Raises:
+            HistoryItemNotFoundError: If the item does not exist.
         """
         with db() as ctx:
             row = (
@@ -311,7 +328,7 @@ class HistoryService:
                 .first()
             )
             if not row:
-                raise ValueError("Not found")
+                raise HistoryItemNotFoundError("Not found")
             ctx.session.delete(row)
             ctx.session.commit()
 
@@ -327,6 +344,11 @@ class HistoryService:
 
         Returns:
             HistoryItem: Newly created history record representing the undo action.
+
+        Raises:
+            SchedulerNotInitializedError: If the scheduler is not running.
+            ProfileNotFoundError: If the profile is unknown.
+            HistoryItemNotFoundError: If the specified item does not exist.
         """
         bridge = self._get_bridge(profile)
         with db() as ctx:
@@ -339,7 +361,7 @@ class HistoryService:
                 .first()
             )
             if not row:
-                raise ValueError("History item not found")
+                raise HistoryItemNotFoundError("History item not found")
 
             outcome = str(row.outcome)
             before_state = row.before_state
