@@ -12,6 +12,11 @@ from sqlalchemy import func, select
 
 from src.config.database import db
 from src.core.anilist import AniListClient
+from src.exceptions import (
+    HistoryItemNotFoundError,
+    ProfileNotFoundError,
+    SchedulerNotInitializedError,
+)
 from src.models.db.sync_history import SyncHistory, SyncOutcome
 from src.models.schemas.anilist import MediaList as AniMediaList
 from src.web.state import get_app_state
@@ -58,10 +63,10 @@ class HistoryService:
         """Get the bridge client for a specific profile."""
         scheduler = get_app_state().scheduler
         if not scheduler:
-            raise ValueError("Scheduler not initialised")
+            raise SchedulerNotInitializedError("Scheduler not initialised")
         bridge = scheduler.bridge_clients.get(profile)
         if not bridge:
-            raise ValueError(f"Unknown profile: {profile}")
+            raise ProfileNotFoundError(f"Unknown profile: {profile}")
         return bridge
 
     @alru_cache(maxsize=128, ttl=300)  # Cache for 5 minutes
@@ -311,7 +316,7 @@ class HistoryService:
                 .first()
             )
             if not row:
-                raise ValueError("Not found")
+                raise HistoryItemNotFoundError("Not found")
             ctx.session.delete(row)
             ctx.session.commit()
 
@@ -339,7 +344,7 @@ class HistoryService:
                 .first()
             )
             if not row:
-                raise ValueError("History item not found")
+                raise HistoryItemNotFoundError("History item not found")
 
             outcome = str(row.outcome)
             before_state = row.before_state

@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from src import __file__ as src_file
 from src import config
+from src.exceptions import DataPathError
 
 __all__ = ["PlexAniBridgeDB", "db"]
 
@@ -77,7 +78,7 @@ class PlexAniBridgeDB:
         if not self.data_path.exists():
             self.data_path.mkdir(parents=True, exist_ok=True)
         elif self.data_path.is_file():
-            raise ValueError(
+            raise DataPathError(
                 f"{self.__class__.__name__}: The path '{self.data_path}' is a file, "
                 "please delete it first or choose a different data folder path",
             )

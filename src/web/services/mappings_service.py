@@ -12,6 +12,10 @@ from sqlalchemy import delete
 from src.config.database import db
 from src.config.settings import get_config
 from src.core.mappings import MappingsClient
+from src.exceptions import (
+    MissingAnilistIdError,
+    UnsupportedMappingFileExtensionError,
+)
 from src.models.db.animap import AniMap
 from src.models.db.provenance import AniMapProvenance
 
@@ -53,7 +57,9 @@ class MappingsService:
                 return af, json.loads(af.path.read_text(encoding="utf-8"))
             elif af.ext in ("yaml", "yml"):
                 return af, yaml.safe_load(af.path.read_text(encoding="utf-8")) or {}
-            raise ValueError(f"Unsupported file extension: {af.ext}")
+            raise UnsupportedMappingFileExtensionError(
+                f"Unsupported file extension: {af.ext}"
+            )
         except Exception:
             return af, {}
 
@@ -71,7 +77,9 @@ class MappingsService:
                 encoding="utf-8",
             )
         else:
-            raise ValueError(f"Unsupported file extension: {af.ext}")
+            raise UnsupportedMappingFileExtensionError(
+                f"Unsupported file extension: {af.ext}"
+            )
 
     def _set_provenance_custom_last(self, anilist_id: int, custom_src: str) -> None:
         """Replace provenance entries so that custom is the last source.
@@ -114,7 +122,7 @@ class MappingsService:
             AniMap: The up-to-date DB model.
         """
         if "anilist_id" not in mapping:
-            raise ValueError("anilist_id is required")
+            raise MissingAnilistIdError("anilist_id is required")
         anilist_id = int(mapping["anilist_id"])
 
         defaults = {c.name: None for c in AniMap.__table__.columns}

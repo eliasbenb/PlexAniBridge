@@ -15,6 +15,7 @@ from src.config.settings import (
     SyncMode,
 )
 from src.core import AniMapClient, BridgeClient
+from src.exceptions import ProfileNotFoundError
 
 __all__ = ["SchedulerClient"]
 
@@ -384,7 +385,7 @@ class SchedulerClient:
         """
         if profile_name is not None:
             if profile_name not in self.bridge_clients:
-                raise KeyError(f"Profile '{profile_name}' not found")
+                raise ProfileNotFoundError(f"Profile '{profile_name}' not found")
 
             log.info(
                 f"{self.__class__.__name__}: [{profile_name}] Manually triggering sync "
@@ -541,7 +542,9 @@ class SchedulerClient:
                 profiles.append((profile_name, profile_config))
 
         if not profiles:
-            raise KeyError(f"Profile for Plex account id '{account_id}' not found")
+            raise ProfileNotFoundError(
+                f"Profile for Plex account id '{account_id}' not found"
+            )
 
         return profiles
 
