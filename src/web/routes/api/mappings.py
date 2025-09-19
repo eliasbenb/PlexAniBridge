@@ -239,6 +239,11 @@ async def create_mapping(mapping: dict[str, Any]) -> MappingItemModel:
 
     Returns:
         dict[str, Any]: The created mapping.
+
+    Raises:
+        MissingAnilistIdError: If anilist_id is not provided.
+        UnsupportedMappingFileExtensionError: If the custom file extension is
+            unsupported.
     """
     svc = get_mappings_service()
     obj = svc.replace_mapping(mapping)
@@ -303,6 +308,11 @@ async def update_mapping(mapping_id: int, mapping: dict[str, Any]) -> MappingIte
 
     Returns:
         dict[str, Any]: The updated mapping.
+
+    Raises:
+        MappingIdMismatchError: If anilist_id in the body does not match the URL.
+        UnsupportedMappingFileExtensionError: If the custom file extension is
+            unsupported.
     """
     if mapping.get("anilist_id") and int(mapping["anilist_id"]) != mapping_id:
         raise MappingIdMismatchError("anilist_id in body does not match URL")
@@ -366,6 +376,9 @@ async def get_mapping(mapping_id: int) -> MappingItemModel:
 
     Returns:
         dict[str, Any]: The mapping data.
+
+    Raises:
+        MappingNotFoundError: If the mapping does not exist.
     """
     with db() as ctx:
         obj = ctx.session.get(AniMap, mapping_id)
@@ -428,6 +441,10 @@ async def delete_mapping(mapping_id: int) -> DeleteMappingResponse:
 
     Returns:
         dict[str, Any]: A confirmation message.
+
+    Raises:
+        UnsupportedMappingFileExtensionError: If the custom file extension is
+            unsupported.
     """
     svc = get_mappings_service()
     svc.delete_mapping(mapping_id)

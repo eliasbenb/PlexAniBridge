@@ -52,6 +52,10 @@ async def get_history(
 
     Returns:
         GetHistoryResponse: The paginated history response.
+
+    Raises:
+        SchedulerNotInitializedError: If the scheduler is not running.
+        ProfileNotFoundError: If the profile is unknown.
     """
     hp: HistoryPage = await get_history_service().get_page(
         profile=profile,
@@ -72,6 +76,9 @@ async def delete_history(profile: str, item_id: int) -> OkResponse:
 
     Returns:
         OkResponse: The response indicating success.
+
+    Raises:
+        HistoryItemNotFoundError: If the specified item does not exist.
     """
     await get_history_service().delete_item(profile, item_id)
     return OkResponse()
@@ -79,6 +86,12 @@ async def delete_history(profile: str, item_id: int) -> OkResponse:
 
 @router.post("/{profile}/{item_id}/undo", response_model=UndoResponse)
 async def undo_history(profile: str, item_id: int) -> UndoResponse:
-    """Undo a history item if possible."""
+    """Undo a history item if possible.
+
+    Raises:
+        SchedulerNotInitializedError: If the scheduler is not running.
+        ProfileNotFoundError: If the profile is unknown.
+        HistoryItemNotFoundError: If the specified item does not exist.
+    """
     item = await get_history_service().undo_item(profile, item_id)
     return UndoResponse(item=item)

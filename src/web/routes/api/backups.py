@@ -35,6 +35,10 @@ def list_backups(profile: str) -> ListBackupsResponse:
 
     Returns:
         ListBackupsResponse: List of available backups
+
+    Raises:
+        SchedulerNotInitializedError: If the scheduler is not running.
+        ProfileNotFoundError: If the profile is unknown.
     """
     backups = get_backup_service().list_backups(profile)
     return ListBackupsResponse(backups=backups)
@@ -42,7 +46,14 @@ def list_backups(profile: str) -> ListBackupsResponse:
 
 @router.post("/{profile}/restore", response_model=RestoreSummary)
 async def restore_backup(profile: str, req: RestoreRequest) -> RestoreSummary:
-    """Restore a backup file (no dry-run mode)."""
+    """Restore a backup file (no dry-run mode).
+
+    Raises:
+        SchedulerNotInitializedError: If the scheduler is not running.
+        ProfileNotFoundError: If the profile is unknown.
+        InvalidBackupFilenameError: If the filename is invalid (e.g., path traversal).
+        BackupFileNotFoundError: If the backup file does not exist.
+    """
     return await get_backup_service().restore_backup(
         profile=profile,
         filename=req.filename,
@@ -54,5 +65,11 @@ def get_backup_raw(profile: str, filename: str) -> dict[str, Any]:
     """Return raw JSON content of a backup.
 
     The response is unvalidated JSON so the UI can present a preview.
+
+    Raises:
+        SchedulerNotInitializedError: If the scheduler is not running.
+        ProfileNotFoundError: If the profile is unknown.
+        InvalidBackupFilenameError: If the filename is invalid.
+        BackupFileNotFoundError: If the backup file was not found.
     """
     return get_backup_service().read_backup_raw(profile, filename)

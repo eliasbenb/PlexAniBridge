@@ -176,6 +176,10 @@ async def get_log_file(
 
     Returns:
         JSONResponse: Ordered list (oldest first) of parsed log entries.
+
+    Raises:
+        InvalidLogFileNameError: If the file name is invalid.
+        LogFileNotFoundError: If the requested log file does not exist.
     """
     path = _safe_resolve(name)
     raw_lines = _tail_lines(path, lines)

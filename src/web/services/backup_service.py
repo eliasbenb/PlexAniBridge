@@ -79,6 +79,10 @@ class BackupService:
 
         Returns:
             list[BackupMeta]: List of backup metadata, newest first.
+
+        Raises:
+            SchedulerNotInitializedError: If the scheduler is not running.
+            ProfileNotFoundError: If the profile is unknown.
         """
         bdir = self._backup_dir(profile)
         if not bdir.exists():
@@ -125,6 +129,12 @@ class BackupService:
 
         Returns:
             dict[str, Any]: Parsed JSON content.
+
+        Raises:
+            SchedulerNotInitializedError: If the scheduler is not running.
+            ProfileNotFoundError: If the profile is unknown.
+            InvalidBackupFilenameError: If the filename is invalid.
+            BackupFileNotFoundError: If the file does not exist.
         """
         bdir = self._backup_dir(profile)
         path = (bdir / filename).resolve()
@@ -169,6 +179,12 @@ class BackupService:
         Args:
             profile: Profile name
             filename: Backup filename (basename only)
+
+        Raises:
+            SchedulerNotInitializedError: If the scheduler is not running.
+            ProfileNotFoundError: If the profile is unknown.
+            InvalidBackupFilenameError: If the filename is invalid.
+            BackupFileNotFoundError: If the file does not exist.
         """
         bridge = self._get_profile_bridge(profile)
         parsed = self._parse_backup(profile, filename)

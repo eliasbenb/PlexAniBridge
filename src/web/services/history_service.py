@@ -60,7 +60,12 @@ class HistoryService:
     """Service to paginate and enrich sync history records."""
 
     def _get_bridge(self, profile: str):
-        """Get the bridge client for a specific profile."""
+        """Get the bridge client for a specific profile.
+
+        Raises:
+            SchedulerNotInitializedError: If the scheduler is not running.
+            ProfileNotFoundError: If the profile is unknown.
+        """
         scheduler = get_app_state().scheduler
         if not scheduler:
             raise SchedulerNotInitializedError("Scheduler not initialised")
@@ -231,6 +236,10 @@ class HistoryService:
 
         Returns:
             HistoryPage: The paginated history entries.
+
+        Raises:
+            SchedulerNotInitializedError: If the scheduler is not running.
+            ProfileNotFoundError: If the profile is unknown.
         """
         page = max(1, page)
         per_page = max(1, min(per_page, 250))
@@ -308,6 +317,9 @@ class HistoryService:
         Args:
             profile (str): The profile name.
             item_id (int): The ID of the history item to delete.
+
+        Raises:
+            HistoryItemNotFoundError: If the item does not exist.
         """
         with db() as ctx:
             row = (
@@ -332,6 +344,11 @@ class HistoryService:
 
         Returns:
             HistoryItem: Newly created history record representing the undo action.
+
+        Raises:
+            SchedulerNotInitializedError: If the scheduler is not running.
+            ProfileNotFoundError: If the profile is unknown.
+            HistoryItemNotFoundError: If the specified item does not exist.
         """
         bridge = self._get_bridge(profile)
         with db() as ctx:

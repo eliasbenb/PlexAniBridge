@@ -25,6 +25,9 @@ async def sync_all(poll: bool = Query(False)) -> OkResponse:
 
     Returns:
         OkResponse: The response containing the sync status.
+
+    Raises:
+        SchedulerNotInitializedError: If the scheduler is not running.
     """
     scheduler = get_app_state().scheduler
     if not scheduler:
@@ -39,6 +42,9 @@ async def sync_database() -> OkResponse:
 
     Returns:
         OkResponse: The response containing the sync status.
+
+    Raises:
+        SchedulerNotInitializedError: If the scheduler is not running.
     """
     scheduler = get_app_state().scheduler
     if not scheduler:
@@ -57,6 +63,10 @@ async def sync_profile(profile: str, poll: bool = Query(False)) -> OkResponse:
 
     Returns:
         OkResponse: The response containing the sync status.
+
+    Raises:
+        SchedulerNotInitializedError: If the scheduler is not running.
+        ProfileNotFoundError: If the profile does not exist.
     """
     scheduler = get_app_state().scheduler
     if not scheduler:

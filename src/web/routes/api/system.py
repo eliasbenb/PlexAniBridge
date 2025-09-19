@@ -103,6 +103,10 @@ async def api_about() -> AboutResponse:
 
     Returns:
         dict[str, Any]: The runtime metadata.
+
+    Raises:
+        SchedulerUnavailableError: If scheduler status cannot be retrieved.
+        PlexAniBridgeError: Any domain error raised by underlying components.
     """
     scheduler = get_app_state().scheduler
     status: dict[str, Any] = {}

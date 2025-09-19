@@ -28,6 +28,9 @@ async def parse_webhook_request(request: Request) -> PlexWebhook:
 
     Returns:
         PlexWebhook: The parsed webhook payload.
+
+    Raises:
+        InvalidWebhookPayloadError: If the request body or payload is invalid.
     """
     content_type = request.headers.get("content-type", "")
     if content_type.startswith("multipart/form-data"):
@@ -61,6 +64,12 @@ async def plex_webhook(
 
     Returns:
         A dictionary containing the result of the webhook processing.
+
+    Raises:
+        SchedulerNotInitializedError: If the scheduler is not running.
+        InvalidWebhookPayloadError: If the payload is invalid.
+        ProfileNotFoundError: If no profiles match the account id.
+        WebhookModeDisabledError: If webhook sync mode is disabled for the profile.
     """
     scheduler = get_app_state().scheduler
     if not scheduler:

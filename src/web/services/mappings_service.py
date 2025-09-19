@@ -120,6 +120,11 @@ class MappingsService:
 
         Returns:
             AniMap: The up-to-date DB model.
+
+        Raises:
+            MissingAnilistIdError: If anilist_id is missing.
+            UnsupportedMappingFileExtensionError: If the custom file extension is
+                unsupported.
         """
         if "anilist_id" not in mapping:
             raise MissingAnilistIdError("anilist_id is required")
@@ -162,6 +167,10 @@ class MappingsService:
 
         Returns:
             AniMap: The up-to-date DB model.
+
+        Raises:
+            UnsupportedMappingFileExtensionError: If the custom file extension is
+                unsupported.
         """
         with db() as ctx:
             obj = ctx.session.get(AniMap, anilist_id)
@@ -210,6 +219,10 @@ class MappingsService:
 
         Args:
             anilist_id (int): The AniList ID of the entry to delete.
+
+        Raises:
+            UnsupportedMappingFileExtensionError: If the custom file extension is
+                unsupported.
         """
         with db() as ctx:
             ctx.session.execute(
