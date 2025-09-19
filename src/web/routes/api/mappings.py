@@ -1,15 +1,18 @@
-"""API endpoints for mappings - list from AniMap DB, edit via custom overrides."""
+"""API endpoints for mappings."""
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import and_, column, exists, func, or_, select
+from sqlalchemy import and_, func, or_, select
+from sqlalchemy.orm import aliased
 
 from src.config.database import db
 from src.models.db.animap import AniMap
+from src.models.db.provenance import AniMapProvenance
 from src.models.schemas.anilist import MediaWithoutList as AniListMetadata
-from src.web.services.mappings_store import get_mappings_store
+from src.utils.sql import json_array_contains, json_dict_has_key, json_dict_has_value
+from src.web.services.mappings_service import get_mappings_service
 from src.web.state import get_app_state
 
 __all__ = ["router"]
@@ -26,8 +29,9 @@ class MappingItemModel(BaseModel):
     tmdb_show_id: list[int] | None = None
     tvdb_id: int | None = None
     tvdb_mappings: dict[str, str] | None = None
-    custom: bool = False
     anilist: AniListMetadata | None = None
+    custom: bool = False
+    sources: list[str] = []
 
 
 class ListMappingsResponse(BaseModel):
@@ -48,8 +52,8 @@ router = APIRouter()
 
 @router.get("", response_model=ListMappingsResponse)
 async def list_mappings(
-    page: int = 1,
-    per_page: int = 25,
+    page: int = Query(1, ge=1),
+    per_page: int = Query(25, ge=1, le=250),
     search: str | None = None,
     custom_only: bool = False,
     with_anilist: bool = False,
@@ -57,128 +61,171 @@ async def list_mappings(
     """List mappings from AniMap database with optional search and pagination.
 
     Edits are stored separately as overrides and merged into the result.
+
+    Args:
+        page (int): Page number (1-based).
+        per_page (int): Number of items per page (max 250).
+        search (str | None): Optional search term to filter mappings.
+        custom_only (bool): If true, only include mappings that have been customized
+            (i.e. last provenance source is not the current upstream URL).
+        with_anilist (bool): If true, include AniList metadata in the response.
+
+    Returns:
+        ListMappingsResponse: The paginated list of mappings.
     """
-    where_clauses = []
+    search_filters: list[Any] = []
     if search:
-        s = search.strip()
-        num = None
+        search_num: int | None = None
         try:
-            num = int(s) if s.isdigit() else None
+            search_num = int(search)
         except ValueError:
-            num = None
+            search_num = None
 
-        or_parts = []
-        if num is not None:
-            or_parts.extend(
-                [
-                    # Direct ID matches
-                    *(
-                        getattr(AniMap, k) == num
-                        for k in ["tmdb_movie_id", "tmdb_show_id", "mal_id"]
-                    ),
-                    # JSONB containment
-                    *(
-                        exists(
-                            select(1)
-                            .select_from(func.json_each(getattr(AniMap, k)))
-                            .where(column("value") == num)
-                        )
-                        for k in ["tmdb_movie_id", "tmdb_show_id", "mal_id"]
-                    ),
-                ]
-            )
-        if s.lower().startswith("tt"):
-            or_parts.append(
-                exists(
-                    select(1)
-                    .select_from(func.json_each(AniMap.imdb_id))
-                    .where(column("value") == s)
-                )
-            )
-        if or_parts:
-            where_clauses.append(or_(*or_parts))
+        per_col = []
+        if search_num is not None:
+            per_col.append(AniMap.anilist_id == search_num)
+            per_col.append(AniMap.anidb_id == search_num)
+            per_col.append(AniMap.tvdb_id == search_num)
+            per_col.append(json_array_contains(AniMap.mal_id, [search_num]))
+            per_col.append(json_array_contains(AniMap.tmdb_movie_id, [search_num]))
+            per_col.append(json_array_contains(AniMap.tmdb_show_id, [search_num]))
 
-    store = get_mappings_store()
-    custom_ids: set[int] | None = None
-    if custom_only:
-        # Preload custom override IDs for filtering query.
-        custom_ids = set(store.keys())
-        if not custom_ids:
-            return ListMappingsResponse(
-                items=[],
-                total=0,
-                page=page,
-                per_page=per_page,
-                pages=0,
-                with_anilist=with_anilist,
-            )
-        where_clauses.append(AniMap.anilist_id.in_(custom_ids))
+        per_col.append(json_array_contains(AniMap.imdb_id, [search]))
+        per_col.append(json_dict_has_key(AniMap.tvdb_mappings, search))
+        per_col.append(json_dict_has_value(AniMap.tvdb_mappings, search))
+        search_filters.append(or_(*per_col))
 
     with db() as ctx:
-        base_query = select(AniMap)
-        count_query = select(func.count()).select_from(AniMap)
-        if where_clauses:
-            wc = and_(*where_clauses)
-            base_query = base_query.where(wc)
-            count_query = count_query.where(wc)
+        stmt = select(AniMap)
 
-        total = ctx.session.execute(count_query).scalar_one()
-        base_query = (
-            base_query.order_by(AniMap.anilist_id)
-            .offset(max(0, (page - 1) * per_page))
+        sub = (
+            select(
+                AniMapProvenance.anilist_id,
+                func.max(AniMapProvenance.n).label("maxn"),
+            )
+            .group_by(AniMapProvenance.anilist_id)
+            .subquery()
+        )
+        stmt = (
+            stmt.outerjoin(sub, sub.c.anilist_id == AniMap.anilist_id)
+            .outerjoin(
+                AniMapProvenance,
+                and_(
+                    AniMapProvenance.anilist_id == sub.c.anilist_id,
+                    AniMapProvenance.n == sub.c.maxn,
+                ),
+            )
+            .add_columns(AniMapProvenance.source)
+        )
+
+        # Apply filters
+        where_clauses: list[Any] = []
+        if search_filters:
+            where_clauses.extend(search_filters)
+
+        # Filter for custom_only: last source != current upstream URL
+        scheduler = get_app_state().scheduler
+        upstream_url = scheduler.global_config.mappings_url if scheduler else None
+        if custom_only:
+            if upstream_url:
+                where_clauses.append(
+                    and_(
+                        AniMapProvenance.source.is_not(None),
+                        AniMapProvenance.source != upstream_url,
+                    )
+                )
+            else:
+                # No upstream configured: treat any non-null source as custom
+                where_clauses.append(AniMapProvenance.source.is_not(None))
+
+        if where_clauses:
+            stmt = stmt.where(and_(*where_clauses))
+
+        count_stmt = select(func.count()).select_from(stmt.subquery())
+        total = ctx.session.execute(count_stmt).scalar_one()
+
+        # Pagination
+        stmt = (
+            stmt.order_by(AniMap.anilist_id.asc())
+            .offset((page - 1) * per_page)
             .limit(per_page)
         )
-        rows = ctx.session.execute(base_query).scalars().all()
+        rows = ctx.session.execute(stmt).all()
 
-    scheduler = get_app_state().scheduler
+        items: list[MappingItemModel] = []
+        anilist_ids: list[int] = []
 
-    items = list(rows)
+        for row in rows:
+            animap: AniMap = row[0]
+            anilist_ids.append(animap.anilist_id)
 
-    enriched_map: dict[int, AniListMetadata] = {}
-    if with_anilist and scheduler and scheduler.bridge_clients:
-        first_bridge = next(iter(scheduler.bridge_clients.values()))
-        try:
-            medias = await first_bridge.anilist_client.batch_get_anime(
-                [it.anilist_id for it in items if it.anilist_id]
+        # Fetch all provenance sources for the page items
+        sources_by_id: dict[int, list[str]] = {aid: [] for aid in anilist_ids}
+        if anilist_ids:
+            prov_rows = ctx.session.execute(
+                select(
+                    AniMapProvenance.anilist_id,
+                    AniMapProvenance.n,
+                    AniMapProvenance.source,
+                )
+                .where(AniMapProvenance.anilist_id.in_(anilist_ids))
+                .order_by(
+                    AniMapProvenance.anilist_id.asc(),
+                    AniMapProvenance.n.asc(),
+                )
+            ).all()
+            for aid, _n, src in prov_rows:
+                sources_by_id.setdefault(aid, []).append(src)
+
+        # Build items with sources and custom flag from last source
+        for row in rows:
+            animap: AniMap = row[0]
+            srcs = sources_by_id.get(animap.anilist_id, [])
+            last_src = srcs[-1] if srcs else None
+            is_custom = bool(
+                last_src is not None and (not upstream_url or last_src != upstream_url)
             )
-            for m in medias:
-                d = m.model_dump(mode="json")
-                d.pop("media_list_entry", None)
-                enriched_map[m.id] = AniListMetadata(**d)
-        except Exception:
-            pass
-
-    store_overrides = get_mappings_store()
-    overrides: dict[int, dict[str, Any]] = {}
-
-    for override_id in list(store_overrides.keys()):
-        ov = store_overrides.get(override_id)
-        if ov:
-            overrides[override_id] = ov
-
-    result_items: list[MappingItemModel] = []
-    for it in items:
-        ov = overrides.get(it.anilist_id) or {}
-        result_items.append(
-            MappingItemModel(
-                anilist_id=it.anilist_id,
-                anidb_id=ov.get("anidb_id", it.anidb_id),
-                imdb_id=ov.get("imdb_id", it.imdb_id),
-                mal_id=ov.get("mal_id", it.mal_id),
-                tmdb_movie_id=ov.get("tmdb_movie_id", it.tmdb_movie_id),
-                tmdb_show_id=ov.get("tmdb_show_id", it.tmdb_show_id),
-                tvdb_id=ov.get("tvdb_id", it.tvdb_id),
-                tvdb_mappings=ov.get("tvdb_mappings", it.tvdb_mappings),
-                custom=bool(ov),
-                anilist=enriched_map.get(it.anilist_id),
+            items.append(
+                MappingItemModel(
+                    anilist_id=animap.anilist_id,
+                    anidb_id=animap.anidb_id,
+                    imdb_id=animap.imdb_id,
+                    mal_id=animap.mal_id,
+                    tmdb_movie_id=animap.tmdb_movie_id,
+                    tmdb_show_id=animap.tmdb_show_id,
+                    tvdb_id=animap.tvdb_id,
+                    tvdb_mappings=animap.tvdb_mappings,
+                    custom=is_custom,
+                    sources=srcs,
+                )
             )
-        )
+
+    if with_anilist and items:
+        scheduler = get_app_state().scheduler
+        if scheduler and scheduler.bridge_clients:
+            # Use the first available profile's AniList client
+            bridge = next(iter(scheduler.bridge_clients.values()))
+            medias = await bridge.anilist_client.batch_get_anime(anilist_ids)
+            by_id = {m.id: m for m in medias}
+
+            for it in items:
+                m = by_id.get(it.anilist_id)
+                if m:
+                    it.anilist = AniListMetadata(
+                        **{
+                            k: getattr(m, k)
+                            for k in AniListMetadata.model_fields
+                            if hasattr(m, k)
+                        }
+                    )
+
+    pages = (total + per_page - 1) // per_page if per_page else 1
     return ListMappingsResponse(
-        items=result_items,
+        items=items,
         total=total,
         page=page,
         per_page=per_page,
-        pages=(total + per_page - 1) // per_page,
+        pages=pages,
         with_anilist=with_anilist,
     )
 
@@ -193,15 +240,56 @@ async def create_mapping(mapping: dict[str, Any]) -> MappingItemModel:
     Returns:
         dict[str, Any]: The created mapping.
     """
-    store = get_mappings_store()
-    scheduler = get_app_state().scheduler
-    res = store.upsert(mapping)
-    if not scheduler:
-        raise HTTPException(503, "Scheduler not available")
-    await scheduler.shared_animap_client._sync_db()
+    svc = get_mappings_service()
+    try:
+        obj = svc.replace_mapping(mapping)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
-    res_obj = MappingItemModel(**res)
-    return res_obj
+    # Compute provenance to set flags
+    scheduler = get_app_state().scheduler
+    upstream_url = scheduler.global_config.mappings_url if scheduler else None
+    # Get last source via provenance
+    with db() as ctx:
+        sub = (
+            select(
+                AniMapProvenance.anilist_id,
+                func.max(AniMapProvenance.n).label("maxn"),
+            )
+            .where(AniMapProvenance.anilist_id == obj.anilist_id)
+            .group_by(AniMapProvenance.anilist_id)
+            .subquery()
+        )
+        prov = aliased(AniMapProvenance)
+        src = ctx.session.execute(
+            select(prov.source).join(
+                sub,
+                and_(prov.anilist_id == sub.c.anilist_id, prov.n == sub.c.maxn),
+            )
+        ).scalar_one_or_none()
+        # Fetch full ordered sources for this mapping
+        prov_list = (
+            ctx.session.execute(
+                select(AniMapProvenance.source)
+                .where(AniMapProvenance.anilist_id == obj.anilist_id)
+                .order_by(AniMapProvenance.n.asc())
+            )
+            .scalars()
+            .all()
+        )
+
+    return MappingItemModel(
+        anilist_id=obj.anilist_id,
+        anidb_id=obj.anidb_id,
+        imdb_id=obj.imdb_id,
+        mal_id=obj.mal_id,
+        tmdb_movie_id=obj.tmdb_movie_id,
+        tmdb_show_id=obj.tmdb_show_id,
+        tvdb_id=obj.tvdb_id,
+        tvdb_mappings=obj.tvdb_mappings,
+        custom=(src is not None and (not upstream_url or src != upstream_url)),
+        sources=list(prov_list),
+    )
 
 
 @router.put("/{mapping_id}", response_model=MappingItemModel)
@@ -215,19 +303,63 @@ async def update_mapping(mapping_id: int, mapping: dict[str, Any]) -> MappingIte
     Returns:
         dict[str, Any]: The updated mapping.
     """
-    store = get_mappings_store()
+    if mapping.get("anilist_id") and int(mapping["anilist_id"]) != mapping_id:
+        raise HTTPException(
+            status_code=400, detail="anilist_id in body does not match URL"
+        )
+
+    svc = get_mappings_service()
+    try:
+        obj = svc.upsert_mapping(mapping_id, mapping)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
     scheduler = get_app_state().scheduler
-    mapping["anilist_id"] = mapping_id
-    res = store.upsert(mapping)
-    if not scheduler:
-        raise HTTPException(503, "Scheduler not available")
-    await scheduler.shared_animap_client._sync_db()
-    return MappingItemModel(**res)
+    upstream_url = scheduler.global_config.mappings_url if scheduler else None
+    with db() as ctx:
+        sub = (
+            select(
+                AniMapProvenance.anilist_id,
+                func.max(AniMapProvenance.n).label("maxn"),
+            )
+            .where(AniMapProvenance.anilist_id == obj.anilist_id)
+            .group_by(AniMapProvenance.anilist_id)
+            .subquery()
+        )
+        prov = aliased(AniMapProvenance)
+        src = ctx.session.execute(
+            select(prov.source).join(
+                sub,
+                and_(prov.anilist_id == sub.c.anilist_id, prov.n == sub.c.maxn),
+            )
+        ).scalar_one_or_none()
+        prov_list = (
+            ctx.session.execute(
+                select(AniMapProvenance.source)
+                .where(AniMapProvenance.anilist_id == obj.anilist_id)
+                .order_by(AniMapProvenance.n.asc())
+            )
+            .scalars()
+            .all()
+        )
+
+    return MappingItemModel(
+        anilist_id=obj.anilist_id,
+        anidb_id=obj.anidb_id,
+        imdb_id=obj.imdb_id,
+        mal_id=obj.mal_id,
+        tmdb_movie_id=obj.tmdb_movie_id,
+        tmdb_show_id=obj.tmdb_show_id,
+        tvdb_id=obj.tvdb_id,
+        tvdb_mappings=obj.tvdb_mappings,
+        custom=(src is not None and (not upstream_url or src != upstream_url)),
+        sources=list(prov_list),
+    )
 
 
 @router.get("/{mapping_id}", response_model=MappingItemModel)
 async def get_mapping(mapping_id: int) -> MappingItemModel:
-    """Retrieve a single custom mapping by ID.
+    """Retrieve a single mapping by ID.
 
     Args:
         mapping_id (int): The ID of the mapping to retrieve.
@@ -235,16 +367,58 @@ async def get_mapping(mapping_id: int) -> MappingItemModel:
     Returns:
         dict[str, Any]: The mapping data.
     """
-    store = get_mappings_store()
-    m = store.get(mapping_id)
-    if not m:
-        raise HTTPException(404, "Not found")
-    return MappingItemModel(**m)
+    with db() as ctx:
+        obj = ctx.session.get(AniMap, mapping_id)
+        if not obj:
+            raise HTTPException(status_code=404, detail="Mapping not found")
+
+        sub = (
+            select(
+                AniMapProvenance.anilist_id,
+                func.max(AniMapProvenance.n).label("maxn"),
+            )
+            .where(AniMapProvenance.anilist_id == obj.anilist_id)
+            .group_by(AniMapProvenance.anilist_id)
+            .subquery()
+        )
+        prov = aliased(AniMapProvenance)
+        src = ctx.session.execute(
+            select(prov.source).join(
+                sub,
+                and_(prov.anilist_id == sub.c.anilist_id, prov.n == sub.c.maxn),
+            )
+        ).scalar_one_or_none()
+
+    # Gather full provenance list for this mapping
+    scheduler = get_app_state().scheduler
+    upstream_url = scheduler.global_config.mappings_url if scheduler else None
+    with db() as ctx2:
+        prov_list = (
+            ctx2.session.execute(
+                select(AniMapProvenance.source)
+                .where(AniMapProvenance.anilist_id == obj.anilist_id)
+                .order_by(AniMapProvenance.n.asc())
+            )
+            .scalars()
+            .all()
+        )
+    return MappingItemModel(
+        anilist_id=obj.anilist_id,
+        anidb_id=obj.anidb_id,
+        imdb_id=obj.imdb_id,
+        mal_id=obj.mal_id,
+        tmdb_movie_id=obj.tmdb_movie_id,
+        tmdb_show_id=obj.tmdb_show_id,
+        tvdb_id=obj.tvdb_id,
+        tvdb_mappings=obj.tvdb_mappings,
+        custom=(src is not None and (not upstream_url or src != upstream_url)),
+        sources=list(prov_list),
+    )
 
 
 @router.delete("/{mapping_id}", response_model=DeleteMappingResponse)
 async def delete_mapping(mapping_id: int) -> DeleteMappingResponse:
-    """Delete a custom mapping.
+    """Delete a mapping.
 
     Args:
         mapping_id (int): The ID of the mapping to delete.
@@ -252,11 +426,9 @@ async def delete_mapping(mapping_id: int) -> DeleteMappingResponse:
     Returns:
         dict[str, Any]: A confirmation message.
     """
-    store = get_mappings_store()
-    scheduler = get_app_state().scheduler
-    if not store.delete(mapping_id):
-        raise HTTPException(404, "Not found")
-    if not scheduler:
-        raise HTTPException(503, "Scheduler not available")
-    await scheduler.shared_animap_client._sync_db()
+    svc = get_mappings_service()
+    try:
+        svc.delete_mapping(mapping_id)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
     return DeleteMappingResponse(ok=True)
