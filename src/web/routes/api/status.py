@@ -5,10 +5,17 @@ from pydantic import BaseModel
 
 from src.web.state import get_app_state
 
-__all__ = ["router"]
+__all__ = [
+    "ProfileConfigModel",
+    "ProfileRuntimeStatusModel",
+    "ProfileStatusModel",
+    "router",
+]
 
 
 class ProfileConfigModel(BaseModel):
+    """Serialized profile configuration exposed to the web UI."""
+
     plex_user: str | None = None
     anilist_user: str | None = None
     sync_interval: int | None = None
@@ -18,11 +25,16 @@ class ProfileConfigModel(BaseModel):
 
 
 class ProfileRuntimeStatusModel(BaseModel):
+    """Runtime status of a profile exposed to the web UI."""
+
     running: bool
     last_synced: str | None = None
+    current_sync: dict | None = None
 
 
 class ProfileStatusModel(BaseModel):
+    """Combined profile configuration and runtime status exposed to the web UI."""
+
     config: ProfileConfigModel
     status: ProfileRuntimeStatusModel
 

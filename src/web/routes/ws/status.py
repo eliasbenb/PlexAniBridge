@@ -28,6 +28,20 @@ async def status_ws(ws: WebSocket) -> None:
                 else {"profiles": {}}
             )
             await ws.send_json(data)
-            await asyncio.sleep(5)
+
+            # If any profile reports an active current_sync, increase refresh rate
+            refresh = 5.0
+            try:
+                profiles = data.get("profiles", {})
+                if any(
+                    (p.get("status", {}).get("current_sync") or {}).get("state")
+                    == "running"
+                    for p in profiles.values()
+                ):
+                    refresh = 0.5
+            except Exception:
+                pass
+
+            await asyncio.sleep(refresh)
     except WebSocketDisconnect:
         pass
