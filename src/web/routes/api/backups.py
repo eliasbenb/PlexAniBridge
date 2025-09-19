@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from pydantic import BaseModel
 
 from src.web.services.backup_service import (
@@ -36,27 +36,17 @@ def list_backups(profile: str) -> ListBackupsResponse:
     Returns:
         ListBackupsResponse: List of available backups
     """
-    try:
-        backups = get_backup_service().list_backups(profile)
-        return ListBackupsResponse(backups=backups)
-    except ValueError as e:
-        raise HTTPException(400, str(e)) from e
+    backups = get_backup_service().list_backups(profile)
+    return ListBackupsResponse(backups=backups)
 
 
 @router.post("/{profile}/restore", response_model=RestoreSummary)
 async def restore_backup(profile: str, req: RestoreRequest) -> RestoreSummary:
     """Restore a backup file (no dry-run mode)."""
-    try:
-        return await get_backup_service().restore_backup(
-            profile=profile,
-            filename=req.filename,
-        )
-    except FileNotFoundError as e:
-        raise HTTPException(404, str(e)) from e
-    except ValueError as e:
-        raise HTTPException(400, str(e)) from e
-    except Exception as e:
-        raise HTTPException(500, f"Restore failed: {e}") from e
+    return await get_backup_service().restore_backup(
+        profile=profile,
+        filename=req.filename,
+    )
 
 
 @router.get("/{profile}/raw/{filename}")
@@ -65,11 +55,4 @@ def get_backup_raw(profile: str, filename: str) -> dict[str, Any]:
 
     The response is unvalidated JSON so the UI can present a preview.
     """
-    try:
-        return get_backup_service().read_backup_raw(profile, filename)
-    except FileNotFoundError as e:
-        raise HTTPException(404, str(e)) from e
-    except ValueError as e:
-        raise HTTPException(400, str(e)) from e
-    except Exception as e:
-        raise HTTPException(500, f"Failed to read backup: {e}") from e
+    return get_backup_service().read_backup_raw(profile, filename)

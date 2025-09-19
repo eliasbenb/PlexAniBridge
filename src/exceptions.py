@@ -162,3 +162,55 @@ class UnsupportedMappingFileExtensionError(MappingError, ValueError):
 
 class MissingAnilistIdError(MappingError, ValueError):
     """Operation requires an AniList ID but none was provided."""
+
+    status_code = 422
+
+
+class MappingIdMismatchError(MappingError, ValueError):
+    """The AniList ID in the URL does not match the request body."""
+
+    status_code = 400
+
+
+class MappingNotFoundError(MappingError, KeyError):
+    """Requested mapping entry could not be located."""
+
+    status_code = 404
+
+
+# Logs errors
+class LogsError(PlexAniBridgeError):
+    """Base class for logs-related failures."""
+
+    status_code = 500
+
+
+class InvalidLogFileNameError(LogsError, ValueError):
+    """Provided log file name is invalid or attempts path traversal."""
+
+    status_code = 400
+
+
+class LogFileNotFoundError(LogsError, FileNotFoundError):
+    """Requested log file was not found within the logs directory."""
+
+    status_code = 404
+
+
+# Webhook errors
+class WebhookError(PlexAniBridgeError):
+    """Base class for webhook-related errors."""
+
+    status_code = 400
+
+
+class InvalidWebhookPayloadError(WebhookError, ValueError):
+    """Webhook payload is missing required fields or malformed."""
+
+    status_code = 400
+
+
+class WebhookModeDisabledError(WebhookError):
+    """Webhook sync mode is not enabled for any matching profile."""
+
+    status_code = 400

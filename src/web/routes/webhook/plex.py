@@ -2,10 +2,16 @@
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, Request
 
 from src import log
 from src.config.settings import SyncMode
+from src.exceptions import (
+    InvalidWebhookPayloadError,
+    ProfileNotFoundError,
+    SchedulerNotInitializedError,
+    WebhookModeDisabledError,
+)
 from src.models.schemas.plex import PlexWebhook, PlexWebhookEventType
 from src.web.state import get_app_state
 
@@ -28,20 +34,20 @@ async def parse_webhook_request(request: Request) -> PlexWebhook:
         form = await request.form()
         payload_raw = form.get("payload")
         if not payload_raw:
-            raise HTTPException(400, "Missing 'payload' form field")
+            raise InvalidWebhookPayloadError("Missing 'payload' form field")
         try:
             return PlexWebhook.model_validate_json(str(payload_raw))
         except Exception as e:
-            raise HTTPException(400, f"Invalid payload JSON: {e}") from e
+            raise InvalidWebhookPayloadError(f"Invalid payload JSON: {e}") from e
     # Fallback to JSON body
     try:
         data = await request.json()
     except Exception as e:
-        raise HTTPException(400, f"Invalid JSON body: {e}") from e
+        raise InvalidWebhookPayloadError(f"Invalid JSON body: {e}") from e
     try:
         return PlexWebhook.model_validate(data)
     except Exception as e:
-        raise HTTPException(400, f"Invalid payload structure: {e}") from e
+        raise InvalidWebhookPayloadError(f"Invalid payload structure: {e}") from e
 
 
 @router.post("")
@@ -59,15 +65,15 @@ async def plex_webhook(
     scheduler = get_app_state().scheduler
     if not scheduler:
         log.warning("Webhook: Scheduler not available")
-        raise HTTPException(503, "Scheduler not available")
+        raise SchedulerNotInitializedError("Scheduler not available")
 
     if not payload.account_id:
         log.debug("Webhook: No account ID found in payload")
-        raise HTTPException(400, "No account ID found in webhook payload")
+        raise InvalidWebhookPayloadError("No account ID found in webhook payload")
 
     if not payload.top_level_rating_key:
         log.debug("Webhook: No rating key found in payload")
-        raise HTTPException(400, "No rating key found in webhook payload")
+        raise InvalidWebhookPayloadError("No rating key found in webhook payload")
 
     if payload.event not in (
         PlexWebhookEventType.MEDIA_ADDED,
@@ -85,11 +91,13 @@ async def plex_webhook(
         ]
     except KeyError as e:
         log.debug(f"Webhook: No profiles found for account ID '{payload.account_id}'")
-        raise HTTPException(404, "Profile not found") from e
+        raise ProfileNotFoundError("Profile not found") from e
 
     if not profiles:
         log.debug("Webhook: No profiles found for account ID '{payload.account_id}'")
-        raise HTTPException(503, "Webhook sync mode is not enabled for this profile")
+        raise WebhookModeDisabledError(
+            "Webhook sync mode is not enabled for this profile"
+        )
 
     log.info(
         f"Webhook: Received Plex event {payload.event} with "

@@ -1,6 +1,6 @@
 """History API endpoints."""
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Query
 from pydantic import BaseModel
 
 from src.web.services.history_service import (
@@ -53,16 +53,13 @@ async def get_history(
     Returns:
         GetHistoryResponse: The paginated history response.
     """
-    try:
-        hp: HistoryPage = await get_history_service().get_page(
-            profile=profile,
-            page=page,
-            per_page=per_page,
-            outcome=outcome,
-        )
-        return GetHistoryResponse(**hp.model_dump())
-    except ValueError as e:
-        raise HTTPException(400, str(e)) from e
+    hp: HistoryPage = await get_history_service().get_page(
+        profile=profile,
+        page=page,
+        per_page=per_page,
+        outcome=outcome,
+    )
+    return GetHistoryResponse(**hp.model_dump())
 
 
 @router.delete("/{profile}/{item_id}", response_model=OkResponse)
@@ -76,20 +73,12 @@ async def delete_history(profile: str, item_id: int) -> OkResponse:
     Returns:
         OkResponse: The response indicating success.
     """
-    try:
-        await get_history_service().delete_item(profile, item_id)
-    except ValueError as e:
-        raise HTTPException(404, str(e)) from e
+    await get_history_service().delete_item(profile, item_id)
     return OkResponse()
 
 
 @router.post("/{profile}/{item_id}/undo", response_model=UndoResponse)
 async def undo_history(profile: str, item_id: int) -> UndoResponse:
     """Undo a history item if possible."""
-    try:
-        item = await get_history_service().undo_item(profile, item_id)
-        return UndoResponse(item=item)
-    except ValueError as e:
-        raise HTTPException(404, str(e)) from e
-    except Exception as e:  # pragma: no cover
-        raise HTTPException(500, f"Undo failed: {e}") from e
+    item = await get_history_service().undo_item(profile, item_id)
+    return UndoResponse(item=item)

@@ -1,8 +1,9 @@
 """API endpoints to trigger sync operations."""
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Query
 from pydantic import BaseModel
 
+from src.exceptions import SchedulerNotInitializedError
 from src.web.state import get_app_state
 
 __all__ = ["router"]
@@ -27,7 +28,7 @@ async def sync_all(poll: bool = Query(False)) -> OkResponse:
     """
     scheduler = get_app_state().scheduler
     if not scheduler:
-        raise HTTPException(503, "Scheduler not available")
+        raise SchedulerNotInitializedError("Scheduler not available")
     await scheduler.trigger_sync(poll=poll)
     return OkResponse(ok=True)
 
@@ -41,7 +42,7 @@ async def sync_database() -> OkResponse:
     """
     scheduler = get_app_state().scheduler
     if not scheduler:
-        raise HTTPException(503, "Scheduler not available")
+        raise SchedulerNotInitializedError("Scheduler not available")
     await scheduler.shared_animap_client._sync_db()
     return OkResponse(ok=True)
 
@@ -59,9 +60,6 @@ async def sync_profile(profile: str, poll: bool = Query(False)) -> OkResponse:
     """
     scheduler = get_app_state().scheduler
     if not scheduler:
-        raise HTTPException(503, "Scheduler not available")
-    try:
-        await scheduler.trigger_sync(profile, poll=poll)
-    except KeyError:
-        raise HTTPException(404, f"Profile '{profile}' not found") from None
+        raise SchedulerNotInitializedError("Scheduler not available")
+    await scheduler.trigger_sync(profile, poll=poll)
     return OkResponse(ok=True)
