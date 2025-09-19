@@ -66,17 +66,6 @@
     onMount(() => {
         loadMeta();
         openWs();
-
-        if (typeof navigator !== "undefined" && "serviceWorker" in navigator) {
-            navigator.serviceWorker.register("/sw.js").catch(() => {});
-
-            navigator.serviceWorker.addEventListener("controllerchange", () => {
-                const id = setTimeout(() => {
-                    clearTimeout(id);
-                    location.reload();
-                }, 50);
-            });
-        }
     });
 </script>
 
