@@ -32,6 +32,17 @@
 
     const { params } = $props<{ params: { profile: string } }>();
 
+    type CurrentSync = {
+        state?: string;
+        started_at?: string;
+        section_index?: number;
+        section_count?: number;
+        section_title?: string | null;
+        stage?: string;
+        section_items_total?: number;
+        section_items_processed?: number;
+    };
+
     type HistoryItem = {
         id: number;
         outcome: string;
@@ -77,10 +88,13 @@
     let showJump = $state(false);
     let newItemsCount = $state(0);
     let ws: WebSocket | null = null;
+    let statusWs: WebSocket | null = null;
     let knownIds = new SvelteSet<number>();
     let sentinel: HTMLDivElement | null = $state(null);
     let titleLangTick = $state(0); // force rerender on title language preference change
     let openDiff: Record<number, boolean> = $state({});
+    let currentSync: CurrentSync | null = $state(null);
+    let isProfileRunning = $state(false);
 
     type ItemDiffUi = {
         tab: "changes" | "compare";
@@ -475,6 +489,40 @@
         };
     }
 
+    function initStatusWs() {
+        try {
+            statusWs?.close();
+        } catch {}
+        const proto = location.protocol === "https:" ? "wss:" : "ws:";
+        statusWs = new WebSocket(`${proto}//${location.host}/ws/status`);
+        statusWs.onmessage = (ev) => {
+            try {
+                const data = JSON.parse(ev.data);
+                const prof = data?.profiles?.[params.profile];
+                const cs = prof?.status?.current_sync;
+                currentSync = cs ?? null;
+                isProfileRunning = !!(
+                    prof && prof.status?.current_sync?.state === "running"
+                );
+            } catch {}
+        };
+        statusWs.onclose = () => {
+            setTimeout(initStatusWs, 2000);
+        };
+    }
+
+    function progressPercent(): number | null {
+        const c = currentSync;
+        if (!c || c.state !== "running") return null;
+        const secIdx = Math.max(0, (c.section_index || 1) - 1);
+        const secCount = Math.max(1, c.section_count || 1);
+        const total = Math.max(1, c.section_items_total || 1);
+        const done = Math.min(total, c.section_items_processed || 0);
+        const sectionFrac = total > 0 ? done / total : 0;
+        const overall = (secIdx + sectionFrac) / secCount;
+        return Math.max(0, Math.min(1, overall));
+    }
+
     function jumpToLatest() {
         window.scrollTo({ top: 0, behavior: "smooth" });
         setTimeout(() => {
@@ -502,6 +550,7 @@
     onMount(() => {
         loadFirst();
         initWs();
+        initStatusWs();
         const langHandler = () => titleLangTick++;
         addEventListener("anilist-lang-changed", langHandler);
         const io = new IntersectionObserver((entries) => {
@@ -512,6 +561,7 @@
         return () => {
             try {
                 ws?.close();
+                statusWs?.close();
             } catch {}
             removeEventListener("anilist-lang-changed", langHandler);
             removeEventListener("scroll", handleScroll);
@@ -529,13 +579,15 @@
             <button
                 onclick={() => triggerSync(false)}
                 type="button"
-                class="inline-flex items-center gap-1 rounded-md border border-emerald-600/60 bg-emerald-600/30 px-2 py-1 font-medium text-emerald-200 hover:bg-emerald-600/40"
+                class="inline-flex items-center gap-1 rounded-md border border-emerald-600/60 bg-emerald-600/30 px-2 py-1 font-medium text-emerald-200 hover:bg-emerald-600/40 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={isProfileRunning}
                 ><RefreshCcw class="inline h-4 w-4 text-[14px]" /> Full Sync</button
             >
             <button
                 onclick={() => triggerSync(true)}
                 type="button"
-                class="inline-flex items-center gap-1 rounded-md border border-sky-600/60 bg-sky-600/30 px-2 py-1 font-medium text-sky-200 hover:bg-sky-600/40"
+                class="inline-flex items-center gap-1 rounded-md border border-sky-600/60 bg-sky-600/30 px-2 py-1 font-medium text-sky-200 hover:bg-sky-600/40 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={isProfileRunning}
                 ><CloudDownload class="inline h-4 w-4 text-[14px]" /> Poll Sync</button
             >
             <button
@@ -546,6 +598,33 @@
             >
         </div>
     </div>
+    {#if currentSync?.state === "running"}
+        <div class="mt-2 space-y-2">
+            <div class="flex items-center justify-between text-[11px] text-slate-400">
+                <div class="truncate">
+                    {#if currentSync.section_title}
+                        <span class="text-slate-300">{currentSync.section_title}</span>
+                        <span class="mx-1">•</span>
+                    {/if}
+                    <span class="tracking-wide uppercase"
+                        >{currentSync.stage || "processing"}</span
+                    >
+                </div>
+                <div>
+                    {currentSync.section_items_processed ||
+                        0}/{currentSync.section_items_total || 0}
+                </div>
+            </div>
+            {#key currentSync.section_index}
+                <div class="h-2 w-full overflow-hidden rounded bg-slate-800/80">
+                    <div
+                        class="h-full bg-gradient-to-r from-indigo-500 via-sky-500 to-cyan-400 transition-[width] duration-300 ease-out"
+                        style={`width: ${Math.round((progressPercent() ?? 0) * 100)}%`}
+                    ></div>
+                </div>
+            {/key}
+        </div>
+    {/if}
     <div class="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
         {#each Object.entries(OUTCOME_META) as [k, meta] (k)}
             <button
