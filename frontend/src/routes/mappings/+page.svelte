@@ -5,6 +5,7 @@
     import { SvelteURLSearchParams } from "svelte/reactivity";
 
     import { apiFetch } from "$lib/api";
+    import HoverTooltip from "$lib/components/hover-tooltip.svelte";
     import { toast } from "$lib/notify";
     import { highlightJson } from "$lib/utils";
 
@@ -719,41 +720,36 @@
                                         )}
                                         {@const totalSeasons = entries.length}
                                         {#if totalSeasons > 0}
-                                            <div class="group relative inline-block">
+                                            <HoverTooltip
+                                                title="TVDB Seasons"
+                                                widthClass="w-min min-w-[8rem]"
+                                                outDelay={100}
+                                            >
                                                 <span
+                                                    slot="trigger"
                                                     class={`inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded px-1.5 text-[10px] ring-1 ${totalSeasons > 1 ? "bg-amber-600/30 text-amber-100 ring-amber-700/40" : "bg-slate-800/60 text-slate-300 ring-slate-700/50"}`}
                                                     >{totalSeasons}</span
                                                 >
-                                                <div
-                                                    class="invisible absolute left-0 z-20 mt-1 w-64 rounded-md border border-slate-800/70 bg-slate-900/95 p-2 opacity-0 shadow-xl transition-opacity group-hover:visible group-hover:opacity-100"
+                                                <ol
+                                                    class="max-h-52 space-y-1 overflow-auto text-[11px]"
                                                 >
-                                                    <div
-                                                        class="mb-1 text-[10px] font-medium text-slate-400"
-                                                    >
-                                                        TVDB Seasons
-                                                    </div>
-                                                    <ol
-                                                        class="max-h-52 space-y-1 overflow-auto text-[11px]"
-                                                    >
-                                                        {#each entries as e (e[0])}
-                                                            <li
-                                                                class="flex items-start gap-1"
+                                                    {#each entries as e (e[0])}
+                                                        <li
+                                                            class="flex items-start gap-1"
+                                                        >
+                                                            <span class="text-slate-500"
+                                                                >{e[0]}</span
                                                             >
-                                                                <span
-                                                                    class="text-slate-500"
-                                                                    >{e[0]}</span
-                                                                >
-                                                                <span
-                                                                    class="truncate text-slate-300"
-                                                                    title={e[1]}
-                                                                    >{e[1] ||
-                                                                        "All episodes"}</span
-                                                                >
-                                                            </li>
-                                                        {/each}
-                                                    </ol>
-                                                </div>
-                                            </div>
+                                                            <span
+                                                                class="truncate text-slate-300"
+                                                                title={e[1]}
+                                                                >{e[1] ||
+                                                                    "All episodes"}</span
+                                                            >
+                                                        </li>
+                                                    {/each}
+                                                </ol>
+                                            </HoverTooltip>
                                         {:else}
                                             <span class="text-[10px] text-slate-500"
                                                 >-</span
@@ -765,37 +761,32 @@
                                     {#key (m.sources ?? []).join("|") + ":" + String(m.custom)}
                                         {@const total = (m.sources ?? []).length}
                                         {#if total > 0}
-                                            <div class="group relative inline-block">
+                                            <HoverTooltip
+                                                title="Provenance"
+                                                widthClass="w-min min-w-[8rem]"
+                                                outDelay={100}
+                                            >
                                                 <span
+                                                    slot="trigger"
                                                     class={`inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded px-1.5 text-[10px] ring-1 ${total > 1 ? "bg-amber-600/30 text-amber-100 ring-amber-700/40" : "bg-slate-800/60 text-slate-300 ring-slate-700/50"}`}
                                                     >{total}</span
                                                 >
-                                                <div
-                                                    class="invisible absolute left-0 z-20 mt-1 w-56 rounded-md border border-slate-800/70 bg-slate-900/95 p-2 opacity-0 shadow-xl transition-opacity group-hover:visible group-hover:opacity-100"
-                                                >
-                                                    <div
-                                                        class="mb-1 text-[10px] font-medium text-slate-400"
-                                                    >
-                                                        Provenance
-                                                    </div>
-                                                    <ol class="space-y-1 text-[11px]">
-                                                        {#each m.sources ?? [] as s, i (i)}
-                                                            <li
-                                                                class="flex items-start gap-1"
+                                                <ol class="space-y-1 text-[11px]">
+                                                    {#each m.sources ?? [] as s, i (i)}
+                                                        <li
+                                                            class="flex items-start gap-1"
+                                                        >
+                                                            <span class="text-slate-500"
+                                                                >{i + 1}.</span
                                                             >
-                                                                <span
-                                                                    class="text-slate-500"
-                                                                    >{i + 1}.</span
-                                                                >
-                                                                <span
-                                                                    class="truncate"
-                                                                    title={s}>{s}</span
-                                                                >
-                                                            </li>
-                                                        {/each}
-                                                    </ol>
-                                                </div>
-                                            </div>
+                                                            <span
+                                                                class="truncate"
+                                                                title={s}>{s}</span
+                                                            >
+                                                        </li>
+                                                    {/each}
+                                                </ol>
+                                            </HoverTooltip>
                                         {:else}
                                             <span class="text-[10px] text-slate-500"
                                                 >-</span
