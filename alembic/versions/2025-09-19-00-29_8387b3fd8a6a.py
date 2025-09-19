@@ -33,6 +33,7 @@ def upgrade() -> None:
     # ### end Alembic commands ###
 
     op.execute("DELETE FROM animap")
+    op.execute("DELETE FROM house_keeping WHERE key = 'animap_mappings_hash'")
 
 
 def downgrade() -> None:
