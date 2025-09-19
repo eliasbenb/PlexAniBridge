@@ -12,7 +12,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from src import __file__ as src_file
-from src import config
+from src import config, log
 from src.exceptions import DataPathError
 
 __all__ = ["PlexAniBridgeDB", "db"]
@@ -47,6 +47,9 @@ class PlexAniBridgeDB:
         self.data_path = data_path
         self.db_path = data_path / "plexanibridge.db"
 
+        log.debug(
+            f"{self.__class__.__name__}: Initializing database at $$'{self.db_path}'$$"
+        )
         self.engine = self._setup_db()
         self._SessionLocal = sessionmaker(
             bind=self.engine,
@@ -76,8 +79,16 @@ class PlexAniBridgeDB:
         import src.models  # noqa: F401
 
         if not self.data_path.exists():
+            log.debug(
+                f"{self.__class__.__name__}: Creating data directory at "
+                f"$$'{self.data_path}'$$"
+            )
             self.data_path.mkdir(parents=True, exist_ok=True)
         elif self.data_path.is_file():
+            log.error(
+                f"{self.__class__.__name__}: Invalid data path "
+                f"$$'{self.data_path}'$$ is a file"
+            )
             raise DataPathError(
                 f"{self.__class__.__name__}: The path '{self.data_path}' is a file, "
                 "please delete it first or choose a different data folder path",
@@ -88,6 +99,9 @@ class PlexAniBridgeDB:
             connect_args={"check_same_thread": False},
             pool_pre_ping=True,
             future=True,
+        )
+        log.debug(
+            f"{self.__class__.__name__}: SQLite engine created at $$'{self.db_path}'$$"
         )
 
         @event.listens_for(engine, "connect")
@@ -119,6 +133,7 @@ class PlexAniBridgeDB:
 
         from alembic import command
 
+        log.debug(f"{self.__class__.__name__}: Running database migrations")
         cfg = Config()
         cfg.set_main_option(
             "script_location",
@@ -126,7 +141,15 @@ class PlexAniBridgeDB:
         )
         cfg.set_main_option("sqlalchemy.url", f"sqlite:///{self.db_path}")
 
-        command.upgrade(cfg, "head")
+        try:
+            command.upgrade(cfg, "head")
+            log.debug(f"{self.__class__.__name__}: Database migrations up-to-date")
+        except Exception as e:
+            log.error(
+                f"{self.__class__.__name__}: Database migration failed: {e}",
+                exc_info=True,
+            )
+            raise
 
     def __enter__(self) -> PlexAniBridgeDB:
         """Enters the context manager, returning the database instance."""

@@ -7,6 +7,8 @@ from typing import Any
 
 from starlette.websockets import WebSocket
 
+from src import log
+
 __all__ = ["WebsocketLogHandler", "get_log_ws_handler"]
 
 
@@ -28,6 +30,9 @@ class WebsocketLogHandler(logging.Handler):
         """
         async with self._lock:
             self._connections.add(ws)
+        log.debug(
+            f"{self.__class__.__name__}: Client added ({len(self._connections)} total)"
+        )
 
     async def remove(self, ws: WebSocket) -> None:
         """Remove a websocket connection from the handler.
@@ -37,6 +42,10 @@ class WebsocketLogHandler(logging.Handler):
         """
         async with self._lock:
             self._connections.discard(ws)
+        log.debug(
+            f"{self.__class__.__name__}: Client removed ({len(self._connections)} "
+            "total)"
+        )
 
     def emit(self, record: logging.LogRecord) -> None:
         """Emit a log record to all connected websocket clients.

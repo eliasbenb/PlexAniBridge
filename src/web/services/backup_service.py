@@ -11,6 +11,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from src import log
 from src.exceptions import (
     BackupFileNotFoundError,
     InvalidBackupFilenameError,
@@ -84,14 +85,22 @@ class BackupService:
             SchedulerNotInitializedError: If the scheduler is not running.
             ProfileNotFoundError: If the profile is unknown.
         """
+        log.debug(
+            f"{self.__class__.__name__}: Listing backups for profile $$'{profile}'$$"
+        )
         bdir = self._backup_dir(profile)
         if not bdir.exists():
+            log.debug(
+                f"{self.__class__.__name__}: Backup directory $$'{bdir}'$$ does not "
+                "exist"
+            )
             return []
         metas: list[BackupMeta] = []
         now = datetime.now(UTC)
 
         anilist_client = self._get_profile_bridge(profile).anilist_client
 
+        count = 0
         for f in sorted(bdir.glob(f"plexanibridge-{profile}.*.json")):
             try:
                 parts = f.name.split(".")
@@ -116,8 +125,13 @@ class BackupService:
                         age_seconds=(now - dt).total_seconds(),
                     )
                 )
+                count += 1
             except Exception:
                 continue
+        log.debug(
+            f"{self.__class__.__name__}: Found {count} backups for profile "
+            f"$$'{profile}'$$"
+        )
         return list(reversed(metas))  # Newest first
 
     def read_backup_raw(self, profile: str, filename: str) -> dict[str, Any]:
@@ -136,6 +150,10 @@ class BackupService:
             InvalidBackupFilenameError: If the filename is invalid.
             BackupFileNotFoundError: If the file does not exist.
         """
+        log.debug(
+            f"{self.__class__.__name__}: Reading raw backup $$'{filename}'$$ for "
+            f"profile $$'{profile}'$$"
+        )
         bdir = self._backup_dir(profile)
         path = (bdir / filename).resolve()
         if path.parent != bdir.resolve():  # Path traversal protection
@@ -148,6 +166,10 @@ class BackupService:
 
     def _parse_backup(self, profile: str, filename: str) -> _ParsedBackup:
         """Parse a backup file and return its entries."""
+        log.debug(
+            f"{self.__class__.__name__}: Parsing backup $$'{filename}'$$ for profile "
+            f"$$'{profile}'$$"
+        )
         bdir = self._backup_dir(profile)
         path = (bdir / filename).resolve()
 
@@ -171,6 +193,10 @@ class BackupService:
                     entries.append(MediaList(**entry))
                 except Exception:
                     continue
+        log.debug(
+            f"{self.__class__.__name__}: Parsed backup entries: "
+            f"{len(entries)} for user $$'{user or 'unknown'}'$$"
+        )
         return _ParsedBackup(entries=entries, user=user)
 
     async def restore_backup(self, profile: str, filename: str) -> RestoreSummary:
@@ -186,6 +212,10 @@ class BackupService:
             InvalidBackupFilenameError: If the filename is invalid.
             BackupFileNotFoundError: If the file does not exist.
         """
+        log.info(
+            f"{self.__class__.__name__}: Restoring backup $$'{filename}'$$ for profile "
+            f"$$'{profile}'$$"
+        )
         bridge = self._get_profile_bridge(profile)
         parsed = self._parse_backup(profile, filename)
         total = len(parsed.entries)
@@ -199,6 +229,10 @@ class BackupService:
             try:
                 await bridge.anilist_client.batch_update_anime_entries(batch)
                 restored += len(batch)
+                log.debug(
+                    f"{self.__class__.__name__}: Restored batch entries "
+                    f"{i}-{i + len(batch) - 1}"
+                )
             except Exception as e:
                 errors.append(
                     {
@@ -207,6 +241,17 @@ class BackupService:
                         "error": str(e),
                     }
                 )
+                log.error(
+                    f"{self.__class__.__name__}: Error restoring batch "
+                    f"{i}-{i + len(batch) - 1}: {e}",
+                    exc_info=True,
+                )
+        elapsed = perf_counter() - start
+        log.info(
+            f"{self.__class__.__name__}: Restore completed for profile "
+            f"$$'{profile}'$$: {restored}/{total} restored, "
+            f"errors={len(errors)}, in {elapsed:.2f}s"
+        )
 
         return RestoreSummary(
             ok=not errors,
@@ -216,7 +261,7 @@ class BackupService:
             restored=restored,
             skipped=0,
             errors=errors,
-            elapsed_seconds=perf_counter() - start,
+            elapsed_seconds=elapsed,
         )
 
 

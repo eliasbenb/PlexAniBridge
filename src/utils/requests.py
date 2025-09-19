@@ -6,6 +6,8 @@ from urllib.parse import urlparse
 import requests
 from urllib3.exceptions import InsecureRequestWarning
 
+from src import log
+
 
 class SelectiveVerifySession(requests.Session):
     """Session that selectively disables SSL verification for whitelisted domains."""
@@ -14,6 +16,11 @@ class SelectiveVerifySession(requests.Session):
         """Initialize the session with a whitelist of domains."""
         super().__init__()
         self.whitelist = set(whitelist or [])
+        if self.whitelist:
+            log.debug(
+                f"{self.__class__.__name__}: SSL verify disabled for domains: "
+                + ", ".join([f"$$'{d}'$$" for d in sorted(self.whitelist)])
+            )
 
     def request(self, method, url, *_, **kwargs):
         """Override the request method to selectively disable SSL verification."""
@@ -24,5 +31,15 @@ class SelectiveVerifySession(requests.Session):
             # Suppress SSL warnings
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore", InsecureRequestWarning)
-                return super().request(method, url, **kwargs)
+                try:
+                    return super().request(method, url, **kwargs)
+                except Exception as e:
+                    log.error(
+                        (
+                            f"{self.__class__.__name__}: Error during request to "
+                            f"$$'{domain}'$$: {e}"
+                        ),
+                        exc_info=True,
+                    )
+                    raise
         return super().request(method, url, *_, **kwargs)
