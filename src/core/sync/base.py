@@ -298,7 +298,15 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         all_trackable_items = await self._get_all_trackable_items(item)
         if all_trackable_items:
             self.sync_stats.register_pending_items(all_trackable_items)
-        self.sync_stats.track_item(item_id, SyncOutcome.PENDING)
+            self.sync_stats.track_item(item_id, SyncOutcome.PENDING)
+        else:
+            log.debug(
+                f"{self.__class__.__name__}: [{self.profile_name}] "
+                f"Skipping {item.type} because it has no eligible child items "
+                f"{debug_log_title} {debug_log_ids}"
+            )
+            self.sync_stats.track_item(item_id, SyncOutcome.SKIPPED)
+            return
 
         found_match = False
         async for (
