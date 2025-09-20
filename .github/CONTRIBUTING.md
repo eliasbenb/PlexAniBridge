@@ -32,9 +32,13 @@ If you are only making changes to the documentation, you can opt to clone the re
 
 ## Contributing Code
 
+The PlexAniBridge codebase is primarily written in Python for the backend and Svelte/TypeScript for the frontend.
+
+The project has a set of developer scripts at `scripts/dev.py` to help with common tasks. You can run these scripts with `python scripts/dev.py <command>`. Run `python scripts/dev.py --help` to see a list of available commands.
+
 - Follow the coding standard. We use [ruff](https://docs.astral.sh/ruff/) for Python linting and [ESLint](https://eslint.org/) for JavaScript/TypeScript linting.
-  - Run `ruff check` to ensure your code passes the Python linting rules.
-  - Run `(cd frontend && pnpx lint)` to ensure your JavaScript/TypeScript code passes the linting rules.
+  - Run `python scripts/dev.py lint` to ensure your Python and Svelte code passes the linting rules.
+  - Run `python scripts/dev.py format` to auto-format your Python and Svelte code.
 - Update or add documentation in the `docs/` directory if it affects usage.
 - Make sure any complex or non-obvious code is explained with comments. This helps maintain readability and ease of review.
 
