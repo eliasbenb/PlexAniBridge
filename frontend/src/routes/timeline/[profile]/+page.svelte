@@ -802,7 +802,7 @@
                                         ).toLocaleString()}</span
                                     >
                                     <div
-                                        class="flex flex-wrap gap-1 text-[9px] text-slate-400"
+                                        class="hidden flex-wrap gap-1 text-[9px] text-slate-400 sm:flex"
                                     >
                                         {#if item.anilist?.format}
                                             <span

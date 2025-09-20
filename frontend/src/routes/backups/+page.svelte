@@ -1,7 +1,7 @@
 <script lang="ts">
     import { onMount } from "svelte";
 
-    import { ArchiveRestore, Folder, LoaderCircle } from "@lucide/svelte";
+    import { ArchiveRestore, ChevronRight, Folder } from "@lucide/svelte";
 
     import { resolve } from "$app/paths";
     import { apiJson } from "$lib/api";
@@ -34,38 +34,71 @@
             <ArchiveRestore class="inline h-4 w-4 text-slate-300" />
             <h2 class="text-lg font-semibold">Backups</h2>
             <span class="hidden text-xs text-slate-500 sm:inline"
-                >{Object.keys(profiles).length} profiles
-                <div class="ml-auto"></div>
-            </span>
+                >{profiles.length} profiles</span
+            >
         </div>
         <p class="text-xs text-slate-400">Restore from backups for each profile.</p>
     </div>
     {#if loading}
-        <div class="flex items-center gap-2 text-sm text-sky-300">
-            <LoaderCircle class="inline h-5 w-5 animate-spin" /> Loading…
+        <div
+            class="grid grid-cols-[repeat(auto-fill,minmax(min(100%,32rem),1fr))] gap-4"
+        >
+            {#each Array(4) as _, i (i)}<!-- eslint-disable-line @typescript-eslint/no-unused-vars -->
+                <div
+                    class="animate-pulse rounded-md border border-slate-800/60 bg-slate-900/40 p-4"
+                >
+                    <div
+                        class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"
+                        aria-hidden="true"
+                    >
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <div class="h-5 w-5 rounded bg-slate-700/60"></div>
+                                <div class="h-4 w-32 rounded bg-slate-700/50"></div>
+                            </div>
+                            <div class="mt-1 h-3 w-20 rounded bg-slate-800/60"></div>
+                        </div>
+
+                        <div class="self-start">
+                            <div class="h-6 w-16 rounded-md bg-indigo-700/30"></div>
+                        </div>
+                    </div>
+                </div>
+            {/each}
         </div>
     {:else if !profiles.length}
-        <p class="text-sm text-slate-500">No profiles loaded.</p>
+        <p class="text-sm text-slate-500">No profiles found.</p>
     {:else}
-        <ul class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div
+            class="grid grid-cols-[repeat(auto-fill,minmax(min(100%,32rem),1fr))] gap-4"
+        >
             {#each profiles as p (p)}
-                <li>
-                    <a
-                        href={resolve(`/backups/${p}`)}
-                        class="group block overflow-hidden rounded-md border border-slate-800 bg-gradient-to-br from-slate-900/70 to-slate-800/40 p-4 shadow-sm backdrop-blur-sm transition hover:border-slate-700 hover:from-slate-800/70 hover:to-slate-700/40 hover:shadow-md"
+                <a
+                    href={resolve(`/backups/${p}`)}
+                    class="group cursor-pointer rounded-md border border-slate-800/80 bg-slate-900/50 p-4 text-left transition-colors hover:bg-slate-900/70 focus:ring-2 focus:ring-sky-600/40 focus:outline-none"
+                    title={`Open backups for ${p}`}
+                >
+                    <div
+                        class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"
                     >
-                        <div class="flex items-center gap-2">
-                            <Folder
-                                class="inline h-5 w-5 text-sky-400 transition-colors group-hover:text-sky-300"
-                            />
-                            <span class="truncate font-medium">{p}</span>
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <Folder class="inline h-5 w-5 text-sky-400" />
+                                <span class="font-medium text-slate-100">{p}</span>
+                            </div>
+                            <div class="mt-1 text-xs text-slate-400">
+                                Backups for the {p} profile
+                            </div>
                         </div>
-                        <p class="mt-2 text-[11px] text-slate-500">
-                            View profile backups.
-                        </p>
-                    </a>
-                </li>
+                        <span
+                            class="inline-flex items-center gap-1 self-start rounded-md border border-indigo-600/60 bg-indigo-600/30 px-2 py-1 text-[11px] font-medium text-indigo-200 shadow-sm transition-colors group-hover:bg-indigo-600/40"
+                        >
+                            <span>Open</span>
+                            <ChevronRight class="inline h-3 w-3" />
+                        </span>
+                    </div>
+                </a>
             {/each}
-        </ul>
+        </div>
     {/if}
 </div>

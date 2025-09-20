@@ -20,7 +20,7 @@
         [k: string]: unknown; // flexible structure
     }
     let previewCache = $state<Record<string, BackupRawPreview>>({});
-    let previewLoading = $state(false);
+    let previewLoading = $state<string | null>(null);
 
     async function load() {
         loading = true;
@@ -74,7 +74,7 @@
     async function openPreview(filename: string) {
         if (previewing === filename) return;
         if (!previewCache[filename]) {
-            previewLoading = true;
+            previewLoading = filename;
             try {
                 const data = await apiJson<BackupRawPreview>(
                     `/api/backups/${params.profile}/raw/${filename}`,
@@ -83,10 +83,10 @@
             } catch (e) {
                 console.error(e);
                 toast("Failed to load preview", "error");
-                previewLoading = false;
+                previewLoading = null;
                 return;
             }
-            previewLoading = false;
+            previewLoading = null;
         }
         previewing = filename;
     }
@@ -158,11 +158,7 @@
         </div>
     </div>
 
-    {#if loading}
-        <div class="flex items-center gap-2 text-sm text-sky-300">
-            <LoaderCircle class="inline h-5 w-5 animate-spin" /> Loading backups…
-        </div>
-    {:else if !backups.length}
+    {#if !loading && !backups.length}
         <p class="text-sm text-slate-500">No backups found.</p>
     {:else}
         <div
@@ -201,12 +197,11 @@
                                 <div class="flex justify-end gap-2">
                                     <button
                                         class="inline-flex items-center gap-1 rounded-md border border-sky-600/60 bg-sky-600/30 px-2 py-1 text-[11px] font-medium text-sky-100 hover:bg-sky-600/40 disabled:opacity-50"
-                                        disabled={previewLoading &&
-                                            !previewCache[b.filename]}
+                                        disabled={previewLoading === b.filename}
                                         onclick={() => openPreview(b.filename)}
                                         title="Preview raw JSON"
                                     >
-                                        {#if previewLoading && !previewCache[b.filename]}
+                                        {#if previewLoading === b.filename}
                                             <LoaderCircle
                                                 class="inline h-4 w-4 animate-spin"
                                             />
