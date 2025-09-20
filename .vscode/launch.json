@@ -4,13 +4,13 @@
             "type": "debugpy",
             "request": "launch",
             "name": "Run PlexAniBridge",
-            "program": "${workspaceFolder}/main.py"
+            "program": "pab-dev backend",
         },
         {
             "type": "node-terminal",
             "request": "launch",
             "name": "Run Frontend",
-            "command": "pnpm -C frontend run dev"
+            "command": "pab-dev frontend",
         }
     ],
 }

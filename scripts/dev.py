@@ -57,7 +57,7 @@ def print_info(message: str) -> None:
     )
 
 
-def parse_target_args() -> str:
+def parse_target_args(argv=None) -> str:
     """Parse command line arguments for target selection."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -67,7 +67,7 @@ def parse_target_args() -> str:
         choices=["both", "backend", "frontend"],
         help="Target to operate on: both, backend, or frontend",
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     return args.target
 
 
@@ -320,3 +320,58 @@ def start() -> None:
             "Python3 not found! Please ensure Python 3 is installed and in your PATH."
         )
         sys.exit(1)
+
+
+def main() -> None:
+    """Main entry point for direct script execution."""
+    parser = argparse.ArgumentParser(
+        description="Development scripts for PlexAniBridge."
+    )
+    parser.add_argument(
+        "command",
+        choices=[
+            "build",
+            "clean",
+            "deps-install",
+            "deps-upgrade",
+            "dev",
+            "format",
+            "lint",
+            "start",
+        ],
+        help="Command to execute",
+    )
+    parser.add_argument(
+        "target",
+        nargs="?",
+        default="both",
+        choices=["both", "backend", "frontend"],
+        help="Target to operate on: both, backend, or frontend",
+    )
+    args = parser.parse_args()
+
+    sys.argv = [sys.argv[0], args.target]  # Pass target to functions
+
+    match args.command:
+        case "build":
+            build()
+        case "clean":
+            clean()
+        case "deps-install":
+            deps_install()
+        case "deps-upgrade":
+            deps_upgrade()
+        case "dev":
+            dev()
+        case "format":
+            format()
+        case "lint":
+            lint()
+        case "start":
+            start()
+        case _:
+            print_error(f"Unknown command: {args.command}")
+
+
+if __name__ == "__main__":
+    main()
