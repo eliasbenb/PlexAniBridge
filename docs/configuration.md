@@ -33,7 +33,7 @@ Settings are applied in the following order:
 2. **Global default settings** (medium priority)
 3. **Built-in defaults** (lowest priority)
 
-For example, if you set `PAB_SYNC_INTERVAL=900` globally and `PAB_PROFILES__personal__SYNC_INTERVAL=1800` for a specific profile, the personal profile will use 1800 seconds while other profiles use 900 seconds. If you don't set `PAB_PROFILES__personal__SYNC_INTERVAL`, it will fall back to the application's built-in default of 3600 seconds.
+For example, if you set `PAB_SYNC_INTERVAL=900` globally and `PAB_PROFILES__personal__SYNC_INTERVAL=1800` for a specific profile, the personal profile will use 1800 seconds while other profiles use 900 seconds. If you don't set `PAB_PROFILES__personal__SYNC_INTERVAL`, it will fall back to the application's built-in default of  86400 seconds (24 hours).
 
 ## Configuration Options
 
@@ -168,7 +168,9 @@ Determines the sync modes to use for this profile. Available modes:
 - `poll`: Poll for changes every 30 seconds, making incremental updates.
 - `webhook`: Trigger syncs via Plex [webhook payloads](https://support.plex.tv/articles/115002267687-webhooks/).
 
-Setting `SYNC_MODES` to `None` or an empty list will cause the application to perform a one-time sync where one full sync is performed followed by an immediate exit.
+Setting `SYNC_MODES` to `None` or an empty list will cause the application to perform a single sync on startup and then exit.
+
+By default, all three modes are enabled, allowing for instant, incremental updates via polling and webhooks, as well as a full periodic sync every [sync interval](#sync_interval) seconds (default: 24 hours) to catch any failed/missed updates.
 
 !!! tip "Plex Webhooks"
 

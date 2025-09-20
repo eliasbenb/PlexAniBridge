@@ -14,7 +14,7 @@ Given that software will always be susceptible to bugs, PlexAniBridge offers mul
 PlexAniBridge creates a JSON snapshot of the current AniList list data on startup and on a daily schedule. These backups are stored under the data folder (defined in `PAB_DATA_PATH`) in the `backups` directory as JSON files named like:
 
 ```
-plexanibridge-<ANILIST_USERNAME>.<YYYYMMDDHHMMSS>.json
+plexanibridge-<PROFILE_NAME>.<YYYYMMDDHHMMSS>.json
 ```
 
 You can work with these backups in two ways:
@@ -23,6 +23,7 @@ You can work with these backups in two ways:
 2. CLI [restore script](https://github.com/eliasbenb/PlexAniBridge/blob/HEAD/scripts/anilist_restore.py) (legacy, deprecated).
 
 !!! warning
+
     Backups are automatically deleted after 7 days (rolling retention). If you need to keep a snapshot longer, save it in a safe location.
 
 ### Viewing & Restoring Backups in the Web UI
@@ -33,14 +34,9 @@ You can work with these backups in two ways:
 4. Click Restore to apply that snapshot back to AniList for the profile.
 5. A toast will indicate success; any individual sync outcomes will appear later on the timeline.
 
-#### What a Web UI Restore Does
+!!! warning
 
-- Replays the backed-up list entries to AniList, overwriting current state for that profile's lists.
-- Only the selected backup file is used—other backups remain untouched.
-- Errors encountered during restore are summarized (restored / skipped / errors).
-
-!!! danger "Irreversible Overwrite"
-    A restore replaces current AniList list entries with the backup content. If you want a safety net, trigger a manual sync first so a fresh pre‑restore backup is generated, or download the current latest backup file.
+    Initiating a restore will **overwrite all current AniList entries** for that profile. 
 
 ## Restoring from Backups (CLI Script)
 
@@ -51,8 +47,6 @@ To restore from a backup without the Web UI, use the [restore script](https://gi
 ## Undoing Individual Sync Changes
 
 In addition to full restores, you can undo specific sync operations directly from the Timeline page.
-
-### How It Works
 
 Each timeline entry representing a change (e.g. a creation, update, or deletion) exposes an Undo button when it is logically reversible. When clicked, PlexAniBridge applies an inverse operation to restore the previous state and creates a new timeline entry marked as `undone`.
 

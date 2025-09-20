@@ -14,6 +14,10 @@ icon: material/docker
 
 Below is a PlexAniBridge Docker compose file with example values. Optional environment variables are commented out.
 
+```yaml title="compose.yaml"
+--8<-- "docs/compose.yaml"
+```
+
 !!! tip "PlexAniBridge Configuration"
 
     Have a look at [the configuration page](../configuration.md) for a detailed list of configurable environment variables.
@@ -36,17 +40,13 @@ Below is a PlexAniBridge Docker compose file with example values. Optional envir
         TZ: Etc/UTC
     ```
 
-```yaml title="compose.yaml"
---8<-- "docs/compose.yaml"
-```
-
 To start the container, run:
 
 ```shell
 docker compose -f compose.yaml up -d
 ```
 
-!!! tip
+!!! tip "Image Tags"
 
     You can pin the image to a specific version or branch by changing `latest` to a specific tag. Some available tags are:
     
@@ -75,6 +75,7 @@ docker run \
     -e PAB_PLEX_TOKEN=2Sb... \
     -e PAB_PLEX_USER=username \
     -e PAB_PLEX_URL=http://plex:32400 \
+    -p 4848:4848 \
     -v /path/to/plexanibridge/data:/config \
     ghcr.io/eliasbenb/plexanibridge:v1
 ```
