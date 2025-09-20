@@ -1,5 +1,6 @@
 """FastAPI application factory and setup."""
 
+import asyncio
 import time
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -104,6 +105,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
     log_ws_handler = get_log_ws_handler()
     if log_ws_handler not in root_logger.handlers:
         root_logger.addHandler(log_ws_handler)
+    try:
+        loop = asyncio.get_running_loop()
+        log_ws_handler.set_event_loop(loop)
+    except Exception:
+        pass
     try:
         yield
     finally:

@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import threading
 from functools import lru_cache
 from typing import Any
 
@@ -19,8 +20,17 @@ class WebsocketLogHandler(logging.Handler):
         """Initialize the WebsocketLogHandler."""
         super().__init__()
         self._connections: set[WebSocket] = set()
-        self._lock = asyncio.Lock()
+        self._lock = threading.RLock()
         self._tasks: set[asyncio.Task[Any]] = set()  # Prevents early GC
+        self._loop: asyncio.AbstractEventLoop | None = None
+
+    def set_event_loop(self, loop: asyncio.AbstractEventLoop) -> None:
+        """Record the main event loop to schedule tasks from other threads.
+
+        Args:
+            loop: The application's main asyncio event loop.
+        """
+        self._loop = loop
 
     async def add(self, ws: WebSocket) -> None:
         """Add a websocket connection to the handler.
@@ -28,7 +38,7 @@ class WebsocketLogHandler(logging.Handler):
         Args:
             ws (WebSocket): The websocket connection to add.
         """
-        async with self._lock:
+        with self._lock:
             self._connections.add(ws)
         log.debug(
             f"{self.__class__.__name__}: Client added ({len(self._connections)} total)"
@@ -40,7 +50,7 @@ class WebsocketLogHandler(logging.Handler):
         Args:
             ws (WebSocket): The websocket connection to remove.
         """
-        async with self._lock:
+        with self._lock:
             self._connections.discard(ws)
         log.debug(
             f"{self.__class__.__name__}: Client removed ({len(self._connections)} "
@@ -57,10 +67,38 @@ class WebsocketLogHandler(logging.Handler):
             msg = self.format(record)
         except Exception:
             return
-        for ws in list(self._connections):
-            task = asyncio.create_task(self._safe_send(ws, msg, record.levelname))
-            self._tasks.add(task)
-            task.add_done_callback(self._tasks.discard)
+
+        with self._lock:
+            conns = list(self._connections)
+
+        if not conns:
+            return
+
+        try:
+            current_loop = asyncio.get_running_loop()
+            in_loop = True
+        except RuntimeError:
+            current_loop = None
+            in_loop = False
+
+        if in_loop and current_loop is not None:
+            for ws in conns:
+                task = current_loop.create_task(
+                    self._safe_send(ws, msg, record.levelname)
+                )
+                self._tasks.add(task)
+                task.add_done_callback(self._tasks.discard)
+            return
+
+        if self._loop and not self._loop.is_closed():
+            for ws in conns:
+                try:
+                    asyncio.run_coroutine_threadsafe(
+                        self._safe_send(ws, msg, record.levelname), self._loop
+                    )
+                except Exception:
+                    continue
+            return
 
     async def _safe_send(self, ws: WebSocket, msg: str, level: str) -> None:
         """Send a message to a websocket connection.
