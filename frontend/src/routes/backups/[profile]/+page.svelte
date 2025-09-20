@@ -5,14 +5,15 @@
 
     import { apiJson } from "$lib/api";
     import { toast } from "$lib/notify";
-    import { highlightJson } from "$lib/utils";
+    import JsonCodeBlock from "$lib/ui/json-code-block.svelte";
+    import Modal from "$lib/ui/modal.svelte";
 
     const { params } = $props<{ params: { profile: string } }>();
 
     let backups: BackupMeta[] = $state([]);
     let loading = $state(true);
     let restoring = $state<string | null>(null);
-    let previewing = $state<string | null>(null); // filename currently previewed (modal)
+    let previewing = $state<string | null>(null);
     interface BackupRawPreview {
         user?: unknown;
         lists?: unknown;
@@ -90,8 +91,11 @@
         previewing = filename;
     }
 
-    function closePreview() {
-        previewing = null;
+    function getPreviewOpen() {
+        return previewing !== null;
+    }
+    function setPreviewOpen(open: boolean) {
+        if (!open) previewing = null;
     }
 
     function humanBytes(n: number) {
@@ -236,52 +240,39 @@
     {/if}
 
     {#if previewing}
-        <div
-            class="fixed inset-0 z-40 flex items-start justify-center overflow-auto bg-black/70 p-4 py-10 backdrop-blur-sm"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Backup JSON Preview"
-            tabindex="-1"
-            onclick={(e) => e.target === e.currentTarget && closePreview()}
-            onkeydown={(e) => e.key === "Escape" && closePreview()}
+        <Modal
+            bind:open={getPreviewOpen, setPreviewOpen}
+            contentClass="fixed top-1/2 left-1/2 z-50 w-full max-w-3xl -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-md border border-slate-800 bg-slate-950/80 shadow-xl backdrop-blur-md"
+            headerWrapperClass="border-b border-slate-800/80 bg-slate-900/60 px-4 py-2"
+            footerClass="flex items-center justify-end gap-2 border-t border-slate-800/70 bg-slate-900/60 px-4 py-2"
+            closeButtonClass="rounded-md px-2 py-1 text-xs text-slate-400 hover:bg-slate-800/70 hover:text-slate-200"
+            onOpenAutoFocus={(e: Event) => e.preventDefault()}
+            onCloseAutoFocus={() => (previewing = null)}
         >
-            <div
-                class="relative w-full max-w-3xl overflow-hidden rounded-md border border-slate-800 bg-slate-950/80 shadow-xl backdrop-blur-md"
-            >
-                <div
-                    class="flex items-center justify-between gap-4 border-b border-slate-800/80 bg-slate-900/60 px-4 py-2"
-                >
-                    <h3 class="text-sm font-semibold tracking-wide text-slate-200">
-                        Backup Preview <span
-                            class="ml-1 font-mono text-[10px] text-slate-400"
-                            >{previewing}</span
-                        >
-                    </h3>
-                    <button
-                        onclick={closePreview}
-                        class="rounded-md px-2 py-1 text-xs text-slate-400 hover:bg-slate-800/70 hover:text-slate-200"
-                        title="Close">✕</button
+            <svelte:fragment slot="title">
+                <div class="text-sm font-semibold tracking-wide text-slate-200">
+                    Backup Preview
+                    <span class="ml-1 font-mono text-[10px] text-slate-400"
+                        >{previewing}</span
                     >
                 </div>
-                <div
-                    class="max-h-[70vh] overflow-auto p-4 font-mono text-[11px] leading-snug"
-                >
-                    <code
-                        class="block rounded-md border border-slate-800 bg-slate-900/70 p-3 whitespace-pre-wrap"
-                    >
-                        <!-- eslint-disable-next-line svelte/no-at-html-tags -->
-                        {@html highlightJson(previewCache[previewing] || {})}
-                    </code>
-                </div>
-                <div
-                    class="flex items-center justify-end gap-2 border-t border-slate-800/70 bg-slate-900/60 px-4 py-2"
-                >
-                    <button
-                        class="rounded-md border border-slate-600/60 bg-slate-700/40 px-3 py-1 text-[11px] font-medium text-slate-200 hover:bg-slate-600/50"
-                        onclick={closePreview}>Close</button
-                    >
-                </div>
+            </svelte:fragment>
+
+            <div class="p-4">
+                <JsonCodeBlock
+                    value={previewCache[previewing] || {}}
+                    className="text-[11px] leading-snug"
+                    maxHeight="max-h-[70vh]"
+                />
             </div>
-        </div>
+            <div slot="footer">
+                <button
+                    class="rounded-md border border-slate-600/60 bg-slate-700/40 px-3 py-1 text-[11px] font-medium text-slate-200 hover:bg-slate-600/50"
+                    onclick={() => setPreviewOpen(false)}
+                >
+                    Close
+                </button>
+            </div>
+        </Modal>
     {/if}
 </div>

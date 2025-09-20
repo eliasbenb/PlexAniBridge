@@ -50,7 +50,6 @@
         <ul class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {#each profiles as p (p)}
                 <li>
-                    <!-- eslint-disable-next-line svelte/no-at-html-tags -->
                     <a
                         href={resolve(`/backups/${p}`)}
                         class="group block overflow-hidden rounded-md border border-slate-800 bg-gradient-to-br from-slate-900/70 to-slate-800/40 p-4 shadow-sm backdrop-blur-sm transition hover:border-slate-700 hover:from-slate-800/70 hover:to-slate-700/40 hover:shadow-md"
