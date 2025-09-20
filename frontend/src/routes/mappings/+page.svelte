@@ -2,6 +2,7 @@
     import { onMount } from "svelte";
 
     import { ArrowRight, Check, List, PenLine, Plus, Search, X } from "@lucide/svelte";
+    import { Tabs } from "bits-ui";
     import { SvelteURLSearchParams } from "svelte/reactivity";
 
     import { apiFetch } from "$lib/api";
@@ -899,35 +900,35 @@
                             ><X class="inline h-3.5 w-3.5" /></button
                         >
                     </div>
-                    <div class="flex gap-2 text-[11px]">
-                        <button
-                            class="rounded-md px-3 py-1.5 font-medium ring-1 transition-colors focus:ring-emerald-500/50 focus:outline-none ${editMode ===
-                            'form'
-                                ? 'bg-slate-800 text-emerald-300 ring-slate-600'
-                                : 'bg-slate-900 text-slate-400 ring-slate-700 hover:bg-slate-800'}"
-                            onclick={() => {
-                                if (editMode !== "form") {
-                                    syncRawToForm();
-                                    editMode = "form";
-                                }
-                            }}>Form</button
-                        >
-                        <button
-                            class="rounded-md px-3 py-1.5 font-medium ring-1 transition-colors focus:ring-emerald-500/50 focus:outline-none ${editMode ===
-                            'raw'
-                                ? 'bg-slate-800 text-emerald-300 ring-slate-600'
-                                : 'bg-slate-900 text-slate-400 ring-slate-700 hover:bg-slate-800'}"
-                            onclick={() => {
-                                if (editMode !== "raw") {
-                                    syncFormToRaw();
-                                    editMode = "raw";
-                                }
-                            }}>Raw JSON</button
-                        >
-                    </div>
+            </svelte:fragment>
 
-                    {#if editMode === "form"}
-                        <!-- JSON Preview Section -->
+            <div class="max-h-[calc(100vh-6rem)] space-y-3 overflow-auto p-4">
+                <Tabs.Root
+                    value={editMode}
+                    onValueChange={(v: string) => {
+                        const next = v as typeof editMode;
+                        if (next === "raw" && editMode !== "raw") {
+                            syncFormToRaw();
+                        }
+                        if (next === "form" && editMode !== "form") {
+                            syncRawToForm();
+                        }
+                        editMode = next;
+                    }}
+                >
+                    <Tabs.List class="flex gap-2 text-[11px]">
+                        <Tabs.Trigger
+                            value="form"
+                            class="rounded-md bg-slate-900 px-3 py-1.5 font-medium text-slate-400 ring-1 ring-slate-700 transition-colors hover:bg-slate-800 focus:outline-none focus-visible:ring-emerald-500/50 data-[state=active]:bg-slate-800 data-[state=active]:text-emerald-300 data-[state=active]:ring-slate-600"
+                            >Form</Tabs.Trigger
+                        >
+                        <Tabs.Trigger
+                            value="raw"
+                            class="rounded-md bg-slate-900 px-3 py-1.5 font-medium text-slate-400 ring-1 ring-slate-700 transition-colors hover:bg-slate-800 focus:outline-none focus-visible:ring-emerald-500/50 data-[state=active]:bg-slate-800 data-[state=active]:text-emerald-300 data-[state=active]:ring-slate-600"
+                            >Raw JSON</Tabs.Trigger
+                        >
+                    </Tabs.List>
+                    <Tabs.Content value="form" class="mt-3 space-y-2">
                         <div
                             class="rounded-md border border-slate-700/50 bg-slate-950/40 p-3"
                         >
@@ -1182,29 +1183,29 @@
                                 </div>
                             </div>
                         </div>
-                    {:else}
-                        <div class="space-y-2">
-                            <div
-                                class="flex items-center justify-between text-[11px] text-slate-400"
+                    </Tabs.Content>
+                    <Tabs.Content value="raw" class="mt-3 space-y-2">
+                        <div
+                            class="flex items-center justify-between text-[11px] text-slate-400"
+                        >
+                            <span>Raw Mapping JSON</span>
+                            <button
+                                class="rounded bg-slate-800 px-2 py-1 text-[10px] text-slate-300 hover:bg-slate-700"
+                                onclick={syncFormToRaw}>Refresh from Form</button
                             >
-                                <span>Raw Mapping JSON</span>
-                                <button
-                                    class="rounded bg-slate-800 px-2 py-1 text-[10px] text-slate-300 hover:bg-slate-700"
-                                    onclick={syncFormToRaw}>Refresh from Form</button
-                                >
-                            </div>
-                            <textarea
-                                bind:value={rawJSON}
-                                class="h-72 w-full resize-none rounded-md border border-slate-700 bg-slate-950/80 px-2 py-2 font-mono text-[11px] leading-snug text-slate-200 focus:border-emerald-600 focus:outline-none"
-                                spellcheck={false}
-                            ></textarea>
-                            <p class="text-[10px] text-slate-500">
-                                Provide a JSON object. Required: <code class="font-mono"
-                                    >anilist_id</code
-                                >. Unknown keys will be sent as-is.
-                            </p>
                         </div>
-                    {/if}
+                        <textarea
+                            bind:value={rawJSON}
+                            class="h-72 w-full resize-none rounded-md border border-slate-700 bg-slate-950/80 px-2 py-2 font-mono text-[11px] leading-snug text-slate-200 focus:border-emerald-600 focus:outline-none"
+                            spellcheck={false}
+                        ></textarea>
+                        <p class="text-[10px] text-slate-500">
+                            Provide a JSON object. Required: <code class="font-mono"
+                                >anilist_id</code
+                            >. Unknown keys will be sent as-is.
+                        </p>
+                    </Tabs.Content>
+                </Tabs.Root>
                     <div class="flex justify-end gap-2 pt-1">
                         <button
                             onclick={() => (modal = false)}

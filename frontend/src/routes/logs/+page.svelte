@@ -14,6 +14,7 @@
         Trash2,
         X,
     } from "@lucide/svelte";
+    import { Tabs } from "bits-ui";
 
     import { apiFetch } from "$lib/api";
     import { toast } from "$lib/notify";
@@ -326,27 +327,31 @@
     <!-- Toolbar -->
     <div class="space-y-2 border-b border-slate-800/70 py-2 text-sm font-medium">
         <!-- Tabs -->
-        <div class="flex items-center gap-2">
-            <button
-                type="button"
-                onclick={() => switchTab("live")}
-                class={`inline-flex h-9 items-center gap-1 rounded-md px-4 text-xs font-medium ${tab === "live" ? "bg-slate-800/80 text-slate-100" : "text-slate-400 hover:text-slate-200"}`}
-            >
-                <Activity class="inline h-4 w-4 text-[13px]" /> Live
-                <span
-                    class="ml-1 h-1.5 w-1.5 rounded-full"
-                    class:bg-emerald-400={isWsOpen}
-                    class:bg-amber-400={!isWsOpen}
-                ></span>
-            </button>
-            <button
-                type="button"
-                onclick={() => switchTab("history")}
-                class={`inline-flex h-9 items-center gap-1 rounded-md px-4 text-xs font-medium ${tab === "history" ? "bg-slate-800/80 text-slate-100" : "text-slate-400 hover:text-slate-200"}`}
-            >
-                <FolderSearch class="inline h-4 w-4 text-[13px]" /> History
-            </button>
-        </div>
+        <Tabs.Root
+            value={tab}
+            onValueChange={(v) => switchTab(v as typeof tab)}
+            class="flex items-center gap-2"
+        >
+            <Tabs.List class="flex items-center gap-2">
+                <Tabs.Trigger
+                    value="live"
+                    class="inline-flex h-9 items-center gap-1 rounded-md px-4 text-xs font-medium text-slate-400 hover:text-slate-200 data-[state=active]:bg-slate-800/80 data-[state=active]:text-slate-100"
+                >
+                    <Activity class="inline h-4 w-4 text-[13px]" /> Live
+                    <span
+                        class="ml-1 h-1.5 w-1.5 rounded-full"
+                        class:bg-emerald-400={isWsOpen}
+                        class:bg-amber-400={!isWsOpen}
+                    ></span>
+                </Tabs.Trigger>
+                <Tabs.Trigger
+                    value="history"
+                    class="inline-flex h-9 items-center gap-1 rounded-md px-4 text-xs font-medium text-slate-400 hover:text-slate-200 data-[state=active]:bg-slate-800/80 data-[state=active]:text-slate-100"
+                >
+                    <FolderSearch class="inline h-4 w-4 text-[13px]" /> History
+                </Tabs.Trigger>
+            </Tabs.List>
+        </Tabs.Root>
         <div class="flex flex-wrap items-center justify-between gap-2">
             <!-- Log Level + Search -->
             <div class="flex w-full items-center gap-2">
