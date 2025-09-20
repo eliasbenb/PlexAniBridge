@@ -152,7 +152,7 @@ Determines the source of metadata for Plex content:
 
 ### `SYNC_INTERVAL`
 
-`int` (Optional, default: `3600`)
+`int` (Optional, default: `86400`)
 
 Interval in seconds to sync when using the `periodic` [sync_mode](#sync_modes)
 
@@ -160,12 +160,12 @@ Interval in seconds to sync when using the `periodic` [sync_mode](#sync_modes)
 
 ### `SYNC_MODES`
 
-`list[Enum("periodic", "poll", "webhook")]` (Optional, default: `["periodic"]`)
+`list[Enum("periodic", "poll", "webhook")]` (Optional, default: `["periodic", "poll", "webhook"]`)
 
 Determines the sync modes to use for this profile. Available modes:
 
-- `periodic`: Sync at the specified sync interval.
-- `poll`: Poll for changes every 30 seconds.
+- `periodic`: Sync all items at the specified [sync interval](#sync_interval).
+- `poll`: Poll for changes every 30 seconds, making incremental updates.
 - `webhook`: Trigger syncs via Plex [webhook payloads](https://support.plex.tv/articles/115002267687-webhooks/).
 
 Setting `SYNC_MODES` to `None` or an empty list will cause the application to perform a one-time sync where one full sync is performed followed by an immediate exit.

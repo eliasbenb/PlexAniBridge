@@ -6,8 +6,8 @@ plex_url: ...
 # plex_sections: []
 # plex_genres: []
 # plex_metadata_source: "local"
-# sync_interval: 3600
-# sync_modes: ["periodic"]
+# sync_interval: 86400
+# sync_modes: ["periodic", "poll", "webhook"]
 # full_scan: false
 # destructive_sync: false
 # excluded_sync_fields: ["notes", "score"]

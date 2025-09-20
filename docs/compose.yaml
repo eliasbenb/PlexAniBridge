@@ -13,8 +13,8 @@ services:
             # PAB_PLEX_SECTIONS: '[]'
             # PAB_PLEX_GENRES: '[]'
             # PAB_PLEX_METADATA_SOURCE: local
-            # PAB_SYNC_INTERVAL: 3600
-            # PAB_SYNC_MODES: '["interval"]'
+            # PAB_SYNC_INTERVAL: 86400
+            # PAB_SYNC_MODES: '["periodic", "poll", "webhook"]'
             # PAB_FULL_SCAN: False
             # PAB_DESTRUCTIVE_SYNC: False
             # PAB_EXCLUDED_SYNC_FIELDS: '["notes", "score"]'

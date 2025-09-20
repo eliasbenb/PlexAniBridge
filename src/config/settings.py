@@ -225,12 +225,12 @@ class PlexAnibridgeProfileConfig(BaseModel):
         description="Source of metadata for Plex media items",
     )
     sync_interval: int = Field(
-        default=3600,
+        default=86400,
         ge=0,
         description="Sync interval in seconds",
     )
     sync_modes: list[SyncMode] = Field(
-        default_factory=lambda: [SyncMode.PERIODIC],
+        default_factory=lambda: [SyncMode.PERIODIC, SyncMode.POLL, SyncMode.WEBHOOK],
         description="List of enabled sync modes (periodic, poll, webhook)",
     )
     polling_scan: bool | None = Field(
