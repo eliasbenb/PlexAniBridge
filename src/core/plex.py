@@ -29,6 +29,7 @@ from src import log
 from src.config.settings import PlexMetadataSource
 from src.exceptions import (
     InvalidGuidError,
+    MediaTypeError,
     PlexClientNotInitializedError,
     PlexUserNotFoundError,
 )
@@ -310,15 +311,16 @@ class PlexClient:
                 rated after this timestamp.
             require_watched: If True, only returns items that have been watched at
                 least once.
-            **kwargs: Additional keyword arguments passed to section.search().
-
-        Args (extended):
             rating_keys: Optional list of rating keys to restrict results to. If
                 provided, only items whose ratingKey matches one of the values will
                 be yielded. (Strings or ints coerced to string)
+            **kwargs: Additional keyword arguments passed to section.search().
 
         Yields:
             Media: Media items matching the criteria.
+
+        Raises:
+            MediaTypeError: If the section type is unsupported.
         """
         filters: dict[str, list] = {"and": []}
 
@@ -367,6 +369,11 @@ class PlexClient:
                         ]
                     }
                 )
+            else:
+                raise MediaTypeError(
+                    f"{self.__class__.__name__}: Unsupported section type "
+                    f"$$'{section.TYPE}'$$"
+                )
 
         if require_watched:
             log.debug(
@@ -408,6 +415,11 @@ class PlexClient:
                             {"lastRatedAt>>": epoch},
                         ]
                     }
+                )
+            else:
+                raise MediaTypeError(
+                    f"{self.__class__.__name__}: Unsupported section type "
+                    f"$$'{section.TYPE}'$$"
                 )
 
         if self.plex_genres:
@@ -569,6 +581,11 @@ class PlexClient:
                         data=history_data,
                     )
                 else:
+                    log.debug(
+                        f"{self.__class__.__name__}: Unexpected media type "
+                        f"$$'{metadata['type']}'$$ in watch history for item "
+                        f"$$'{item.title}'$$ $${{plex_id: {item.guid}}}$$"
+                    )
                     continue
 
                 h.ratingKey = metadata["id"]

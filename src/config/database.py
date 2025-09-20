@@ -64,11 +64,6 @@ class PlexAniBridgeDB:
     def _setup_db(self) -> Engine:
         """Creates and initializes the SQLite database.
 
-        Performs the following setup steps:
-        1. Validates or creates the data directory
-        2. Imports database models to register them with SQLAlchemy
-        3. Creates a SQLAlchemy engine for database connections
-
         Returns:
             Engine: Configured SQLAlchemy engine instance
 
@@ -76,8 +71,6 @@ class PlexAniBridgeDB:
             PermissionError: If unable to create the data directory
             ValueError: If data_path exists but is a file instead of a directory
         """
-        import src.models  # noqa: F401
-
         if not self.data_path.exists():
             log.debug(
                 f"{self.__class__.__name__}: Creating data directory at "
