@@ -95,6 +95,7 @@
     let openDiff: Record<number, boolean> = $state({});
     let currentSync: CurrentSync | null = $state(null);
     let isProfileRunning = $state(false);
+    let retryLoading: Record<number, boolean> = $state({});
 
     type ItemDiffUi = {
         tab: "changes" | "compare";
@@ -341,6 +342,39 @@
         )
             return true; // restore deletion
         return false;
+    }
+
+    function canRetry(item: HistoryItem): boolean {
+        return (
+            !!item.plex_rating_key &&
+            (item.outcome === "failed" || item.outcome === "not_found")
+        );
+    }
+
+    async function retryHistory(item: HistoryItem) {
+        if (!canRetry(item)) return toast("Retry not available for this entry", "warn");
+        if (retryLoading[item.id]) return;
+        if (!item.plex_rating_key) return;
+        retryLoading[item.id] = true;
+        try {
+            const res = await apiFetch(
+                `/api/sync/profile/${params.profile}?poll=false`,
+                {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ rating_keys: [item.plex_rating_key] }),
+                },
+                {
+                    successMessage: `Retry requested for ${item.plex?.title || item.plex_rating_key}`,
+                },
+            );
+            if (!res.ok) throw new Error("HTTP " + res.status);
+        } catch (e) {
+            console.error(e);
+            toast("Retry failed", "error");
+        } finally {
+            retryLoading[item.id] = false;
+        }
     }
 
     function canShowDiff(item: HistoryItem): boolean {
@@ -792,6 +826,24 @@
                                 </div>
                             </div>
                             <div class="flex shrink-0 items-center gap-2">
+                                {#if canRetry(item)}
+                                    <button
+                                        type="button"
+                                        disabled={retryLoading[item.id] ||
+                                            isProfileRunning}
+                                        onclick={() => retryHistory(item)}
+                                        class="inline-flex h-8 items-center justify-center gap-1 rounded-md border border-emerald-600/60 bg-emerald-700/40 px-2 text-[11px] font-medium text-emerald-100 hover:bg-emerald-600/50 disabled:opacity-50"
+                                        title="Retry sync for this item"
+                                    >
+                                        {#if retryLoading[item.id]}
+                                            <LoaderCircle
+                                                class="inline h-4 w-4 animate-spin"
+                                            />
+                                        {:else}
+                                            <RefreshCcw class="inline h-4 w-4" />
+                                        {/if}
+                                    </button>
+                                {/if}
                                 {#if canUndo(item)}
                                     <button
                                         type="button"

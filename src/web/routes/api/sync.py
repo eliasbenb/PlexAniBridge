@@ -1,6 +1,6 @@
 """API endpoints to trigger sync operations."""
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Body, Path, Query
 from pydantic import BaseModel
 
 from src.exceptions import SchedulerNotInitializedError
@@ -54,12 +54,17 @@ async def sync_database() -> OkResponse:
 
 
 @router.post("/profile/{profile}", response_model=OkResponse)
-async def sync_profile(profile: str, poll: bool = Query(False)) -> OkResponse:
+async def sync_profile(
+    profile: str = Path(...),
+    poll: bool = Query(False),
+    rating_keys: list[str] | None = Body(default=None, embed=True),
+) -> OkResponse:
     """Trigger a sync for a specific profile.
 
     Args:
         profile (str): The profile to sync.
         poll (bool): Whether to poll for updates.
+        rating_keys (list[str] | None): Specific rating keys to sync (if any).
 
     Returns:
         OkResponse: The response containing the sync status.
@@ -71,5 +76,5 @@ async def sync_profile(profile: str, poll: bool = Query(False)) -> OkResponse:
     scheduler = get_app_state().scheduler
     if not scheduler:
         raise SchedulerNotInitializedError("Scheduler not available")
-    await scheduler.trigger_sync(profile, poll=poll)
+    await scheduler.trigger_sync(profile, poll=poll, rating_keys=rating_keys)
     return OkResponse(ok=True)
