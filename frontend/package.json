@@ -38,7 +38,8 @@
         "vite": "7.1.5"
     },
     "dependencies": {
-        "@lucide/svelte": "^0.544.0"
+        "@lucide/svelte": "^0.544.0",
+        "bits-ui": "^2.10.0"
     },
     "pnpm": {
         "onlyBuiltDependencies": [

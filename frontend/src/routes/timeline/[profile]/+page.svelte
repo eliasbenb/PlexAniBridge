@@ -28,7 +28,7 @@
 
     import { apiFetch } from "$lib/api";
     import { toast } from "$lib/notify";
-    import { highlightJson } from "$lib/utils";
+    import JsonCodeBlock from "$lib/ui/json-code-block.svelte";
 
     const { params } = $props<{ params: { profile: string } }>();
 
@@ -983,12 +983,10 @@
                                             >{sizeLabel(item.before_state)}</span
                                         >
                                     </h5>
-                                    <code
-                                        class="block max-h-64 overflow-auto rounded-md border border-slate-800 bg-slate-900/80 p-2 font-mono text-[11px] leading-tight whitespace-pre"
-                                    >
-                                        <!-- eslint-disable-next-line svelte/no-at-html-tags -->
-                                        {@html highlightJson(item.before_state ?? {})}
-                                    </code>
+                                    <JsonCodeBlock
+                                        value={item.before_state ?? {}}
+                                        className="leading-tight"
+                                    />
                                 </div>
                                 <div class="space-y-1.5">
                                     <h5
@@ -999,12 +997,10 @@
                                             >{sizeLabel(item.after_state)}</span
                                         >
                                     </h5>
-                                    <code
-                                        class="block max-h-64 overflow-auto rounded-md border border-slate-800 bg-slate-900/80 p-2 font-mono text-[11px] leading-tight whitespace-pre"
-                                    >
-                                        <!-- eslint-disable-next-line svelte/no-at-html-tags -->
-                                        {@html highlightJson(item.after_state ?? {})}
-                                    </code>
+                                    <JsonCodeBlock
+                                        value={item.after_state ?? {}}
+                                        className="leading-tight"
+                                    />
                                 </div>
                             </div>
                         {/if}

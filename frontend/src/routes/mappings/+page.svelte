@@ -2,12 +2,14 @@
     import { onMount } from "svelte";
 
     import { ArrowRight, Check, List, PenLine, Plus, Search, X } from "@lucide/svelte";
+    import { Tabs } from "bits-ui";
     import { SvelteURLSearchParams } from "svelte/reactivity";
 
     import { apiFetch } from "$lib/api";
-    import HoverTooltip from "$lib/components/hover-tooltip.svelte";
     import { toast } from "$lib/notify";
-    import { highlightJson } from "$lib/utils";
+    import JsonCodeBlock from "$lib/ui/json-code-block.svelte";
+    import Modal from "$lib/ui/modal.svelte";
+    import UiTooltip from "$lib/ui/ui-tooltip.svelte";
 
     type ExternalIds = {
         anilist_id?: number | null;
@@ -720,16 +722,13 @@
                                         )}
                                         {@const totalSeasons = entries.length}
                                         {#if totalSeasons > 0}
-                                            <HoverTooltip
-                                                title="TVDB Seasons"
-                                                widthClass="w-min min-w-[8rem]"
-                                                outDelay={100}
-                                            >
+                                            <UiTooltip>
                                                 <span
-                                                    slot="trigger"
                                                     class={`inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded px-1.5 text-[10px] ring-1 ${totalSeasons > 1 ? "bg-amber-600/30 text-amber-100 ring-amber-700/40" : "bg-slate-800/60 text-slate-300 ring-slate-700/50"}`}
-                                                    >{totalSeasons}</span
+                                                    slot="trigger"
                                                 >
+                                                    {totalSeasons}
+                                                </span>
                                                 <ol
                                                     class="max-h-52 space-y-1 overflow-auto text-[11px]"
                                                 >
@@ -743,13 +742,13 @@
                                                             <span
                                                                 class="truncate text-slate-300"
                                                                 title={e[1]}
-                                                                >{e[1] ||
-                                                                    "All episodes"}</span
                                                             >
+                                                                {e[1] || "All episodes"}
+                                                            </span>
                                                         </li>
                                                     {/each}
                                                 </ol>
-                                            </HoverTooltip>
+                                            </UiTooltip>
                                         {:else}
                                             <span class="text-[10px] text-slate-500"
                                                 >-</span
@@ -761,16 +760,13 @@
                                     {#key (m.sources ?? []).join("|") + ":" + String(m.custom)}
                                         {@const total = (m.sources ?? []).length}
                                         {#if total > 0}
-                                            <HoverTooltip
-                                                title="Provenance"
-                                                widthClass="w-min min-w-[8rem]"
-                                                outDelay={100}
-                                            >
+                                            <UiTooltip>
                                                 <span
-                                                    slot="trigger"
                                                     class={`inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded px-1.5 text-[10px] ring-1 ${total > 1 ? "bg-amber-600/30 text-amber-100 ring-amber-700/40" : "bg-slate-800/60 text-slate-300 ring-slate-700/50"}`}
-                                                    >{total}</span
+                                                    slot="trigger"
                                                 >
+                                                    {total}
+                                                </span>
                                                 <ol class="space-y-1 text-[11px]">
                                                     {#each m.sources ?? [] as s, i (i)}
                                                         <li
@@ -786,7 +782,7 @@
                                                         </li>
                                                     {/each}
                                                 </ol>
-                                            </HoverTooltip>
+                                            </UiTooltip>
                                         {:else}
                                             <span class="text-[10px] text-slate-500"
                                                 >-</span
@@ -870,64 +866,43 @@
     </div>
 
     {#if modal}
-        <div
-            class="fixed inset-0 z-40 flex items-start justify-center overflow-auto bg-black/70 p-4 py-8 backdrop-blur-sm"
-            role="dialog"
-            aria-modal="true"
-            aria-label={form._isNew ? "New Mapping Override" : "Edit Mapping Override"}
-            tabindex="-1"
-            onclick={(e) => e.target === e.currentTarget && (modal = false)}
-            onkeydown={(e) => e.key === "Escape" && (modal = false)}
-        >
-            <div
-                class="relative max-h-[calc(100vh-6rem)] w-full max-w-lg overflow-auto rounded-md border border-slate-700/70 bg-slate-900/95 shadow-xl ring-1 ring-slate-700/40"
-            >
-                <div class="space-y-3 p-4">
-                    <div class="flex items-start justify-between gap-4">
-                        <h3
-                            class="flex items-center gap-2 text-sm font-semibold tracking-wide"
-                        >
-                            <PenLine class="inline h-4 w-4 text-slate-400" /><span
-                                >{form._isNew
-                                    ? "New Override"
-                                    : "Edit Override #" + form.anilist_id}</span
-                            >
-                        </h3>
-                        <button
-                            onclick={() => (modal = false)}
-                            class="text-slate-400 hover:text-slate-200"
-                            ><X class="inline h-3.5 w-3.5" /></button
-                        >
-                    </div>
-                    <div class="flex gap-2 text-[11px]">
-                        <button
-                            class="rounded-md px-3 py-1.5 font-medium ring-1 transition-colors focus:ring-emerald-500/50 focus:outline-none ${editMode ===
-                            'form'
-                                ? 'bg-slate-800 text-emerald-300 ring-slate-600'
-                                : 'bg-slate-900 text-slate-400 ring-slate-700 hover:bg-slate-800'}"
-                            onclick={() => {
-                                if (editMode !== "form") {
-                                    syncRawToForm();
-                                    editMode = "form";
-                                }
-                            }}>Form</button
-                        >
-                        <button
-                            class="rounded-md px-3 py-1.5 font-medium ring-1 transition-colors focus:ring-emerald-500/50 focus:outline-none ${editMode ===
-                            'raw'
-                                ? 'bg-slate-800 text-emerald-300 ring-slate-600'
-                                : 'bg-slate-900 text-slate-400 ring-slate-700 hover:bg-slate-800'}"
-                            onclick={() => {
-                                if (editMode !== "raw") {
-                                    syncFormToRaw();
-                                    editMode = "raw";
-                                }
-                            }}>Raw JSON</button
-                        >
-                    </div>
+        <Modal bind:open={modal} onOpenAutoFocus={(e: Event) => e.preventDefault()}>
+            <svelte:fragment slot="title">
+                <div
+                    class="flex items-center gap-2 text-sm font-semibold tracking-wide"
+                >
+                    <PenLine class="inline h-4 w-4 text-slate-400" />
+                    {form._isNew ? "New Override" : "Edit Override #" + form.anilist_id}
+                </div>
+            </svelte:fragment>
 
-                    {#if editMode === "form"}
-                        <!-- JSON Preview Section -->
+            <div class="max-h-[calc(100vh-6rem)] space-y-3 overflow-auto p-4">
+                <Tabs.Root
+                    value={editMode}
+                    onValueChange={(v: string) => {
+                        const next = v as typeof editMode;
+                        if (next === "raw" && editMode !== "raw") {
+                            syncFormToRaw();
+                        }
+                        if (next === "form" && editMode !== "form") {
+                            syncRawToForm();
+                        }
+                        editMode = next;
+                    }}
+                >
+                    <Tabs.List class="flex gap-2 text-[11px]">
+                        <Tabs.Trigger
+                            value="form"
+                            class="rounded-md bg-slate-900 px-3 py-1.5 font-medium text-slate-400 ring-1 ring-slate-700 transition-colors hover:bg-slate-800 focus:outline-none focus-visible:ring-emerald-500/50 data-[state=active]:bg-slate-800 data-[state=active]:text-emerald-300 data-[state=active]:ring-slate-600"
+                            >Form</Tabs.Trigger
+                        >
+                        <Tabs.Trigger
+                            value="raw"
+                            class="rounded-md bg-slate-900 px-3 py-1.5 font-medium text-slate-400 ring-1 ring-slate-700 transition-colors hover:bg-slate-800 focus:outline-none focus-visible:ring-emerald-500/50 data-[state=active]:bg-slate-800 data-[state=active]:text-emerald-300 data-[state=active]:ring-slate-600"
+                            >Raw JSON</Tabs.Trigger
+                        >
+                    </Tabs.List>
+                    <Tabs.Content value="form" class="mt-3 space-y-2">
                         <div
                             class="rounded-md border border-slate-700/50 bg-slate-950/40 p-3"
                         >
@@ -939,17 +914,15 @@
                                 <button
                                     class="rounded bg-slate-800 px-2 py-0.5 text-[9px] text-slate-300 hover:bg-slate-700"
                                     onclick={syncFormToRaw}
-                                    title="Refresh preview">Refresh</button
+                                    title="Refresh preview"
                                 >
+                                    Refresh
+                                </button>
                             </div>
-                            <div
-                                class="max-h-32 overflow-auto rounded border border-slate-800/60 bg-slate-900/60 p-2 font-mono text-[10px] leading-relaxed"
-                            >
-                                <code class="whitespace-pre">
-                                    <!-- eslint-disable-next-line svelte/no-at-html-tags -->
-                                    {@html highlightJson(toPayload(form))}
-                                </code>
-                            </div>
+                            <JsonCodeBlock
+                                value={toPayload(form)}
+                                maxHeight="max-h-32"
+                            />
                         </div>
                         <div class="space-y-2">
                             <div class="flex items-center gap-2">
@@ -1182,42 +1155,44 @@
                                 </div>
                             </div>
                         </div>
-                    {:else}
-                        <div class="space-y-2">
-                            <div
-                                class="flex items-center justify-between text-[11px] text-slate-400"
-                            >
-                                <span>Raw Mapping JSON</span>
-                                <button
-                                    class="rounded bg-slate-800 px-2 py-1 text-[10px] text-slate-300 hover:bg-slate-700"
-                                    onclick={syncFormToRaw}>Refresh from Form</button
-                                >
-                            </div>
-                            <textarea
-                                bind:value={rawJSON}
-                                class="h-72 w-full resize-none rounded-md border border-slate-700 bg-slate-950/80 px-2 py-2 font-mono text-[11px] leading-snug text-slate-200 focus:border-emerald-600 focus:outline-none"
-                                spellcheck={false}
-                            ></textarea>
-                            <p class="text-[10px] text-slate-500">
-                                Provide a JSON object. Required: <code class="font-mono"
-                                    >anilist_id</code
-                                >. Unknown keys will be sent as-is.
-                            </p>
-                        </div>
-                    {/if}
-                    <div class="flex justify-end gap-2 pt-1">
-                        <button
-                            onclick={() => (modal = false)}
-                            class="rounded-md bg-slate-800 px-3 py-1.5 text-sm hover:bg-slate-700"
-                            >Cancel</button
-                        ><button
-                            onclick={save}
-                            class="rounded-md bg-emerald-600/90 px-3 py-1.5 text-sm font-medium hover:bg-emerald-500"
-                            >Save</button
+                    </Tabs.Content>
+                    <Tabs.Content value="raw" class="mt-3 space-y-2">
+                        <div
+                            class="flex items-center justify-between text-[11px] text-slate-400"
                         >
-                    </div>
+                            <span>Raw Mapping JSON</span>
+                            <button
+                                class="rounded bg-slate-800 px-2 py-1 text-[10px] text-slate-300 hover:bg-slate-700"
+                                onclick={syncFormToRaw}>Refresh from Form</button
+                            >
+                        </div>
+                        <textarea
+                            bind:value={rawJSON}
+                            class="h-72 w-full resize-none rounded-md border border-slate-700 bg-slate-950/80 px-2 py-2 font-mono text-[11px] leading-snug text-slate-200 focus:border-emerald-600 focus:outline-none"
+                            spellcheck={false}
+                        ></textarea>
+                        <p class="text-[10px] text-slate-500">
+                            Provide a JSON object. Required: <code class="font-mono"
+                                >anilist_id</code
+                            >. Unknown keys will be sent as-is.
+                        </p>
+                    </Tabs.Content>
+                </Tabs.Root>
+                <div class="flex justify-end gap-2 pt-1">
+                    <button
+                        class="rounded-md bg-slate-800 px-3 py-1.5 text-sm hover:bg-slate-700"
+                        onclick={() => (modal = false)}
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onclick={save}
+                        class="rounded-md bg-emerald-600/90 px-3 py-1.5 text-sm font-medium hover:bg-emerald-500"
+                    >
+                        Save
+                    </button>
                 </div>
             </div>
-        </div>
+        </Modal>
     {/if}
 </div>
