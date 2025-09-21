@@ -1,4 +1,4 @@
-"""Mappings service for CRUD operations and provenance updates."""
+"""Mappings service for CRUD operations, listing, and provenance updates."""
 
 import json
 from dataclasses import dataclass
@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from sqlalchemy import delete
+from sqlalchemy import and_, delete, func, or_, select
 
 from src import log
 from src.config.database import db
@@ -19,6 +19,13 @@ from src.exceptions import (
 )
 from src.models.db.animap import AniMap
 from src.models.db.provenance import AniMapProvenance
+from src.models.schemas.anilist import MediaWithoutList as AniListMetadata
+from src.utils.sql import (
+    json_array_contains,
+    json_dict_has_key,
+    json_dict_has_value,
+)
+from src.web.state import get_app_state
 
 __all__ = ["MappingsService", "get_mappings_service"]
 
@@ -255,6 +262,320 @@ class MappingsService:
         log.success(
             f"{self.__class__.__name__}: Deleted mapping for anilist_id={anilist_id}"
         )
+
+    async def list_mappings(
+        self,
+        *,
+        page: int,
+        per_page: int,
+        id_search: str | None,
+        title_search: str | None,
+        custom_only: bool,
+        with_anilist: bool,
+    ) -> tuple[list[dict[str, Any]], int]:
+        """List mappings with optional ID or title search.
+
+        Args:
+            page (int): 1-based page number.
+            per_page (int): Number of items per page.
+            id_search (str | None): ID search string.
+            title_search (str | None): Title search string.
+            custom_only (bool): Include only custom mappings.
+            with_anilist (bool): Include AniList metadata.
+
+        Returns:
+            tuple[list[dict[str, Any]], int]: The list of mappings and the total count.
+        """
+        upstream_url = self.upstream_url
+
+        # Build ID-based search filters
+        search_filters: list[Any] = []
+        if id_search:
+            search_num: int | None
+            try:
+                search_num = int(id_search)
+            except ValueError:
+                search_num = None
+
+            per_col: list[Any] = []
+            if search_num is not None:
+                per_col.append(AniMap.anilist_id == search_num)
+                per_col.append(AniMap.anidb_id == search_num)
+                per_col.append(AniMap.tvdb_id == search_num)
+                per_col.append(json_array_contains(AniMap.mal_id, [search_num]))
+                per_col.append(json_array_contains(AniMap.tmdb_movie_id, [search_num]))
+                per_col.append(json_array_contains(AniMap.tmdb_show_id, [search_num]))
+
+            per_col.append(json_array_contains(AniMap.imdb_id, [id_search]))
+            per_col.append(json_dict_has_key(AniMap.tvdb_mappings, id_search))
+            per_col.append(json_dict_has_value(AniMap.tvdb_mappings, id_search))
+            search_filters.append(or_(*per_col))
+
+        items: list[dict[str, Any]] = []
+        total: int = 0
+
+        with db() as ctx:
+            stmt = select(AniMap)
+
+            # Join last provenance source
+            sub = (
+                select(
+                    AniMapProvenance.anilist_id,
+                    func.max(AniMapProvenance.n).label("maxn"),
+                )
+                .group_by(AniMapProvenance.anilist_id)
+                .subquery()
+            )
+            stmt = (
+                stmt.outerjoin(sub, sub.c.anilist_id == AniMap.anilist_id)
+                .outerjoin(
+                    AniMapProvenance,
+                    and_(
+                        AniMapProvenance.anilist_id == sub.c.anilist_id,
+                        AniMapProvenance.n == sub.c.maxn,
+                    ),
+                )
+                .add_columns(AniMapProvenance.source)
+            )
+
+            # Precedence: id_search > title_search > none
+            if id_search:
+                where_clauses: list[Any] = []
+                if search_filters:
+                    where_clauses.extend(search_filters)
+
+                if custom_only:
+                    if upstream_url:
+                        where_clauses.append(
+                            and_(
+                                AniMapProvenance.source.is_not(None),
+                                AniMapProvenance.source != upstream_url,
+                            )
+                        )
+                    else:
+                        where_clauses.append(AniMapProvenance.source.is_not(None))
+
+                if where_clauses:
+                    stmt = stmt.where(and_(*where_clauses))
+
+                count_stmt = select(func.count()).select_from(stmt.subquery())
+                total = ctx.session.execute(count_stmt).scalar_one()
+
+                stmt = (
+                    stmt.order_by(AniMap.anilist_id.asc())
+                    .offset((page - 1) * per_page)
+                    .limit(per_page)
+                )
+                rows = ctx.session.execute(stmt).all()
+
+                anilist_ids = [row[0].anilist_id for row in rows]
+                sources_by_id: dict[int, list[str]] = {aid: [] for aid in anilist_ids}
+                if anilist_ids:
+                    prov_rows = ctx.session.execute(
+                        select(
+                            AniMapProvenance.anilist_id,
+                            AniMapProvenance.n,
+                            AniMapProvenance.source,
+                        )
+                        .where(AniMapProvenance.anilist_id.in_(anilist_ids))
+                        .order_by(
+                            AniMapProvenance.anilist_id.asc(),
+                            AniMapProvenance.n.asc(),
+                        )
+                    ).all()
+                    for aid, _n, src in prov_rows:
+                        sources_by_id.setdefault(aid, []).append(src)
+
+                for row in rows:
+                    animap: AniMap = row[0]
+                    srcs = sources_by_id.get(animap.anilist_id, [])
+                    last_src = srcs[-1] if srcs else None
+                    is_custom = bool(
+                        last_src is not None
+                        and (not upstream_url or last_src != upstream_url)
+                    )
+                    items.append(
+                        {
+                            "anilist_id": animap.anilist_id,
+                            "anidb_id": animap.anidb_id,
+                            "imdb_id": animap.imdb_id,
+                            "mal_id": animap.mal_id,
+                            "tmdb_movie_id": animap.tmdb_movie_id,
+                            "tmdb_show_id": animap.tmdb_show_id,
+                            "tvdb_id": animap.tvdb_id,
+                            "tvdb_mappings": animap.tvdb_mappings,
+                            "custom": is_custom,
+                            "sources": srcs,
+                        }
+                    )
+            elif title_search:
+                # Title search: use AniList and merge with DB
+                anilist_client = await get_app_state().ensure_public_anilist()
+                search_limit = min(max(per_page * 5, 50), 200)
+                api_ids: set[int] = set()
+                async for m in anilist_client.search_anime(
+                    title_search, is_movie=False, episodes=None, limit=search_limit
+                ):
+                    api_ids.add(int(m.id))
+                async for m in anilist_client.search_anime(
+                    title_search, is_movie=True, episodes=None, limit=search_limit
+                ):
+                    api_ids.add(int(m.id))
+
+                union_ids: list[int] = sorted(api_ids)
+                if union_ids:
+                    rows_map: dict[int, AniMap] = {}
+                    for row in ctx.session.execute(
+                        select(AniMap).where(AniMap.anilist_id.in_(union_ids))
+                    ).all():
+                        obj: AniMap = row[0]
+                        rows_map[obj.anilist_id] = obj
+
+                    sources_by_id: dict[int, list[str]] = {aid: [] for aid in union_ids}
+                    prov_rows = ctx.session.execute(
+                        select(
+                            AniMapProvenance.anilist_id,
+                            AniMapProvenance.n,
+                            AniMapProvenance.source,
+                        )
+                        .where(AniMapProvenance.anilist_id.in_(union_ids))
+                        .order_by(
+                            AniMapProvenance.anilist_id.asc(),
+                            AniMapProvenance.n.asc(),
+                        )
+                    ).all()
+                    for aid, _n, src in prov_rows:
+                        sources_by_id.setdefault(aid, []).append(src)
+
+                    full_items: list[dict[str, Any]] = []
+                    for aid in union_ids:
+                        animap_row = rows_map.get(aid)
+                        srcs = sources_by_id.get(aid, [])
+                        last_src = srcs[-1] if srcs else None
+                        is_custom = bool(
+                            last_src is not None
+                            and (not upstream_url or last_src != upstream_url)
+                        )
+                        if animap_row is None:
+                            full_items.append(
+                                {
+                                    "anilist_id": aid,
+                                    "custom": False,
+                                    "sources": srcs,
+                                }
+                            )
+                        else:
+                            full_items.append(
+                                {
+                                    "anilist_id": animap_row.anilist_id,
+                                    "anidb_id": animap_row.anidb_id,
+                                    "imdb_id": animap_row.imdb_id,
+                                    "mal_id": animap_row.mal_id,
+                                    "tmdb_movie_id": animap_row.tmdb_movie_id,
+                                    "tmdb_show_id": animap_row.tmdb_show_id,
+                                    "tvdb_id": animap_row.tvdb_id,
+                                    "tvdb_mappings": animap_row.tvdb_mappings,
+                                    "custom": is_custom,
+                                    "sources": srcs,
+                                }
+                            )
+
+                    if custom_only:
+                        full_items = [it for it in full_items if it.get("custom")]
+
+                    total = len(full_items)
+                    start = (page - 1) * per_page
+                    end = start + per_page
+                    items = full_items[start:end]
+                else:
+                    total = 0
+                    items = []
+            else:
+                # No search: list all
+                where_clauses: list[Any] = []
+                if custom_only:
+                    if upstream_url:
+                        where_clauses.append(
+                            and_(
+                                AniMapProvenance.source.is_not(None),
+                                AniMapProvenance.source != upstream_url,
+                            )
+                        )
+                    else:
+                        where_clauses.append(AniMapProvenance.source.is_not(None))
+
+                if where_clauses:
+                    stmt = stmt.where(and_(*where_clauses))
+
+                count_stmt = select(func.count()).select_from(stmt.subquery())
+                total = ctx.session.execute(count_stmt).scalar_one()
+
+                stmt = (
+                    stmt.order_by(AniMap.anilist_id.asc())
+                    .offset((page - 1) * per_page)
+                    .limit(per_page)
+                )
+                rows = ctx.session.execute(stmt).all()
+
+                anilist_ids = [row[0].anilist_id for row in rows]
+                sources_by_id: dict[int, list[str]] = {aid: [] for aid in anilist_ids}
+                if anilist_ids:
+                    prov_rows = ctx.session.execute(
+                        select(
+                            AniMapProvenance.anilist_id,
+                            AniMapProvenance.n,
+                            AniMapProvenance.source,
+                        )
+                        .where(AniMapProvenance.anilist_id.in_(anilist_ids))
+                        .order_by(
+                            AniMapProvenance.anilist_id.asc(),
+                            AniMapProvenance.n.asc(),
+                        )
+                    ).all()
+                    for aid, _n, src in prov_rows:
+                        sources_by_id.setdefault(aid, []).append(src)
+
+                for row in rows:
+                    animap: AniMap = row[0]
+                    srcs = sources_by_id.get(animap.anilist_id, [])
+                    last_src = srcs[-1] if srcs else None
+                    is_custom = bool(
+                        last_src is not None
+                        and (not upstream_url or last_src != upstream_url)
+                    )
+                    items.append(
+                        {
+                            "anilist_id": animap.anilist_id,
+                            "anidb_id": animap.anidb_id,
+                            "imdb_id": animap.imdb_id,
+                            "mal_id": animap.mal_id,
+                            "tmdb_movie_id": animap.tmdb_movie_id,
+                            "tmdb_show_id": animap.tmdb_show_id,
+                            "tvdb_id": animap.tvdb_id,
+                            "tvdb_mappings": animap.tvdb_mappings,
+                            "custom": is_custom,
+                            "sources": srcs,
+                        }
+                    )
+
+        # Optionally fetch AniList metadata for page items only.
+        if with_anilist and items:
+            anilist_client = await get_app_state().ensure_public_anilist()
+            anilist_ids = [int(it["anilist_id"]) for it in items]
+            medias = await anilist_client.batch_get_anime(anilist_ids)
+            by_id = {m.id: m for m in medias}
+            for it in items:
+                m = by_id.get(int(it["anilist_id"]))
+                if m:
+                    it["anilist"] = {
+                        k: getattr(m, k)
+                        for k in AniListMetadata.model_fields
+                        if hasattr(m, k)
+                    }
+                else:
+                    it["anilist"] = None
+
+        return items, total
 
 
 @lru_cache(maxsize=1)
