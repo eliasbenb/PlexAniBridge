@@ -5,12 +5,14 @@ route handlers and websocket endpoints.
 """
 
 from collections.abc import Callable
+from contextlib import suppress
 from datetime import UTC, datetime
 from functools import lru_cache
 from typing import Any
 
 from plexapi.server import PlexServer
 
+from src.core.anilist import AniListClient
 from src.core.sched import SchedulerClient
 
 __all__ = ["AppState", "get_app_state"]
@@ -23,6 +25,7 @@ class AppState:
         """Initialize empty state containers and record process start time."""
         self.plex: PlexServer | None = None
         self.scheduler: SchedulerClient | None = None
+        self.public_anilist: AniListClient | None = None
         self.on_shutdown_callbacks: list[Callable[[], Any]] = []
         self.started_at: datetime = datetime.now(UTC)
 
@@ -42,6 +45,22 @@ class AppState:
         """
         self.on_shutdown_callbacks.append(cb)
 
+    async def ensure_public_anilist(self) -> AniListClient:
+        """Get or create the shared public AniList client.
+
+        Returns:
+            AniListClient: A tokenless AniList client suitable for public queries.
+        """
+        if self.public_anilist is None:
+            self.public_anilist = AniListClient(
+                anilist_token=None,
+                backup_dir=None,
+                dry_run=False,
+                profile_name="public",
+            )
+            await self.public_anilist.initialize()
+        return self.public_anilist
+
     async def shutdown(self) -> None:
         """Run registered shutdown callbacks (ignore individual errors).
 
@@ -55,6 +74,11 @@ class AppState:
                     await res
             except Exception:
                 pass
+
+        if self.public_anilist is not None:
+            with suppress(Exception):
+                await self.public_anilist.close()
+            self.public_anilist = None
 
 
 @lru_cache(maxsize=1)
