@@ -395,38 +395,6 @@ class MappingsService:
                                 )
                             )
                         )
-                    elif v == "custom":
-                        # Equivalent to custom:true
-                        sub = (
-                            select(
-                                AniMapProvenance.anilist_id,
-                                func.max(AniMapProvenance.n).label("maxn"),
-                            )
-                            .group_by(AniMapProvenance.anilist_id)
-                            .subquery()
-                        )
-                        join_stmt = (
-                            select(AniMap.anilist_id, AniMapProvenance.source)
-                            .select_from(AniMap)
-                            .outerjoin(sub, sub.c.anilist_id == AniMap.anilist_id)
-                            .outerjoin(
-                                AniMapProvenance,
-                                and_(
-                                    AniMapProvenance.anilist_id == sub.c.anilist_id,
-                                    AniMapProvenance.n == sub.c.maxn,
-                                ),
-                            )
-                        )
-                        rows = ctx.session.execute(join_stmt).all()
-                        out: set[int] = set()
-                        for aid, src in rows:
-                            is_custom = bool(
-                                src is not None
-                                and (not upstream_url or src != upstream_url)
-                            )
-                            if is_custom:
-                                out.add(int(aid))
-                        return out
                     else:
                         return set()
                     return set(int(r[0]) for r in ctx.session.execute(s).all())
@@ -540,39 +508,6 @@ class MappingsService:
                     tvdb_or.append(json_dict_has_value(AniMap.tvdb_mappings, value))
                     if tvdb_or:
                         s = s.where(or_(*tvdb_or))
-                elif key == "custom":
-                    want_true = str(value).lower() in {"1", "true", "yes", "on"}
-                    # Join last provenance and filter by last source
-                    sub = (
-                        select(
-                            AniMapProvenance.anilist_id,
-                            func.max(AniMapProvenance.n).label("maxn"),
-                        )
-                        .group_by(AniMapProvenance.anilist_id)
-                        .subquery()
-                    )
-                    join_stmt = (
-                        select(AniMap.anilist_id, AniMapProvenance.source)
-                        .select_from(AniMap)
-                        .outerjoin(sub, sub.c.anilist_id == AniMap.anilist_id)
-                        .outerjoin(
-                            AniMapProvenance,
-                            and_(
-                                AniMapProvenance.anilist_id == sub.c.anilist_id,
-                                AniMapProvenance.n == sub.c.maxn,
-                            ),
-                        )
-                    )
-                    rows = ctx.session.execute(join_stmt).all()
-                    out: set[int] = set()
-                    for aid, src in rows:
-                        is_custom = bool(
-                            src is not None
-                            and (not upstream_url or src != upstream_url)
-                        )
-                        if is_custom == want_true:
-                            out.add(int(aid))
-                    return out
                 else:
                     return set()
 

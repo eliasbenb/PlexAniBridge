@@ -36,10 +36,9 @@
         { key: "tmdb_movie", desc: "TMDb Movie ID (int)", type: "int" },
         { key: "tmdb_show", desc: "TMDb TV ID (int)", type: "int" },
         { key: "tvdb", desc: "TheTVDB ID or season key/value", type: "int|string" },
-        { key: "custom", desc: "Only custom mappings (true/false)", type: "bool" },
         {
             key: "has",
-            desc: "Presence filter: anidb/imdb/mal/tmdb_movie/tmdb_show/tvdb/tvdb_mappings/custom",
+            desc: "Presence filter: anidb/imdb/mal/tmdb_movie/tmdb_show/tvdb/tvdb_mappings",
             type: "enum",
         },
     ];
@@ -153,7 +152,6 @@
                         "tmdb_show",
                         "tvdb",
                         "tvdb_mappings",
-                        "custom",
                     ];
                     for (const opt of opts) {
                         if (vpart && !opt.startsWith(vpart.toLowerCase())) continue;
