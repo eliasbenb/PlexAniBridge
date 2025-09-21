@@ -38,6 +38,19 @@ def json_array_contains(field: Mapped, values: list[Any]) -> ColumnElement[bool]
     )
 
 
+def json_array_exists(field: Mapped) -> ColumnElement[bool]:
+    """Check if a JSON array field exists and is non-empty.
+
+    Args:
+        field (Mapped): SQLAlchemy mapped field representing a JSON array column.
+
+    Returns:
+        ColumnElement[bool]: SQL condition that evaluates to True if the array
+                             exists and is non-empty.
+    """
+    return func.json_array_length(field) > 0
+
+
 def json_dict_has_key(field: Mapped, key: str) -> BinaryExpression:
     """Generate a SQL expression for checking if a JSON field contains a key.
 

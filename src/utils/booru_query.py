@@ -14,9 +14,8 @@ Supported syntax:
 - NOT: `-foo` search the negation of `foo`
 - Grouping: `(foo | bar) baz` search for `(foo OR bar) AND baz`
 - Ranges: `foo:<10 | foo:100..210` search for foo less than 10 or between 100 and 210
+- Presence: `has:foo` search for mappings that have the field `foo`
 """
-
-# TODO: Support `has:foo` queries
 
 from collections.abc import Callable
 from dataclasses import dataclass

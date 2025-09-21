@@ -9,6 +9,7 @@ from typing import Any
 
 import yaml
 from sqlalchemy import and_, delete, func, or_, select
+from sqlalchemy.sql import exists
 
 from src import log
 from src.config.database import db
@@ -23,6 +24,7 @@ from src.utils.sql import (
     json_array_between,
     json_array_compare,
     json_array_contains,
+    json_array_exists,
     json_dict_has_key,
     json_dict_has_value,
 )
@@ -362,6 +364,72 @@ class MappingsService:
                     except Exception:
                         return set()
                     s = s.where(AniMap.anilist_id == num)
+                elif key == "has":
+                    v = str(value or "").strip().lower()
+                    if v in {"anilist", "id"}:
+                        # Every mapping has an AniList id; return all
+                        return set(
+                            int(r[0])
+                            for r in ctx.session.execute(
+                                select(AniMap.anilist_id)
+                            ).all()
+                        )
+                    if v == "anidb":
+                        s = s.where(AniMap.anidb_id.is_not(None))
+                    elif v == "imdb":
+                        s = s.where(json_array_exists(AniMap.imdb_id))
+                    elif v == "mal":
+                        s = s.where(json_array_exists(AniMap.mal_id))
+                    elif v == "tmdb_movie":
+                        s = s.where(json_array_exists(AniMap.tmdb_movie_id))
+                    elif v == "tmdb_show":
+                        s = s.where(json_array_exists(AniMap.tmdb_show_id))
+                    elif v == "tvdb":
+                        s = s.where(AniMap.tvdb_id.is_not(None))
+                    elif v in {"tvdb_mappings", "tvdb_map", "tvdb_mapping"}:
+                        # Non-empty object
+                        s = s.where(
+                            exists(
+                                select(1).select_from(
+                                    func.json_each(AniMap.tvdb_mappings)
+                                )
+                            )
+                        )
+                    elif v == "custom":
+                        # Equivalent to custom:true
+                        sub = (
+                            select(
+                                AniMapProvenance.anilist_id,
+                                func.max(AniMapProvenance.n).label("maxn"),
+                            )
+                            .group_by(AniMapProvenance.anilist_id)
+                            .subquery()
+                        )
+                        join_stmt = (
+                            select(AniMap.anilist_id, AniMapProvenance.source)
+                            .select_from(AniMap)
+                            .outerjoin(sub, sub.c.anilist_id == AniMap.anilist_id)
+                            .outerjoin(
+                                AniMapProvenance,
+                                and_(
+                                    AniMapProvenance.anilist_id == sub.c.anilist_id,
+                                    AniMapProvenance.n == sub.c.maxn,
+                                ),
+                            )
+                        )
+                        rows = ctx.session.execute(join_stmt).all()
+                        out: set[int] = set()
+                        for aid, src in rows:
+                            is_custom = bool(
+                                src is not None
+                                and (not upstream_url or src != upstream_url)
+                            )
+                            if is_custom:
+                                out.add(int(aid))
+                        return out
+                    else:
+                        return set()
+                    return set(int(r[0]) for r in ctx.session.execute(s).all())
                 elif key == "anidb":
                     try:
                         if m_cmp:

@@ -21,7 +21,6 @@
     }: Props = $props();
 
     /**
-     * @TODO `has:` field
      * @TODO better type hinting for keys (e.g. imdb doesn't take >, <, etc)
      */
     const KEYS = [
@@ -38,6 +37,11 @@
         { key: "tmdb_show", desc: "TMDb TV ID (int)", type: "int" },
         { key: "tvdb", desc: "TheTVDB ID or season key/value", type: "int|string" },
         { key: "custom", desc: "Only custom mappings (true/false)", type: "bool" },
+        {
+            key: "has",
+            desc: "Presence filter: anidb/imdb/mal/tmdb_movie/tmdb_show/tvdb/tvdb_mappings/custom",
+            type: "enum",
+        },
     ];
 
     // Internal state
@@ -140,7 +144,33 @@
                 }
             } else {
                 // Value suggestions depending on key type
-                if (kinfo?.type === "bool") {
+                if (kinfo?.key === "has") {
+                    const opts = [
+                        "anidb",
+                        "imdb",
+                        "mal",
+                        "tmdb_movie",
+                        "tmdb_show",
+                        "tvdb",
+                        "tvdb_mappings",
+                        "custom",
+                    ];
+                    for (const opt of opts) {
+                        if (vpart && !opt.startsWith(vpart.toLowerCase())) continue;
+                        out.push({
+                            label: `${prefix}${kinfo.key}:${opt}`,
+                            detail: "Has field",
+                            kind: "value",
+                            apply: ({ replace }) => {
+                                replace(
+                                    seg.start,
+                                    seg.end,
+                                    `${prefix}${kinfo.key}:${opt}`,
+                                );
+                            },
+                        });
+                    }
+                } else if (kinfo?.type === "bool") {
                     ["true", "false"].forEach((v) =>
                         out.push({
                             label: `${prefix}${kinfo.key}:${v}`,
