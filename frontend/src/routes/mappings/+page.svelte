@@ -1,12 +1,13 @@
 <script lang="ts">
     import { onMount } from "svelte";
 
-    import { ArrowRight, Check, List, PenLine, Plus, Search, X } from "@lucide/svelte";
+    import { Check, List, PenLine, Plus, X } from "@lucide/svelte";
     import { Tabs } from "bits-ui";
     import { SvelteURLSearchParams } from "svelte/reactivity";
 
     import { apiFetch } from "$lib/api";
     import { toast } from "$lib/notify";
+    import BooruSearch from "$lib/ui/booru-search.svelte";
     import JsonCodeBlock from "$lib/ui/json-code-block.svelte";
     import Modal from "$lib/ui/modal.svelte";
     import UiTooltip from "$lib/ui/ui-tooltip.svelte";
@@ -433,24 +434,15 @@
             </p>
         </div>
         <div class="hidden items-center gap-2 text-[11px] sm:flex">
-            <div class="relative">
-                <input
+            <div class="relative w-72">
+                <BooruSearch
                     bind:value={query}
-                    placeholder="Search..."
-                    aria-label="Search mappings"
-                    class="h-8 w-72 rounded-md border border-slate-700/70 bg-slate-900/70 pr-9 pl-8 text-[11px] shadow-sm placeholder:text-slate-500 focus:border-slate-600 focus:bg-slate-900"
-                    onkeydown={(e) => e.key === "Enter" && ((page = 1), load())}
+                    size="sm"
+                    onSubmit={() => {
+                        page = 1;
+                        load();
+                    }}
                 />
-                <Search
-                    class="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-slate-500"
-                />
-                <button
-                    class="absolute top-1/2 right-1 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md bg-slate-800 text-slate-300 hover:bg-slate-700"
-                    aria-label="Run search"
-                    onclick={() => ((page = 1), load())}
-                >
-                    <ArrowRight class="inline h-3 w-3" />
-                </button>
             </div>
             <button
                 onclick={() => {
@@ -493,23 +485,14 @@
             class="flex flex-col gap-3 rounded-md border border-slate-800/70 bg-slate-900/60 p-3 text-[11px] sm:hidden"
         >
             <div class="relative">
-                <input
+                <BooruSearch
                     bind:value={query}
-                    placeholder="Search (booru: key:value, -, or)"
-                    aria-label="Search mappings"
-                    class="h-9 w-full rounded-md border border-slate-700/70 bg-slate-900/70 pr-10 pl-9 text-[11px] shadow-sm placeholder:text-slate-500 focus:border-slate-600 focus:bg-slate-900"
-                    onkeydown={(e) => e.key === "Enter" && ((page = 1), load())}
+                    size="md"
+                    onSubmit={() => {
+                        page = 1;
+                        load();
+                    }}
                 />
-                <Search
-                    class="pointer-events-none absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2 text-slate-500"
-                />
-                <button
-                    class="absolute top-1/2 right-1 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md bg-slate-800 text-slate-300 hover:bg-slate-700"
-                    aria-label="Run search"
-                    onclick={() => ((page = 1), load())}
-                >
-                    <ArrowRight class="inline h-3.5 w-3.5" />
-                </button>
             </div>
             <div class="flex flex-wrap items-center justify-between">
                 <button
