@@ -500,14 +500,25 @@ class MappingsService:
                     tvdb_or: list[Any] = []
                     if num is not None:
                         tvdb_or.append(AniMap.tvdb_id == num)
-                        tvdb_or.append(
-                            json_dict_has_value(AniMap.tvdb_mappings, str(num))
-                        )
-                    # allow string as well (season mapping keys)
-                    tvdb_or.append(json_dict_has_key(AniMap.tvdb_mappings, value))
-                    tvdb_or.append(json_dict_has_value(AniMap.tvdb_mappings, value))
                     if tvdb_or:
                         s = s.where(or_(*tvdb_or))
+                elif key == "tvdb_mappings":
+                    if m_cmp:
+                        try:
+                            num = int(m_cmp.group(2))
+                        except Exception:
+                            return set()
+                        return set()
+                    if m_rng:
+                        # TODO: Ranges not supported right now.
+                        return set()
+
+                    tvdm_or: list[Any] = []
+                    tvdm_or.append(json_dict_has_key(AniMap.tvdb_mappings, str(value)))
+                    tvdm_or.append(
+                        json_dict_has_value(AniMap.tvdb_mappings, str(value))
+                    )
+                    s = s.where(or_(*tvdm_or))
                 else:
                     return set()
 

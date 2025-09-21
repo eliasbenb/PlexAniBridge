@@ -35,7 +35,12 @@
         { key: "mal", desc: "MyAnimeList ID (int)", type: "int" },
         { key: "tmdb_movie", desc: "TMDb Movie ID (int)", type: "int" },
         { key: "tmdb_show", desc: "TMDb TV ID (int)", type: "int" },
-        { key: "tvdb", desc: "TheTVDB ID or season key/value", type: "int|string" },
+        { key: "tvdb", desc: "TheTVDB ID (int)", type: "int" },
+        {
+            key: "tvdb_mappings",
+            desc: "TVDB mappings (season keys or values)",
+            type: "string",
+        },
         {
             key: "has",
             desc: "Presence filter: anidb/imdb/mal/tmdb_movie/tmdb_show/tvdb/tvdb_mappings",
