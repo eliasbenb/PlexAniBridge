@@ -359,7 +359,7 @@ class AniListClient:
     async def search_anime(
         self,
         search_str: str,
-        is_movie: bool,
+        is_movie: bool | None,
         episodes: int | None = None,
         limit: int = 10,
     ) -> AsyncIterator[Media]:
@@ -370,8 +370,10 @@ class AniListClient:
 
         Args:
             search_str (str): Title or keywords to search for.
-            is_movie (bool): If True, searches only for movies and specials. If False,
-                searches for TV series, OVAs, and ONAs.
+            is_movie (bool | None):
+                - True: search only movies and specials
+                - False: search TV series, OVAs, ONAs (and TV_SHORT)
+                - None: search across both movies/specials and TV/OVAs/ONAs
             episodes (int | None): Filter results to match this episode count. If None,
                 returns all results.
             limit (int): Maximum number of results to return.
@@ -382,13 +384,11 @@ class AniListClient:
         Raises:
             aiohttp.ClientError: If the API request fails.
         """
+        kind = "all" if is_movie is None else ("movie" if is_movie else "show")
         log.debug(
-            f"{self.__class__.__name__}: Searching for {
-                'movie' if is_movie else 'show'
-            } "
-            f"with title $$'{search_str}'$$ that is releasing and has {
-                episodes or 'unknown'
-            } episodes"
+            f"{self.__class__.__name__}: Searching for {kind} "
+            f"with title $$'{search_str}'$$ that is releasing and has "
+            f"{episodes or 'unknown'} episodes"
         )
 
         res = await self._search_anime(search_str, is_movie, limit)
@@ -404,26 +404,10 @@ class AniListClient:
     async def _search_anime(
         self,
         search_str: str,
-        is_movie: bool,
+        is_movie: bool | None,
         limit: int = 10,
     ) -> list[Media]:
-        """Cached helper function for anime searches.
-
-        Makes the actual GraphQL query to search for anime and caches results
-        to reduce API calls for repeated searches.
-
-        Args:
-            search_str (str): Title or keywords to search for.
-            is_movie (bool): If True, limits to movies and specials. If False, limits
-                to TV series, OVAs, and ONAs.
-            limit (int): Maximum number of results to return. Defaults to 10.
-
-        Returns:
-            list[Media]: List of matching anime entries, unfiltered.
-
-        Raises:
-            aiohttp.ClientError: If the API request fails.
-        """
+        """Cached helper function for anime searches."""
         query = f"""
             query ($search: String, $formats: [MediaFormat], $limit: Int) {{
                 Page(perPage: $limit) {{
@@ -436,8 +420,17 @@ class AniListClient:
 
         formats = (
             [MediaFormat.MOVIE, MediaFormat.SPECIAL]
-            if is_movie
+            if is_movie is True
             else [
+                MediaFormat.TV,
+                MediaFormat.TV_SHORT,
+                MediaFormat.ONA,
+                MediaFormat.OVA,
+            ]
+            if is_movie is False
+            else [
+                MediaFormat.MOVIE,
+                MediaFormat.SPECIAL,
                 MediaFormat.TV,
                 MediaFormat.TV_SHORT,
                 MediaFormat.ONA,

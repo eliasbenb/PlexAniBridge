@@ -414,11 +414,7 @@ class MappingsService:
                 search_limit = min(max(per_page * 5, 50), 200)
                 api_ids: set[int] = set()
                 async for m in anilist_client.search_anime(
-                    title_search, is_movie=False, episodes=None, limit=search_limit
-                ):
-                    api_ids.add(int(m.id))
-                async for m in anilist_client.search_anime(
-                    title_search, is_movie=True, episodes=None, limit=search_limit
+                    title_search, is_movie=None, episodes=None, limit=search_limit
                 ):
                     api_ids.add(int(m.id))
 
