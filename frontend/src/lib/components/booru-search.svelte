@@ -2,6 +2,7 @@
     import { onMount } from "svelte";
 
     import { ArrowRight, Search } from "@lucide/svelte";
+    import { Popover } from "bits-ui";
 
     type Props = {
         value?: string;
@@ -48,12 +49,15 @@
         },
     ];
 
-    // Internal state
-    let inputEl: HTMLInputElement | null = null;
+    let inputEl = $state<HTMLInputElement | null>(null);
     let open = $state(false);
     let activeIndex = $state<number>(-1);
     let caret = $state(0);
     let suggestions = $derived(getSuggestions(value, caret));
+    let focused = $state(false);
+    const isActive = $derived(focused || open || value.trim().length > 0);
+    let pointerInPopover = $state(false);
+    const listId = `booru-suggestions-${Math.random().toString(36).slice(2, 8)}`;
 
     type Suggestion = {
         label: string;
@@ -349,86 +353,137 @@
     }
 
     function onFocus() {
+        focused = true;
         open = true;
         caret = inputEl?.selectionStart ?? 0;
     }
 
     function onBlur() {
         setTimeout(() => {
-            open = false;
-            activeIndex = -1;
-        }, 120);
+            focused = false;
+            if (!pointerInPopover) {
+                open = false;
+                activeIndex = -1;
+            }
+        }, 50);
     }
 
     onMount(() => {
         if (autoFocus) inputEl?.focus();
     });
+    function closePopover() {
+        open = false;
+        activeIndex = -1;
+    }
+
+    $effect(() => {
+        if (!open) return;
+        if (activeIndex < 0) return;
+        const el = document.querySelector(
+            `[data-booru-suggestion="${activeIndex}"]`,
+        ) as HTMLElement | null;
+        el?.scrollIntoView({ block: "nearest" });
+    });
 </script>
 
-<div class="relative" data-component="booru-search">
-    <input
-        bind:this={inputEl}
-        {placeholder}
-        {disabled}
-        {value}
-        oninput={onInput}
-        onkeydown={handleKeydown}
-        onfocus={onFocus}
-        onblur={onBlur}
-        aria-label="Search mappings"
-        class={`${size === "sm" ? "h-8 pr-9 pl-8" : "h-9 pr-10 pl-9"} w-full rounded-md border border-slate-700/70 bg-slate-900/70 text-[11px] shadow-sm placeholder:text-slate-500 focus:border-slate-600 focus:bg-slate-900`}
-    />
-    <Search
-        class="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-slate-500"
-    />
-    <button
-        class="absolute top-1/2 right-1 inline-flex items-center justify-center rounded-md bg-slate-800 text-slate-300 hover:bg-slate-700 {size ===
-        'sm'
-            ? 'h-6 w-6 -translate-y-1/2'
-            : 'h-7 w-7 -translate-y-1/2'}"
-        aria-label="Run search"
-        onclick={() => {
-            open = false;
-            activeIndex = -1;
-            onSubmit?.();
-        }}
-        {disabled}
-    >
-        <ArrowRight class={size === "sm" ? "h-3 w-3" : "h-3.5 w-3.5"} />
-    </button>
-
-    {#if open && suggestions.length}
-        <div
-            class="absolute z-20 mt-1 w-full overflow-hidden rounded-md border border-slate-800/70 bg-slate-900/95 shadow-xl backdrop-blur supports-[backdrop-filter]:bg-slate-900/75"
+<div class="relative flex items-center justify-end" data-component="booru-search">
+    <div class="relative" data-active={isActive}>
+        <input
+            bind:this={inputEl}
+            {placeholder}
+            {disabled}
+            {value}
+            oninput={onInput}
+            onkeydown={handleKeydown}
+            onfocus={onFocus}
+            onblur={onBlur}
+            role="combobox"
+            aria-expanded={open}
+            aria-controls={listId}
+            aria-label="Search mappings"
+            class={`${size === "sm" ? "h-8 pr-9 pl-8" : "h-9 pr-10 pl-9"} ml-auto rounded-md border border-slate-700/70 bg-slate-900/70 text-[11px] shadow-sm transition-[width] duration-200 ease-out placeholder:text-slate-500 focus:border-slate-600 focus:bg-slate-900 ${isActive ? "w-[28rem] max-w-[90vw]" : "w-28 sm:w-40"}`}
+        />
+        <Search
+            class="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-slate-500"
+        />
+        <button
+            class="absolute top-1/2 right-1 inline-flex items-center justify-center rounded-md bg-slate-800 text-slate-300 hover:bg-slate-700 {size ===
+            'sm'
+                ? 'h-6 w-6 -translate-y-1/2'
+                : 'h-7 w-7 -translate-y-1/2'}"
+            aria-label="Run search"
+            onclick={() => {
+                closePopover();
+                onSubmit?.();
+            }}
+            {disabled}
         >
-            <ul class="max-h-64 overflow-auto py-1 text-[11px]">
-                {#each suggestions as s, i (s.label)}
-                    <li>
-                        <button
-                            class={`group flex w-full items-center justify-between gap-2 px-2 py-1.5 text-left hover:bg-slate-800/70 ${i === activeIndex ? "bg-slate-800/70" : ""}`}
-                            onmousedown={(e) => {
-                                e.preventDefault();
-                                applySuggestion(i);
-                            }}
-                        >
-                            <span class="font-mono text-slate-200">{s.label}</span>
-                            {#if s.detail}
-                                <span class="ml-2 shrink-0 text-[10px] text-slate-400"
-                                    >{s.detail}</span
-                                >
-                            {/if}
-                        </button>
-                    </li>
-                {/each}
-            </ul>
-            <div
-                class="border-t border-slate-800/70 px-2 py-1 text-[10px] text-slate-400"
+            <ArrowRight class={size === "sm" ? "h-3 w-3" : "h-3.5 w-3.5"} />
+        </button>
+    </div>
+
+    <Popover.Root
+        bind:open
+        onOpenChangeComplete={(o: boolean) => {
+            if (!o) {
+                activeIndex = -1;
+                pointerInPopover = false;
+            }
+        }}
+    >
+        <Popover.Portal>
+            <Popover.Content
+                customAnchor={inputEl}
+                side="bottom"
+                align="end"
+                sideOffset={6}
+                trapFocus={false}
+                onOpenAutoFocus={(e) => e.preventDefault()}
+                updatePositionStrategy="always"
+                class="focus-override data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 z-50 mt-1 w-[var(--bits-popover-anchor-width)] max-w-[90vw] min-w-[260px] overflow-hidden rounded-md border border-slate-800/70 bg-slate-900/95 shadow-xl outline-hidden backdrop-blur supports-[backdrop-filter]:bg-slate-900/75"
+                onmouseenter={() => (pointerInPopover = true)}
+                onmouseleave={() => {
+                    pointerInPopover = false;
+                    if (!focused) closePopover();
+                }}
             >
-                Tips: Use '~' to OR within a group, '|' for OR between groups, '-' to
-                negate, quotes for AniList title, and '()' to group terms.
-            </div>
-        </div>
-    {/if}
+                <ul
+                    id={listId}
+                    role="listbox"
+                    class="max-h-64 overflow-auto py-1 text-[11px]"
+                >
+                    {#each suggestions as s, i (s.label)}
+                        <li>
+                            <button
+                                data-booru-suggestion={i}
+                                role="option"
+                                aria-selected={i === activeIndex}
+                                class={`group flex w-full items-center justify-between gap-2 px-2 py-1.5 text-left hover:bg-slate-800/70 ${i === activeIndex ? "bg-slate-800/70" : ""}`}
+                                onmousedown={(e) => {
+                                    e.preventDefault();
+                                    applySuggestion(i);
+                                }}
+                            >
+                                <span class="font-mono text-slate-200">{s.label}</span>
+                                {#if s.detail}
+                                    <span
+                                        class="ml-2 shrink-0 text-[10px] text-slate-400"
+                                        >{s.detail}</span
+                                    >
+                                {/if}
+                            </button>
+                        </li>
+                    {/each}
+                </ul>
+                <div
+                    class="border-t border-slate-800/70 px-2 py-1 text-[10px] text-slate-400"
+                >
+                    Tips: Use '~' to OR within a group, '|' for OR between groups, '-'
+                    to negate, quotes for AniList title, and '()' to group terms.
+                </div>
+            </Popover.Content>
+        </Popover.Portal>
+    </Popover.Root>
 </div>
 
 <style>
