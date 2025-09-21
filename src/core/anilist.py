@@ -15,6 +15,7 @@ from async_lru import alru_cache
 from limiter import Limiter
 
 from src import __version__, log
+from src.exceptions import AniListTokenRequiredError
 from src.models.schemas.anilist import (
     Media,
     MediaFormat,
@@ -47,23 +48,24 @@ class AniListClient:
 
     def __init__(
         self,
-        anilist_token: str,
-        backup_dir: Path,
+        anilist_token: str | None,
+        backup_dir: Path | None,
         dry_run: bool,
-        profile_name: str,
+        profile_name: str | None,
     ) -> None:
         """Initialize the AniList client.
 
         Args:
-            anilist_token (str): Authentication token for AniList API
-            backup_dir (Path): Directory path where backup files will be stored
+            anilist_token (str | None): Authentication token for AniList API; if None,
+                client operates in public mode for read-only queries
+            backup_dir (Path | None): Directory path where backup files will be stored
             dry_run (bool): If True, simulates API calls without making actual changes
-            profile_name (str): Owning profile name
+            profile_name (str | None): Owning profile name; optional in public mode
         """
         self.anilist_token = anilist_token
         self.backup_dir = backup_dir
         self.dry_run = dry_run
-        self.profile_name = profile_name
+        self.profile_name = profile_name or "public"
         self._session: aiohttp.ClientSession | None = None
 
         self.offline_anilist_entries: dict[int, Media] = {}
@@ -79,9 +81,12 @@ class AniListClient:
                 "Accept": "application/json",
                 "Content-Type": "application/json",
                 "User-Agent": f"PlexAniBridge/{__version__}",
-                "Authorization": f"Bearer {self.anilist_token}",
             }
+            if self.anilist_token:
+                headers["Authorization"] = f"Bearer {self.anilist_token}"
+
             self._session = aiohttp.ClientSession(headers=headers)
+
         return self._session
 
     async def close(self):
@@ -108,11 +113,26 @@ class AniListClient:
         await self.close()
 
     async def initialize(self):
-        """Initialize the client by getting user info and backing up data."""
+        """Initialize the client by getting user info and backing up data.
+
+        In public (unauthenticated) mode, initialization is a no-op.
+        """
+        # If no token is provided, operate in public mode without user context
+        if not self.anilist_token:
+            self.offline_anilist_entries.clear()
+            return
+
         self.user = await self.get_user()
         self.user_tz = self.get_user_tz()
         self.offline_anilist_entries.clear()
         await self.backup_anilist()
+
+    def _ensure_authenticated(self) -> None:
+        """Ensure that client has authentication for privileged operations."""
+        if not self.anilist_token:
+            raise AniListTokenRequiredError(
+                "This operation requires an authenticated AniList client"
+            )
 
     async def get_user(self) -> User:
         """Retrieves the authenticated user's information from AniList.
@@ -164,6 +184,8 @@ class AniListClient:
         Raises:
             aiohttp.ClientError: If the API request fails
         """
+        self._ensure_authenticated()
+
         query = f"""
         mutation (
             $mediaId: Int, $status: MediaListStatus, $score: Float, $progress: Int,
@@ -211,6 +233,8 @@ class AniListClient:
         Raises:
             aiohttp.ClientError: If the API request fails.
         """
+        self._ensure_authenticated()
+
         BATCH_SIZE = 10
 
         if not media_list_entries:
@@ -303,6 +327,8 @@ class AniListClient:
         Raises:
             aiohttp.ClientError: If the API request fails.
         """
+        self._ensure_authenticated()
+
         query = """
         mutation ($id: Int) {
             DeleteMediaListEntry(id: $id) {
@@ -559,6 +585,12 @@ class AniListClient:
             aiohttp.ClientError: If the API request fails.
             OSError: If unable to create backup directory or write backup file.
         """
+        self._ensure_authenticated()
+        if self.backup_dir is None:
+            raise aiohttp.ClientError(
+                f"{self.__class__.__name__}: backup_dir must be set for backups"
+            )
+
         query = f"""
         query MediaListCollection($userId: Int, $type: MediaType, $chunk: Int) {{
             MediaListCollection(userId: $userId, type: $type, chunk: $chunk) {{

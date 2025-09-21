@@ -71,6 +71,19 @@ class UnsupportedMediaTypeError(MediaTypeError, ValueError):
     status_code = 400
 
 
+# AniList client errors
+class AniListError(PlexAniBridgeError):
+    """Base class for AniList-related failures."""
+
+    status_code = 500
+
+
+class AniListTokenRequiredError(AniListError, RuntimeError):
+    """Operation requires an authenticated AniList client (token)."""
+
+    status_code = 401
+
+
 # Plex client errors
 class PlexError(PlexAniBridgeError):
     """Base class for Plex-related failures."""
