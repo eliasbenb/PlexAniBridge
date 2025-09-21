@@ -101,6 +101,18 @@
         };
     }
 
+    function isIdLike(q: string): boolean {
+        const s = (q || "").trim();
+        if (!s) return false;
+        // Pure digits (AniList, AniDB, TVDB, TMDB, MAL IDs)
+        if (/^\d+$/.test(s)) return true;
+        // IMDB IDs like tt12345678
+        if (/^tt\d+$/i.test(s)) return true;
+        // Allow simple TV season key like s1, s01 (tvdb_mappings keys)
+        if (/^s\d+$/i.test(s)) return true;
+        return false;
+    }
+
     async function load() {
         loading = true;
         try {
@@ -108,7 +120,10 @@
                 page: String(page),
                 per_page: String(perPage),
             });
-            if (query) p.set("search", query);
+            if (query) {
+                if (isIdLike(query)) p.set("id_search", query);
+                else p.set("title_search", query);
+            }
             if (customOnly) p.set("custom_only", "true");
             p.set("with_anilist", "true");
             const r = await apiFetch("/api/mappings?" + p.toString());

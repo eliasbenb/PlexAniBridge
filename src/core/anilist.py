@@ -15,6 +15,7 @@ from async_lru import alru_cache
 from limiter import Limiter
 
 from src import __version__, log
+from src.exceptions import AniListTokenRequiredError
 from src.models.schemas.anilist import (
     Media,
     MediaFormat,
@@ -47,23 +48,24 @@ class AniListClient:
 
     def __init__(
         self,
-        anilist_token: str,
-        backup_dir: Path,
+        anilist_token: str | None,
+        backup_dir: Path | None,
         dry_run: bool,
-        profile_name: str,
+        profile_name: str | None,
     ) -> None:
         """Initialize the AniList client.
 
         Args:
-            anilist_token (str): Authentication token for AniList API
-            backup_dir (Path): Directory path where backup files will be stored
+            anilist_token (str | None): Authentication token for AniList API; if None,
+                client operates in public mode for read-only queries
+            backup_dir (Path | None): Directory path where backup files will be stored
             dry_run (bool): If True, simulates API calls without making actual changes
-            profile_name (str): Owning profile name
+            profile_name (str | None): Owning profile name; optional in public mode
         """
         self.anilist_token = anilist_token
         self.backup_dir = backup_dir
         self.dry_run = dry_run
-        self.profile_name = profile_name
+        self.profile_name = profile_name or "public"
         self._session: aiohttp.ClientSession | None = None
 
         self.offline_anilist_entries: dict[int, Media] = {}
@@ -79,9 +81,12 @@ class AniListClient:
                 "Accept": "application/json",
                 "Content-Type": "application/json",
                 "User-Agent": f"PlexAniBridge/{__version__}",
-                "Authorization": f"Bearer {self.anilist_token}",
             }
+            if self.anilist_token:
+                headers["Authorization"] = f"Bearer {self.anilist_token}"
+
             self._session = aiohttp.ClientSession(headers=headers)
+
         return self._session
 
     async def close(self):
@@ -108,11 +113,26 @@ class AniListClient:
         await self.close()
 
     async def initialize(self):
-        """Initialize the client by getting user info and backing up data."""
+        """Initialize the client by getting user info and backing up data.
+
+        In public (unauthenticated) mode, initialization is a no-op.
+        """
+        # If no token is provided, operate in public mode without user context
+        if not self.anilist_token:
+            self.offline_anilist_entries.clear()
+            return
+
         self.user = await self.get_user()
         self.user_tz = self.get_user_tz()
         self.offline_anilist_entries.clear()
         await self.backup_anilist()
+
+    def _ensure_authenticated(self) -> None:
+        """Ensure that client has authentication for privileged operations."""
+        if not self.anilist_token:
+            raise AniListTokenRequiredError(
+                "This operation requires an authenticated AniList client"
+            )
 
     async def get_user(self) -> User:
         """Retrieves the authenticated user's information from AniList.
@@ -164,6 +184,8 @@ class AniListClient:
         Raises:
             aiohttp.ClientError: If the API request fails
         """
+        self._ensure_authenticated()
+
         query = f"""
         mutation (
             $mediaId: Int, $status: MediaListStatus, $score: Float, $progress: Int,
@@ -211,6 +233,8 @@ class AniListClient:
         Raises:
             aiohttp.ClientError: If the API request fails.
         """
+        self._ensure_authenticated()
+
         BATCH_SIZE = 10
 
         if not media_list_entries:
@@ -303,6 +327,8 @@ class AniListClient:
         Raises:
             aiohttp.ClientError: If the API request fails.
         """
+        self._ensure_authenticated()
+
         query = """
         mutation ($id: Int) {
             DeleteMediaListEntry(id: $id) {
@@ -333,7 +359,7 @@ class AniListClient:
     async def search_anime(
         self,
         search_str: str,
-        is_movie: bool,
+        is_movie: bool | None,
         episodes: int | None = None,
         limit: int = 10,
     ) -> AsyncIterator[Media]:
@@ -344,8 +370,10 @@ class AniListClient:
 
         Args:
             search_str (str): Title or keywords to search for.
-            is_movie (bool): If True, searches only for movies and specials. If False,
-                searches for TV series, OVAs, and ONAs.
+            is_movie (bool | None):
+                - True: search only movies and specials
+                - False: search TV series, OVAs, ONAs (and TV_SHORT)
+                - None: search across both movies/specials and TV/OVAs/ONAs
             episodes (int | None): Filter results to match this episode count. If None,
                 returns all results.
             limit (int): Maximum number of results to return.
@@ -356,13 +384,11 @@ class AniListClient:
         Raises:
             aiohttp.ClientError: If the API request fails.
         """
+        kind = "all" if is_movie is None else ("movie" if is_movie else "show")
         log.debug(
-            f"{self.__class__.__name__}: Searching for {
-                'movie' if is_movie else 'show'
-            } "
-            f"with title $$'{search_str}'$$ that is releasing and has {
-                episodes or 'unknown'
-            } episodes"
+            f"{self.__class__.__name__}: Searching for {kind} "
+            f"with title $$'{search_str}'$$ that is releasing and has "
+            f"{episodes or 'unknown'} episodes"
         )
 
         res = await self._search_anime(search_str, is_movie, limit)
@@ -378,26 +404,10 @@ class AniListClient:
     async def _search_anime(
         self,
         search_str: str,
-        is_movie: bool,
+        is_movie: bool | None,
         limit: int = 10,
     ) -> list[Media]:
-        """Cached helper function for anime searches.
-
-        Makes the actual GraphQL query to search for anime and caches results
-        to reduce API calls for repeated searches.
-
-        Args:
-            search_str (str): Title or keywords to search for.
-            is_movie (bool): If True, limits to movies and specials. If False, limits
-                to TV series, OVAs, and ONAs.
-            limit (int): Maximum number of results to return. Defaults to 10.
-
-        Returns:
-            list[Media]: List of matching anime entries, unfiltered.
-
-        Raises:
-            aiohttp.ClientError: If the API request fails.
-        """
+        """Cached helper function for anime searches."""
         query = f"""
             query ($search: String, $formats: [MediaFormat], $limit: Int) {{
                 Page(perPage: $limit) {{
@@ -410,8 +420,17 @@ class AniListClient:
 
         formats = (
             [MediaFormat.MOVIE, MediaFormat.SPECIAL]
-            if is_movie
+            if is_movie is True
             else [
+                MediaFormat.TV,
+                MediaFormat.TV_SHORT,
+                MediaFormat.ONA,
+                MediaFormat.OVA,
+            ]
+            if is_movie is False
+            else [
+                MediaFormat.MOVIE,
+                MediaFormat.SPECIAL,
                 MediaFormat.TV,
                 MediaFormat.TV_SHORT,
                 MediaFormat.ONA,
@@ -559,6 +578,12 @@ class AniListClient:
             aiohttp.ClientError: If the API request fails.
             OSError: If unable to create backup directory or write backup file.
         """
+        self._ensure_authenticated()
+        if self.backup_dir is None:
+            raise aiohttp.ClientError(
+                f"{self.__class__.__name__}: backup_dir must be set for backups"
+            )
+
         query = f"""
         query MediaListCollection($userId: Int, $type: MediaType, $chunk: Int) {{
             MediaListCollection(userId: $userId, type: $type, chunk: $chunk) {{

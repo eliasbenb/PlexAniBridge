@@ -101,6 +101,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
             await scheduler.start()
             log.success("Web: Scheduler started for web UI")
 
+    try:
+        await get_app_state().ensure_public_anilist()
+    except Exception:
+        log.debug("Web: Failed to initialize public AniList client at startup")
+
     root_logger = log
     log_ws_handler = get_log_ws_handler()
     if log_ws_handler not in root_logger.handlers:
