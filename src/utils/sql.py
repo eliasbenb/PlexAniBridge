@@ -72,18 +72,37 @@ def json_dict_has_value(field: Mapped, value: Any) -> UnaryExpression:
     )
 
 
-def json_array_between(col, lo: int, hi: int):
-    """Check if any element of a JSON numeric array is within [lo, hi]."""
+def json_array_between(field: Mapped, lo: int, hi: int):
+    """Check if any element of a JSON numeric array is within [lo, hi].
+
+    Args:
+        field (Mapped): SQLAlchemy mapped field representing a JSON array column
+        lo (int): Lower bound of the range (inclusive)
+        hi (int): Upper bound of the range (inclusive)
+
+    Returns:
+        ColumnElement[bool]: SQL condition that evaluates to True if any element is
+            within the range
+    """
     v = cast(column("value"), Integer)
     return exists(
-        select(1).select_from(func.json_each(col)).where(and_(v >= lo, v <= hi))
+        select(1).select_from(func.json_each(field)).where(and_(v >= lo, v <= hi))
     )
 
 
-def json_array_compare(col, op: str, num: int) -> ColumnElement[bool]:
+def json_array_compare(field: Mapped, op: str, num: int) -> ColumnElement[bool]:
     """Compare any element of a JSON numeric array to a number.
 
     Supported operators: ">", ">=", "<", "<=".
+
+    Args:
+        field (Mapped): SQLAlchemy mapped field representing a JSON array column
+        op (str): Comparison operator (">", ">=", "<", "<=")
+        num (int): Number to compare against
+
+    Returns:
+        ColumnElement[bool]: SQL condition that evaluates to True if any element
+            satisfies the comparison
     """
     v = cast(column("value"), Integer)
     if op == ">":
@@ -97,4 +116,4 @@ def json_array_compare(col, op: str, num: int) -> ColumnElement[bool]:
     else:
         # Fallback to false for unsupported operators
         return false()
-    return exists(select(1).select_from(func.json_each(col)).where(comp))
+    return exists(select(1).select_from(func.json_each(field)).where(comp))
