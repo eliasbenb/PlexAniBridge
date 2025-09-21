@@ -13,7 +13,7 @@
     };
     let {
         value = $bindable(""),
-        placeholder = 'Search (booru: key:value, -, |, ~, "title")',
+        placeholder = "Search...",
         disabled = false,
         autoFocus = false,
         size = "sm",
