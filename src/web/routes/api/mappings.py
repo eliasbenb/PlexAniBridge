@@ -53,8 +53,7 @@ router = APIRouter()
 async def list_mappings(
     page: int = Query(1, ge=1),
     per_page: int = Query(25, ge=1, le=250),
-    id_search: str | None = None,
-    title_search: str | None = None,
+    q: str | None = None,
     custom_only: bool = False,
     with_anilist: bool = False,
 ) -> ListMappingsResponse:
@@ -63,8 +62,7 @@ async def list_mappings(
     Args:
         page (int): 1-based page number.
         per_page (int): Number of items per page.
-        id_search (str | None): ID search string.
-        title_search (str | None): Title search string.
+        q (str | None): Booru-like query string.
         custom_only (bool): Include only custom mappings.
         with_anilist (bool): Include AniList metadata.
 
@@ -75,8 +73,7 @@ async def list_mappings(
     raw_items, total = await svc.list_mappings(
         page=page,
         per_page=per_page,
-        id_search=id_search,
-        title_search=title_search,
+        q=q,
         custom_only=custom_only,
         with_anilist=with_anilist,
     )
