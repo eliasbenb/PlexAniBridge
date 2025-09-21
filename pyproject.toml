@@ -43,6 +43,7 @@ dependencies = [
     "plexapi>=4.17.0",
     "pydantic>=2.11.1",
     "pydantic-settings>=2.9.1",
+    "pyparsing>=3.2.5",
     "pyyaml>=6.0.2",
     "rapidfuzz>=3.13.0",
     "requests>=2.32.3",
