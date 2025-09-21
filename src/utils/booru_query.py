@@ -20,7 +20,7 @@ Supported syntax:
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import cast
+from typing import Any, cast
 
 import pyparsing as pp
 
@@ -312,37 +312,48 @@ def evaluate(
     """
     used_bare = False
     order_hint: dict[int, int] = {}
+    universe: set[int] = set(universe_ids or set())
 
-    def eval_node(n: Node) -> set[int]:
-        nonlocal used_bare, order_hint
+    def _coerce(n_any) -> Node | Any:
+        """Unwrap pyparsing Group/ParseResults that contain a single Node.
+
+        This occurs for parenthesized expressions like -(foo | bar), where the
+        grouped child may arrive as a ParseResults([Node]).
+        """
+        try:
+            if isinstance(n_any, (list, pp.ParseResults)) and len(n_any) == 1:
+                return _coerce(n_any[0])
+        except Exception:
+            pass
+        return n_any
+
+    def eval_node(n: Node | Any) -> set[int]:
+        nonlocal used_bare, order_hint, universe
+        n = _coerce(n)
         if isinstance(n, And):
-            if not n.children:  # Treated as True
-                return set()
-            sets = [eval_node(c) for c in n.children]
-            if not sets:
-                return set()
-
-            base: set[int] | None = None
-            for s in sets:
-                if base is None:
-                    base = set(s)
+            if not n.children:
+                # Empty AND, return Universe
+                return set(universe)
+            acc: set[int] | None = None
+            for c in n.children:
+                s = eval_node(c)
+                if acc is None:
+                    acc = set(s)
                 else:
-                    base &= s
-            return base or set()
+                    acc &= s
+                if not acc:
+                    # Early exit on empty intersection
+                    return set()
+            return acc or set()
         if isinstance(n, Or):
-            sets = [eval_node(c) for c in n.children]
             out: set[int] = set()
-            for s in sets:
-                out |= s
+            for c in n.children:
+                out |= eval_node(c)
             return out
         if isinstance(n, Not):
-            # Negation handled by caller using a universe; here evaluate the child
-            # and annotate the node with that set.
-            child_set = eval_node(n.child)
-            # We'll annotate the node with the child set and let caller handle
-            # the negation.
-            n._ids = child_set
-            return set()
+            # Local complement relative to the universe
+            child = eval_node(n.child)
+            return set(universe) - set(child)
         if isinstance(n, KeyTerm):
             return set(db_resolver(n.key, n.value))
         if isinstance(n, BareTerm):
@@ -355,35 +366,5 @@ def evaluate(
         return set()
 
     ids = eval_node(node)
-
-    def collect_nodes(n: Node, lst: list[Node]):
-        lst.append(n)
-        if isinstance(n, (And, Or)):
-            for c in n.children:
-                collect_nodes(c, lst)
-
-    nodes: list[Node] = []
-    collect_nodes(node, nodes)
-    neg_sets: list[set[int]] = []
-    for n in nodes:
-        if isinstance(n, Not) and n._ids is not None:
-            neg_sets.append(n._ids)
-
-    # Build a universe: caller-provided IDs (when available), unioned with
-    # positive sources we have in order_hint keys and ids
-    universe: set[int] = set(universe_ids or set()) | set(ids) | set(order_hint.keys())
-    for s in neg_sets:
-        universe |= set(s)
-
-    # Apply negations: subtract union of neg_sets. If the expression is purely
-    # negative (no positive ids), expand to the provided universe to allow
-    # subtraction; otherwise, keep empty results empty.
-    neg_union: set[int] = set()
-    for s in neg_sets:
-        neg_union |= s
-    if not ids and neg_union and universe:
-        ids = set(universe)
-    if neg_union:
-        ids -= neg_union
 
     return EvalResult(ids=ids, order_hint=order_hint, used_bare=used_bare)
