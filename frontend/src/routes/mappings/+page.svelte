@@ -101,18 +101,6 @@
         };
     }
 
-    function isIdLike(q: string): boolean {
-        const s = (q || "").trim();
-        if (!s) return false;
-        // Pure digits (AniList, AniDB, TVDB, TMDB, MAL IDs)
-        if (/^\d+$/.test(s)) return true;
-        // IMDB IDs like tt12345678
-        if (/^tt\d+$/i.test(s)) return true;
-        // Allow simple TV season key like s1, s01 (tvdb_mappings keys)
-        if (/^s\d+$/i.test(s)) return true;
-        return false;
-    }
-
     async function load() {
         loading = true;
         try {
@@ -120,10 +108,7 @@
                 page: String(page),
                 per_page: String(perPage),
             });
-            if (query) {
-                if (isIdLike(query)) p.set("id_search", query);
-                else p.set("title_search", query);
-            }
+            if (query) p.set("q", query);
             if (customOnly) p.set("custom_only", "true");
             p.set("with_anilist", "true");
             const r = await apiFetch("/api/mappings?" + p.toString());
@@ -451,7 +436,7 @@
             <div class="relative">
                 <input
                     bind:value={query}
-                    placeholder="Search (AniList, TMDB, IMDB, etc)"
+                    placeholder="Search..."
                     aria-label="Search mappings"
                     class="h-8 w-72 rounded-md border border-slate-700/70 bg-slate-900/70 pr-9 pl-8 text-[11px] shadow-sm placeholder:text-slate-500 focus:border-slate-600 focus:bg-slate-900"
                     onkeydown={(e) => e.key === "Enter" && ((page = 1), load())}
@@ -510,7 +495,7 @@
             <div class="relative">
                 <input
                     bind:value={query}
-                    placeholder="Search (AniList, TMDB, IMDB, etc)"
+                    placeholder="Search (booru: key:value, -, or)"
                     aria-label="Search mappings"
                     class="h-9 w-full rounded-md border border-slate-700/70 bg-slate-900/70 pr-10 pl-9 text-[11px] shadow-sm placeholder:text-slate-500 focus:border-slate-600 focus:bg-slate-900"
                     onkeydown={(e) => e.key === "Enter" && ((page = 1), load())}
