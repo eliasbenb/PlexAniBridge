@@ -412,13 +412,18 @@ class MappingsService:
                 # Title search: use AniList and merge with DB
                 anilist_client = await get_app_state().ensure_public_anilist()
                 search_limit = min(max(per_page * 5, 50), 200)
-                api_ids: set[int] = set()
+
+                # Preserve original search order
+                union_ids: list[int] = []
+                api_ids_seen: set[int] = set()
                 async for m in anilist_client.search_anime(
                     title_search, is_movie=None, episodes=None, limit=search_limit
                 ):
-                    api_ids.add(int(m.id))
+                    aid = int(m.id)
+                    if aid not in api_ids_seen:
+                        union_ids.append(aid)
+                        api_ids_seen.add(aid)
 
-                union_ids: list[int] = sorted(api_ids)
                 if union_ids:
                     rows_map: dict[int, AniMap] = {}
                     for row in ctx.session.execute(
