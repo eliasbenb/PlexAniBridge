@@ -1,6 +1,6 @@
 [project]
 name = "PlexAniBridge"
-version = "1.3.1"
+version = "1.4.0"
 description = "The smart way to keep your AniList profile perfectly synchronized with your Plex library."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -43,7 +43,6 @@ dependencies = [
     "plexapi>=4.17.0",
     "pydantic>=2.11.1",
     "pydantic-settings>=2.9.1",
-    "pyparsing>=3.2.5",
     "pyyaml>=6.0.2",
     "rapidfuzz>=3.13.0",
     "requests>=2.32.3",
