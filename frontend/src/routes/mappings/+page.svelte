@@ -6,11 +6,11 @@
     import { SvelteURLSearchParams } from "svelte/reactivity";
 
     import { apiFetch } from "$lib/api";
+    import BooruSearch from "$lib/components/booru-search.svelte";
+    import JsonCodeBlock from "$lib/components/json-code-block.svelte";
     import { toast } from "$lib/notify";
-    import BooruSearch from "$lib/ui/booru-search.svelte";
-    import JsonCodeBlock from "$lib/ui/json-code-block.svelte";
     import Modal from "$lib/ui/modal.svelte";
-    import UiTooltip from "$lib/ui/ui-tooltip.svelte";
+    import UiTooltip from "$lib/ui/tooltip.svelte";
 
     type ExternalIds = {
         anilist_id?: number | null;

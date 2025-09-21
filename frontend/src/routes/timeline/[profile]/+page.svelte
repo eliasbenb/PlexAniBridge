@@ -27,8 +27,8 @@
     import { SvelteSet, SvelteURLSearchParams } from "svelte/reactivity";
 
     import { apiFetch } from "$lib/api";
+    import JsonCodeBlock from "$lib/components/json-code-block.svelte";
     import { toast } from "$lib/notify";
-    import JsonCodeBlock from "$lib/ui/json-code-block.svelte";
 
     const { params } = $props<{ params: { profile: string } }>();
 

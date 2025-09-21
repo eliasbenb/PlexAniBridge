@@ -4,8 +4,8 @@
     import { ArchiveRestore, Eye, LoaderCircle, RefreshCcw } from "@lucide/svelte";
 
     import { apiJson } from "$lib/api";
+    import JsonCodeBlock from "$lib/components/json-code-block.svelte";
     import { toast } from "$lib/notify";
-    import JsonCodeBlock from "$lib/ui/json-code-block.svelte";
     import Modal from "$lib/ui/modal.svelte";
 
     const { params } = $props<{ params: { profile: string } }>();
