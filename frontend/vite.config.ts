@@ -17,7 +17,7 @@ export default defineConfig({
                 "pwa-maskable-192x192.png",
                 "pwa-maskable-512x512.png",
             ],
-            devOptions: { enabled: true },
+            devOptions: { enabled: false },
             manifest: {
                 name: "PlexAniBridge",
                 short_name: "PAB",
