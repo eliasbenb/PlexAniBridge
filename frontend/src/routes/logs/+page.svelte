@@ -368,7 +368,7 @@
                         ><option>WARNING</option><option>ERROR</option>
                     </select>
                 </div>
-                <div class="relative w-full max-w-xs sm:max-w-sm md:max-w-md">
+                <div class="relative w-full">
                     <label for="log-search" class="sr-only">Search</label>
                     <input
                         id="log-search"
@@ -391,19 +391,19 @@
                         </button>
                     {/if}
                 </div>
-            </div>
-            <!-- Icon Buttons -->
-            <div class="flex flex-wrap items-center gap-2">
+                <!-- History files toggle (mobile) -->
                 {#if tab === "history" && isMobile}
-                    <button
-                        type="button"
-                        aria-label="Toggle files sidebar"
-                        title={showFiles ? "Hide files list" : "Show files list"}
-                        onclick={() => (showFiles = !showFiles)}
-                        class={`inline-flex h-8 w-8 items-center justify-center rounded-md ring-1 ring-slate-700/60 transition-colors ${showFiles ? "bg-amber-600 text-white hover:bg-amber-500" : "bg-slate-800 text-amber-300 hover:bg-slate-700"}`}
-                    >
-                        <FolderSearch class="inline h-4 w-4" />
-                    </button>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button
+                            type="button"
+                            aria-label="Toggle files sidebar"
+                            title={showFiles ? "Hide files list" : "Show files list"}
+                            onclick={() => (showFiles = !showFiles)}
+                            class={`inline-flex h-8 w-8 items-center justify-center rounded-md ring-1 ring-slate-700/60 transition-colors ${showFiles ? "bg-amber-600 text-white hover:bg-amber-500" : "bg-slate-800 text-amber-300 hover:bg-slate-700"}`}
+                        >
+                            <FolderSearch class="inline h-4 w-4" />
+                        </button>
+                    </div>
                 {/if}
             </div>
         </div>
@@ -485,37 +485,50 @@
                 </div>
                 <div
                     bind:this={liveScroller}
-                    class="scrollbar-thin flex-1 overflow-auto p-1 font-mono text-[11px] leading-normal"
+                    class="scrollbar-thin flex-1 overflow-y-auto p-1 font-mono text-[11px] leading-normal"
+                    class:overflow-x-auto={!wrap}
+                    class:overflow-x-hidden={wrap}
+                    style="touch-action: auto;"
                 >
-                    {#each filtered as entry, i (`${entry.timestamp}-${i}`)}
-                        <div
-                            class={`group flex items-start gap-2 border-l-2 px-2 py-0.5 pr-3 ${entryClass(entry.level)}`}
-                        >
-                            <span
-                                class="hidden w-[54px] shrink-0 text-right text-[10px] text-slate-500 tabular-nums sm:inline-block"
-                                >{formatTime(entry)}</span
+                    <div class="min-w-full" style:width={wrap ? "auto" : "max-content"}>
+                        {#each filtered as entry, i (`${entry.timestamp}-${i}`)}
+                            <div
+                                class={`group flex items-start gap-2 border-l-2 px-2 py-0.5 pr-3 ${entryClass(entry.level)}`}
                             >
-                            <span
-                                class={`flex h-5 shrink-0 items-center rounded-md bg-slate-800/70 px-1 text-[10px] font-semibold tracking-wide text-slate-300 ${badgeClass(entry.level)}`}
-                                >{entry.level}</span
-                            >
-                            <span
-                                class="min-w-0 flex-1 text-slate-200"
-                                class:whitespace-pre-wrap={wrap}
-                                class:break-words={wrap}
-                                class:whitespace-pre={!wrap}
-                            >
-                                <!-- eslint-disable-next-line svelte/no-at-html-tags -->
-                                {@html highlightLog(entry.message)}</span
-                            >
-                            <span class="text-[10px] text-slate-500 sm:hidden"
-                                >{formatTime(entry)}</span
-                            >
-                        </div>
-                    {/each}
-                    {#if !filtered.length}<p class="p-2 text-xs text-slate-500">
-                            No log entries.
-                        </p>{/if}
+                                <span
+                                    class="hidden w-[54px] shrink-0 text-right text-[10px] text-slate-500 tabular-nums sm:inline-block"
+                                    >{formatTime(entry)}</span
+                                >
+                                <span
+                                    class={`flex h-5 shrink-0 items-center rounded-md bg-slate-800/70 px-1 text-[10px] font-semibold tracking-wide text-slate-300 ${badgeClass(entry.level)}`}
+                                    >{entry.level}</span
+                                >
+                                <div
+                                    class="min-w-0 flex-1 text-slate-200"
+                                    class:overflow-x-auto={!wrap}
+                                    class:overflow-x-hidden={wrap}
+                                    class:whitespace-pre-wrap={wrap}
+                                    class:whitespace-pre={!wrap}
+                                    style="-webkit-overflow-scrolling: touch; word-break: normal;"
+                                    style:overflow-wrap={wrap ? "anywhere" : "normal"}
+                                >
+                                    <div
+                                        class:inline-block={!wrap}
+                                        class:whitespace-pre={!wrap}
+                                    >
+                                        <!-- eslint-disable-next-line svelte/no-at-html-tags -->
+                                        {@html highlightLog(entry.message)}
+                                    </div>
+                                </div>
+                                <span class="text-[10px] text-slate-500 sm:hidden"
+                                    >{formatTime(entry)}</span
+                                >
+                            </div>
+                        {/each}
+                        {#if !filtered.length}<p class="p-2 text-xs text-slate-500">
+                                No log entries.
+                            </p>{/if}
+                    </div>
                 </div>
             </div>
         {/if}
@@ -529,7 +542,8 @@
                         <span class="text-slate-400"
                             >{currentFile ? currentFile.name : "Select a file"}</span
                         >
-                        {#if historyEntries.length}<span class="text-slate-500"
+                        {#if historyEntries.length}<span
+                                class="hidden text-slate-500 sm:inline"
                                 >({historyEntries.length} lines)</span
                             >{/if}
                     </div>
@@ -647,40 +661,61 @@
                     <div class="flex flex-1 flex-col">
                         <div
                             bind:this={historyScroller}
-                            class="scrollbar-thin flex-1 overflow-auto p-1 font-mono text-[11px] leading-normal"
+                            class="scrollbar-thin flex-1 overflow-y-auto p-1 font-mono text-[11px] leading-normal"
+                            class:overflow-x-auto={!wrap}
+                            class:overflow-x-hidden={wrap}
+                            style="touch-action: auto;"
                         >
-                            {#each historyFiltered as entry, i (`${entry.timestamp}-${i}`)}
-                                <div
-                                    class={`group flex items-start gap-2 border-l-2 px-2 py-0.5 pr-3 ${entryClass(entry.level)}`}
-                                >
-                                    <span
-                                        class="hidden w-[54px] shrink-0 text-right text-[10px] text-slate-500 tabular-nums sm:inline-block"
-                                        >{formatTime(entry)}</span
+                            <div
+                                class="min-w-full"
+                                style:width={wrap ? "auto" : "max-content"}
+                            >
+                                {#each historyFiltered as entry, i (`${entry.timestamp}-${i}`)}
+                                    <div
+                                        class={`group flex items-start gap-2 border-l-2 px-2 py-0.5 pr-3 ${entryClass(entry.level)}`}
                                     >
-                                    <span
-                                        class={`flex h-5 shrink-0 items-center rounded-md bg-slate-800/70 px-1 text-[10px] font-semibold tracking-wide text-slate-300 ${badgeClass(entry.level)}`}
-                                        >{entry.level}</span
+                                        <span
+                                            class="hidden w-[54px] shrink-0 text-right text-[10px] text-slate-500 tabular-nums sm:inline-block"
+                                            >{formatTime(entry)}</span
+                                        >
+                                        <span
+                                            class={`flex h-5 shrink-0 items-center rounded-md bg-slate-800/70 px-1 text-[10px] font-semibold tracking-wide text-slate-300 ${badgeClass(entry.level)}`}
+                                            >{entry.level}</span
+                                        >
+                                        <div
+                                            class="min-w-0 flex-1 text-slate-200"
+                                            class:overflow-x-auto={!wrap}
+                                            class:overflow-x-hidden={wrap}
+                                            class:whitespace-pre-wrap={wrap}
+                                            class:whitespace-pre={!wrap}
+                                            style="-webkit-overflow-scrolling: touch; word-break: normal;"
+                                            style:overflow-wrap={wrap
+                                                ? "anywhere"
+                                                : "normal"}
+                                        >
+                                            <div
+                                                class:inline-block={!wrap}
+                                                class:whitespace-pre={!wrap}
+                                            >
+                                                <!-- eslint-disable-next-line svelte/no-at-html-tags -->
+                                                {@html highlightLog(entry.message)}
+                                            </div>
+                                        </div>
+                                        <span
+                                            class="text-[10px] text-slate-500 sm:hidden"
+                                            >{formatTime(entry)}</span
+                                        >
+                                    </div>
+                                {/each}
+                                {#if currentFile && !historyFiltered.length}<p
+                                        class="p-2 text-xs text-slate-500"
                                     >
-                                    <span
-                                        class="min-w-0 flex-1 text-slate-200"
-                                        class:whitespace-pre-wrap={wrap}
-                                        class:break-words={wrap}
-                                        class:whitespace-pre={!wrap}
-                                        >{entry.message}</span
-                                    >
-                                    <span class="text-[10px] text-slate-500 sm:hidden"
-                                        >{formatTime(entry)}</span
-                                    >
-                                </div>
-                            {/each}
-                            {#if currentFile && !historyFiltered.length}<p
-                                    class="p-2 text-xs text-slate-500"
-                                >
-                                    No lines match.
-                                </p>{/if}
-                            {#if !currentFile}<p class="p-2 text-xs text-slate-500">
-                                    Select a file to view its tail.
-                                </p>{/if}
+                                        No lines match.
+                                    </p>{/if}
+                                {#if !currentFile}<p class="p-2 text-xs text-slate-500">
+                                        Select a file to view its tail.
+                                    </p>{/if}
+                            </div>
                         </div>
                     </div>
                 </div>

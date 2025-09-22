@@ -228,9 +228,7 @@
             <footer
                 class="mt-auto border-t border-slate-800/80 bg-slate-950/70 px-4 py-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] text-[11px] text-slate-500 backdrop-blur"
             >
-                <div
-                    class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
-                >
+                <div class="flex flex-row items-center justify-between gap-2">
                     <div class="flex flex-wrap items-center gap-3">
                         <a
                             href="https://github.com/eliasbenb/PlexAniBridge"

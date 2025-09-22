@@ -434,10 +434,10 @@
             </p>
         </div>
         <div class="hidden items-center gap-2 text-[11px] sm:flex">
-            <div class="relative w-72">
+            <div class="relative w-64 md:w-96">
                 <BooruSearch
                     bind:value={query}
-                    size="sm"
+                    size="md"
                     onSubmit={() => {
                         page = 1;
                         load();

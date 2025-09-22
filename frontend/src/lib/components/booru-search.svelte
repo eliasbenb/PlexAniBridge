@@ -50,6 +50,7 @@
     ];
 
     let inputEl = $state<HTMLInputElement | null>(null);
+    let containerEl = $state<HTMLDivElement | null>(null);
     let open = $state(false);
     let activeIndex = $state<number>(-1);
     let caret = $state(0);
@@ -371,6 +372,7 @@
     onMount(() => {
         if (autoFocus) inputEl?.focus();
     });
+
     function closePopover() {
         open = false;
         activeIndex = -1;
@@ -386,40 +388,77 @@
     });
 </script>
 
-<div class="relative flex items-center justify-end" data-component="booru-search">
-    <div class="relative" data-active={isActive}>
-        <input
-            bind:this={inputEl}
-            {placeholder}
-            {disabled}
-            {value}
-            oninput={onInput}
-            onkeydown={handleKeydown}
-            onfocus={onFocus}
-            onblur={onBlur}
-            role="combobox"
-            aria-expanded={open}
-            aria-controls={listId}
-            aria-label="Search mappings"
-            class={`${size === "sm" ? "h-8 pr-9 pl-8" : "h-9 pr-10 pl-9"} ml-auto rounded-md border border-slate-700/70 bg-slate-900/70 text-[11px] shadow-sm transition-[width] duration-200 ease-out placeholder:text-slate-500 focus:border-slate-600 focus:bg-slate-900 ${isActive ? "w-[28rem] max-w-[90vw]" : "w-28 sm:w-40"}`}
-        />
-        <Search
-            class="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-slate-500"
-        />
-        <button
-            class="absolute top-1/2 right-1 inline-flex items-center justify-center rounded-md bg-slate-800 text-slate-300 hover:bg-slate-700 {size ===
-            'sm'
-                ? 'h-6 w-6 -translate-y-1/2'
-                : 'h-7 w-7 -translate-y-1/2'}"
-            aria-label="Run search"
-            onclick={() => {
-                closePopover();
-                onSubmit?.();
-            }}
-            {disabled}
+<div class="relative w-full" data-component="booru-search">
+    <div bind:this={containerEl} class="relative flex items-center">
+        <div
+            class={`relative ml-auto transition-all duration-300 ease-in-out ${
+                isActive ? "w-full" : "w-full sm:w-64 md:w-48"
+            }`}
         >
-            <ArrowRight class={size === "sm" ? "h-3 w-3" : "h-3.5 w-3.5"} />
-        </button>
+            <input
+                bind:this={inputEl}
+                {placeholder}
+                {disabled}
+                {value}
+                oninput={onInput}
+                onkeydown={handleKeydown}
+                onfocus={onFocus}
+                onblur={onBlur}
+                role="combobox"
+                aria-expanded={open}
+                aria-controls={listId}
+                aria-label="Search mappings"
+                class={`
+                    w-full
+                    ${size === "sm" ? "h-8 pr-9 pl-8" : "h-9 pr-10 pl-9"}
+                    rounded-md 
+                    border border-slate-700/70 
+                    bg-slate-900/70 
+                    text-[11px] 
+                    shadow-sm 
+                    placeholder:text-slate-500 
+                    focus:border-slate-600 
+                    focus:bg-slate-900
+                    focus:outline-none
+                `}
+            />
+            <Search
+                class={`
+                    pointer-events-none 
+                    absolute 
+                    top-1/2 
+                    left-2.5 
+                    -translate-y-1/2 
+                    text-slate-500
+                    ${size === "sm" ? "h-3.5 w-3.5" : "h-4 w-4"}
+                `}
+            />
+            <button
+                class={`
+                    absolute 
+                    top-1/2 
+                    right-1 
+                    inline-flex
+                    -translate-y-1/2 
+                    items-center 
+                    justify-center 
+                    rounded-md 
+                    bg-slate-800 
+                    text-slate-300 
+                    transition-colors
+                    hover:bg-slate-700
+                    ${size === "sm" ? "h-6 w-6" : "h-7 w-7"}
+                `}
+                aria-label="Run search"
+                onclick={() => {
+                    closePopover();
+                    onSubmit?.();
+                }}
+                {disabled}
+            >
+                <ArrowRight class={size === "sm" ? "h-3 w-3" : "h-3.5 w-3.5"} />
+            </button>
+        </div>
     </div>
 
     <Popover.Root
@@ -440,7 +479,7 @@
                 trapFocus={false}
                 onOpenAutoFocus={(e) => e.preventDefault()}
                 updatePositionStrategy="always"
-                class="focus-override data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 z-50 mt-1 w-[var(--bits-popover-anchor-width)] max-w-[90vw] min-w-[260px] overflow-hidden rounded-md border border-slate-800/70 bg-slate-900/95 shadow-xl outline-hidden backdrop-blur supports-[backdrop-filter]:bg-slate-900/75"
+                class="focus-override data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 z-50 mt-1 w-[var(--bits-popover-anchor-width)] max-w-[90vw] overflow-hidden rounded-md border border-slate-800/70 bg-slate-900/95 shadow-xl outline-hidden backdrop-blur supports-[backdrop-filter]:bg-slate-900/75"
                 onmouseenter={() => (pointerInPopover = true)}
                 onmouseleave={() => {
                     pointerInPopover = false;

@@ -183,7 +183,7 @@
                             <td class="px-3 py-2 font-mono text-[11px] break-all"
                                 >{b.filename}</td
                             >
-                            <td class="px-3 py-2"
+                            <td class="px-3 py-2 text-[11px]"
                                 >{new Date(b.created_at).toLocaleString()}</td
                             >
                             <td class="px-3 py-2 text-slate-400"

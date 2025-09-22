@@ -179,32 +179,32 @@
             </div>
             <div class="flex flex-wrap gap-2 sm:justify-end">
                 <button
-                    class="inline-flex items-center gap-1 rounded-md border border-amber-600/60 bg-amber-600/30 px-3 py-1.5 text-sm font-medium text-amber-200 shadow-sm backdrop-blur-sm transition-colors hover:bg-amber-600/40 focus:ring-2 focus:ring-amber-500/40 focus:outline-none"
+                    class="inline-flex items-center gap-1 rounded-md border border-amber-600/60 bg-amber-600/30 px-2 py-1 text-xs font-medium text-amber-200 shadow-sm backdrop-blur-sm transition-colors hover:bg-amber-600/40 focus:ring-2 focus:ring-amber-500/40 focus:outline-none sm:gap-1 sm:px-3 sm:py-1.5 sm:text-sm"
                     onclick={syncDatabase}
                 >
-                    <DatabaseBackup class="inline h-4 w-4" />
+                    <DatabaseBackup class="inline h-3 w-3 sm:h-4 sm:w-4" />
                     <span>Sync Database</span>
                 </button>
                 <button
-                    class="inline-flex items-center gap-1 rounded-md border border-emerald-600/60 bg-emerald-600/30 px-3 py-1.5 text-sm font-medium text-emerald-200 shadow-sm backdrop-blur-sm transition-colors hover:bg-emerald-600/40 focus:ring-2 focus:ring-emerald-500/40 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                    class="inline-flex items-center gap-1 rounded-md border border-emerald-600/60 bg-emerald-600/30 px-2 py-1 text-xs font-medium text-emerald-200 shadow-sm backdrop-blur-sm transition-colors hover:bg-emerald-600/40 focus:ring-2 focus:ring-emerald-500/40 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 sm:gap-1 sm:px-3 sm:py-1.5 sm:text-sm"
                     onclick={() => syncAll(false)}
                     disabled={anyRunning()}
                     title={anyRunning()
                         ? "A sync is currently running. Please wait."
                         : "Trigger a full sync for all profiles"}
                 >
-                    <RefreshCcw class="inline h-4 w-4" />
+                    <RefreshCcw class="inline h-3 w-3 sm:h-4 sm:w-4" />
                     <span>Full Sync All</span>
                 </button>
                 <button
-                    class="inline-flex items-center gap-1 rounded-md border border-sky-600/60 bg-sky-600/30 px-3 py-1.5 text-sm font-medium text-sky-200 shadow-sm backdrop-blur-sm transition-colors hover:bg-sky-600/40 focus:ring-2 focus:ring-sky-500/40 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                    class="inline-flex items-center gap-1 rounded-md border border-sky-600/60 bg-sky-600/30 px-2 py-1 text-xs font-medium text-sky-200 shadow-sm backdrop-blur-sm transition-colors hover:bg-sky-600/40 focus:ring-2 focus:ring-sky-500/40 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 sm:gap-1 sm:px-3 sm:py-1.5 sm:text-sm"
                     onclick={() => syncAll(true)}
                     disabled={anyRunning()}
                     title={anyRunning()
                         ? "A sync is currently running. Please wait."
                         : "Trigger a poll sync for all profiles"}
                 >
-                    <CloudDownload class="inline h-4 w-4" />
+                    <CloudDownload class="inline h-3 w-3 sm:h-4 sm:w-4" />
                     <span>Poll Sync All</span>
                 </button>
             </div>
