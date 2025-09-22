@@ -366,7 +366,7 @@ class MappingsService:
                     s = s.where(AniMap.anilist_id == num)
                 elif key == "has":
                     v = str(value or "").strip().lower()
-                    if v in {"anilist", "id"}:
+                    if v in ("anilist", "id"):
                         # Every mapping has an AniList id; return all
                         return set(
                             int(r[0])
@@ -386,13 +386,16 @@ class MappingsService:
                         s = s.where(json_array_exists(AniMap.tmdb_show_id))
                     elif v == "tvdb":
                         s = s.where(AniMap.tvdb_id.is_not(None))
-                    elif v in {"tvdb_mappings", "tvdb_map", "tvdb_mapping"}:
-                        # Non-empty object
+                    elif v == "tvdb_mappings":
                         s = s.where(
-                            exists(
-                                select(1).select_from(
-                                    func.json_each(AniMap.tvdb_mappings)
-                                )
+                            and_(
+                                AniMap.tvdb_mappings.is_not(None),
+                                func.json_type(AniMap.tvdb_mappings) == "object",
+                                exists(
+                                    select(1).select_from(
+                                        func.json_each(AniMap.tvdb_mappings)
+                                    )
+                                ),
                             )
                         )
                     else:
