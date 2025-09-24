@@ -299,8 +299,7 @@ class MappingsService:
                 list[int]: List of matching AniList IDs.
             """
             client = await get_app_state().ensure_public_anilist()
-            # Be generous but capped; return in API order
-            search_limit = 200
+            search_limit = 50  # Max results AniList API allows
             ids: list[int] = []
             seen: set[int] = set()
             async for m in client.search_anime(
