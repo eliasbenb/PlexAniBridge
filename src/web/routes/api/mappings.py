@@ -100,112 +100,77 @@ async def get_query_capabilities() -> QueryCapabilitiesResponse:
         "tvdb_mappings",
     ]
 
+    DEFAULT_INT_KWARGS = {
+        "type": FieldType.INT,
+        "operators": [
+            FieldOperator.EQ,
+            FieldOperator.GT,
+            FieldOperator.GTE,
+            FieldOperator.LT,
+            FieldOperator.LTE,
+            FieldOperator.RANGE,
+        ],
+    }
+    DEFAULT_STRING_KWARGS = {
+        "type": FieldType.STRING,
+        "operators": [
+            FieldOperator.EQ,
+            FieldOperator.STAR_WILDCARD,
+            FieldOperator.QMARK_WILDCARD,
+        ],
+    }
+    DEFAULT_ENUM_KWARGS = {
+        "type": FieldType.ENUM,
+        "operators": [FieldOperator.EQ],
+    }
+
     fields = [
         FieldCapability(
             key="anilist",
-            aliases=["id"],
-            type=FieldType.INT,
-            operators=[
-                FieldOperator.EQ,
-                FieldOperator.GT,
-                FieldOperator.GTE,
-                FieldOperator.LT,
-                FieldOperator.LTE,
-                FieldOperator.RANGE,
-            ],
             desc="AniList ID",
+            aliases=["id"],
+            **DEFAULT_INT_KWARGS,
         ),
         FieldCapability(
             key="anidb",
-            type=FieldType.INT,
-            operators=[
-                FieldOperator.EQ,
-                FieldOperator.GT,
-                FieldOperator.GTE,
-                FieldOperator.LT,
-                FieldOperator.LTE,
-                FieldOperator.RANGE,
-            ],
             desc="AniDB ID",
+            **DEFAULT_INT_KWARGS,
         ),
         FieldCapability(
             key="imdb",
-            type=FieldType.STRING,
-            operators=[
-                FieldOperator.EQ,
-                FieldOperator.STAR_WILDCARD,
-                FieldOperator.QMARK_WILDCARD,
-            ],
             desc="IMDb ID",
+            **DEFAULT_STRING_KWARGS,
         ),
         FieldCapability(
             key="mal",
-            type=FieldType.INT,
-            operators=[
-                FieldOperator.EQ,
-                FieldOperator.GT,
-                FieldOperator.GTE,
-                FieldOperator.LT,
-                FieldOperator.LTE,
-                FieldOperator.RANGE,
-            ],
             desc="MyAnimeList ID",
+            **DEFAULT_INT_KWARGS,
         ),
         FieldCapability(
             key="tmdb_movie",
-            type=FieldType.INT,
-            operators=[
-                FieldOperator.EQ,
-                FieldOperator.GT,
-                FieldOperator.GTE,
-                FieldOperator.LT,
-                FieldOperator.LTE,
-                FieldOperator.RANGE,
-            ],
             desc="TMDb Movie ID",
+            **DEFAULT_INT_KWARGS,
         ),
         FieldCapability(
             key="tmdb_show",
-            type=FieldType.INT,
-            operators=[
-                FieldOperator.EQ,
-                FieldOperator.GT,
-                FieldOperator.GTE,
-                FieldOperator.LT,
-                FieldOperator.LTE,
-                FieldOperator.RANGE,
-            ],
             desc="TMDb TV Show ID",
+            **DEFAULT_INT_KWARGS,
         ),
         FieldCapability(
             key="tvdb",
-            type=FieldType.INT,
-            operators=[
-                FieldOperator.EQ,
-                FieldOperator.GT,
-                FieldOperator.GTE,
-                FieldOperator.LT,
-                FieldOperator.LTE,
-                FieldOperator.RANGE,
-            ],
             desc="TVDB ID",
+            **DEFAULT_INT_KWARGS,
         ),
         FieldCapability(
             key="tvdb_mappings",
-            type=FieldType.STRING,
-            operators=[
-                FieldOperator.EQ,
-                FieldOperator.STAR_WILDCARD,
-                FieldOperator.QMARK_WILDCARD,
-            ],
             desc="Season/episode mappings",
+            **DEFAULT_STRING_KWARGS,
         ),
         FieldCapability(
             key="has",
-            type=FieldType.ENUM,
-            operators=[FieldOperator.EQ],
-            values=has_values,
             desc="Presence filter",
+            values=has_values,
+            **DEFAULT_ENUM_KWARGS,
         ),
     ]
 
