@@ -59,6 +59,8 @@ class FieldOperator(StrEnum):
     GTE = ">="
     LT = "<"
     LTE = "<="
+    STAR_WILDCARD = "*"
+    QMARK_WILDCARD = "?"
     RANGE = "range"
 
 
@@ -129,7 +131,11 @@ async def get_query_capabilities() -> QueryCapabilitiesResponse:
         FieldCapability(
             key="imdb",
             type=FieldType.STRING,
-            operators=[FieldOperator.EQ],
+            operators=[
+                FieldOperator.EQ,
+                FieldOperator.STAR_WILDCARD,
+                FieldOperator.QMARK_WILDCARD,
+            ],
             desc="IMDb ID",
         ),
         FieldCapability(
@@ -187,7 +193,11 @@ async def get_query_capabilities() -> QueryCapabilitiesResponse:
         FieldCapability(
             key="tvdb_mappings",
             type=FieldType.STRING,
-            operators=[FieldOperator.EQ],
+            operators=[
+                FieldOperator.EQ,
+                FieldOperator.STAR_WILDCARD,
+                FieldOperator.QMARK_WILDCARD,
+            ],
             desc="Season/episode mappings",
         ),
         FieldCapability(

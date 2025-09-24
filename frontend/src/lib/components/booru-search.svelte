@@ -27,7 +27,7 @@
         key: string;
         aliases?: string[];
         type: "int" | "string" | "enum" | string;
-        operators: string[]; // "=", ">", ">=", "<", "<=", "range"
+        operators: string[]; // "=", ">", ">=", "<", "<=", "*", "?", "range"
         values?: string[] | null;
         desc?: string | null;
     };
@@ -187,13 +187,15 @@
                         ">=": "Greater or equal",
                         "<": "Less than",
                         "<=": "Less or equal",
+                        "*": "Wildcard (*)",
+                        "?": "Wildcard (?)",
                         range: "Range (lo..hi)",
                     };
 
                     // Transform to UI suffixes
                     const allOps: Array<[string, string]> = capOps.map((op) => [
                         op === "=" ? "" : op === "range" ? ".." : op,
-                        opMap[op] || "",
+                        op === "wildcard" ? "*" : opMap[op] || "",
                     ]);
 
                     const filteredOps = vpart
