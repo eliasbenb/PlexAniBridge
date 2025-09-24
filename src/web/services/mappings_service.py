@@ -529,8 +529,12 @@ class MappingsService:
                         tvdm_or.append(json_dict_key_like(AniMap.tvdb_mappings, v))
                         tvdm_or.append(json_dict_value_like(AniMap.tvdb_mappings, v))
                     else:
-                        tvdm_or.append(json_dict_has_key(AniMap.tvdb_mappings, v))
+                        # Avoid generating an invalid JSON path like '$.' when empty
+                        if v != "":
+                            tvdm_or.append(json_dict_has_key(AniMap.tvdb_mappings, v))
                         tvdm_or.append(json_dict_has_value(AniMap.tvdb_mappings, v))
+                    if not tvdm_or:
+                        return set()
                     s = s.where(or_(*tvdm_or))
                 else:
                     return set()
