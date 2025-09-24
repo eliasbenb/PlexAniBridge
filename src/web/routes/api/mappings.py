@@ -1,5 +1,6 @@
 """API endpoints for mappings."""
 
+from enum import StrEnum
 from typing import Any
 
 from fastapi import APIRouter, Query
@@ -46,7 +47,159 @@ class DeleteMappingResponse(BaseModel):
     ok: bool
 
 
+class FieldType(StrEnum):
+    INT = "int"
+    STRING = "string"
+    ENUM = "enum"
+
+
+class FieldOperator(StrEnum):
+    EQ = "="
+    GT = ">"
+    GTE = ">="
+    LT = "<"
+    LTE = "<="
+    RANGE = "range"
+
+
+class FieldCapability(BaseModel):
+    """Describes supported operators and value type for a query field."""
+
+    key: str
+    aliases: list[str] = []
+    type: FieldType
+    operators: list[FieldOperator]
+    values: list[str] | None = None  # for enums like has:*
+    desc: str | None = None
+
+
+class QueryCapabilitiesResponse(BaseModel):
+    fields: list[FieldCapability]
+
+
 router = APIRouter()
+
+
+@router.get("/query-capabilities", response_model=QueryCapabilitiesResponse)
+async def get_query_capabilities() -> QueryCapabilitiesResponse:
+    """Return supported operators for each queryable field.
+
+    This allows the frontend to tailor suggestions based on backend capabilities.
+    """
+    has_values = [
+        "anilist",
+        "id",
+        "anidb",
+        "imdb",
+        "mal",
+        "tmdb_movie",
+        "tmdb_show",
+        "tvdb",
+        "tvdb_mappings",
+    ]
+
+    fields = [
+        FieldCapability(
+            key="anilist",
+            aliases=["id"],
+            type=FieldType.INT,
+            operators=[
+                FieldOperator.EQ,
+                FieldOperator.GT,
+                FieldOperator.GTE,
+                FieldOperator.LT,
+                FieldOperator.LTE,
+                FieldOperator.RANGE,
+            ],
+            desc="AniList ID",
+        ),
+        FieldCapability(
+            key="anidb",
+            type=FieldType.INT,
+            operators=[
+                FieldOperator.EQ,
+                FieldOperator.GT,
+                FieldOperator.GTE,
+                FieldOperator.LT,
+                FieldOperator.LTE,
+                FieldOperator.RANGE,
+            ],
+            desc="AniDB ID",
+        ),
+        FieldCapability(
+            key="imdb",
+            type=FieldType.STRING,
+            operators=[FieldOperator.EQ],
+            desc="IMDb ID",
+        ),
+        FieldCapability(
+            key="mal",
+            type=FieldType.INT,
+            operators=[
+                FieldOperator.EQ,
+                FieldOperator.GT,
+                FieldOperator.GTE,
+                FieldOperator.LT,
+                FieldOperator.LTE,
+                FieldOperator.RANGE,
+            ],
+            desc="MyAnimeList ID",
+        ),
+        FieldCapability(
+            key="tmdb_movie",
+            type=FieldType.INT,
+            operators=[
+                FieldOperator.EQ,
+                FieldOperator.GT,
+                FieldOperator.GTE,
+                FieldOperator.LT,
+                FieldOperator.LTE,
+                FieldOperator.RANGE,
+            ],
+            desc="TMDb Movie ID",
+        ),
+        FieldCapability(
+            key="tmdb_show",
+            type=FieldType.INT,
+            operators=[
+                FieldOperator.EQ,
+                FieldOperator.GT,
+                FieldOperator.GTE,
+                FieldOperator.LT,
+                FieldOperator.LTE,
+                FieldOperator.RANGE,
+            ],
+            desc="TMDb TV Show ID",
+        ),
+        FieldCapability(
+            key="tvdb",
+            type=FieldType.INT,
+            operators=[
+                FieldOperator.EQ,
+                FieldOperator.GT,
+                FieldOperator.GTE,
+                FieldOperator.LT,
+                FieldOperator.LTE,
+                FieldOperator.RANGE,
+            ],
+            desc="TVDB ID",
+        ),
+        FieldCapability(
+            key="tvdb_mappings",
+            type=FieldType.STRING,
+            operators=[FieldOperator.EQ],
+            desc="Season/episode mappings",
+        ),
+        FieldCapability(
+            key="has",
+            type=FieldType.ENUM,
+            operators=[FieldOperator.EQ],
+            values=has_values,
+            desc="Presence filter",
+        ),
+    ]
+
+    return QueryCapabilitiesResponse(fields=fields)
 
 
 @router.get("", response_model=ListMappingsResponse)
