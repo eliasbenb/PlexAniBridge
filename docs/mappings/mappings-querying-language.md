@@ -40,6 +40,20 @@ The querying language supports a wide range of operators to build flexible and c
 
 - `has:foo` → Search for mappings that have the field `foo`
 
+### Wildcards on text fields
+
+- Use `*` for any sequence of characters and `?` for a single character.
+- Matching is case-insensitive.
+- Works on text-based fields: `imdb` and `tvdb_mappings` (both keys like `s1` and values like `e1-e12`).
+
+Examples:
+
+```bash
+tvdb_mappings:s1? # season key like s1X (s10..s19)
+tvdb_mappings:e12* # any episode range starting with e12-
+tvdb_mappings:*e24 # any episode range ending with e24
+```
+
 ## Supported Fields
 
 - `""` → Title (AniList API search for bare term)

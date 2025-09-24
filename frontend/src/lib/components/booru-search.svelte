@@ -497,8 +497,9 @@
                 <div
                     class="border-t border-slate-800/70 px-2 py-1 text-[10px] text-slate-400"
                 >
-                    Tips: Use '~' to OR within a group, '|' for OR between groups, '-'
-                    to negate, quotes for AniList title, and '()' to group terms.
+                    Tips: Use '()' to group terms, '|' to OR between groups, '~' to OR
+                    within a group, '-' to negate, '..' for ranges, '*' or '?' as
+                    wildcards, and quotes for AniList title search.
                 </div>
             </Popover.Content>
         </Popover.Portal>
