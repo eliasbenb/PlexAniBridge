@@ -471,7 +471,8 @@
                 <ul
                     id={listId}
                     role="listbox"
-                    class="max-h-64 overflow-auto py-1 text-[11px]"
+                    class={"max-h-64 overflow-auto py-1 text-[11px]" +
+                        (suggestions.length === 0 ? " hidden" : "")}
                 >
                     {#each suggestions as s, i (s.label)}
                         <li>
