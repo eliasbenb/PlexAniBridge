@@ -5,14 +5,17 @@ from typing import Any
 from sqlalchemy.orm.base import Mapped
 from sqlalchemy.sql import and_, cast, column, exists, false, func, select
 from sqlalchemy.sql.elements import BinaryExpression, ColumnElement, UnaryExpression
-from sqlalchemy.sql.sqltypes import Integer
+from sqlalchemy.sql.sqltypes import Integer, String
 
 __all__ = [
     "json_array_between",
     "json_array_compare",
     "json_array_contains",
+    "json_array_like",
     "json_dict_has_key",
     "json_dict_has_value",
+    "json_dict_key_like",
+    "json_dict_value_like",
 ]
 
 
@@ -51,6 +54,54 @@ def json_array_exists(field: Mapped) -> ColumnElement[bool]:
     return func.json_array_length(field) > 0
 
 
+def _to_like_pattern(value: str) -> str:
+    r"""Convert a user-provided pattern with '*' and '?' into a SQL LIKE pattern.
+
+    - '*' -> '%' (multi-char wildcard)
+    - '?' -> '_' (single-char wildcard)
+    - '\*' -> literal '*'
+    - '\?' -> literal '?'
+
+    Escapes existing SQL LIKE meta characters so they cannot be injected.
+    """
+    # Escape SQL LIKE meta characters first
+    pat = value.replace("\\", "\\\\")
+    pat = pat.replace("%", "\\%").replace("_", "\\_")
+
+    # Temporarily replace escaped wildcards to avoid double-replacing
+    pat = pat.replace(r"\*", "[TMP_STAR]")
+    pat = pat.replace(r"\?", "[TMP_QMARK]")
+
+    pat = pat.replace("*", "%").replace("?", "_")
+
+    pat = pat.replace("[TMP_STAR]", "*").replace("[TMP_QMARK]", "?")
+
+    return pat
+
+
+def json_array_like(
+    field: Mapped, pattern: str, *, case_insensitive: bool = True
+) -> ColumnElement[bool]:
+    """Check if any element of a JSON array matches a LIKE pattern.
+
+    Supports wildcard '*' and '?' in the given pattern.
+
+    Args:
+        field (Mapped): SQLAlchemy mapped field representing a JSON array column.
+        pattern (str): LIKE pattern to match against (supports '*' and '?').
+        case_insensitive (bool): Whether the match should be case-insensitive.
+
+    Returns:
+        ColumnElement[bool]: SQL condition that evaluates to True if any matches.
+    """
+    like_pat = _to_like_pattern(pattern)
+    v = cast(column("value"), String)
+    if case_insensitive:
+        v = v.collate("NOCASE")
+    cond = v.like(like_pat, escape="\\")
+    return exists(select(1).select_from(func.json_each(field)).where(cond))
+
+
 def json_dict_has_key(field: Mapped, key: str) -> BinaryExpression:
     """Generate a SQL expression for checking if a JSON field contains a key.
 
@@ -83,6 +134,52 @@ def json_dict_has_value(field: Mapped, value: Any) -> UnaryExpression:
     return exists(
         select(1).select_from(func.json_each(field)).where(column("value") == value)
     )
+
+
+def json_dict_key_like(
+    field: Mapped, pattern: str, *, case_insensitive: bool = True
+) -> UnaryExpression:
+    """Check if any key in a JSON object matches a LIKE pattern.
+
+    Supports wildcard '*' and '?'.
+
+    Args:
+        field (Mapped): SQLAlchemy mapped field representing a JSON object column.
+        pattern (str): LIKE pattern to match against (supports '*' and '?').
+        case_insensitive (bool): Whether the match should be case-insensitive.
+
+    Returns:
+        ColumnElement[bool]: SQL condition that evaluates to True if any matches.
+    """
+    like_pat = _to_like_pattern(pattern)
+    k = cast(column("key"), String)
+    if case_insensitive:
+        k = k.collate("NOCASE")
+    cond = k.like(like_pat, escape="\\")
+    return exists(select(1).select_from(func.json_each(field)).where(cond))
+
+
+def json_dict_value_like(
+    field: Mapped, pattern: str, *, case_insensitive: bool = True
+) -> UnaryExpression:
+    """Check if any value in a JSON object matches a LIKE pattern.
+
+    Supports wildcard '*' and '?'.
+
+    Args:
+        field (Mapped): SQLAlchemy mapped field representing a JSON object column.
+        pattern (str): LIKE pattern to match against (supports '*' and '?').
+        case_insensitive (bool): Whether the match should be case-insensitive.
+
+    Returns:
+        ColumnElement[bool]: SQL condition that evaluates to True if any matches.
+    """
+    like_pat = _to_like_pattern(pattern)
+    v = cast(column("value"), String)
+    if case_insensitive:
+        v = v.collate("NOCASE")
+    cond = v.like(like_pat, escape="\\")
+    return exists(select(1).select_from(func.json_each(field)).where(cond))
 
 
 def json_array_between(field: Mapped, lo: int, hi: int):

@@ -25,8 +25,11 @@ from src.utils.sql import (
     json_array_compare,
     json_array_contains,
     json_array_exists,
+    json_array_like,
     json_dict_has_key,
     json_dict_has_value,
+    json_dict_key_like,
+    json_dict_value_like,
 )
 from src.web.state import get_app_state
 
@@ -321,6 +324,10 @@ class MappingsService:
             Returns:
                 set[int]: Set of matching AniList IDs.
             """
+
+            def _has_wildcards(s: str) -> bool:
+                return "*" in s or "?" in s
+
             with db() as ctx:
                 s = select(AniMap.anilist_id)
 
@@ -423,7 +430,10 @@ class MappingsService:
                         return set()
                     s = s.where(AniMap.anidb_id == num)
                 elif key == "imdb":
-                    s = s.where(json_array_contains(AniMap.imdb_id, [value]))
+                    if _has_wildcards(value):
+                        s = s.where(json_array_like(AniMap.imdb_id, value))
+                    else:
+                        s = s.where(json_array_contains(AniMap.imdb_id, [value]))
                 elif key == "mal":
                     try:
                         if m_cmp:
@@ -512,14 +522,15 @@ class MappingsService:
                             return set()
                         return set()
                     if m_rng:
-                        # TODO: Ranges not supported right now.
                         return set()
-
+                    v = str(value)
                     tvdm_or: list[Any] = []
-                    tvdm_or.append(json_dict_has_key(AniMap.tvdb_mappings, str(value)))
-                    tvdm_or.append(
-                        json_dict_has_value(AniMap.tvdb_mappings, str(value))
-                    )
+                    if _has_wildcards(v):
+                        tvdm_or.append(json_dict_key_like(AniMap.tvdb_mappings, v))
+                        tvdm_or.append(json_dict_value_like(AniMap.tvdb_mappings, v))
+                    else:
+                        tvdm_or.append(json_dict_has_key(AniMap.tvdb_mappings, v))
+                        tvdm_or.append(json_dict_has_value(AniMap.tvdb_mappings, v))
                     s = s.where(or_(*tvdm_or))
                 else:
                     return set()
