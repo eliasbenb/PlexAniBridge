@@ -1,5 +1,6 @@
 """API endpoints for mappings."""
 
+from enum import StrEnum
 from typing import Any
 
 from fastapi import APIRouter, Query
@@ -46,7 +47,134 @@ class DeleteMappingResponse(BaseModel):
     ok: bool
 
 
+class FieldType(StrEnum):
+    INT = "int"
+    STRING = "string"
+    ENUM = "enum"
+
+
+class FieldOperator(StrEnum):
+    EQ = "="
+    GT = ">"
+    GTE = ">="
+    LT = "<"
+    LTE = "<="
+    STAR_WILDCARD = "*"
+    QMARK_WILDCARD = "?"
+    RANGE = "range"
+
+
+class FieldCapability(BaseModel):
+    """Describes supported operators and value type for a query field."""
+
+    key: str
+    aliases: list[str] = []
+    type: FieldType
+    operators: list[FieldOperator]
+    values: list[str] | None = None  # for enums like has:*
+    desc: str | None = None
+
+
+class QueryCapabilitiesResponse(BaseModel):
+    fields: list[FieldCapability]
+
+
 router = APIRouter()
+
+
+@router.get("/query-capabilities", response_model=QueryCapabilitiesResponse)
+async def get_query_capabilities() -> QueryCapabilitiesResponse:
+    """Return supported operators for each queryable field.
+
+    This allows the frontend to tailor suggestions based on backend capabilities.
+    """
+    has_values = [
+        "anilist",
+        "id",
+        "anidb",
+        "imdb",
+        "mal",
+        "tmdb_movie",
+        "tmdb_show",
+        "tvdb",
+        "tvdb_mappings",
+    ]
+
+    DEFAULT_INT_KWARGS = {
+        "type": FieldType.INT,
+        "operators": [
+            FieldOperator.EQ,
+            FieldOperator.GT,
+            FieldOperator.GTE,
+            FieldOperator.LT,
+            FieldOperator.LTE,
+            FieldOperator.RANGE,
+        ],
+    }
+    DEFAULT_STRING_KWARGS = {
+        "type": FieldType.STRING,
+        "operators": [
+            FieldOperator.EQ,
+            FieldOperator.STAR_WILDCARD,
+            FieldOperator.QMARK_WILDCARD,
+        ],
+    }
+    DEFAULT_ENUM_KWARGS = {
+        "type": FieldType.ENUM,
+        "operators": [FieldOperator.EQ],
+    }
+
+    fields = [
+        FieldCapability(
+            key="anilist",
+            desc="AniList ID",
+            aliases=["id"],
+            **DEFAULT_INT_KWARGS,
+        ),
+        FieldCapability(
+            key="anidb",
+            desc="AniDB ID",
+            **DEFAULT_INT_KWARGS,
+        ),
+        FieldCapability(
+            key="imdb",
+            desc="IMDb ID",
+            **DEFAULT_STRING_KWARGS,
+        ),
+        FieldCapability(
+            key="mal",
+            desc="MyAnimeList ID",
+            **DEFAULT_INT_KWARGS,
+        ),
+        FieldCapability(
+            key="tmdb_movie",
+            desc="TMDb Movie ID",
+            **DEFAULT_INT_KWARGS,
+        ),
+        FieldCapability(
+            key="tmdb_show",
+            desc="TMDb TV Show ID",
+            **DEFAULT_INT_KWARGS,
+        ),
+        FieldCapability(
+            key="tvdb",
+            desc="TVDB ID",
+            **DEFAULT_INT_KWARGS,
+        ),
+        FieldCapability(
+            key="tvdb_mappings",
+            desc="Season/episode mappings",
+            **DEFAULT_STRING_KWARGS,
+        ),
+        FieldCapability(
+            key="has",
+            desc="Presence filter",
+            values=has_values,
+            **DEFAULT_ENUM_KWARGS,
+        ),
+    ]
+
+    return QueryCapabilitiesResponse(fields=fields)
 
 
 @router.get("", response_model=ListMappingsResponse)

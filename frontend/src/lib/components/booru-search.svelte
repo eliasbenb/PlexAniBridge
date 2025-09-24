@@ -4,6 +4,8 @@
     import { ArrowRight, Search } from "@lucide/svelte";
     import { Popover } from "bits-ui";
 
+    import { apiJson } from "$lib/api";
+
     type Props = {
         value?: string;
         placeholder?: string;
@@ -21,33 +23,19 @@
         onSubmit,
     }: Props = $props();
 
-    /**
-     * @TODO better type hinting for keys (e.g. imdb doesn't take >, <, etc)
-     */
-    const KEYS = [
-        {
-            key: "anilist",
-            alias: ["id"],
-            desc: "AniList ID (int, supports >, <, ..)",
-            type: "int",
-        },
-        { key: "anidb", desc: "AniDB ID (int)", type: "int" },
-        { key: "imdb", desc: "IMDB ID (e.g., tt1234567)", type: "string" },
-        { key: "mal", desc: "MyAnimeList ID (int)", type: "int" },
-        { key: "tmdb_movie", desc: "TMDb Movie ID (int)", type: "int" },
-        { key: "tmdb_show", desc: "TMDb TV ID (int)", type: "int" },
-        { key: "tvdb", desc: "TheTVDB ID (int)", type: "int" },
-        {
-            key: "tvdb_mappings",
-            desc: "TVDB mappings (season keys or values)",
-            type: "string",
-        },
-        {
-            key: "has",
-            desc: "Presence filter: anidb/imdb/mal/tmdb_movie/tmdb_show/tvdb/tvdb_mappings",
-            type: "enum",
-        },
-    ];
+    type FieldCapability = {
+        key: string;
+        aliases?: string[];
+        type: "int" | "string" | "enum" | string;
+        operators: string[]; // "=", ">", ">=", "<", "<=", "*", "?", "range"
+        values?: string[] | null;
+        desc?: string | null;
+    };
+
+    type CapabilitiesResponse = { fields: FieldCapability[] };
+
+    let capabilities = $state<FieldCapability[] | null>(null);
+    let KEYS: FieldCapability[] = $derived(capabilities ?? []);
 
     let inputEl = $state<HTMLInputElement | null>(null);
     let containerEl = $state<HTMLDivElement | null>(null);
@@ -106,7 +94,9 @@
         if (!name) return undefined;
         const lname = name.toLowerCase();
         for (const k of KEYS) {
-            if (k.key === lname || (k.alias && k.alias.includes(lname))) return k;
+            const aliases = k.aliases ?? [];
+            if (k.key === lname || (Array.isArray(aliases) && aliases.includes(lname)))
+                return k;
         }
         return undefined;
     }
@@ -129,18 +119,6 @@
             // Key suggestions (when typing name or missing colon)
             if (!hasColon) {
                 const needle = name;
-                for (const k of KEYS) {
-                    if (needle && !k.key.startsWith(needle)) continue;
-                    out.push({
-                        label: `${prefix}${k.key}:`,
-                        detail: k.desc,
-                        kind: "key",
-                        apply: ({ replace }) => {
-                            replace(seg.start, seg.end, `${prefix}${k.key}:`);
-                        },
-                    });
-                }
-
                 if (!needle && prefix === "" && t.trim() === t) {
                     out.push({
                         label: '"title"',
@@ -151,18 +129,22 @@
                         },
                     });
                 }
+
+                for (const k of KEYS) {
+                    if (needle && !k.key.startsWith(needle)) continue;
+                    out.push({
+                        label: `${prefix}${k.key}:`,
+                        detail: k.desc ?? undefined,
+                        kind: "key",
+                        apply: ({ replace }) => {
+                            replace(seg.start, seg.end, `${prefix}${k.key}:`);
+                        },
+                    });
+                }
             } else {
                 // Value suggestions depending on key type
                 if (kinfo?.key === "has") {
-                    const opts = [
-                        "anidb",
-                        "imdb",
-                        "mal",
-                        "tmdb_movie",
-                        "tmdb_show",
-                        "tvdb",
-                        "tvdb_mappings",
-                    ];
+                    const opts = kinfo.values || [];
                     for (const opt of opts) {
                         if (vpart && !opt.startsWith(vpart.toLowerCase())) continue;
                         out.push({
@@ -194,29 +176,39 @@
                         }),
                     );
                 } else if (kinfo) {
-                    // Numeric/string operators
+                    // Operators based on backend capabilities
                     const base = `${prefix}${kinfo.key}:`;
-                    const ops: Array<[string, string]> = [
-                        [">=", "Greater or equal"],
-                        ["<=", "Less or equal"],
-                        [">", "Greater than"],
-                        ["<", "Less than"],
-                        ["..", "Range (lo..hi)"],
-                    ];
+                    const capOps: string[] = Array.isArray(kinfo.operators)
+                        ? kinfo.operators
+                        : [];
+                    const opMap: Record<string, string> = {
+                        "=": "Equals",
+                        ">": "Greater than",
+                        ">=": "Greater or equal",
+                        "<": "Less than",
+                        "<=": "Less or equal",
+                        "*": "Wildcard (*)",
+                        "?": "Wildcard (?)",
+                        range: "Range (lo..hi)",
+                    };
 
-                    // If the user started typing an operator, filter to those
+                    // Transform to UI suffixes
+                    const allOps: Array<[string, string]> = capOps.map((op) => [
+                        op === "=" ? "" : op === "range" ? ".." : op,
+                        op === "wildcard" ? "*" : opMap[op] || "",
+                    ]);
+
                     const filteredOps = vpart
-                        ? ops.filter(([op]) => op.startsWith(vpart))
-                        : ops;
+                        ? allOps.filter(([op]) => op.startsWith(vpart))
+                        : allOps;
                     for (const [op, detail] of filteredOps) {
                         out.push({
                             label: base + op,
-                            detail,
+                            detail: detail || undefined,
                             kind: "value",
                             apply: ({ replace }) => {
                                 const rest = vpart;
                                 let next = base + op;
-
                                 if (op === ".." && /\d$/.test(rest)) {
                                     next = base + rest + "..";
                                 }
@@ -228,30 +220,12 @@
             }
         }
 
-        if (!t || /^\s*$/.test(t)) {
-            [
-                { sym: "|", desc: "OR between terms" },
-                { sym: "~", desc: "Mark term for OR in group" },
-                { sym: "-", desc: "NOT (negate next term)" },
-                { sym: "(", desc: "Start group" },
-                { sym: ")", desc: "End group" },
-                { sym: '""', desc: "Bare title search" },
-            ].forEach(({ sym, desc }) =>
-                out.push({
-                    label: sym,
-                    detail: desc,
-                    kind: "op",
-                    apply: ({ insert }) => insert(sym),
-                }),
-            );
-        }
-
         if (out.length < 6 && val.trim() === "") {
             for (const k of KEYS) {
                 if (out.length >= 6) break;
                 out.push({
                     label: `${k.key}:`,
-                    detail: k.desc,
+                    detail: k.desc ?? undefined,
                     kind: "key",
                     apply: ({ insert }) => insert(`${k.key}:`),
                 });
@@ -369,8 +343,16 @@
         }, 50);
     }
 
-    onMount(() => {
+    onMount(async () => {
         if (autoFocus) inputEl?.focus();
+        try {
+            const res = await apiJson<CapabilitiesResponse>(
+                "/api/mappings/query-capabilities",
+            );
+            if (res && Array.isArray(res.fields) && res.fields.length) {
+                capabilities = res.fields as FieldCapability[];
+            }
+        } catch {}
     });
 
     function closePopover() {
@@ -489,7 +471,8 @@
                 <ul
                     id={listId}
                     role="listbox"
-                    class="max-h-64 overflow-auto py-1 text-[11px]"
+                    class={"max-h-64 overflow-auto py-1 text-[11px]" +
+                        (suggestions.length === 0 ? " hidden" : "")}
                 >
                     {#each suggestions as s, i (s.label)}
                         <li>
@@ -517,8 +500,9 @@
                 <div
                     class="border-t border-slate-800/70 px-2 py-1 text-[10px] text-slate-400"
                 >
-                    Tips: Use '~' to OR within a group, '|' for OR between groups, '-'
-                    to negate, quotes for AniList title, and '()' to group terms.
+                    Tips: Use '()' to group terms, '|' to OR between groups, '~' to OR
+                    within a group, '-' to negate, '..' for ranges, '*' or '?' as
+                    wildcards, and quotes for AniList title search.
                 </div>
             </Popover.Content>
         </Popover.Portal>
