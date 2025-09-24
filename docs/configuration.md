@@ -279,7 +279,7 @@ For example, if a sync job finds 10 items to update with `BATCH_REQUESTS` enable
 
 Determines how similar (as a percentage) a title must be to the search query to be considered a match.
 
-The default behavior is to disable searching completely and only rely on the [community and local mappings database](./advanced/custom-mappings.md).
+The default behavior is to disable searching completely and only rely on the [community and local mappings database](./mappings/custom-mappings.md).
 
 ??? tip "Enabling Search Fallback"
 
