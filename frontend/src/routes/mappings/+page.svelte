@@ -12,34 +12,7 @@
     import Modal from "$lib/ui/modal.svelte";
     import UiTooltip from "$lib/ui/tooltip.svelte";
 
-    type ExternalIds = {
-        anilist_id?: number | null;
-        anidb_id?: number | null;
-        imdb_id?: string[] | null;
-        mal_id?: number[] | null;
-        tmdb_movie_id?: number[] | null;
-        tmdb_show_id?: number[] | null;
-        tvdb_id?: number | null;
-        tvdb_mappings?: Record<string, string> | null;
-        custom?: boolean;
-        sources?: string[];
-    };
-
-    interface AniListMediaLite {
-        id: number;
-        title?: { romaji?: string; english?: string; native?: string };
-        coverImage?: {
-            medium?: string;
-            large?: string;
-            extraLarge: string;
-            color?: string;
-        };
-        format?: string;
-        status?: string;
-        episodes?: number;
-    }
-
-    type Mapping = ExternalIds & { anilist?: AniListMediaLite };
+    import type { Mapping } from "$lib/types/api";
 
     let items: Mapping[] = $state([]);
     let total = $state(0);
@@ -222,7 +195,9 @@
             return arr;
         }
 
-        const out: Mapping = { anilist_id: toInt(f.anilist_id) };
+    const aid = toInt(f.anilist_id);
+    const out: Partial<Mapping> = {};
+    if (aid !== null) out.anilist_id = aid;
 
         if (f.anidb_mode === "null") out.anidb_id = null;
         else if (f.anidb_mode === "value") out.anidb_id = toInt(f.anidb_id);
@@ -257,7 +232,7 @@
             }
             out.tvdb_mappings = Object.keys(obj).length ? obj : null;
         }
-        return out;
+        return out as Mapping; // caller ensures anilist_id present before send
     }
 
     function syncFormToRaw() {
@@ -363,7 +338,7 @@
                 alert("AniList ID required");
                 return;
             }
-            payload = toPayload(form);
+            payload = toPayload(form) as unknown as Record<string, unknown>;
         }
         const isNew = form._isNew; // creation state determined when opening modal
         const url = isNew ? "/api/mappings" : "/api/mappings/" + aid;
@@ -404,10 +379,10 @@
     }
 
     function preferredTitle(t?: {
-        romaji?: string;
-        english?: string;
-        native?: string;
-    }) {
+        romaji?: string | null;
+        english?: string | null;
+        native?: string | null;
+    } | null) {
         if (!t) return null;
         let pref: string | null = null;
         try {

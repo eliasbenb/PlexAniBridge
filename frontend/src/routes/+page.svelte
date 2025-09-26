@@ -11,30 +11,15 @@
 
     import { goto } from "$app/navigation";
     import { resolve } from "$app/paths";
-    import { apiFetch } from "$lib/api";
+    import { apiFetch, apiJson } from "$lib/api";
     import { toast } from "$lib/notify";
 
-    type CurrentSync = {
-        state?: string;
-        started_at?: string;
-        section_index?: number;
-        section_count?: number;
-        section_title?: string | null;
-        stage?: string;
-        section_items_total?: number;
-        section_items_processed?: number;
-    };
+    import type {
+        StatusResponse,
+        ProfileStatus,
+    } from "$lib/types/api";
 
-    type ProfileStatus = {
-        status?: { last_synced?: string; current_sync?: CurrentSync };
-        config?: {
-            anilist_user?: string;
-            sync_interval?: string | number;
-            sync_modes?: string[];
-        };
-    };
-
-    let profiles: Record<string, ProfileStatus> = $state({});
+    let profiles: StatusResponse["profiles"] = $state({});
     let isLoading = $state(true);
     let lastRefreshed: number | null = $state(null);
     let ws: WebSocket | null = $state(null);
@@ -70,10 +55,8 @@
 
     async function refresh() {
         try {
-            const r = await apiFetch("/api/status");
-            if (!r.ok) throw new Error("HTTP " + r.status);
-            const d = await r.json();
-            profiles = d.profiles || {};
+            const d = await apiJson<StatusResponse>("/api/status");
+            profiles = d.profiles;
             isLoading = false;
             lastRefreshed = Date.now();
         } catch (e) {

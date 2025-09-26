@@ -3,15 +3,11 @@
 
     import { Languages, Settings, User } from "@lucide/svelte";
 
-    import { apiFetch } from "$lib/api";
+    import { apiJson } from "$lib/api";
     import { toast } from "$lib/notify";
+    import type { SettingsResponse } from "$lib/types/api";
 
-    interface SettingsResp {
-        global_config: Record<string, unknown>;
-        profiles: { name: string; settings: Record<string, unknown> }[];
-    }
-
-    let data: SettingsResp = $state({ global_config: {}, profiles: [] });
+    let data: SettingsResponse = $state({ global_config: {}, profiles: [] });
     let loading = $state(true);
     let error: string | null = $state(null);
     let titleLang = $state("romaji");
@@ -37,9 +33,7 @@
         loading = true;
         error = null;
         try {
-            const r = await apiFetch("/api/system/settings");
-            if (!r.ok) throw new Error("HTTP " + r.status);
-            data = await r.json();
+            data = await apiJson<SettingsResponse>("/api/system/settings");
         } catch (e: unknown) {
             if (e instanceof Error) error = e.message;
             else error = String(e);

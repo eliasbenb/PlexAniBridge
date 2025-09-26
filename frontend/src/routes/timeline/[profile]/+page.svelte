@@ -29,53 +29,9 @@
     import { apiFetch } from "$lib/api";
     import JsonCodeBlock from "$lib/components/json-code-block.svelte";
     import { toast } from "$lib/notify";
+    import type { HistoryItem, CurrentSync } from "$lib/types/api";
 
     const { params } = $props<{ params: { profile: string } }>();
-
-    type CurrentSync = {
-        state?: string;
-        started_at?: string;
-        section_index?: number;
-        section_count?: number;
-        section_title?: string | null;
-        stage?: string;
-        section_items_total?: number;
-        section_items_processed?: number;
-    };
-
-    type HistoryItem = {
-        id: number;
-        outcome: string;
-        timestamp: string;
-        anilist_id?: number;
-        plex_guid?: string;
-        plex_rating_key?: string;
-        plex_child_rating_key?: string | null;
-        plex_type?: string;
-        error_message?: string;
-        before_state?: object;
-        after_state?: object;
-        anilist?: {
-            id?: number;
-            title?: { romaji?: string; english?: string; native?: string };
-            coverImage?: {
-                medium?: string;
-                large?: string;
-                extraLarge?: string;
-                color: string;
-            };
-            format?: string;
-            status?: string;
-            episodes?: number;
-        };
-        plex?: {
-            guid?: string;
-            title?: string;
-            type?: string | null;
-            art?: string | null;
-            thumb?: string | null;
-        };
-    };
 
     let items: HistoryItem[] = $state([]);
     let stats: Record<string, number> = $state({});
@@ -256,10 +212,10 @@
     };
 
     function preferredTitle(t?: {
-        romaji?: string;
-        english?: string;
-        native?: string;
-    }) {
+        romaji?: string | null;
+        english?: string | null;
+        native?: string | null;
+    } | null) {
         if (!t) return null;
         let pref: string | null = null;
         try {

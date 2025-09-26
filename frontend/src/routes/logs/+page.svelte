@@ -18,18 +18,7 @@
 
     import { apiFetch } from "$lib/api";
     import { toast } from "$lib/notify";
-
-    interface LogEntry {
-        timestamp: string | null;
-        level: string;
-        message: string;
-    }
-    interface FileMeta {
-        name: string;
-        size: number;
-        mtime: number;
-        current: boolean;
-    }
+    import type { LogEntry, LogFile } from "$lib/types/api";
 
     let tab = $state<"live" | "history">("live");
     let level = $state("INFO");
@@ -41,8 +30,8 @@
     let ws: WebSocket | null = null;
     let isWsOpen = $state(false);
     let lastReceived: number | null = $state(null);
-    let files: FileMeta[] = $state([]);
-    let currentFile: FileMeta | null = $state(null);
+    let files: LogFile[] = $state([]);
+    let currentFile: LogFile | null = $state(null);
     let historyEntries: LogEntry[] = $state([]);
     let historyFiltered: LogEntry[] = $state([]);
     let historyLines = $state(500);
@@ -166,7 +155,7 @@
         }
     }
 
-    async function loadFile(f: FileMeta, force = false) {
+    async function loadFile(f: LogFile, force = false) {
         const same = currentFile && currentFile.name === f.name;
         if (!force && same && lastHistoryLinesLoaded === historyLines) return;
         currentFile = f;

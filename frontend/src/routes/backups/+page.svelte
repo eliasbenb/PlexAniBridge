@@ -6,9 +6,7 @@
     import { resolve } from "$app/paths";
     import { apiJson } from "$lib/api";
 
-    interface StatusResponse {
-        profiles: Record<string, unknown>;
-    }
+    import type { StatusResponse } from "$lib/types/api";
 
     let profiles: string[] = $state([]);
     let loading = $state(true);

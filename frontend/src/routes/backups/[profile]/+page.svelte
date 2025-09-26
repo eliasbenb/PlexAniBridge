@@ -7,6 +7,7 @@
     import JsonCodeBlock from "$lib/components/json-code-block.svelte";
     import { toast } from "$lib/notify";
     import Modal from "$lib/ui/modal.svelte";
+    import type { BackupMeta, RestoreSummary } from "$lib/types/api";
 
     const { params } = $props<{ params: { profile: string } }>();
 
@@ -31,26 +32,6 @@
         } finally {
             loading = false;
         }
-    }
-
-    interface BackupMeta {
-        filename: string;
-        created_at: string;
-        size_bytes: number;
-        entries?: number | null;
-        user?: string | null;
-        age_seconds: number;
-    }
-
-    interface RestoreSummary {
-        ok: boolean;
-        filename: string;
-        total_entries: number;
-        processed: number;
-        restored: number;
-        skipped: number;
-        errors: { [k: string]: unknown }[];
-        elapsed_seconds: number;
     }
 
     async function listBackups(profile: string): Promise<BackupMeta[]> {
