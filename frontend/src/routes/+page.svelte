@@ -11,30 +11,11 @@
 
     import { goto } from "$app/navigation";
     import { resolve } from "$app/paths";
-    import { apiFetch } from "$lib/api";
-    import { toast } from "$lib/notify";
+    import type { ProfileStatus, StatusResponse } from "$lib/types/api";
+    import { apiFetch, apiJson } from "$lib/utils/api";
+    import { toast } from "$lib/utils/notify";
 
-    type CurrentSync = {
-        state?: string;
-        started_at?: string;
-        section_index?: number;
-        section_count?: number;
-        section_title?: string | null;
-        stage?: string;
-        section_items_total?: number;
-        section_items_processed?: number;
-    };
-
-    type ProfileStatus = {
-        status?: { last_synced?: string; current_sync?: CurrentSync };
-        config?: {
-            anilist_user?: string;
-            sync_interval?: string | number;
-            sync_modes?: string[];
-        };
-    };
-
-    let profiles: Record<string, ProfileStatus> = $state({});
+    let profiles: StatusResponse["profiles"] = $state({});
     let isLoading = $state(true);
     let lastRefreshed: number | null = $state(null);
     let ws: WebSocket | null = $state(null);
@@ -70,10 +51,8 @@
 
     async function refresh() {
         try {
-            const r = await apiFetch("/api/status");
-            if (!r.ok) throw new Error("HTTP " + r.status);
-            const d = await r.json();
-            profiles = d.profiles || {};
+            const d = await apiJson<StatusResponse>("/api/status");
+            profiles = d.profiles;
             isLoading = false;
             lastRefreshed = Date.now();
         } catch (e) {
@@ -172,16 +151,14 @@
                         >{Object.keys(profiles).length} total {#if lastRefreshed}•
                             updated {formatTimeAgo(
                                 new Date(lastRefreshed).toISOString(),
-                            )}{/if}</span
-                    >
+                            )}{/if}</span>
                 </div>
                 <p class="text-xs text-slate-400">Browse your configured profiles.</p>
             </div>
             <div class="flex flex-wrap gap-2 sm:justify-end">
                 <button
                     class="inline-flex items-center gap-1 rounded-md border border-amber-600/60 bg-amber-600/30 px-2 py-1 text-xs font-medium text-amber-200 shadow-sm backdrop-blur-sm transition-colors hover:bg-amber-600/40 focus:ring-2 focus:ring-amber-500/40 focus:outline-none sm:gap-1 sm:px-3 sm:py-1.5 sm:text-sm"
-                    onclick={syncDatabase}
-                >
+                    onclick={syncDatabase}>
                     <DatabaseBackup class="inline h-3 w-3 sm:h-4 sm:w-4" />
                     <span>Sync Database</span>
                 </button>
@@ -191,8 +168,7 @@
                     disabled={anyRunning()}
                     title={anyRunning()
                         ? "A sync is currently running. Please wait."
-                        : "Trigger a full sync for all profiles"}
-                >
+                        : "Trigger a full sync for all profiles"}>
                     <RefreshCcw class="inline h-3 w-3 sm:h-4 sm:w-4" />
                     <span>Full Sync All</span>
                 </button>
@@ -202,8 +178,7 @@
                     disabled={anyRunning()}
                     title={anyRunning()
                         ? "A sync is currently running. Please wait."
-                        : "Trigger a poll sync for all profiles"}
-                >
+                        : "Trigger a poll sync for all profiles"}>
                     <CloudDownload class="inline h-3 w-3 sm:h-4 sm:w-4" />
                     <span>Poll Sync All</span>
                 </button>
@@ -212,10 +187,9 @@
     </div>
     <div class="grid grid-cols-[repeat(auto-fill,minmax(min(100%,32rem),1fr))] gap-4">
         {#if isLoading && Object.keys(profiles).length === 0}
-            {#each Array(3) as _, i (i)}<!-- eslint-disable-line @typescript-eslint/no-unused-vars -->
+            {#each [1, 2, 3] as i (i)}
                 <div
-                    class="animate-pulse rounded-md border border-slate-800/60 bg-slate-900/40 p-4"
-                >
+                    class="animate-pulse rounded-md border border-slate-800/60 bg-slate-900/40 p-4">
                     <div class="h-4 w-1/3 rounded-md bg-slate-700/60"></div>
                     <div class="mt-3 h-3 w-1/2 rounded-md bg-slate-800/60"></div>
                     <div class="mt-3 flex gap-2">
@@ -231,11 +205,9 @@
                 type="button"
                 class="group cursor-pointer rounded-md border border-slate-800/80 bg-slate-900/50 p-4 text-left transition-colors hover:bg-slate-900/70 focus:ring-2 focus:ring-sky-600/40 focus:outline-none"
                 onclick={() => goTimeline(name)}
-                title={`Open timeline for ${name}`}
-            >
+                title={`Open timeline for ${name}`}>
                 <div
-                    class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"
-                >
+                    class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                         <div class="font-medium text-slate-100">{name}</div>
                         <div class="mt-1 text-xs text-slate-400">
@@ -246,8 +218,7 @@
                                     ).toLocaleString()}
                                     >Last sync · {formatTimeAgo(
                                         p.status.last_synced,
-                                    )}</span
-                                >
+                                    )}</span>
                             {:else}
                                 <span>No sync yet</span>
                             {/if}
@@ -256,8 +227,7 @@
                     <div class="flex flex-wrap items-start gap-2">
                         <a
                             href={resolve(`/timeline/${name}`)}
-                            class="inline-flex items-center gap-1 rounded-md border border-indigo-600/60 bg-indigo-600/30 px-2 py-1 text-[11px] font-medium text-indigo-200 shadow-sm hover:bg-indigo-600/40"
-                        >
+                            class="inline-flex items-center gap-1 rounded-md border border-indigo-600/60 bg-indigo-600/30 px-2 py-1 text-[11px] font-medium text-indigo-200 shadow-sm hover:bg-indigo-600/40">
                             <span>Timeline</span>
                             <ChevronRight class="inline h-3 w-3" />
                         </a>
@@ -279,8 +249,7 @@
                             class:cursor-not-allowed={isProfileRunning(p)}
                             title={isProfileRunning(p)
                                 ? "Sync in progress. Please wait."
-                                : "Full sync this profile"}
-                        >
+                                : "Full sync this profile"}>
                             <RefreshCcw class="inline h-3 w-3" />
                             <span>Full</span>
                         </span>
@@ -302,8 +271,7 @@
                             class:cursor-not-allowed={isProfileRunning(p)}
                             title={isProfileRunning(p)
                                 ? "Sync in progress. Please wait."
-                                : "Poll sync this profile"}
-                        >
+                                : "Poll sync this profile"}>
                             <CloudDownload class="inline h-3 w-3" />
                             <span>Poll</span>
                         </span>
@@ -312,18 +280,16 @@
                 {#if p.status?.current_sync?.state === "running"}
                     <div class="mt-3 space-y-2">
                         <div
-                            class="flex items-center justify-between text-[11px] text-slate-400"
-                        >
+                            class="flex items-center justify-between text-[11px] text-slate-400">
                             <div class="truncate">
                                 {#if p.status.current_sync.section_title}
                                     <span class="text-slate-300"
-                                        >{p.status.current_sync.section_title}</span
-                                    >
+                                        >{p.status.current_sync.section_title}</span>
                                     <span class="mx-1">•</span>
                                 {/if}
                                 <span class="tracking-wide uppercase"
-                                    >{p.status.current_sync.stage || "processing"}</span
-                                >
+                                    >{p.status.current_sync.stage ||
+                                        "processing"}</span>
                             </div>
                             <div>
                                 {p.status.current_sync.section_items_processed || 0}/{p
@@ -332,12 +298,11 @@
                         </div>
                         {#key p.status.current_sync.section_index}
                             <div
-                                class="h-2 w-full overflow-hidden rounded bg-slate-800/80"
-                            >
+                                class="h-2 w-full overflow-hidden rounded bg-slate-800/80">
                                 <div
                                     class="h-full bg-gradient-to-r from-indigo-500 via-sky-500 to-cyan-400 transition-[width] duration-300 ease-out"
-                                    style={`width: ${Math.round((progressPercent(p) ?? 0) * 100)}%`}
-                                ></div>
+                                    style={`width: ${Math.round((progressPercent(p) ?? 0) * 100)}%`}>
+                                </div>
                             </div>
                         {/key}
                     </div>
@@ -348,8 +313,7 @@
                             >{p.config.anilist_user}</span
                         >{/if}
                     <span class="rounded-md bg-slate-800/80 px-2 py-1 text-slate-300"
-                        >Interval: {p.config?.sync_interval ?? "-"}</span
-                    >
+                        >Interval: {p.config?.sync_interval ?? "-"}</span>
                     {#if p.config?.sync_modes?.includes("periodic")}<span
                             class="rounded-md bg-blue-900/50 px-2 py-1 text-blue-200"
                             >Periodic Sync</span

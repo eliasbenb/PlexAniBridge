@@ -26,56 +26,12 @@
     } from "@lucide/svelte";
     import { SvelteSet, SvelteURLSearchParams } from "svelte/reactivity";
 
-    import { apiFetch } from "$lib/api";
     import JsonCodeBlock from "$lib/components/json-code-block.svelte";
-    import { toast } from "$lib/notify";
+    import type { CurrentSync, HistoryItem } from "$lib/types/api";
+    import { apiFetch } from "$lib/utils/api";
+    import { toast } from "$lib/utils/notify";
 
     const { params } = $props<{ params: { profile: string } }>();
-
-    type CurrentSync = {
-        state?: string;
-        started_at?: string;
-        section_index?: number;
-        section_count?: number;
-        section_title?: string | null;
-        stage?: string;
-        section_items_total?: number;
-        section_items_processed?: number;
-    };
-
-    type HistoryItem = {
-        id: number;
-        outcome: string;
-        timestamp: string;
-        anilist_id?: number;
-        plex_guid?: string;
-        plex_rating_key?: string;
-        plex_child_rating_key?: string | null;
-        plex_type?: string;
-        error_message?: string;
-        before_state?: object;
-        after_state?: object;
-        anilist?: {
-            id?: number;
-            title?: { romaji?: string; english?: string; native?: string };
-            coverImage?: {
-                medium?: string;
-                large?: string;
-                extraLarge?: string;
-                color: string;
-            };
-            format?: string;
-            status?: string;
-            episodes?: number;
-        };
-        plex?: {
-            guid?: string;
-            title?: string;
-            type?: string | null;
-            art?: string | null;
-            thumb?: string | null;
-        };
-    };
 
     let items: HistoryItem[] = $state([]);
     let stats: Record<string, number> = $state({});
@@ -246,20 +202,16 @@
             per_page: String(perPage),
         });
         if (outcomeFilter) u.set("outcome", outcomeFilter);
-        console.log(
-            "Building query with outcomeFilter:",
-            outcomeFilter,
-            "URL:",
-            `/api/history/${params.profile}?${u}`,
-        );
         return `/api/history/${params.profile}?${u}`;
     };
 
-    function preferredTitle(t?: {
-        romaji?: string;
-        english?: string;
-        native?: string;
-    }) {
+    function preferredTitle(
+        t?: {
+            romaji?: string | null;
+            english?: string | null;
+            native?: string | null;
+        } | null,
+    ) {
         if (!t) return null;
         let pref: string | null = null;
         try {
@@ -615,21 +567,18 @@
                 type="button"
                 class="inline-flex items-center gap-1 rounded-md border border-emerald-600/60 bg-emerald-600/30 px-2 py-1 font-medium text-emerald-200 hover:bg-emerald-600/40 disabled:cursor-not-allowed disabled:opacity-50"
                 disabled={isProfileRunning}
-                ><RefreshCcw class="inline h-4 w-4 text-[14px]" /> Full Sync</button
-            >
+                ><RefreshCcw class="inline h-4 w-4 text-[14px]" /> Full Sync</button>
             <button
                 onclick={() => triggerSync(true)}
                 type="button"
                 class="inline-flex items-center gap-1 rounded-md border border-sky-600/60 bg-sky-600/30 px-2 py-1 font-medium text-sky-200 hover:bg-sky-600/40 disabled:cursor-not-allowed disabled:opacity-50"
                 disabled={isProfileRunning}
-                ><CloudDownload class="inline h-4 w-4 text-[14px]" /> Poll Sync</button
-            >
+                ><CloudDownload class="inline h-4 w-4 text-[14px]" /> Poll Sync</button>
             <button
                 onclick={() => loadFirst()}
                 type="button"
                 class="inline-flex items-center gap-1 rounded-md border border-slate-600/60 bg-slate-700/40 px-2 py-1 font-medium text-slate-200 hover:bg-slate-600/50"
-                ><RotateCw class="inline h-4 w-4 text-[14px]" /> Refresh</button
-            >
+                ><RotateCw class="inline h-4 w-4 text-[14px]" /> Refresh</button>
         </div>
     </div>
     {#if currentSync?.state === "running"}
@@ -641,8 +590,7 @@
                         <span class="mx-1">•</span>
                     {/if}
                     <span class="tracking-wide uppercase"
-                        >{currentSync.stage || "processing"}</span
-                    >
+                        >{currentSync.stage || "processing"}</span>
                 </div>
                 <div>
                     {currentSync.section_items_processed ||
@@ -653,8 +601,8 @@
                 <div class="h-2 w-full overflow-hidden rounded bg-slate-800/80">
                     <div
                         class="h-full bg-gradient-to-r from-indigo-500 via-sky-500 to-cyan-400 transition-[width] duration-300 ease-out"
-                        style={`width: ${Math.round((progressPercent() ?? 0) * 100)}%`}
-                    ></div>
+                        style={`width: ${Math.round((progressPercent() ?? 0) * 100)}%`}>
+                    </div>
                 </div>
             {/key}
         </div>
@@ -667,11 +615,9 @@
                 class={`group relative cursor-pointer overflow-hidden rounded-md p-3 text-left transition select-none ${outcomeFilter === k ? "border-sky-500 bg-sky-950/40 ring-1 ring-sky-400/60" : "border border-slate-800 bg-gradient-to-br from-slate-900/70 to-slate-800/30 hover:border-slate-700"}`}
                 title={outcomeFilter === k
                     ? "Click to remove filter"
-                    : "Filter by " + meta.label}
-            >
+                    : "Filter by " + meta.label}>
                 <div
-                    class="text-[10px] font-medium tracking-wide text-slate-400 uppercase"
-                >
+                    class="text-[10px] font-medium tracking-wide text-slate-400 uppercase">
                     {meta.label}
                 </div>
                 <div class="mt-1 text-2xl font-semibold tabular-nums">
@@ -681,8 +627,7 @@
                     <div class="absolute top-1 right-1">
                         <span
                             class="mr-1 inline-flex items-center gap-0.5 rounded bg-sky-600/70 px-1 py-0.5 text-[9px] font-semibold text-white"
-                            ><Funnel class="inline h-3 w-3" /> Active</span
-                        >
+                            ><Funnel class="inline h-3 w-3" /> Active</span>
                     </div>
                 {/if}
             </button>
@@ -692,23 +637,19 @@
         <div class="flex items-center gap-2 text-[11px] text-slate-400">
             <div>
                 Filtering by <span class="font-semibold text-slate-200"
-                    >{metaFor(outcomeFilter).label}</span
-                >
+                    >{metaFor(outcomeFilter).label}</span>
             </div>
             <button
                 onclick={() => ((outcomeFilter = null), loadFirst())}
                 class="flex items-center gap-1 rounded bg-slate-800 px-1.5 py-0.5 text-[10px] font-medium text-sky-300 hover:bg-slate-700"
-                ><X class="inline h-3.5 w-3.5" /> Clear</button
-            >
+                ><X class="inline h-3.5 w-3.5" /> Clear</button>
         </div>
     {/if}
     <div
         class="flex items-center gap-2 text-[11px] text-slate-500"
-        hidden={!items.length}
-    >
+        hidden={!items.length}>
         <span class="inline-flex items-center gap-1"
-            ><InfinityIcon class="inline h-4 w-4" /> Scroll to load older history</span
-        >
+            ><InfinityIcon class="inline h-4 w-4" /> Scroll to load older history</span>
         {#if loadingMore}<span class="inline-flex items-center gap-1 text-sky-300"
                 ><LoaderCircle class="inline h-4 w-4 animate-spin" /> Loading…</span
             >{/if}
@@ -717,29 +658,27 @@
                 ><Check class="inline h-4 w-4" /> All loaded</span
             >{/if}
     </div>
-    <div class="space-y-4" class:hidden={!items.length && !loadingInitial}>
+    <div
+        class="space-y-4"
+        class:hidden={!items.length && !loadingInitial}>
         {#each items as item (item.id + "-" + titleLangTick)}
             {@const meta = metaFor(item.outcome)}
             <div
-                class="flex gap-3 overflow-hidden rounded-md border border-slate-800 bg-slate-900/60 p-4 shadow-sm backdrop-blur-sm transition-shadow hover:shadow-md"
-            >
+                class="flex gap-3 overflow-hidden rounded-md border border-slate-800 bg-slate-900/60 p-4 shadow-sm backdrop-blur-sm transition-shadow hover:shadow-md">
                 <div class={`w-1 rounded-md ${meta.color}`}></div>
                 <div class="flex min-w-0 flex-1 gap-3">
                     {#if coverImage(item)}
                         <div
-                            class="relative h-20 w-14 shrink-0 overflow-hidden rounded-md border border-slate-800 bg-slate-800/40"
-                        >
+                            class="relative h-20 w-14 shrink-0 overflow-hidden rounded-md border border-slate-800 bg-slate-800/40">
                             <img
                                 src={coverImage(item)!}
                                 alt={displayTitle(item) || "Cover"}
                                 loading="lazy"
-                                class="h-full w-full object-cover"
-                            />
+                                class="h-full w-full object-cover" />
                         </div>
                     {:else}
                         <div
-                            class="flex h-20 w-14 shrink-0 items-center justify-center rounded-md border border-dashed border-slate-700 bg-slate-800/30 text-[9px] text-slate-500"
-                        >
+                            class="flex h-20 w-14 shrink-0 items-center justify-center rounded-md border border-dashed border-slate-700 bg-slate-800/30 text-[9px] text-slate-500">
                             No Art
                         </div>
                     {/if}
@@ -750,20 +689,16 @@
                                     <span
                                         class="truncate font-medium"
                                         title={displayTitle(item)}
-                                        >{displayTitle(item)}</span
-                                    >
+                                        >{displayTitle(item)}</span>
                                     <span
-                                        class={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium tracking-wide ${meta.color}`}
-                                    >
+                                        class={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium tracking-wide ${meta.color}`}>
                                         <meta.icon
-                                            class="inline h-3.5 w-3.5 text-[10px]"
-                                        />
+                                            class="inline h-3.5 w-3.5 text-[10px]" />
                                         {meta.label}
                                     </span>
                                 </div>
                                 <div
-                                    class="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-400"
-                                >
+                                    class="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-400">
                                     {#if item.anilist?.id}
                                         <!-- eslint-disable svelte/no-navigation-without-resolve -->
                                         <a
@@ -771,11 +706,9 @@
                                             target="_blank"
                                             rel="noopener"
                                             class="inline-flex items-center gap-1 rounded-md border border-sky-600/60 bg-sky-700/50 px-1 py-0.5 text-[9px] font-semibold text-sky-100 hover:bg-sky-600/60"
-                                            title="Open in AniList"
-                                        >
+                                            title="Open in AniList">
                                             <ExternalLink
-                                                class="inline h-3.5 w-3.5 text-[11px]"
-                                            />
+                                                class="inline h-3.5 w-3.5 text-[11px]" />
                                             AniList
                                         </a>
                                         <!-- eslint-enable svelte/no-navigation-without-resolve -->
@@ -788,39 +721,32 @@
                                             target="_blank"
                                             rel="noopener"
                                             class="inline-flex items-center gap-1 rounded-md border border-amber-600 bg-amber-700/60 px-1.5 py-0.5 text-[10px] text-amber-100 transition-colors hover:bg-amber-600/60"
-                                            title="Open in Plex"
-                                        >
+                                            title="Open in Plex">
                                             <ExternalLink
-                                                class="inline h-3.5 w-3.5 text-[11px]"
-                                            /> Plex</a
-                                        >
+                                                class="inline h-3.5 w-3.5 text-[11px]" />
+                                            Plex</a>
                                         <!-- eslint-enable svelte/no-navigation-without-resolve -->
                                     {/if}
                                     <span class="text-xs text-slate-400"
                                         >{new Date(
                                             item.timestamp + "Z",
-                                        ).toLocaleString()}</span
-                                    >
+                                        ).toLocaleString()}</span>
                                     <div
-                                        class="hidden flex-wrap gap-1 text-[9px] text-slate-400 sm:flex"
-                                    >
+                                        class="hidden flex-wrap gap-1 text-[9px] text-slate-400 sm:flex">
                                         {#if item.anilist?.format}
                                             <span
                                                 class="rounded bg-slate-800/70 px-1 py-0.5 tracking-wide uppercase"
-                                                >{item.anilist.format}</span
-                                            >
+                                                >{item.anilist.format}</span>
                                         {/if}
                                         {#if item.anilist?.status}
                                             <span
                                                 class="rounded bg-slate-800/70 px-1 py-0.5 tracking-wide uppercase"
-                                                >{item.anilist.status}</span
-                                            >
+                                                >{item.anilist.status}</span>
                                         {/if}
                                         {#if item.anilist?.episodes}
                                             <span
                                                 class="rounded bg-slate-800/70 px-1 py-0.5"
-                                                >EP {item.anilist.episodes}</span
-                                            >
+                                                >EP {item.anilist.episodes}</span>
                                         {/if}
                                     </div>
                                 </div>
@@ -833,12 +759,10 @@
                                             isProfileRunning}
                                         onclick={() => retryHistory(item)}
                                         class="inline-flex h-8 items-center justify-center gap-1 rounded-md border border-emerald-600/60 bg-emerald-700/40 px-2 text-[11px] font-medium text-emerald-100 hover:bg-emerald-600/50 disabled:opacity-50"
-                                        title="Retry sync for this item"
-                                    >
+                                        title="Retry sync for this item">
                                         {#if retryLoading[item.id]}
                                             <LoaderCircle
-                                                class="inline h-4 w-4 animate-spin"
-                                            />
+                                                class="inline h-4 w-4 animate-spin" />
                                         {:else}
                                             <RefreshCcw class="inline h-4 w-4" />
                                         {/if}
@@ -850,12 +774,10 @@
                                         disabled={undoLoading[item.id]}
                                         onclick={() => undoHistory(item)}
                                         class="inline-flex h-8 items-center justify-center gap-1 rounded-md border border-violet-600/60 bg-violet-700/40 px-2 text-[11px] font-medium text-violet-100 hover:bg-violet-600/50 disabled:opacity-50"
-                                        title="Undo this change"
-                                    >
+                                        title="Undo this change">
                                         {#if undoLoading[item.id]}
                                             <LoaderCircle
-                                                class="inline h-4 w-4 animate-spin"
-                                            />
+                                                class="inline h-4 w-4 animate-spin" />
                                         {:else}
                                             <RotateCw class="inline h-4 w-4" />
                                         {/if}
@@ -865,8 +787,7 @@
                                     type="button"
                                     onclick={() => deleteHistory(item)}
                                     class="inline-flex h-8 items-center justify-center gap-1 rounded-md border border-red-600/60 bg-red-700/40 px-2 text-[11px] font-medium text-red-100 hover:bg-red-600/50"
-                                    title="Delete history entry"
-                                >
+                                    title="Delete history entry">
                                     <Trash2 class="inline h-4 w-4" />
                                 </button>
                             </div>
@@ -879,13 +800,10 @@
                                 <button
                                     type="button"
                                     onclick={() => toggleDiff(item.id)}
-                                    class="inline-flex items-center gap-1 text-xs text-sky-400 hover:text-sky-300"
-                                >
+                                    class="inline-flex items-center gap-1 text-xs text-sky-400 hover:text-sky-300">
                                     {#if openDiff[item.id]}<SquareMinus
-                                            class="inline h-4 w-4 text-[14px]"
-                                        />{:else}<SquarePlus
-                                            class="inline h-4 w-4 text-[14px]"
-                                        />{/if}
+                                            class="inline h-4 w-4 text-[14px]" />{:else}<SquarePlus
+                                            class="inline h-4 w-4 text-[14px]" />{/if}
                                     {openDiff[item.id] ? "Hide diff" : "Show diff"}
                                 </button>
                             </div>
@@ -897,44 +815,35 @@
                 {@const ui = ensureDiffUi(item.id)}
                 {@const diffs = buildDiff(item)}
                 <div
-                    class="mt-2 overflow-hidden rounded-md border border-slate-800 bg-slate-950/80"
-                >
+                    class="mt-2 overflow-hidden rounded-md border border-slate-800 bg-slate-950/80">
                     <div
-                        class="flex flex-wrap items-center gap-3 border-b border-slate-800 px-3 py-2"
-                    >
+                        class="flex flex-wrap items-center gap-3 border-b border-slate-800 px-3 py-2">
                         <div
-                            class="flex items-center overflow-hidden rounded-md border border-slate-700/70 bg-slate-900/60 text-[11px]"
-                        >
+                            class="flex items-center overflow-hidden rounded-md border border-slate-700/70 bg-slate-900/60 text-[11px]">
                             <button
                                 class={`px-2 py-1 font-medium ${ui.tab === "changes" ? "bg-slate-700/70 text-slate-100" : "text-slate-400 hover:text-slate-200"}`}
-                                onclick={() => (ui.tab = "changes")}
-                            >
+                                onclick={() => (ui.tab = "changes")}>
                                 Changes
                             </button>
                             <button
                                 class={`hidden px-2 py-1 font-medium md:inline-flex ${ui.tab === "compare" ? "bg-slate-700/70 text-slate-100" : "text-slate-400 hover:text-slate-200"}`}
-                                onclick={() => (ui.tab = "compare")}
-                            >
+                                onclick={() => (ui.tab = "compare")}>
                                 Compare
                             </button>
                         </div>
                         {#if ui.tab === "changes"}
                             <div
-                                class="flex min-w-[12rem] grow items-center gap-2 text-[11px]"
-                            >
+                                class="flex min-w-[12rem] grow items-center gap-2 text-[11px]">
                                 <div class="relative flex-1">
                                     <Search
-                                        class="absolute top-1/2 left-1.5 h-3.5 w-3.5 -translate-y-1/2 text-slate-500"
-                                    />
+                                        class="absolute top-1/2 left-1.5 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
                                     <input
                                         bind:value={ui.filter}
                                         placeholder="Filter path…"
-                                        class="w-full rounded-md border border-slate-700/70 bg-slate-900/60 py-1 pr-2 pl-6 placeholder:text-slate-600 focus:border-sky-500 focus:outline-none"
-                                    />
+                                        class="w-full rounded-md border border-slate-700/70 bg-slate-900/60 py-1 pr-2 pl-6 placeholder:text-slate-600 focus:border-sky-500 focus:outline-none" />
                                 </div>
                                 <label
-                                    class="inline-flex cursor-pointer items-center gap-1 select-none"
-                                >
+                                    class="inline-flex cursor-pointer items-center gap-1 select-none">
                                     <input
                                         type="checkbox"
                                         checked={ui.showUnchanged}
@@ -942,8 +851,7 @@
                                             const target = e.target as HTMLInputElement;
                                             ui.showUnchanged = target.checked;
                                         }}
-                                        class="h-3.5 w-3.5 rounded border-slate-600 bg-slate-800 text-sky-500 focus:ring-0"
-                                    />
+                                        class="h-3.5 w-3.5 rounded border-slate-600 bg-slate-800 text-sky-500 focus:ring-0" />
                                     <span class="text-slate-400">Unchanged</span>
                                 </label>
                             </div>
@@ -952,15 +860,13 @@
                             <button
                                 onclick={() => copyJson(item.before_state)}
                                 class="flex items-center gap-1 rounded-md bg-slate-800 px-2 py-1 text-[11px] text-slate-300 hover:bg-slate-700"
-                                title="Copy Before JSON"
-                            >
+                                title="Copy Before JSON">
                                 <Copy class="inline h-3.5 w-3.5" /> <span>Before</span>
                             </button>
                             <button
                                 onclick={() => copyJson(item.after_state)}
                                 class="flex items-center gap-1 rounded-md bg-slate-800 px-2 py-1 text-[11px] text-slate-300 hover:bg-slate-700"
-                                title="Copy After JSON"
-                            >
+                                title="Copy After JSON">
                                 <Copy class="inline h-3.5 w-3.5" /> <span>After</span>
                             </button>
                         </div>
@@ -984,15 +890,12 @@
                                     {#each filtered as d (d.path)}
                                         <li class="group px-1 py-1.5">
                                             <div
-                                                class="flex flex-wrap items-start gap-2"
-                                            >
+                                                class="flex flex-wrap items-start gap-2">
                                                 <span
                                                     class="max-w-full rounded bg-slate-800/80 px-1.5 py-0.5 font-mono text-[10px] break-all text-slate-300 group-hover:bg-slate-700/80"
-                                                    >{d.path}</span
-                                                >
+                                                    >{d.path}</span>
                                                 <div
-                                                    class="flex min-w-[10rem] flex-1 items-start gap-1.5"
-                                                >
+                                                    class="flex min-w-[10rem] flex-1 items-start gap-1.5">
                                                     <span
                                                         class="min-w-0 break-all {d.status ===
                                                         'removed'
@@ -1000,11 +903,11 @@
                                                             : d.status === 'changed'
                                                               ? 'text-red-300'
                                                               : 'text-slate-500'}"
-                                                        >{truncateValue(d.before)}</span
-                                                    >
+                                                        >{truncateValue(
+                                                            d.before,
+                                                        )}</span>
                                                     <ArrowRight
-                                                        class="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-600"
-                                                    />
+                                                        class="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-600" />
                                                     <span
                                                         class="min-w-0 break-all {d.status ===
                                                         'added'
@@ -1012,8 +915,7 @@
                                                             : d.status === 'changed'
                                                               ? 'text-emerald-300'
                                                               : 'text-slate-500'}"
-                                                        >{truncateValue(d.after)}</span
-                                                    >
+                                                        >{truncateValue(d.after)}</span>
                                                 </div>
                                             </div>
                                         </li>
@@ -1028,31 +930,25 @@
                             <div class="grid items-start gap-2 md:grid-cols-2 md:gap-3">
                                 <div class="space-y-1.5">
                                     <h5
-                                        class="flex items-center gap-1 text-xs font-semibold tracking-wider text-slate-400 uppercase"
-                                    >
+                                        class="flex items-center gap-1 text-xs font-semibold tracking-wider text-slate-400 uppercase">
                                         Before <span
                                             class="text-[10px] font-normal text-slate-600"
-                                            >{sizeLabel(item.before_state)}</span
-                                        >
+                                            >{sizeLabel(item.before_state)}</span>
                                     </h5>
                                     <JsonCodeBlock
                                         value={item.before_state ?? {}}
-                                        className="leading-tight"
-                                    />
+                                        class="leading-tight" />
                                 </div>
                                 <div class="space-y-1.5">
                                     <h5
-                                        class="flex items-center gap-1 text-xs font-semibold tracking-wider text-slate-400 uppercase"
-                                    >
+                                        class="flex items-center gap-1 text-xs font-semibold tracking-wider text-slate-400 uppercase">
                                         After <span
                                             class="text-[10px] font-normal text-slate-600"
-                                            >{sizeLabel(item.after_state)}</span
-                                        >
+                                            >{sizeLabel(item.after_state)}</span>
                                     </h5>
                                     <JsonCodeBlock
                                         value={item.after_state ?? {}}
-                                        className="leading-tight"
-                                    />
+                                        class="leading-tight" />
                                 </div>
                             </div>
                         {/if}
@@ -1069,8 +965,7 @@
         <div class="fixed right-6 bottom-6 z-40">
             <button
                 onclick={jumpToLatest}
-                class="pointer-events-auto flex items-center gap-2 rounded-md border border-sky-500/60 bg-gradient-to-r from-sky-600 to-sky-500 py-2 pr-3 pl-3 text-sm font-medium text-white shadow-md shadow-slate-950/40 backdrop-blur-md hover:from-sky-500 hover:to-sky-400"
-            >
+                class="pointer-events-auto flex items-center gap-2 rounded-md border border-sky-500/60 bg-gradient-to-r from-sky-600 to-sky-500 py-2 pr-3 pl-3 text-sm font-medium text-white shadow-md shadow-slate-950/40 backdrop-blur-md hover:from-sky-500 hover:to-sky-400">
                 <ArrowUp class="inline h-4 w-4" />
                 <span class="hidden sm:inline">Latest</span>
                 {#if newItemsCount > 0}<span

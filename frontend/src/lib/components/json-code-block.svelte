@@ -1,7 +1,12 @@
 <script lang="ts">
-    export let value: object | null | undefined = undefined;
-    export let maxHeight: string = "max-h-64";
-    export let className: string = "";
+    import { twMerge } from "tailwind-merge";
+
+    interface Props {
+        value?: object | null;
+        class?: string;
+    }
+
+    let { value = null, class: className = "" }: Props = $props();
 
     export function highlightJson(obj: object) {
         if (!obj) return '<span class="text-slate-600">—</span>';
@@ -27,11 +32,12 @@
 </script>
 
 <div
-    class={`overflow-auto rounded border border-slate-800/60 bg-slate-900/60 p-2 font-mono text-[10px] leading-relaxed ${maxHeight} ${className}`}
->
+    class={twMerge(
+        "overflow-auto rounded border border-slate-800/60 bg-slate-900/60 p-2 font-mono text-[10px] leading-relaxed",
+        className,
+    )}>
     <code class="whitespace-pre">
         <!-- eslint-disable-next-line svelte/no-at-html-tags -->
         {@html highlightJson(value ?? {})}
     </code>
-    <slot />
 </div>

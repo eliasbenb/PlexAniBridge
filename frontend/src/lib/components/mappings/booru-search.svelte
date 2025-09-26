@@ -4,21 +4,22 @@
     import { ArrowRight, Search } from "@lucide/svelte";
     import { Popover } from "bits-ui";
 
-    import { apiJson } from "$lib/api";
+    import { apiJson } from "$lib/utils/api";
 
-    type Props = {
+    interface Props {
         value?: string;
-        placeholder?: string;
-        disabled?: boolean;
         autoFocus?: boolean;
+        disabled?: boolean;
+        placeholder?: string;
         size?: "sm" | "md";
         onSubmit?: () => void;
-    };
+    }
+
     let {
         value = $bindable(""),
-        placeholder = "Search...",
-        disabled = false,
         autoFocus = false,
+        disabled = false,
+        placeholder = "Search...",
         size = "sm",
         onSubmit,
     }: Props = $props();
@@ -370,13 +371,16 @@
     });
 </script>
 
-<div class="relative w-full" data-component="booru-search">
-    <div bind:this={containerEl} class="relative flex items-center">
+<div
+    class="relative w-full"
+    data-component="booru-search">
+    <div
+        bind:this={containerEl}
+        class="relative flex items-center">
         <div
             class={`relative ml-auto transition-all duration-300 ease-in-out ${
                 isActive ? "w-full" : "w-full sm:w-64 md:w-48"
-            }`}
-        >
+            }`}>
             <input
                 bind:this={inputEl}
                 {placeholder}
@@ -402,8 +406,7 @@
                     focus:border-slate-600 
                     focus:bg-slate-900
                     focus:outline-none
-                `}
-            />
+                `} />
             <Search
                 class={`
                     pointer-events-none 
@@ -413,8 +416,7 @@
                     -translate-y-1/2 
                     text-slate-500
                     ${size === "sm" ? "h-3.5 w-3.5" : "h-4 w-4"}
-                `}
-            />
+                `} />
             <button
                 class={`
                     absolute 
@@ -436,8 +438,7 @@
                     closePopover();
                     onSubmit?.();
                 }}
-                {disabled}
-            >
+                {disabled}>
                 <ArrowRight class={size === "sm" ? "h-3 w-3" : "h-3.5 w-3.5"} />
             </button>
         </div>
@@ -450,8 +451,7 @@
                 activeIndex = -1;
                 pointerInPopover = false;
             }
-        }}
-    >
+        }}>
         <Popover.Portal>
             <Popover.Content
                 customAnchor={inputEl}
@@ -466,14 +466,12 @@
                 onmouseleave={() => {
                     pointerInPopover = false;
                     if (!focused) closePopover();
-                }}
-            >
+                }}>
                 <ul
                     id={listId}
                     role="listbox"
                     class={"max-h-64 overflow-auto py-1 text-[11px]" +
-                        (suggestions.length === 0 ? " hidden" : "")}
-                >
+                        (suggestions.length === 0 ? " hidden" : "")}>
                     {#each suggestions as s, i (s.label)}
                         <li>
                             <button
@@ -484,22 +482,19 @@
                                 onmousedown={(e) => {
                                     e.preventDefault();
                                     applySuggestion(i);
-                                }}
-                            >
+                                }}>
                                 <span class="font-mono text-slate-200">{s.label}</span>
                                 {#if s.detail}
                                     <span
                                         class="ml-2 shrink-0 text-[10px] text-slate-400"
-                                        >{s.detail}</span
-                                    >
+                                        >{s.detail}</span>
                                 {/if}
                             </button>
                         </li>
                     {/each}
                 </ul>
                 <div
-                    class="border-t border-slate-800/70 px-2 py-1 text-[10px] text-slate-400"
-                >
+                    class="border-t border-slate-800/70 px-2 py-1 text-[10px] text-slate-400">
                     Tips: Use '()' to group terms, '|' to OR between groups, '~' to OR
                     within a group, '-' to negate, '..' for ranges, '*' or '?' as
                     wildcards, and quotes for AniList title search.
@@ -508,11 +503,3 @@
         </Popover.Portal>
     </Popover.Root>
 </div>
-
-<style>
-    [data-component="booru-search"] .font-mono {
-        font-feature-settings:
-            "tnum" 1,
-            "ss01" 1;
-    }
-</style>

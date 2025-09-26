@@ -1,4 +1,4 @@
-import { toast, type ToastType } from "$lib/notify";
+import { toast, type ToastType } from "$lib/utils/notify";
 
 export interface ApiErrorData {
     message?: string;
