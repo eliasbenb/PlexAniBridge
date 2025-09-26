@@ -4,21 +4,22 @@
     import { ArrowRight, Search } from "@lucide/svelte";
     import { Popover } from "bits-ui";
 
-    import { apiJson } from "$lib/api";
+    import { apiJson } from "$lib/utils/api";
 
-    type Props = {
+    interface Props {
         value?: string;
-        placeholder?: string;
-        disabled?: boolean;
         autoFocus?: boolean;
+        disabled?: boolean;
+        placeholder?: string;
         size?: "sm" | "md";
         onSubmit?: () => void;
-    };
+    }
+
     let {
         value = $bindable(""),
-        placeholder = "Search...",
-        disabled = false,
         autoFocus = false,
+        disabled = false,
+        placeholder = "Search...",
         size = "sm",
         onSubmit,
     }: Props = $props();
@@ -508,11 +509,3 @@
         </Popover.Portal>
     </Popover.Root>
 </div>
-
-<style>
-    [data-component="booru-search"] .font-mono {
-        font-feature-settings:
-            "tnum" 1,
-            "ss01" 1;
-    }
-</style>

@@ -3,7 +3,7 @@
 
     import { X } from "@lucide/svelte";
 
-    import { dismiss, toasts, type Toast } from "$lib/notify";
+    import { dismiss, toasts, type Toast } from "$lib/utils/notify";
 
     let list: Toast[] = $state([]);
     const unsub = toasts.subscribe((v) => (list = v));
@@ -48,6 +48,7 @@
         </div>
     {/each}
 </div>
+s
 
 <style>
     @keyframes shrink {
