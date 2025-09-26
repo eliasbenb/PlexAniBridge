@@ -38,13 +38,11 @@
             onSubmit={() => {
                 page = 1;
                 onLoad();
-            }}
-        />
+            }} />
     </div>
     <button
         onclick={toggleCustom}
-        class={`inline-flex h-8 items-center gap-1 rounded-md px-3 text-[11px] font-medium ring-1 ${customOnly ? "bg-emerald-600/90 text-white ring-emerald-500/40 hover:bg-emerald-500" : "bg-slate-800 text-slate-300 ring-slate-700/60 hover:bg-slate-700"}`}
-    >
+        class={`inline-flex h-8 items-center gap-1 rounded-md px-3 text-[11px] font-medium ring-1 ${customOnly ? "bg-emerald-600/90 text-white ring-emerald-500/40 hover:bg-emerald-500" : "bg-slate-800 text-slate-300 ring-slate-700/60 hover:bg-slate-700"}`}>
         {#if customOnly}
             <Check class="inline h-3.5 w-3.5 text-[14px]" />
         {:else}
@@ -56,8 +54,14 @@
                 stroke-width="2"
                 stroke-linecap="round"
                 stroke-linejoin="round"
-                ><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg
-            >
+                ><rect
+                    x="3"
+                    y="3"
+                    width="18"
+                    height="18"
+                    rx="2"
+                    ry="2"></rect
+                ></svg>
         {/if}
         <span>Custom Only</span>
     </button>
@@ -66,8 +70,7 @@
             title="New Override"
             aria-label="New Override"
             class="inline-flex h-8 items-center gap-1 rounded-md bg-emerald-600/90 px-3 text-[11px] font-medium text-emerald-50 hover:bg-emerald-500"
-            onclick={onNew}
-        >
+            onclick={onNew}>
             <Plus class="inline h-3.5 w-3.5 text-[14px]" />
         </button>
     </div>
@@ -78,8 +81,7 @@
     class={twMerge(
         "flex flex-col gap-3 rounded-md border border-slate-800/70 bg-slate-900/60 p-3 text-[11px] sm:hidden",
         className,
-    )}
->
+    )}>
     <div class="relative">
         <BooruSearch
             bind:value={query}
@@ -87,14 +89,12 @@
             onSubmit={() => {
                 page = 1;
                 onLoad();
-            }}
-        />
+            }} />
     </div>
     <div class="flex flex-wrap items-center justify-between">
         <button
             onclick={toggleCustom}
-            class={`inline-flex h-8 items-center gap-1 rounded-md px-3 text-[11px] font-medium ring-1 ${customOnly ? "bg-emerald-600/90 text-white ring-emerald-500/40 hover:bg-emerald-500" : "bg-slate-800 text-slate-300 ring-slate-700/60 hover:bg-slate-700"}`}
-        >
+            class={`inline-flex h-8 items-center gap-1 rounded-md px-3 text-[11px] font-medium ring-1 ${customOnly ? "bg-emerald-600/90 text-white ring-emerald-500/40 hover:bg-emerald-500" : "bg-slate-800 text-slate-300 ring-slate-700/60 hover:bg-slate-700"}`}>
             {#if customOnly}
                 <Check class="inline h-3.5 w-3.5" />
             {:else}
@@ -106,8 +106,14 @@
                     stroke-width="2"
                     stroke-linecap="round"
                     stroke-linejoin="round"
-                    ><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg
-                >
+                    ><rect
+                        x="3"
+                        y="3"
+                        width="18"
+                        height="18"
+                        rx="2"
+                        ry="2"></rect
+                    ></svg>
             {/if}
             <span>Custom Only</span>
         </button>
@@ -115,8 +121,7 @@
             title="New Override"
             aria-label="New Override"
             class="inline-flex h-8 items-center gap-1 rounded-md bg-emerald-600/90 px-3 text-[11px] font-medium text-emerald-50 hover:bg-emerald-500"
-            onclick={onNew}
-        >
+            onclick={onNew}>
             <Plus class="inline h-3.5 w-3.5 text-[14px]" />
         </button>
     </div>

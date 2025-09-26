@@ -5,6 +5,8 @@
     "trailingComma": "all",
     "printWidth": 88,
     "objectWrap": "collapse",
+    "bracketSameLine": true,
+    "singleAttributePerLine": true,
     "plugins": [
         "prettier-plugin-svelte",
         "prettier-plugin-tailwindcss",

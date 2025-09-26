@@ -56,7 +56,9 @@
         <div class="space-y-2 rounded-md border border-slate-800 bg-slate-900/50 p-4">
             <h3 class="text-sm font-medium tracking-wide text-slate-200">Runtime</h3>
             {#if loading}<p class="text-[11px] text-slate-500">Loading…</p>{/if}
-            <ul class="space-y-1 text-[11px] text-slate-300" class:hidden={loading}>
+            <ul
+                class="space-y-1 text-[11px] text-slate-300"
+                class:hidden={loading}>
                 <li><span class="text-slate-500">Version:</span> {info.version}</li>
                 <li><span class="text-slate-500">Git Hash:</span> {info.git_hash}</li>
                 <li><span class="text-slate-500">Python:</span> {info.python}</li>
@@ -70,8 +72,7 @@
             </ul>
         </div>
         <div
-            class="space-y-2 rounded-md border border-slate-800 bg-slate-900/50 p-4 md:col-span-2"
-        >
+            class="space-y-2 rounded-md border border-slate-800 bg-slate-900/50 p-4 md:col-span-2">
             <h3 class="text-sm font-medium tracking-wide text-slate-200">
                 Scheduler Status
             </h3>

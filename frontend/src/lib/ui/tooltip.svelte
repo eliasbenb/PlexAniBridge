@@ -12,7 +12,9 @@
         <slot name="trigger" />
     </Tooltip.Trigger>
     <Tooltip.Portal>
-        <Tooltip.Content {sideOffset} class={contentClass}>
+        <Tooltip.Content
+            {sideOffset}
+            class={contentClass}>
             <slot />
             <Tooltip.Arrow />
         </Tooltip.Content>

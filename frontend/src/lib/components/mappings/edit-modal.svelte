@@ -63,7 +63,9 @@
 </script>
 
 {#if open}
-    <Modal bind:open onOpenAutoFocus={(e: Event) => e.preventDefault()}>
+    <Modal
+        bind:open
+        onOpenAutoFocus={(e: Event) => e.preventDefault()}>
         <svelte:fragment slot="title">
             <div class="flex items-center gap-2 text-sm font-semibold tracking-wide">
                 <PenLine class="inline h-4 w-4 text-slate-400" />
@@ -78,49 +80,46 @@
                     if (next === "raw" && editMode !== "raw") syncFormToRaw();
                     if (next === "form" && editMode !== "form") syncRawToForm();
                     editMode = next;
-                }}
-            >
+                }}>
                 <Tabs.List class="flex gap-2 text-[11px]">
                     <Tabs.Trigger
                         value="form"
                         class="rounded-md bg-slate-900 px-3 py-1.5 font-medium text-slate-400 ring-1 ring-slate-700 transition-colors hover:bg-slate-800 focus:outline-none focus-visible:ring-emerald-500/50 data-[state=active]:bg-slate-800 data-[state=active]:text-emerald-300 data-[state=active]:ring-slate-600"
-                        >Form</Tabs.Trigger
-                    >
+                        >Form</Tabs.Trigger>
                     <Tabs.Trigger
                         value="raw"
                         class="rounded-md bg-slate-900 px-3 py-1.5 font-medium text-slate-400 ring-1 ring-slate-700 transition-colors hover:bg-slate-800 focus:outline-none focus-visible:ring-emerald-500/50 data-[state=active]:bg-slate-800 data-[state=active]:text-emerald-300 data-[state=active]:ring-slate-600"
-                        >Raw JSON</Tabs.Trigger
-                    >
+                        >Raw JSON</Tabs.Trigger>
                 </Tabs.List>
-                <Tabs.Content value="form" class="mt-3 space-y-2">
+                <Tabs.Content
+                    value="form"
+                    class="mt-3 space-y-2">
                     <div
-                        class="rounded-md border border-slate-700/50 bg-slate-950/40 p-3"
-                    >
+                        class="rounded-md border border-slate-700/50 bg-slate-950/40 p-3">
                         <div class="mb-2 flex items-center justify-between">
                             <span
                                 class="text-[10px] font-medium tracking-wide text-slate-400 uppercase"
-                                >JSON Preview</span
-                            >
+                                >JSON Preview</span>
                             <button
                                 class="rounded bg-slate-800 px-2 py-0.5 text-[9px] text-slate-300 hover:bg-slate-700"
                                 onclick={syncFormToRaw}
-                                title="Refresh preview">Refresh</button
-                            >
+                                title="Refresh preview">Refresh</button>
                         </div>
-                        <JsonCodeBlock value={toPayload(form)} class="max-h-32" />
+                        <JsonCodeBlock
+                            value={toPayload(form)}
+                            class="max-h-32" />
                     </div>
                     <div class="space-y-2">
                         <div class="flex items-center gap-2">
-                            <label for="f-anilist" class="text-[11px] text-slate-400"
-                                >AniList ID</label
-                            >
+                            <label
+                                for="f-anilist"
+                                class="text-[11px] text-slate-400">AniList ID</label>
                             <input
                                 id="f-anilist"
                                 bind:value={form.anilist_id}
                                 type="number"
                                 class="h-8 w-full flex-1 rounded-md border border-slate-800 bg-slate-950/80 px-2 text-[11px] shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
-                                disabled={!form._isNew}
-                            />
+                                disabled={!form._isNew} />
                         </div>
                         <!-- Scalar + Array fields grid -->
                         <div class="grid grid-cols-2 gap-3">
@@ -130,13 +129,11 @@
                                     <label
                                         for="f-anidb-mode"
                                         class="text-[11px] text-slate-400"
-                                        >AniDB ID</label
-                                    >
+                                        >AniDB ID</label>
                                     <select
                                         id="f-anidb-mode"
                                         bind:value={form.anidb_mode}
-                                        class="h-7 rounded-md border border-slate-700 bg-slate-900 px-2 text-[11px]"
-                                    >
+                                        class="h-7 rounded-md border border-slate-700 bg-slate-900 px-2 text-[11px]">
                                         <option value="omit">Omit</option><option
                                             value="null">Null</option
                                         ><option value="value">Value</option>
@@ -146,8 +143,7 @@
                                     bind:value={form.anidb_id}
                                     type="number"
                                     class="mt-1 h-8 w-full rounded-md border border-slate-800 bg-slate-950/80 px-2 text-[11px] disabled:cursor-not-allowed disabled:opacity-60"
-                                    disabled={form.anidb_mode !== "value"}
-                                />
+                                    disabled={form.anidb_mode !== "value"} />
                             </div>
                             <!-- TVDB -->
                             <div>
@@ -155,13 +151,11 @@
                                     <label
                                         for="f-tvdb-mode"
                                         class="text-[11px] text-slate-400"
-                                        >TVDB ID</label
-                                    >
+                                        >TVDB ID</label>
                                     <select
                                         id="f-tvdb-mode"
                                         bind:value={form.tvdb_mode}
-                                        class="h-7 rounded-md border border-slate-700 bg-slate-900 px-2 text-[11px]"
-                                    >
+                                        class="h-7 rounded-md border border-slate-700 bg-slate-900 px-2 text-[11px]">
                                         <option value="omit">Omit</option><option
                                             value="null">Null</option
                                         ><option value="value">Value</option>
@@ -171,8 +165,7 @@
                                     bind:value={form.tvdb_id}
                                     type="number"
                                     class="mt-1 h-8 w-full rounded-md border border-slate-800 bg-slate-950/80 px-2 text-[11px] disabled:cursor-not-allowed disabled:opacity-60"
-                                    disabled={form.tvdb_mode !== "value"}
-                                />
+                                    disabled={form.tvdb_mode !== "value"} />
                             </div>
                             <!-- IMDB -->
                             <div class="col-span-2">
@@ -182,13 +175,11 @@
                                         class="text-[11px] text-slate-400"
                                         >IMDB IDs <span class="text-xs text-slate-500"
                                             >(comma separated)</span
-                                        ></label
-                                    >
+                                        ></label>
                                     <select
                                         id="f-imdb-mode"
                                         bind:value={form.imdb_mode}
-                                        class="h-7 rounded-md border border-slate-700 bg-slate-900 px-2 text-[11px]"
-                                    >
+                                        class="h-7 rounded-md border border-slate-700 bg-slate-900 px-2 text-[11px]">
                                         <option value="omit">Omit</option><option
                                             value="null">Null</option
                                         ><option value="value">Value</option>
@@ -198,8 +189,7 @@
                                     bind:value={form.imdb_csv}
                                     type="text"
                                     class="mt-1 h-8 w-full rounded-md border border-slate-800 bg-slate-950/80 px-2 text-[11px] disabled:cursor-not-allowed disabled:opacity-60"
-                                    disabled={form.imdb_mode !== "value"}
-                                />
+                                    disabled={form.imdb_mode !== "value"} />
                             </div>
                             <!-- MAL -->
                             <div class="col-span-2">
@@ -209,13 +199,11 @@
                                         class="text-[11px] text-slate-400"
                                         >MAL IDs <span class="text-xs text-slate-500"
                                             >(comma separated)</span
-                                        ></label
-                                    >
+                                        ></label>
                                     <select
                                         id="f-mal-mode"
                                         bind:value={form.mal_mode}
-                                        class="h-7 rounded-md border border-slate-700 bg-slate-900 px-2 text-[11px]"
-                                    >
+                                        class="h-7 rounded-md border border-slate-700 bg-slate-900 px-2 text-[11px]">
                                         <option value="omit">Omit</option><option
                                             value="null">Null</option
                                         ><option value="value">Value</option>
@@ -225,8 +213,7 @@
                                     bind:value={form.mal_csv}
                                     type="text"
                                     class="mt-1 h-8 w-full rounded-md border border-slate-800 bg-slate-950/80 px-2 text-[11px] disabled:cursor-not-allowed disabled:opacity-60"
-                                    disabled={form.mal_mode !== "value"}
-                                />
+                                    disabled={form.mal_mode !== "value"} />
                             </div>
                             <!-- TMDB Movie -->
                             <div class="col-span-2">
@@ -237,13 +224,11 @@
                                         >TMDB Movie IDs <span
                                             class="text-xs text-slate-500"
                                             >(comma separated)</span
-                                        ></label
-                                    >
+                                        ></label>
                                     <select
                                         id="f-tmdb-movie-mode"
                                         bind:value={form.tmdb_movie_mode}
-                                        class="h-7 rounded-md border border-slate-700 bg-slate-900 px-2 text-[11px]"
-                                    >
+                                        class="h-7 rounded-md border border-slate-700 bg-slate-900 px-2 text-[11px]">
                                         <option value="omit">Omit</option><option
                                             value="null">Null</option
                                         ><option value="value">Value</option>
@@ -253,8 +238,7 @@
                                     bind:value={form.tmdb_movie_csv}
                                     type="text"
                                     class="mt-1 h-8 w-full rounded-md border border-slate-800 bg-slate-950/80 px-2 text-[11px] disabled:cursor-not-allowed disabled:opacity-60"
-                                    disabled={form.tmdb_movie_mode !== "value"}
-                                />
+                                    disabled={form.tmdb_movie_mode !== "value"} />
                             </div>
                             <!-- TMDB Show -->
                             <div class="col-span-2">
@@ -265,13 +249,11 @@
                                         >TMDB Show IDs <span
                                             class="text-xs text-slate-500"
                                             >(comma separated)</span
-                                        ></label
-                                    >
+                                        ></label>
                                     <select
                                         id="f-tmdb-show-mode"
                                         bind:value={form.tmdb_show_mode}
-                                        class="h-7 rounded-md border border-slate-700 bg-slate-900 px-2 text-[11px]"
-                                    >
+                                        class="h-7 rounded-md border border-slate-700 bg-slate-900 px-2 text-[11px]">
                                         <option value="omit">Omit</option><option
                                             value="null">Null</option
                                         ><option value="value">Value</option>
@@ -281,8 +263,7 @@
                                     bind:value={form.tmdb_show_csv}
                                     type="text"
                                     class="mt-1 h-8 w-full rounded-md border border-slate-800 bg-slate-950/80 px-2 text-[11px] disabled:cursor-not-allowed disabled:opacity-60"
-                                    disabled={form.tmdb_show_mode !== "value"}
-                                />
+                                    disabled={form.tmdb_show_mode !== "value"} />
                             </div>
                             <!-- TVDB Season Mappings -->
                             <div class="col-span-2">
@@ -290,13 +271,11 @@
                                     <label
                                         for="f-tvdb-map-mode"
                                         class="text-[11px] text-slate-400"
-                                        >TVDB Season Mappings</label
-                                    >
+                                        >TVDB Season Mappings</label>
                                     <select
                                         id="f-tvdb-map-mode"
                                         bind:value={form.tvdb_map_mode}
-                                        class="h-7 rounded-md border border-slate-700 bg-slate-900 px-2 text-[11px]"
-                                    >
+                                        class="h-7 rounded-md border border-slate-700 bg-slate-900 px-2 text-[11px]">
                                         <option value="omit">Omit</option><option
                                             value="null">Null</option
                                         ><option value="value">Value</option>
@@ -309,47 +288,42 @@
                                                 <input
                                                     bind:value={mapping.season}
                                                     placeholder="Season (e.g., s1, s2)"
-                                                    class="h-7 flex-1 rounded-md border border-slate-800 bg-slate-950/80 px-2 text-[11px]"
-                                                />
+                                                    class="h-7 flex-1 rounded-md border border-slate-800 bg-slate-950/80 px-2 text-[11px]" />
                                                 <input
                                                     bind:value={mapping.pattern}
                                                     placeholder="Pattern"
-                                                    class="h-7 flex-1 rounded-md border border-slate-800 bg-slate-950/80 px-2 text-[11px]"
-                                                />
+                                                    class="h-7 flex-1 rounded-md border border-slate-800 bg-slate-950/80 px-2 text-[11px]" />
                                                 <button
                                                     onclick={() => removeTvdbMapping(i)}
                                                     class="inline-flex h-7 w-7 items-center justify-center rounded-md bg-rose-700/70 text-rose-200 hover:bg-rose-600"
                                                     title="Remove mapping"
-                                                    ><X class="h-3 w-3" /></button
-                                                >
+                                                    ><X class="h-3 w-3" /></button>
                                             </div>
                                         {/each}
                                         <button
                                             onclick={addTvdbMapping}
                                             class="inline-flex h-7 items-center gap-1 rounded-md bg-slate-800 px-2 text-[11px] text-slate-300 hover:bg-slate-700"
-                                            ><Plus class="h-3 w-3" /> Add Mapping</button
-                                        >
+                                            ><Plus class="h-3 w-3" /> Add Mapping</button>
                                     </div>
                                 {/if}
                             </div>
                         </div>
                     </div>
                 </Tabs.Content>
-                <Tabs.Content value="raw" class="mt-3 space-y-2">
+                <Tabs.Content
+                    value="raw"
+                    class="mt-3 space-y-2">
                     <div
-                        class="flex items-center justify-between text-[11px] text-slate-400"
-                    >
+                        class="flex items-center justify-between text-[11px] text-slate-400">
                         <span>Raw Mapping JSON</span>
                         <button
                             class="rounded bg-slate-800 px-2 py-1 text-[10px] text-slate-300 hover:bg-slate-700"
-                            onclick={syncFormToRaw}>Refresh from Form</button
-                        >
+                            onclick={syncFormToRaw}>Refresh from Form</button>
                     </div>
                     <textarea
                         bind:value={rawJSON}
                         class="h-72 w-full resize-none rounded-md border border-slate-700 bg-slate-950/80 px-2 py-2 font-mono text-[11px] leading-snug text-slate-200 focus:border-emerald-600 focus:outline-none"
-                        spellcheck={false}
-                    ></textarea>
+                        spellcheck={false}></textarea>
                     <p class="text-[10px] text-slate-500">
                         Provide a JSON object. Required: <code class="font-mono"
                             >anilist_id</code
@@ -360,8 +334,7 @@
             <div class="flex justify-end gap-2 pt-1">
                 <button
                     class="rounded-md bg-slate-800 px-3 py-1.5 text-sm hover:bg-slate-700"
-                    onclick={() => (open = false)}>Cancel</button
-                >
+                    onclick={() => (open = false)}>Cancel</button>
                 <button
                     onclick={save}
                     class="rounded-md bg-emerald-600/90 px-3 py-1.5 text-sm font-medium hover:bg-emerald-500"

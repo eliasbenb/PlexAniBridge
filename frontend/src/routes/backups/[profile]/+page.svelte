@@ -114,8 +114,7 @@
             <button
                 onclick={load}
                 type="button"
-                class="inline-flex items-center gap-1 rounded-md border border-slate-600/60 bg-slate-700/40 px-2 py-1 font-medium text-slate-200 hover:bg-slate-600/50"
-            >
+                class="inline-flex items-center gap-1 rounded-md border border-slate-600/60 bg-slate-700/40 px-2 py-1 font-medium text-slate-200 hover:bg-slate-600/50">
                 <RefreshCcw class="inline h-4 w-4 text-[14px]" /> Refresh
             </button>
         </div>
@@ -125,12 +124,10 @@
         <p class="text-sm text-slate-500">No backups found.</p>
     {:else}
         <div
-            class="overflow-x-auto rounded-md border border-slate-800 bg-slate-900/60 shadow-sm backdrop-blur-sm"
-        >
+            class="overflow-x-auto rounded-md border border-slate-800 bg-slate-900/60 shadow-sm backdrop-blur-sm">
             <table class="w-full text-sm">
                 <thead
-                    class="bg-slate-800/60 text-left text-[11px] tracking-wide text-slate-400 uppercase"
-                >
+                    class="bg-slate-800/60 text-left text-[11px] tracking-wide text-slate-400 uppercase">
                     <tr>
                         <th class="px-3 py-2 font-medium">Filename</th>
                         <th class="px-3 py-2 font-medium">Created</th>
@@ -144,17 +141,13 @@
                     {#each backups as b (b.filename)}
                         <tr class="transition hover:bg-slate-800/50">
                             <td class="px-3 py-2 font-mono text-[11px] break-all"
-                                >{b.filename}</td
-                            >
+                                >{b.filename}</td>
                             <td class="px-3 py-2 text-[11px]"
-                                >{new Date(b.created_at).toLocaleString()}</td
-                            >
+                                >{new Date(b.created_at).toLocaleString()}</td>
                             <td class="px-3 py-2 text-slate-400"
-                                >{humanDuration(b.age_seconds)}</td
-                            >
+                                >{humanDuration(b.age_seconds)}</td>
                             <td class="px-3 py-2 text-slate-400"
-                                >{humanSize(b.size_bytes)}</td
-                            >
+                                >{humanSize(b.size_bytes)}</td>
                             <td class="px-3 py-2 text-slate-400">{b.user || "—"}</td>
                             <td class="px-3 py-2">
                                 <div class="flex justify-end gap-2">
@@ -162,12 +155,10 @@
                                         class="inline-flex items-center gap-1 rounded-md border border-sky-600/60 bg-sky-600/30 px-2 py-1 text-[11px] font-medium text-sky-100 hover:bg-sky-600/40 disabled:opacity-50"
                                         disabled={previewLoading === b.filename}
                                         onclick={() => openPreview(b.filename)}
-                                        title="Preview raw JSON"
-                                    >
+                                        title="Preview raw JSON">
                                         {#if previewLoading === b.filename}
                                             <LoaderCircle
-                                                class="inline h-4 w-4 animate-spin"
-                                            />
+                                                class="inline h-4 w-4 animate-spin" />
                                         {:else}
                                             <Eye class="inline h-4 w-4" />
                                         {/if}
@@ -177,12 +168,10 @@
                                         class="inline-flex items-center gap-1 rounded-md border border-emerald-600/60 bg-emerald-600/30 px-2 py-1 text-[11px] font-medium text-emerald-100 hover:bg-emerald-600/40 disabled:opacity-50"
                                         disabled={restoring === b.filename}
                                         onclick={() => doRestore(b.filename)}
-                                        title="Restore backup"
-                                    >
+                                        title="Restore backup">
                                         {#if restoring === b.filename}
                                             <LoaderCircle
-                                                class="inline h-4 w-4 animate-spin"
-                                            />
+                                                class="inline h-4 w-4 animate-spin" />
                                         {:else}
                                             <ArchiveRestore class="inline h-4 w-4" />
                                         {/if}
@@ -205,28 +194,24 @@
             footerClass="flex items-center justify-end gap-2 border-t border-slate-800/70 bg-slate-900/60 px-4 py-2"
             closeButtonClass="rounded-md px-2 py-1 text-xs text-slate-400 hover:bg-slate-800/70 hover:text-slate-200"
             onOpenAutoFocus={(e: Event) => e.preventDefault()}
-            onCloseAutoFocus={() => (previewing = null)}
-        >
+            onCloseAutoFocus={() => (previewing = null)}>
             <svelte:fragment slot="title">
                 <div class="text-sm font-semibold tracking-wide text-slate-200">
                     Backup Preview
                     <span class="ml-1 font-mono text-[10px] text-slate-400"
-                        >{previewing}</span
-                    >
+                        >{previewing}</span>
                 </div>
             </svelte:fragment>
 
             <div class="p-4">
                 <JsonCodeBlock
                     value={previewCache[previewing] || {}}
-                    class="max-h-[70vh] text-[11px] leading-snug"
-                />
+                    class="max-h-[70vh] text-[11px] leading-snug" />
             </div>
             <div slot="footer">
                 <button
                     class="rounded-md border border-slate-600/60 bg-slate-700/40 px-3 py-1 text-[11px] font-medium text-slate-200 hover:bg-slate-600/50"
-                    onclick={() => setPreviewOpen(false)}
-                >
+                    onclick={() => setPreviewOpen(false)}>
                     Close
                 </button>
             </div>

@@ -386,26 +386,36 @@
                 Browse and override external ID mappings
             </p>
         </div>
-        <SearchBar bind:query bind:customOnly bind:page onLoad={load} onNew={openNew} />
+        <SearchBar
+            bind:query
+            bind:customOnly
+            bind:page
+            onLoad={load}
+            onNew={openNew} />
     </div>
     <div
-        class="relative flex h-[70vh] flex-col overflow-hidden rounded-md border border-slate-800/70 bg-slate-900/40 backdrop-blur-sm"
-    >
+        class="relative flex h-[70vh] flex-col overflow-hidden rounded-md border border-slate-800/70 bg-slate-900/40 backdrop-blur-sm">
         <div
-            class="flex items-center gap-4 border-b border-slate-800/60 bg-slate-950/50 px-3 py-2 text-[11px]"
-        >
+            class="flex items-center gap-4 border-b border-slate-800/60 bg-slate-950/50 px-3 py-2 text-[11px]">
             <span class="text-slate-400"
                 >Showing <span class="font-medium text-slate-200">{items.length}</span
-                >/<span class="text-slate-500">{total}</span></span
-            >
+                >/<span class="text-slate-500">{total}</span></span>
             {#if pages > 1}<span class="text-slate-500">Page {page} / {pages}</span
                 >{/if}
             {#if customOnly}<span class="text-emerald-400">Custom overrides only</span
                 >{/if}
         </div>
-        <MappingsTable {items} onEdit={openEdit} onDelete={remove} />
+        <MappingsTable
+            {items}
+            onEdit={openEdit}
+            onDelete={remove} />
     </div>
-    <Pagination class="mt-3" bind:page bind:perPage bind:pages onChange={load} />
+    <Pagination
+        class="mt-3"
+        bind:page
+        bind:perPage
+        bind:pages
+        onChange={load} />
 
     <EditModal
         bind:open={modal}
@@ -415,6 +425,5 @@
         {toPayload}
         {syncFormToRaw}
         {syncRawToForm}
-        {save}
-    />
+        {save} />
 </div>

@@ -77,15 +77,13 @@
 
 <Tooltip.Provider>
     <div
-        class="min-h-dvh overflow-x-hidden bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-950 via-slate-950 to-slate-900 text-slate-100 antialiased selection:bg-blue-600/40 selection:text-white"
-    >
+        class="min-h-dvh overflow-x-hidden bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-950 via-slate-950 to-slate-900 text-slate-100 antialiased selection:bg-blue-600/40 selection:text-white">
         <!-- Toasts -->
         <ToastHost />
         <a
             href="#main"
             class="sr-only bg-blue-600 px-3 py-2 text-sm font-medium text-white shadow-lg focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded-md"
-            >Skip to content</a
-        >
+            >Skip to content</a>
         <!-- Mobile backdrop -->
         {#if sidebarOpen}
             <div
@@ -96,17 +94,22 @@
                 onclick={() => (sidebarOpen = false)}
                 onkeydown={(e) =>
                     (e.key === "Escape" || e.key === "Enter" || e.key === " ") &&
-                    (e.preventDefault(), (sidebarOpen = false))}
-            ></div>
+                    (e.preventDefault(), (sidebarOpen = false))}>
+            </div>
         {/if}
         <!-- Sidebar -->
         <aside
             class="fixed inset-y-0 left-0 z-40 flex w-64 -translate-x-full flex-col border-r border-slate-800 bg-slate-950/95 px-3 pt-4 pb-6 shadow-xl shadow-slate-950/50 backdrop-blur transition-transform duration-300 ease-out lg:translate-x-0"
-            class:translate-x-0={sidebarOpen}
-        >
+            class:translate-x-0={sidebarOpen}>
             <div class="mb-4 flex items-center gap-3 px-2">
-                <img src={logo} alt="Logo" class="h-8 w-8" loading="lazy" />
-                <a href={resolve("/")} class="group">
+                <img
+                    src={logo}
+                    alt="Logo"
+                    class="h-8 w-8"
+                    loading="lazy" />
+                <a
+                    href={resolve("/")}
+                    class="group">
                     <h1 class="text-base font-semibold tracking-tight text-white">
                         PlexAniBridge
                     </h1>
@@ -124,43 +127,37 @@
                     aria-current={active("/", true) || active("/timeline")
                         ? "page"
                         : undefined}
-                    ><LayoutDashboard class="inline h-4 w-4" /><span>Dashboard</span></a
-                >
+                    ><LayoutDashboard class="inline h-4 w-4" /><span>Dashboard</span
+                    ></a>
                 <a
                     href={resolve("/mappings")}
                     class="nav-link {active('/mappings') ? 'nav-link-active' : ''}"
                     aria-current={active("/mappings") ? "page" : undefined}
-                    ><List class="inline h-4 w-4" /><span>Mappings</span></a
-                >
+                    ><List class="inline h-4 w-4" /><span>Mappings</span></a>
                 <a
                     href={resolve("/logs")}
                     class="nav-link {active('/logs') ? 'nav-link-active' : ''}"
                     aria-current={active("/logs") ? "page" : undefined}
-                    ><Terminal class="inline h-4 w-4" /><span>Logs</span></a
-                >
+                    ><Terminal class="inline h-4 w-4" /><span>Logs</span></a>
                 <a
                     href={resolve("/backups")}
                     class="nav-link {active('/backups') ? 'nav-link-active' : ''}"
                     aria-current={active("/backups") ? "page" : undefined}
-                    ><ArchiveRestore class="inline h-4 w-4" /><span>Backups</span></a
-                >
+                    ><ArchiveRestore class="inline h-4 w-4" /><span>Backups</span></a>
                 <div
-                    class="mt-4 px-3 text-[10px] font-semibold tracking-wider text-slate-500 uppercase"
-                >
+                    class="mt-4 px-3 text-[10px] font-semibold tracking-wider text-slate-500 uppercase">
                     System
                 </div>
                 <a
                     href={resolve("/settings")}
                     class="nav-link {active('/settings') ? 'nav-link-active' : ''}"
                     aria-current={active("/settings") ? "page" : undefined}
-                    ><Settings class="inline h-4 w-4" /><span>Settings</span></a
-                >
+                    ><Settings class="inline h-4 w-4" /><span>Settings</span></a>
                 <a
                     href={resolve("/about")}
                     class="nav-link {active('/about') ? 'nav-link-active' : ''}"
                     aria-current={active("/about") ? "page" : undefined}
-                    ><Activity class="inline h-4 w-4" /><span>About</span></a
-                >
+                    ><Activity class="inline h-4 w-4" /><span>About</span></a>
                 <div class="mt-auto border-t border-slate-800/60 pt-4">
                     <p class="px-3 text-[11px] text-slate-500">
                         © {new Date().getFullYear()}
@@ -169,8 +166,7 @@
                             target="_blank"
                             rel="noopener"
                             class="transition-colors hover:text-slate-200"
-                            >PlexAniBridge</a
-                        >
+                            >PlexAniBridge</a>
                     </p>
                 </div>
             </nav>
@@ -179,14 +175,12 @@
         <div class="flex min-h-dvh w-full flex-col lg:pl-64">
             <!-- Top bar -->
             <header
-                class="sticky top-0 z-20 flex h-14 w-full items-center gap-3 border-b border-slate-800/80 bg-slate-950/80 px-4 pb-[env(safe-area-inset-top)] backdrop-blur supports-[backdrop-filter]:bg-slate-950/65"
-            >
+                class="sticky top-0 z-20 flex h-14 w-full items-center gap-3 border-b border-slate-800/80 bg-slate-950/80 px-4 pb-[env(safe-area-inset-top)] backdrop-blur supports-[backdrop-filter]:bg-slate-950/65">
                 <button
                     type="button"
                     class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-700/70 bg-slate-800/70 text-slate-300 hover:bg-slate-700/70 hover:text-white focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none lg:hidden"
                     aria-label="Toggle navigation"
-                    onclick={() => (sidebarOpen = !sidebarOpen)}
-                >
+                    onclick={() => (sidebarOpen = !sidebarOpen)}>
                     {#if sidebarOpen}
                         <X class="inline h-4 w-4" />
                     {:else}
@@ -196,8 +190,7 @@
                 <div class="flex flex-1 items-center gap-3">
                     <div
                         class="hidden items-center gap-2 rounded-md border border-slate-700/60 bg-slate-900/60 px-3 py-1.5 text-xs text-slate-400 sm:flex"
-                        aria-live="polite"
-                    >
+                        aria-live="polite">
                         <span class="relative flex h-2 w-2">
                             <span
                                 class={`absolute inline-flex h-full w-full rounded-md ${isWsOpen ? "animate-ping bg-blue-500/60" : "bg-amber-500/40"}`}
@@ -213,29 +206,28 @@
                     <button
                         type="button"
                         class="btn-base border border-slate-700/70 bg-slate-800/70 text-slate-300 hover:bg-slate-700/70 hover:text-white focus-visible:ring-blue-500"
-                        onclick={() => location.reload()}
-                    >
+                        onclick={() => location.reload()}>
                         <RotateCw class="inline h-4 w-4" />
                         <span class="hidden sm:inline">Refresh</span>
                     </button>
                 </div>
             </header>
             <!-- Page content area -->
-            <main id="main" class="flex-1 p-4 sm:p-6">
+            <main
+                id="main"
+                class="flex-1 p-4 sm:p-6">
                 <div class="fade-in space-y-8">{@render children?.()}</div>
             </main>
             <!-- Footer -->
             <footer
-                class="mt-auto border-t border-slate-800/80 bg-slate-950/70 px-4 py-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] text-[11px] text-slate-500 backdrop-blur"
-            >
+                class="mt-auto border-t border-slate-800/80 bg-slate-950/70 px-4 py-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] text-[11px] text-slate-500 backdrop-blur">
                 <div class="flex flex-row items-center justify-between gap-2">
                     <div class="flex flex-wrap items-center gap-3">
                         <a
                             href="https://github.com/eliasbenb/PlexAniBridge"
                             target="_blank"
                             rel="noopener"
-                            class="inline-flex items-center gap-1 text-slate-400 transition-colors hover:text-slate-200"
-                        >
+                            class="inline-flex items-center gap-1 text-slate-400 transition-colors hover:text-slate-200">
                             <Github class="inline h-4 w-4" /><span>GitHub</span>
                         </a>
                         <div>
@@ -244,16 +236,14 @@
                                 target="_blank"
                                 rel="noopener"
                                 class="text-slate-600 transition-colors hover:text-slate-200"
-                                >v{version}</a
-                            >
+                                >v{version}</a>
                             {#if gitHash}
                                 <a
                                     href={`https://github.com/eliasbenb/PlexAniBridge/tree/${gitHash}`}
                                     target="_blank"
                                     rel="noopener"
                                     class="ml-1 text-slate-600 transition-colors hover:text-slate-200"
-                                    >({gitHash.slice(0, 7)})</a
-                                >
+                                    >({gitHash.slice(0, 7)})</a>
                             {/if}
                         </div>
                     </div>
@@ -262,8 +252,8 @@
                             href="https://github.com/eliasbenb"
                             target="_blank"
                             rel="noopener"
-                            class="transition-colors hover:text-slate-200">@eliasbenb</a
-                        >
+                            class="transition-colors hover:text-slate-200"
+                            >@eliasbenb</a>
                     </div>
                 </div>
             </footer>

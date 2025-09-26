@@ -35,8 +35,7 @@
     class={twMerge(
         "overflow-auto rounded border border-slate-800/60 bg-slate-900/60 p-2 font-mono text-[10px] leading-relaxed",
         className,
-    )}
->
+    )}>
     <code class="whitespace-pre">
         <!-- eslint-disable-next-line svelte/no-at-html-tags -->
         {@html highlightJson(value ?? {})}

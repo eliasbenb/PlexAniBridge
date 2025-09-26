@@ -25,7 +25,10 @@
 <Dialog.Root bind:open>
     <Dialog.Portal>
         <Dialog.Overlay class={overlayClass} />
-        <Dialog.Content class={contentClass} {onOpenAutoFocus} {onCloseAutoFocus}>
+        <Dialog.Content
+            class={contentClass}
+            {onOpenAutoFocus}
+            {onCloseAutoFocus}>
             {#if title !== undefined || $$slots.title || showClose}
                 <div class={headerWrapperClass}>
                     <div class={headerClass}>
@@ -33,7 +36,9 @@
                             <slot name="title">{title}</slot>
                         </Dialog.Title>
                         {#if showClose}
-                            <Dialog.Close class={closeButtonClass} aria-label="Close">
+                            <Dialog.Close
+                                class={closeButtonClass}
+                                aria-label="Close">
                                 <X class="inline h-3.5 w-3.5" />
                             </Dialog.Close>
                         {/if}
