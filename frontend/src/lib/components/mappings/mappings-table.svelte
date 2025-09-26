@@ -171,9 +171,11 @@
                                 {@const totalSeasons = entries.length}
                                 {#if totalSeasons > 0}
                                     <UiTooltip>
-                                        <span
-                                            class={`inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded px-1.5 text-[10px] ring-1 ${totalSeasons > 1 ? "bg-amber-600/30 text-amber-100 ring-amber-700/40" : "bg-slate-800/60 text-slate-300 ring-slate-700/50"}`}
-                                            slot="trigger">{totalSeasons}</span>
+                                        {#snippet trigger()}
+                                            <span
+                                                class={`inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded px-1.5 text-[10px] ring-1 ${totalSeasons > 1 ? "bg-amber-600/30 text-amber-100 ring-amber-700/40" : "bg-slate-800/60 text-slate-300 ring-slate-700/50"}`}
+                                                >{totalSeasons}</span>
+                                        {/snippet}
                                         <ol
                                             class="max-h-52 space-y-1 overflow-auto text-[11px]">
                                             {#each entries as e (e[0])}
@@ -198,9 +200,11 @@
                                 {@const total = (m.sources ?? []).length}
                                 {#if total > 0}
                                     <UiTooltip>
-                                        <span
-                                            class={`inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded px-1.5 text-[10px] ring-1 ${total > 1 ? "bg-amber-600/30 text-amber-100 ring-amber-700/40" : "bg-slate-800/60 text-slate-300 ring-slate-700/50"}`}
-                                            slot="trigger">{total}</span>
+                                        {#snippet trigger()}
+                                            <span
+                                                class={`inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded px-1.5 text-[10px] ring-1 ${total > 1 ? "bg-amber-600/30 text-amber-100 ring-amber-700/40" : "bg-slate-800/60 text-slate-300 ring-slate-700/50"}`}
+                                                >{total}</span>
+                                        {/snippet}
                                         <ol class="space-y-1 text-[11px]">
                                             {#each m.sources ?? [] as s, i (i)}
                                                 <li class="flex items-start gap-1">

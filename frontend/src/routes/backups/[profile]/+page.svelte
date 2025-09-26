@@ -195,25 +195,26 @@
             closeButtonClass="rounded-md px-2 py-1 text-xs text-slate-400 hover:bg-slate-800/70 hover:text-slate-200"
             onOpenAutoFocus={(e: Event) => e.preventDefault()}
             onCloseAutoFocus={() => (previewing = null)}>
-            <svelte:fragment slot="title">
+            {#snippet titleChildren()}
                 <div class="text-sm font-semibold tracking-wide text-slate-200">
                     Backup Preview
                     <span class="ml-1 font-mono text-[10px] text-slate-400"
                         >{previewing}</span>
                 </div>
-            </svelte:fragment>
-
+            {/snippet}
+            {#snippet footerChildren()}
+                <div>
+                    <button
+                        class="rounded-md border border-slate-600/60 bg-slate-700/40 px-3 py-1 text-[11px] font-medium text-slate-200 hover:bg-slate-600/50"
+                        onclick={() => setPreviewOpen(false)}>
+                        Close
+                    </button>
+                </div>
+            {/snippet}
             <div class="p-4">
                 <JsonCodeBlock
                     value={previewCache[previewing] || {}}
                     class="max-h-[70vh] text-[11px] leading-snug" />
-            </div>
-            <div slot="footer">
-                <button
-                    class="rounded-md border border-slate-600/60 bg-slate-700/40 px-3 py-1 text-[11px] font-medium text-slate-200 hover:bg-slate-600/50"
-                    onclick={() => setPreviewOpen(false)}>
-                    Close
-                </button>
             </div>
         </Modal>
     {/if}

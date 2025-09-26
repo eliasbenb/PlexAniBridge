@@ -66,12 +66,12 @@
     <Modal
         bind:open
         onOpenAutoFocus={(e: Event) => e.preventDefault()}>
-        <svelte:fragment slot="title">
+        {#snippet titleChildren()}
             <div class="flex items-center gap-2 text-sm font-semibold tracking-wide">
                 <PenLine class="inline h-4 w-4 text-slate-400" />
                 {form._isNew ? "New Override" : "Edit Override #" + form.anilist_id}
             </div>
-        </svelte:fragment>
+        {/snippet}
         <div class="max-h-[calc(100vh-6rem)] space-y-3 overflow-auto p-4">
             <Tabs.Root
                 value={editMode}
