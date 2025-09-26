@@ -187,7 +187,7 @@
     </div>
     <div class="grid grid-cols-[repeat(auto-fill,minmax(min(100%,32rem),1fr))] gap-4">
         {#if isLoading && Object.keys(profiles).length === 0}
-            {#each Array(3) as _, i (i)}<!-- eslint-disable-line @typescript-eslint/no-unused-vars -->
+            {#each [1, 2, 3] as i (i)}
                 <div
                     class="animate-pulse rounded-md border border-slate-800/60 bg-slate-900/40 p-4">
                     <div class="h-4 w-1/3 rounded-md bg-slate-700/60"></div>

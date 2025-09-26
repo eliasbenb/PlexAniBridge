@@ -38,7 +38,7 @@
     {#if loading}
         <div
             class="grid grid-cols-[repeat(auto-fill,minmax(min(100%,32rem),1fr))] gap-4">
-            {#each Array(4) as _, i (i)}<!-- eslint-disable-line @typescript-eslint/no-unused-vars -->
+            {#each [1, 2, 3, 4] as i (i)}
                 <div
                     class="animate-pulse rounded-md border border-slate-800/60 bg-slate-900/40 p-4">
                     <div
