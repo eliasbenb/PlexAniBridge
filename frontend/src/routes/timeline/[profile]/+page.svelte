@@ -202,12 +202,6 @@
             per_page: String(perPage),
         });
         if (outcomeFilter) u.set("outcome", outcomeFilter);
-        console.log(
-            "Building query with outcomeFilter:",
-            outcomeFilter,
-            "URL:",
-            `/api/history/${params.profile}?${u}`,
-        );
         return `/api/history/${params.profile}?${u}`;
     };
 
