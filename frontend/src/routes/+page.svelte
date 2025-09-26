@@ -11,13 +11,9 @@
 
     import { goto } from "$app/navigation";
     import { resolve } from "$app/paths";
-    import { apiFetch, apiJson } from "$lib/api";
-    import { toast } from "$lib/notify";
-
-    import type {
-        StatusResponse,
-        ProfileStatus,
-    } from "$lib/types/api";
+    import type { ProfileStatus, StatusResponse } from "$lib/types/api";
+    import { apiFetch, apiJson } from "$lib/utils/api";
+    import { toast } from "$lib/utils/notify";
 
     let profiles: StatusResponse["profiles"] = $state({});
     let isLoading = $state(true);

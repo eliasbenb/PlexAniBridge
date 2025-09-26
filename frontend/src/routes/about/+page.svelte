@@ -3,8 +3,8 @@
 
     import { Activity } from "@lucide/svelte";
 
-    import { apiFetch } from "$lib/api";
-    import { toast } from "$lib/notify";
+    import { apiFetch } from "$lib/utils/api";
+    import { toast } from "$lib/utils/notify";
 
     interface AboutInfo {
         version?: string;

@@ -16,9 +16,10 @@
     } from "@lucide/svelte";
     import { Tabs } from "bits-ui";
 
-    import { apiFetch } from "$lib/api";
-    import { toast } from "$lib/notify";
     import type { LogEntry, LogFile } from "$lib/types/api";
+    import { apiFetch } from "$lib/utils/api";
+    import { humanDuration } from "$lib/utils/human";
+    import { toast } from "$lib/utils/notify";
 
     let tab = $state<"live" | "history">("live");
     let level = $state("INFO");
@@ -85,16 +86,6 @@
             } catch {}
         }
         return "";
-    }
-
-    function formatTimeAgo(ts: number | null) {
-        if (!ts) return "";
-        const diff = Math.floor((Date.now() - ts) / 1000);
-        if (diff < 60) return diff + "s ago";
-        const m = Math.floor(diff / 60);
-        if (m < 60) return m + "m ago";
-        const h = Math.floor(m / 60);
-        return h + "h ago";
     }
 
     function applyFilter() {
@@ -419,7 +410,7 @@
                         ></span>
                         {#if lastReceived}
                             <span class="hidden text-slate-500 md:inline"
-                                >Updated {formatTimeAgo(lastReceived)}</span
+                                >Updated {humanDuration(lastReceived)}</span
                             >
                         {/if}
                     </div>
@@ -486,8 +477,9 @@
                             >
                                 <span
                                     class="hidden w-[54px] shrink-0 text-right text-[10px] text-slate-500 tabular-nums sm:inline-block"
-                                    >{formatTime(entry)}</span
                                 >
+                                    {formatTime(entry)}
+                                </span>
                                 <span
                                     class={`flex h-5 shrink-0 items-center rounded-md bg-slate-800/70 px-1 text-[10px] font-semibold tracking-wide text-slate-300 ${badgeClass(entry.level)}`}
                                     >{entry.level}</span
@@ -509,9 +501,9 @@
                                         {@html highlightLog(entry.message)}
                                     </div>
                                 </div>
-                                <span class="text-[10px] text-slate-500 sm:hidden"
-                                    >{formatTime(entry)}</span
-                                >
+                                <span class="text-[10px] text-slate-500 sm:hidden">
+                                    {formatTime(entry)}
+                                </span>
                             </div>
                         {/each}
                         {#if !filtered.length}<p class="p-2 text-xs text-slate-500">
@@ -665,8 +657,9 @@
                                     >
                                         <span
                                             class="hidden w-[54px] shrink-0 text-right text-[10px] text-slate-500 tabular-nums sm:inline-block"
-                                            >{formatTime(entry)}</span
                                         >
+                                            {formatTime(entry)}
+                                        </span>
                                         <span
                                             class={`flex h-5 shrink-0 items-center rounded-md bg-slate-800/70 px-1 text-[10px] font-semibold tracking-wide text-slate-300 ${badgeClass(entry.level)}`}
                                             >{entry.level}</span
@@ -692,8 +685,9 @@
                                         </div>
                                         <span
                                             class="text-[10px] text-slate-500 sm:hidden"
-                                            >{formatTime(entry)}</span
                                         >
+                                            {formatTime(entry)}
+                                        </span>
                                     </div>
                                 {/each}
                                 {#if currentFile && !historyFiltered.length}<p

@@ -3,9 +3,9 @@
 
     import { Languages, Settings, User } from "@lucide/svelte";
 
-    import { apiJson } from "$lib/api";
-    import { toast } from "$lib/notify";
     import type { SettingsResponse } from "$lib/types/api";
+    import { apiJson } from "$lib/utils/api";
+    import { toast } from "$lib/utils/notify";
 
     let data: SettingsResponse = $state({ global_config: {}, profiles: [] });
     let loading = $state(true);

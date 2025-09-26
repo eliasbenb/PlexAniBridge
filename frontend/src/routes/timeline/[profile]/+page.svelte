@@ -26,10 +26,10 @@
     } from "@lucide/svelte";
     import { SvelteSet, SvelteURLSearchParams } from "svelte/reactivity";
 
-    import { apiFetch } from "$lib/api";
+    import { apiFetch } from "$lib/utils/api";
     import JsonCodeBlock from "$lib/components/json-code-block.svelte";
-    import { toast } from "$lib/notify";
-    import type { HistoryItem, CurrentSync } from "$lib/types/api";
+    import { toast } from "$lib/utils/notify";
+    import type { CurrentSync, HistoryItem } from "$lib/types/api";
 
     const { params } = $props<{ params: { profile: string } }>();
 
@@ -211,11 +211,13 @@
         return `/api/history/${params.profile}?${u}`;
     };
 
-    function preferredTitle(t?: {
-        romaji?: string | null;
-        english?: string | null;
-        native?: string | null;
-    } | null) {
+    function preferredTitle(
+        t?: {
+            romaji?: string | null;
+            english?: string | null;
+            native?: string | null;
+        } | null,
+    ) {
         if (!t) return null;
         let pref: string | null = null;
         try {
@@ -993,7 +995,7 @@
                                     </h5>
                                     <JsonCodeBlock
                                         value={item.before_state ?? {}}
-                                        className="leading-tight"
+                                        class="leading-tight"
                                     />
                                 </div>
                                 <div class="space-y-1.5">
@@ -1007,7 +1009,7 @@
                                     </h5>
                                     <JsonCodeBlock
                                         value={item.after_state ?? {}}
-                                        className="leading-tight"
+                                        class="leading-tight"
                                     />
                                 </div>
                             </div>

@@ -3,11 +3,12 @@
 
     import { ArchiveRestore, Eye, LoaderCircle, RefreshCcw } from "@lucide/svelte";
 
-    import { apiJson } from "$lib/api";
     import JsonCodeBlock from "$lib/components/json-code-block.svelte";
-    import { toast } from "$lib/notify";
-    import Modal from "$lib/ui/modal.svelte";
     import type { BackupMeta, RestoreSummary } from "$lib/types/api";
+    import Modal from "$lib/ui/modal.svelte";
+    import { apiJson } from "$lib/utils/api";
+    import { humanDuration, humanSize } from "$lib/utils/human";
+    import { toast } from "$lib/utils/notify";
 
     const { params } = $props<{ params: { profile: string } }>();
 
@@ -77,25 +78,6 @@
     }
     function setPreviewOpen(open: boolean) {
         if (!open) previewing = null;
-    }
-
-    function humanBytes(n: number) {
-        if (n < 1024) return n + " B";
-        const units = ["KB", "MB", "GB"];
-        let u = -1;
-        let v = n;
-        do {
-            v /= 1024;
-            u++;
-        } while (v >= 1024 && u < units.length - 1);
-        return v.toFixed(v >= 10 ? 0 : 1) + " " + units[u];
-    }
-
-    function ageLabel(sec: number) {
-        if (sec < 90) return Math.round(sec) + "s ago";
-        if (sec < 3600) return Math.round(sec / 60) + "m ago";
-        if (sec < 86400) return Math.round(sec / 3600) + "h ago";
-        return Math.round(sec / 86400) + "d ago";
     }
 
     async function doRestore(filename: string) {
@@ -168,10 +150,10 @@
                                 >{new Date(b.created_at).toLocaleString()}</td
                             >
                             <td class="px-3 py-2 text-slate-400"
-                                >{ageLabel(b.age_seconds)}</td
+                                >{humanDuration(b.age_seconds)}</td
                             >
                             <td class="px-3 py-2 text-slate-400"
-                                >{humanBytes(b.size_bytes)}</td
+                                >{humanSize(b.size_bytes)}</td
                             >
                             <td class="px-3 py-2 text-slate-400">{b.user || "—"}</td>
                             <td class="px-3 py-2">
@@ -237,8 +219,7 @@
             <div class="p-4">
                 <JsonCodeBlock
                     value={previewCache[previewing] || {}}
-                    className="text-[11px] leading-snug"
-                    maxHeight="max-h-[70vh]"
+                    class="max-h-[70vh] text-[11px] leading-snug"
                 />
             </div>
             <div slot="footer">

@@ -22,8 +22,8 @@
 
     import { Tooltip } from "bits-ui";
 
-    import { apiFetch } from "$lib/api";
     import ToastHost from "$lib/components/toast-host.svelte";
+    import { apiFetch } from "$lib/utils/api";
 
     let { children } = $props();
     let version = $state("v?");

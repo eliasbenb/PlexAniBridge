@@ -4,9 +4,8 @@
     import { ArchiveRestore, ChevronRight, Folder } from "@lucide/svelte";
 
     import { resolve } from "$app/paths";
-    import { apiJson } from "$lib/api";
-
     import type { StatusResponse } from "$lib/types/api";
+    import { apiJson } from "$lib/utils/api";
 
     let profiles: string[] = $state([]);
     let loading = $state(true);
