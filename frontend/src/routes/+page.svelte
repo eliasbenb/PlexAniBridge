@@ -8,6 +8,7 @@
         RefreshCcw,
         Users,
     } from "@lucide/svelte";
+    import { Meter } from "bits-ui";
 
     import { goto } from "$app/navigation";
     import { resolve } from "$app/paths";
@@ -297,13 +298,17 @@
                             </div>
                         </div>
                         {#key p.status.current_sync.section_index}
-                            <div
+                            <Meter.Root
+                                value={progressPercent(p) ?? 0}
+                                min={0}
+                                max={1}
                                 class="h-2 w-full overflow-hidden rounded bg-slate-800/80">
                                 <div
-                                    class="h-full bg-gradient-to-r from-indigo-500 via-sky-500 to-cyan-400 transition-[width] duration-300 ease-out"
-                                    style={`width: ${Math.round((progressPercent(p) ?? 0) * 100)}%`}>
+                                    class="h-full bg-gradient-to-r from-indigo-500 via-sky-500 to-cyan-400 transition-all duration-300 ease-out"
+                                    style="transform: translateX(-{100 -
+                                        (100 * (progressPercent(p) ?? 0)) / 1}%)">
                                 </div>
-                            </div>
+                            </Meter.Root>
                         {/key}
                     </div>
                 {/if}

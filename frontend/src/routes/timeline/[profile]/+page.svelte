@@ -24,6 +24,7 @@
         Trash2,
         X,
     } from "@lucide/svelte";
+    import { Meter } from "bits-ui";
     import { SvelteSet, SvelteURLSearchParams } from "svelte/reactivity";
 
     import JsonCodeBlock from "$lib/components/json-code-block.svelte";
@@ -598,12 +599,17 @@
                 </div>
             </div>
             {#key currentSync.section_index}
-                <div class="h-2 w-full overflow-hidden rounded bg-slate-800/80">
+                <Meter.Root
+                    value={progressPercent() ?? 0}
+                    min={0}
+                    max={1}
+                    class="h-2 w-full overflow-hidden rounded bg-slate-800/80">
                     <div
-                        class="h-full bg-gradient-to-r from-indigo-500 via-sky-500 to-cyan-400 transition-[width] duration-300 ease-out"
-                        style={`width: ${Math.round((progressPercent() ?? 0) * 100)}%`}>
+                        class="h-full bg-gradient-to-r from-indigo-500 via-sky-500 to-cyan-400 transition-all duration-300 ease-out"
+                        style="transform: translateX(-{100 -
+                            (100 * (progressPercent() ?? 0)) / 1}%)">
                     </div>
-                </div>
+                </Meter.Root>
             {/key}
         </div>
     {/if}
