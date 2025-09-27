@@ -44,7 +44,6 @@
         </div>
     {/each}
 </div>
-s
 
 <style>
     @keyframes shrink {
