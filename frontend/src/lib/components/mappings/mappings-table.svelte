@@ -2,6 +2,7 @@
     import { Tooltip } from "bits-ui";
 
     import type { Mapping } from "$lib/types/api";
+    import { preferredTitle } from "$lib/utils/anilist";
     import type { ColumnConfig } from "./columns";
     import { defaultColumns } from "./columns";
 
@@ -58,23 +59,6 @@
         }
     }
 
-    function preferredTitle(
-        t?: {
-            romaji?: string | null;
-            english?: string | null;
-            native?: string | null;
-        } | null,
-    ) {
-        if (!t) return null;
-        let pref: string | null = null;
-        try {
-            pref = localStorage.getItem("anilist.lang");
-        } catch {}
-        if (pref && (t as Record<string, string | undefined>)[pref])
-            return (t as Record<string, string | undefined>)[pref] as string;
-        return t.romaji || t.english || t.native || null;
-    }
-
     const visibleColumns = $derived(columns.filter((c) => c.visible));
 </script>
 
@@ -96,8 +80,6 @@
                             style="width: {column.width}px;">
                             <div class="flex items-center justify-between">
                                 <span class="truncate">{column.title}</span>
-
-                                <!-- Column settings popover moved to toolbar -->
                             </div>
 
                             <!-- Resize handle -->

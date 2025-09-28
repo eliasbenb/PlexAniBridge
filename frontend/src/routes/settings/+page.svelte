@@ -4,29 +4,23 @@
     import { Languages, Settings, User } from "@lucide/svelte";
 
     import type { SettingsResponse } from "$lib/types/api";
+    import {
+        anilistTitleLang,
+        setAniListTitleLang,
+        type TitleLanguage,
+    } from "$lib/utils/anilist";
     import { apiJson } from "$lib/utils/api";
     import { toast } from "$lib/utils/notify";
 
     let data: SettingsResponse = $state({ global_config: {}, profiles: [] });
     let loading = $state(true);
     let error: string | null = $state(null);
-    let titleLang = $state("romaji");
 
-    function loadPref() {
-        try {
-            titleLang = localStorage.getItem("anilist.lang") || "romaji";
-        } catch {}
-    }
+    const LANG_OPTS: TitleLanguage[] = ["romaji", "english", "native"];
 
-    function setLang(v: string) {
-        titleLang = v;
-        try {
-            localStorage.setItem("anilist.lang", v);
-            dispatchEvent(
-                new CustomEvent("anilist-lang-changed", { detail: { lang: v } }),
-            );
-        } catch {}
-        toast(`Language set to ${v}`, "success");
+    function setLang(v: TitleLanguage) {
+        setAniListTitleLang(v);
+        toast(`AniList title language set to ${v}`, "success");
     }
 
     async function load() {
@@ -43,7 +37,6 @@
     }
 
     onMount(() => {
-        loadPref();
         load();
     });
 </script>
@@ -89,25 +82,27 @@
             <div class="space-y-2">
                 <h4
                     class="flex items-center gap-2 text-sm font-medium tracking-wide text-slate-200">
-                    <Languages class="inline h-4 w-4 text-slate-400" /><span
-                        >AniList Title Language</span>
+                    <Languages class="inline h-4 w-4 text-slate-400" /> AniList Title Language
                 </h4>
                 <p class="text-[11px] leading-relaxed text-slate-500">
-                    Choose which title language to prefer (Romaji, English, or Native).
-                    Stored only in this browser.
+                    Choose which title language to prefer. Stored only in this browser.
                 </p>
-                <div class="flex gap-2">
-                    {#each ["romaji", "english", "native"] as opt (opt)}
+                <div class="flex flex-wrap gap-2">
+                    {#each LANG_OPTS as opt (opt)}
                         <button
                             type="button"
                             onclick={() => setLang(opt)}
-                            class={`rounded-md border px-3 py-1.5 text-[11px] font-medium ${titleLang === opt ? "border-blue-500 bg-blue-600 text-white" : "border-slate-700 bg-slate-800/60 text-slate-300 hover:bg-slate-700/60"}`}
+                            class={`rounded-md border px-3 py-1.5 text-[11px] font-medium ${$anilistTitleLang === opt ? "border-blue-500 bg-blue-600 text-white" : "border-slate-700 bg-slate-800/60 text-slate-300 hover:bg-slate-700/60"}`}
                             >{opt[0].toUpperCase() + opt.slice(1)}</button>
                     {/each}
                 </div>
                 <p class="text-[10px] text-slate-500">
-                    Current preference: <span class="font-medium text-slate-300"
-                        >{titleLang}</span>
+                    Current preference:
+                    <span class="font-medium text-slate-300">
+                        {$anilistTitleLang === "userPreferred"
+                            ? "AniList Preferred"
+                            : $anilistTitleLang}
+                    </span>
                 </p>
             </div>
         </div>

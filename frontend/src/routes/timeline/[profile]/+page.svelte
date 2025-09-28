@@ -29,6 +29,7 @@
 
     import JsonCodeBlock from "$lib/components/json-code-block.svelte";
     import type { CurrentSync, HistoryItem } from "$lib/types/api";
+    import { preferredTitle } from "$lib/utils/anilist";
     import { apiFetch } from "$lib/utils/api";
     import { toast } from "$lib/utils/notify";
 
@@ -48,7 +49,6 @@
     let statusWs: WebSocket | null = null;
     let knownIds = new SvelteSet<number>();
     let sentinel: HTMLDivElement | null = $state(null);
-    let titleLangTick = $state(0); // force rerender on title language preference change
     let openDiff: Record<number, boolean> = $state({});
     let currentSync: CurrentSync | null = $state(null);
     let isProfileRunning = $state(false);
@@ -205,23 +205,6 @@
         if (outcomeFilter) u.set("outcome", outcomeFilter);
         return `/api/history/${params.profile}?${u}`;
     };
-
-    function preferredTitle(
-        t?: {
-            romaji?: string | null;
-            english?: string | null;
-            native?: string | null;
-        } | null,
-    ) {
-        if (!t) return null;
-        let pref: string | null = null;
-        try {
-            pref = localStorage.getItem("anilist.lang");
-        } catch {}
-        if (pref && (t as Record<string, string | undefined>)[pref])
-            return (t as Record<string, string | undefined>)[pref] as string;
-        return t.romaji || t.english || t.native || null;
-    }
 
     function displayTitle(item: HistoryItem) {
         return (
@@ -538,8 +521,6 @@
         loadFirst();
         initWs();
         initStatusWs();
-        const langHandler = () => titleLangTick++;
-        addEventListener("anilist-lang-changed", langHandler);
         const io = new IntersectionObserver((entries) => {
             for (const e of entries) if (e.isIntersecting) loadMore();
         });
@@ -550,7 +531,6 @@
                 ws?.close();
                 statusWs?.close();
             } catch {}
-            removeEventListener("anilist-lang-changed", langHandler);
             removeEventListener("scroll", handleScroll);
             io.disconnect();
         };
@@ -667,7 +647,7 @@
     <div
         class="space-y-4"
         class:hidden={!items.length && !loadingInitial}>
-        {#each items as item (item.id + "-" + titleLangTick)}
+        {#each items as item (item.id)}
             {@const meta = metaFor(item.outcome)}
             <div
                 class="flex gap-3 overflow-hidden rounded-md border border-slate-800 bg-slate-900/60 p-4 shadow-sm backdrop-blur-sm transition-shadow hover:shadow-md">
