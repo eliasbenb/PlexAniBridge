@@ -25,7 +25,9 @@
         X,
     } from "@lucide/svelte";
     import { Meter } from "bits-ui";
+    import { cubicOut } from "svelte/easing";
     import { SvelteSet, SvelteURLSearchParams } from "svelte/reactivity";
+    import { fade, slide } from "svelte/transition";
 
     import JsonCodeBlock from "$lib/components/json-code-block.svelte";
     import type { CurrentSync, HistoryItem } from "$lib/types/api";
@@ -786,11 +788,32 @@
                                 <button
                                     type="button"
                                     onclick={() => toggleDiff(item.id)}
-                                    class="inline-flex items-center gap-1 text-xs text-sky-400 hover:text-sky-300">
-                                    {#if openDiff[item.id]}<SquareMinus
-                                            class="inline h-4 w-4 text-[14px]" />{:else}<SquarePlus
-                                            class="inline h-4 w-4 text-[14px]" />{/if}
-                                    {openDiff[item.id] ? "Hide diff" : "Show diff"}
+                                    class={`diff-toggle inline-flex items-center gap-1 text-xs text-sky-400 hover:text-sky-300 ${openDiff[item.id] ? "open" : ""}`}
+                                    aria-expanded={openDiff[item.id]}>
+                                    <span
+                                        class="relative inline-flex h-4 w-4 items-center justify-center overflow-hidden">
+                                        {#if openDiff[item.id]}
+                                            <span
+                                                in:fade={{ duration: 140 }}
+                                                out:fade={{ duration: 90 }}
+                                                class="absolute inset-0 flex items-center justify-center">
+                                                <SquareMinus
+                                                    class="diff-icon inline h-4 w-4 text-[14px]" />
+                                            </span>
+                                        {:else}
+                                            <span
+                                                in:fade={{ duration: 140 }}
+                                                out:fade={{ duration: 90 }}
+                                                class="absolute inset-0 flex items-center justify-center">
+                                                <SquarePlus
+                                                    class="diff-icon inline h-4 w-4 text-[14px]" />
+                                            </span>
+                                        {/if}
+                                    </span>
+                                    <span class="diff-label relative"
+                                        >{openDiff[item.id]
+                                            ? "Hide diff"
+                                            : "Show diff"}</span>
                                 </button>
                             </div>
                         {/if}
@@ -801,7 +824,9 @@
                 {@const ui = ensureDiffUi(item.id)}
                 {@const diffs = buildDiff(item)}
                 <div
-                    class="mt-2 overflow-hidden rounded-md border border-slate-800 bg-slate-950/80">
+                    in:slide={{ duration: 180, easing: cubicOut }}
+                    out:slide={{ duration: 140, easing: cubicOut }}
+                    class="mt-2 overflow-hidden rounded-md border border-slate-800 bg-slate-950/80 will-change-transform">
                     <div
                         class="flex flex-wrap items-center gap-3 border-b border-slate-800 px-3 py-2">
                         <div
@@ -962,3 +987,44 @@
         </div>
     {/if}
 </div>
+
+<style>
+    :global(.diff-toggle) {
+        position: relative;
+        transition: color 0.25s ease;
+    }
+    :global(.diff-toggle.open) {
+        animation: diffPulse 900ms ease;
+    }
+    @keyframes diffPulse {
+        0% {
+            text-shadow: 0 0 0 rgba(56, 189, 248, 0);
+        }
+        35% {
+            text-shadow: 0 0 6px rgba(56, 189, 248, 0.7);
+        }
+        100% {
+            text-shadow: 0 0 0 rgba(56, 189, 248, 0);
+        }
+    }
+    :global(.diff-toggle .diff-icon) {
+        transition: transform 220ms ease;
+    }
+    :global(.diff-toggle.open .diff-icon) {
+        transform: rotate(90deg) scale(1.05);
+    }
+    :global(.diff-toggle:not(.open):hover .diff-icon) {
+        transform: rotate(6deg);
+    }
+    @media (prefers-reduced-motion: reduce) {
+        :global(.diff-toggle .diff-icon),
+        :global(.diff-toggle.open .diff-icon),
+        :global(.diff-toggle:not(.open):hover .diff-icon) {
+            transition: none;
+            transform: none;
+        }
+        :global(.diff-toggle.open) {
+            animation: none;
+        }
+    }
+</style>
