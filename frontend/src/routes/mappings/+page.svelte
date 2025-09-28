@@ -1,9 +1,14 @@
 <script lang="ts">
     import { onMount } from "svelte";
 
-    import { List } from "@lucide/svelte";
+    import { Check, Eye, List } from "@lucide/svelte";
+    import { Checkbox, Popover } from "bits-ui";
     import { SvelteURLSearchParams } from "svelte/reactivity";
 
+    import {
+        defaultColumns,
+        type ColumnConfig,
+    } from "$lib/components/mappings/columns";
     import EditModal from "$lib/components/mappings/edit-modal.svelte";
     import MappingsTable from "$lib/components/mappings/mappings-table.svelte";
     import SearchBar from "$lib/components/mappings/tool-bar.svelte";
@@ -226,7 +231,7 @@
             }
             out.tvdb_mappings = Object.keys(obj).length ? obj : null;
         }
-        return out as Mapping; // caller ensures anilist_id present before send
+        return out as Mapping;
     }
 
     function syncFormToRaw() {
@@ -372,6 +377,43 @@
         }
     }
 
+    let columns = $state<ColumnConfig[]>(restoreColumns());
+
+    function restoreColumns(): ColumnConfig[] {
+        try {
+            const raw = localStorage.getItem("mappings.columns.v1");
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (Array.isArray(parsed)) {
+                    const map = new Map(parsed.map((c: ColumnConfig) => [c.id, c]));
+                    return defaultColumns.map((d) => ({
+                        ...d,
+                        ...(map.get(d.id) || {}),
+                    }));
+                }
+            }
+        } catch {}
+        return [...defaultColumns];
+    }
+
+    function hideAllColumns() {
+        columns = columns.map((c) => ({ ...c, visible: false }));
+    }
+
+    function showAllColumns() {
+        columns = columns.map((c) => ({ ...c, visible: true }));
+    }
+
+    function resetColumns() {
+        columns = [...defaultColumns];
+    }
+
+    $effect(() => {
+        try {
+            localStorage.setItem("mappings.columns.v1", JSON.stringify(columns));
+        } catch {}
+    });
+
     onMount(load);
 </script>
 
@@ -404,9 +446,72 @@
                 >{/if}
             {#if customOnly}<span class="text-emerald-400">Custom overrides only</span
                 >{/if}
+            <span class="flex-1"></span>
+            <!-- Column settings popover -->
+            <Popover.Root>
+                <Popover.Trigger
+                    class="inline-flex h-6 w-6 items-center justify-center rounded bg-slate-800/50 text-slate-400 transition-colors hover:bg-slate-700 hover:text-slate-200"
+                    title="Column settings"
+                    aria-label="Column settings">
+                    <Eye class="h-4 w-4" />
+                </Popover.Trigger>
+                <Popover.Content
+                    class="z-50 w-64 rounded-md border border-slate-700 bg-slate-900 p-3 shadow-lg"
+                    side="bottom"
+                    align="end"
+                    sideOffset={4}>
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-sm font-medium text-slate-200">
+                            Column Visibility
+                        </h3>
+                        {#if columns.some((c) => !c.visible)}<button
+                                onclick={showAllColumns}
+                                class="text-xs text-slate-400 hover:text-slate-200"
+                                >Show All</button>
+                        {:else}
+                            <button
+                                onclick={hideAllColumns}
+                                class="text-xs text-slate-400 hover:text-slate-200"
+                                >Hide All</button>
+                        {/if}
+                    </div>
+                    <div>
+                        <button
+                            onclick={resetColumns}
+                            class="muted mb-3 text-xs text-slate-400 italic hover:text-slate-200">
+                            (reset)
+                        </button>
+                    </div>
+                    <div class="space-y-2">
+                        {#each columns as column (column.id)}
+                            <div class="flex items-center gap-2">
+                                <label
+                                    class="flex cursor-pointer items-center gap-2 text-xs text-slate-300">
+                                    <Checkbox.Root
+                                        bind:checked={column.visible}
+                                        class="flex h-4 w-4 items-center justify-center rounded border border-slate-600 bg-slate-800 data-[state=checked]:border-emerald-600 data-[state=checked]:bg-emerald-600">
+                                        {#snippet children({ checked, indeterminate })}
+                                            {#if indeterminate}
+                                                <div
+                                                    class="h-2 w-2 rounded-sm bg-white">
+                                                </div>
+                                            {:else if checked}
+                                                <Check class="h-3 w-3 text-white" />
+                                            {/if}
+                                        {/snippet}
+                                    </Checkbox.Root>
+                                    <span class="truncate select-none"
+                                        >{column.title}</span>
+                                </label>
+                            </div>
+                        {/each}
+                    </div>
+                </Popover.Content>
+            </Popover.Root>
         </div>
         <MappingsTable
             {items}
+            bind:columns
             onEdit={openEdit}
             onDelete={remove} />
     </div>
