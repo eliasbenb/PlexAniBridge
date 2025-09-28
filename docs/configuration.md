@@ -33,7 +33,7 @@ Settings are applied in the following order:
 2. **Global default settings** (medium priority)
 3. **Built-in defaults** (lowest priority)
 
-For example, if you set `PAB_SYNC_INTERVAL=900` globally and `PAB_PROFILES__personal__SYNC_INTERVAL=1800` for a specific profile, the personal profile will use 1800 seconds while other profiles use 900 seconds. If you don't set `PAB_PROFILES__personal__SYNC_INTERVAL`, it will fall back to the application's built-in default of  86400 seconds (24 hours).
+For example, if `PAB_SYNC_INTERVAL=900` is set globally and `PAB_PROFILES__personal__SYNC_INTERVAL=1800` is set for a specific profile, the profile named 'personal' will use 1800 seconds as the sync interval while other profiles will use 900 seconds. If `PAB_PROFILES__personal__SYNC_INTERVAL` is unset it falls back to the application's built-in default of 86400 seconds (24 hours).
 
 ## Configuration Options
 
@@ -51,13 +51,9 @@ AniList API access token for this profile.
 
 `str` (Required)
 
-Plex API access token.
+Plex API access token (`X-Plex-Token`) belonging to the **admin user** of the server.
 
 [:material-plex: Finding the Plex Token](https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/){: .md-button style="background-color: #e5a00d; color: white;"}
-
-!!! note
-
-    The token must belong to the **admin** user of the Plex server.
 
 ---
 
@@ -83,25 +79,17 @@ Plex user to sync for this profile. Can be identified by:
 
 URL to your Plex server that the PlexAniBridge host can access.
 
-??? tip "Docker Networking"
-
-    If both Plex and PlexAniBridge are running as Docker containers in the same network, you can use the service name as the URL: `http://plex:32400`
-
 ---
 
 ### `PLEX_SECTIONS`
 
 `list[str]` (Optional, default: `[]`)
 
-List of Plex library sections to consider for this profile:
+An optional list of Plex library sections to filter by. If specified, only items in these sections will be scanned.
 
 ```python
 ["Anime", "Anime Movies"]
 ```
-
-!!! tip "Allowing All Sections"
-
-    To sync all sections, set this to an empty list: `[]` or don't set it at all. This is the default behavior.
 
 ---
 
@@ -109,44 +97,41 @@ List of Plex library sections to consider for this profile:
 
 `list[str]` (Optional, default: `[]`)
 
-An optional list of Plex genres to filter by. If specified, only items with these genres will be synced.
+An optional list of Plex genres to filter by. If specified, only items with these genres will be scanned.
 
 ```python
 ["Anime", "Animation"]
 ```
 
-This is useful for syncing only Anime content in a mixed library.
+This is useful for scanning for only Anime content in a mixed library.
 
-!!! tip "Finding Possible Genres"
+!!! question "How to Find Plex Genres"
 
-    Genres are sourced from the metadata you use (typically TheMovieDB or TheTVDB). You can find the possible genres below:
+    Genres are sourced from the media item's source metadata agent (typically TheMovieDB or TheTVDB). You can find some of the common genres here:
 
     - [TheTVDB Genres](https://thetvdb.com/genres)
     - [TheMovieDB Genres](https://www.themoviedb.org/talk/644a4b69f794ad04fe3cf1b9)
 
 ---
-
 ### `PLEX_METADATA_SOURCE`
 
 `Enum("local", "online")` (Optional, default: `"local"`)
 
-Determines the source of metadata for Plex content:
+Determines the source of Plex metadata to use when syncing:
 
 - `local`: Use metadata stored locally on the Plex server.
-- `online`: Fetch metadata from Plex's servers using the [Plex Metadata](https://metadata.provider.plex.tv).
+- `online`: Fetch metadata from Plex's servers using the [Plex Metadata](https://metadata.provider.plex.tv) provider.
 
 !!! warning "Online Metadata Advantages and Limitations"
 
-    The main advantage of using the online metadata is that it provides the most complete library possible. A complete set of seasons and episodes will exist, even if they are not in your library. This is useful if you regularly delete content and keep incomplete shows.
+    Online metadata can provide a more complete library (including seasons/episodes not present locally) and records activity across Plex servers, allowing syncs for content from multiple or previously deleted servers.
 
-    Additionally, the online source logs your activity across all Plex servers, so you can sync content from multiple servers or even previously deleted servers.
+    Limitations:
 
-    However, the online metadata has some limitations:
-
-    - Being online, it's subject to outages and rate limits, causing sync times to drastically increase.
-    - You are required to enable [Plex Sync](https://support.plex.tv/articles/sync-watch-state-and-ratings/) for the online Plex API to work.
-    - It may not be as up-to-date with your activity as the local server in the event Plex Sync fails.
-    - Due to API limitations, only the admin user can use the online Plex API. All other users will be forced to use the local metadata source.
+    - Susceptible to outages and rate limits, which can greatly slow syncs.
+    - Requires [Plex Sync](https://support.plex.tv/articles/sync-watch-state-and-ratings/) to be enabled for the online API to function.
+    - May be less up-to-date than the local server if Plex Sync fails.
+    - The online API is available only to the Plex admin user..
 
 ---
 
@@ -154,7 +139,7 @@ Determines the source of metadata for Plex content:
 
 `int` (Optional, default: `86400`)
 
-Interval in seconds to sync when using the `periodic` [sync_mode](#sync_modes)
+Interval in seconds to sync when using the `periodic` [sync mode](#sync_modes)
 
 ---
 
@@ -162,38 +147,34 @@ Interval in seconds to sync when using the `periodic` [sync_mode](#sync_modes)
 
 `list[Enum("periodic", "poll", "webhook")]` (Optional, default: `["periodic", "poll", "webhook"]`)
 
-Determines the sync modes to use for this profile. Available modes:
+Determines the triggers for scanning:
 
-- `periodic`: Sync all items at the specified [sync interval](#sync_interval).
+- `periodic`: Scan all items at the specified [sync interval](#sync_interval).
 - `poll`: Poll for changes every 30 seconds, making incremental updates.
 - `webhook`: Trigger syncs via Plex [webhook payloads](https://support.plex.tv/articles/115002267687-webhooks/).
 
-Setting `SYNC_MODES` to `None` or an empty list will cause the application to perform a single sync on startup and then exit.
+Setting `SYNC_MODES` to `None` or an empty list will cause the application to perform a single scan on startup and then exit.
 
-By default, all three modes are enabled, allowing for instant, incremental updates via polling and webhooks, as well as a full periodic sync every [sync interval](#sync_interval) seconds (default: 24 hours) to catch any failed/missed updates.
+By default, all three modes are enabled, allowing for instant, incremental updates via polling and webhooks, as well as a full periodic scan every [`SYNC_INTERVAL`](#sync_interval) seconds (default: 24 hours) to catch any failed/missed updates.
 
-!!! tip "Plex Webhooks"
+!!! info "Plex Webhooks"
 
-    To use Plex Webhooks correctly, you must:
+    To use Plex Webhooks, you must:
 
     1. Have [`PAB_WEB_ENABLED`](#pab_web_enabled) set to `True` (the default).
-    2. Include `webhook` in the [`SYNC_MODES`](#sync_modes) list for your profile.
-    3. [Configure your Plex server](https://support.plex.tv/articles/115002267687-webhooks/) to send webhook payloads to the following URL: `http://<your-server-host>/webhook/plex`.
-    4. Also ensure PlexAniBridge is accessible to Plex over the network.
-
-    _Note: If you do not explicitly define a profile name in your config, the profile name is likely assigned as 'default'._
+    2. Include `webhook` in the enabled [`SYNC_MODES`](#sync_modes).
+    3. [Configure the Plex server](https://support.plex.tv/articles/115002267687-webhooks/) to send webhook payloads to `http://<your-server-host>/webhook/plex`.
+    4. Ensure PlexAniBridge is accessible to Plex over the network.
 
 ### `FULL_SCAN`
 
 `bool` (Optional, default: `False`)
 
-Scans all Plex media, regardless of activity. By default, only watched items are scanned.
+When enabled, the scan process will include all items, regardless of watch activity. By default, only watched items are scanned.
 
-!!! note
+!!! warning "Recommended Usage"
 
-    Full scans are generally **not recommended** unless used with `DESTRUCTIVE_SYNC`.
-
-!!! warning
+    Full scans are generally **not recommended** unless combined with [`DESTRUCTIVE_SYNC`](#destructive_sync) to delete AniList entries for unwatched Plex content.
 
     Enabling `FULL_SCAN` can lead to **excessive API usage** and **longer processing times**.
 
@@ -205,16 +186,14 @@ Scans all Plex media, regardless of activity. By default, only watched items are
 
 Allows regressive updates and deletions, which **can cause data loss**.
 
-!!! warning
+!!! danger "Data Loss Warning"
 
     **Enable only if you understand the implications.**
 
     Destructive sync allows:
 
     - Deleting AniList entries.
-    - Making regressive updates (e.g., if AniList progress is higher than Plex, AniList will be **lowered** to match Plex).
-
-!!! note
+    - Making regressive updates - e.g., if AniList progress is higher than Plex, AniList will be **lowered** to match Plex.
 
     To delete AniList entries for unwatched Plex content, enable both `FULL_SCAN` and `DESTRUCTIVE_SYNC`.
 
@@ -244,12 +223,12 @@ Specifies which fields should **not** be synced. Available fields:
 
 `bool` (Optional, default: `False`)
 
-When enabled for this profile:
+When enabled:
 
 - AniList data **is not modified**.
 - Logs show what changes **would** have been made.
 
-!!! tip "First Run"
+!!! success "First Run"
 
     Run with `DRY_RUN` enabled on first launch to preview changes without modifying your AniList data.
 
@@ -259,17 +238,20 @@ When enabled for this profile:
 
 `bool` (Optional, default: `False`)
 
-When enabled, AniList update and get requests are sent in batches instead of individually. At the start of each sync job, a batch of requests is created and sent to AniList to retrieve all the entries that will be worked on. Then, near the end of the sync job, all entries that need updating are batched to reduce the number of requests.
+When enabled, AniList API requests are made in batches:
 
-This can be used to significantly reduce rate limiting at the cost of worse error handling.
+1. Prior to syncing, a batch of requests is created to retrieve all the entries that will be worked on.
+2. Post-sync, a batch of requests is created to update all the entries that were changed.
 
-For example, if a sync job finds 10 items to update with `BATCH_REQUESTS` enabled, all 10 requests will be sent at once. If any of the requests fail, all 10 requests will fail.
+This can significantly reduce rate limiting, but at the cost of atomicity. If any request in the batch fails, the entire batch will fail.
 
-!!! tip "First Run"
+For example, if a sync job finds 10 items to update with `BATCH_REQUESTS` enabled, all 10 requests will be sent at once. If any of the requests fail, all 10 updates will fail.
 
-    The main use case for this option is when going through the first sync of a large library. It can significantly reduce the rate limiting of the AniList API.
+!!! success "First Run"
 
-    For subsequent syncs, it is recommended to disable this option unless you encounter rate limiting issues constantly.
+    The primary use case of batch requests is going through the first sync of a large library. It can significantly reduce rate limiting from AniList.
+
+    For subsequent syncs, your data is pre-cached, and the benefit of batching is reduced.
 
 ---
 
@@ -277,15 +259,11 @@ For example, if a sync job finds 10 items to update with `BATCH_REQUESTS` enable
 
 `int` (Optional, default: `-1`)
 
-Determines how similar (as a percentage) a title must be to the search query to be considered a match.
+Determines how similar a title must be to the search query as a percentage to be considered a match.
 
 The default behavior is to disable searching completely and only rely on the [community and local mappings database](./mappings/custom-mappings.md).
 
-??? tip "Enabling Search Fallback"
-
-    Set this to a value between `0` and `100` to enable **search fallback**. The higher the value, the more strict the title matching.
-
-    A value of `100` requires an exact match, while `0` will match the first result returned by AniList, regardless of similarity.
+The higher the value, the more strict the title matching. A value of `100` requires an exact match, while `0` will match the first result returned by AniList, regardless of similarity.
 
 ## Global Configuration Options
 
@@ -296,10 +274,6 @@ These global settings cannot be overridden on the profile level and apply to all
 `str` (Optional, default: `./data`)
 
 Path to store the database, backups, and custom mappings. This is shared across all profiles.
-
-??? note "Docker"
-
-    If running in Docker, **do not change this path** unless properly mapped in your Docker volume/mount.
 
 ---
 
@@ -327,11 +301,11 @@ URL to the upstream mappings source. This can be a JSON or YAML file.
 
 This option is only intended for advanced users who want to use their own upstream mappings source or disable upstream mappings entirely. For most users, it is recommended to keep the default value.
 
-!!! note "Custom Mappings"
+!!! info "Custom Mappings"
 
-    This setting works in tandem with custom mappings stored in the `mappings/` directory inside the data path. Custom mappings will override any upstream mappings.
+    This setting works in tandem with custom mappings stored in the `mappings/` directory inside the data path. Custom mappings will overload any upstream mappings.
 
-??? tip "Disabling Upstream Mappings"
+??? question "Disabling Upstream Mappings"
 
     To disable upstream mappings, set this to an empty string: `""`.
 
@@ -389,7 +363,7 @@ PAB_PROFILES__guest__EXCLUDED_SYNC_FIELDS=["notes", "score", "repeat", "started_
 
 ### Per-Library Profiles
 
-This example shows how to create seperate profiles for different Plex libraries, allowing for tailored sync settings based on content type.
+This example shows how to create separate profiles for different Plex libraries, allowing for tailored sync settings based on content type.
 
 ```dosini
 # Global defaults shared by all profiles
