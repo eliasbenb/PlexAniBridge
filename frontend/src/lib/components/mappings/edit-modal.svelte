@@ -2,6 +2,7 @@
     import { PenLine, Plus, X } from "@lucide/svelte";
     import { Tabs } from "bits-ui";
 
+    import CodeEditor from "$lib/components/code-editor.svelte";
     import JsonCodeBlock from "$lib/components/json-code-block.svelte";
     import type { Mapping } from "$lib/types/api";
     import Modal from "$lib/ui/modal.svelte";
@@ -60,6 +61,54 @@
         form.tvdb_mappings.splice(i, 1);
         form.tvdb_mappings = [...form.tvdb_mappings];
     }
+
+    const mappingSchema = {
+        $title: "PlexAniBridge Mapping Override",
+        type: "object",
+        required: ["anilist_id"],
+        additionalProperties: false,
+        properties: {
+            anilist_id: { type: ["integer", "string"], pattern: "^[0-9]+$" },
+            anidb_id: { type: ["integer", "null"] },
+            imdb_id: {
+                anyOf: [
+                    { type: "string", pattern: "^tt[0-9]{7,}$" },
+                    {
+                        type: "array",
+                        items: { type: "string", pattern: "^tt[0-9]{7,}$" },
+                    },
+                    { type: "null" },
+                ],
+            },
+            mal_id: {
+                anyOf: [
+                    { type: "integer" },
+                    { type: "array", items: { type: "integer" } },
+                    { type: "null" },
+                ],
+            },
+            tmdb_movie_id: {
+                anyOf: [
+                    { type: "integer" },
+                    { type: "array", items: { type: "integer" } },
+                    { type: "null" },
+                ],
+            },
+            tmdb_show_id: {
+                anyOf: [
+                    { type: "integer" },
+                    { type: "array", items: { type: "integer" } },
+                    { type: "null" },
+                ],
+            },
+            tvdb_id: { type: ["integer", "null"] },
+            tvdb_mappings: {
+                type: "object",
+                patternProperties: { "^s[0-9]+$": { type: "string" } },
+                additionalProperties: false,
+            },
+        },
+    };
 </script>
 
 {#if open}
@@ -320,10 +369,11 @@
                             class="rounded bg-slate-800 px-2 py-1 text-[10px] text-slate-300 hover:bg-slate-700"
                             onclick={syncFormToRaw}>Refresh from Form</button>
                     </div>
-                    <textarea
+                    <CodeEditor
                         bind:value={rawJSON}
-                        class="h-72 w-full resize-none rounded-md border border-slate-700 bg-slate-950/80 px-2 py-2 font-mono text-[11px] leading-snug text-slate-200 focus:border-emerald-600 focus:outline-none"
-                        spellcheck={false}></textarea>
+                        language="json"
+                        class="h-96"
+                        jsonSchema={mappingSchema} />
                     <p class="text-[10px] text-slate-500">
                         Provide a JSON object. Required: <code class="font-mono"
                             >anilist_id</code
