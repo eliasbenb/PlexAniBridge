@@ -18,6 +18,7 @@ export default defineConfig({
                 "pwa-maskable-512x512.png",
             ],
             devOptions: { enabled: false },
+            workbox: { maximumFileSizeToCacheInBytes: 8000000 },
             manifest: {
                 name: "PlexAniBridge",
                 short_name: "PAB",
