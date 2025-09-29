@@ -1,6 +1,7 @@
 <script lang="ts">
     import { PenLine, Plus, X } from "@lucide/svelte";
     import { Tabs } from "bits-ui";
+    import type * as Monaco from "monaco-editor/esm/vs/editor/editor.api";
 
     import CodeEditor from "$lib/components/code-editor.svelte";
     import JsonCodeBlock from "$lib/components/json-code-block.svelte";
@@ -62,50 +63,70 @@
         form.tvdb_mappings = [...form.tvdb_mappings];
     }
 
-    const mappingSchema = {
-        $title: "PlexAniBridge Mapping Override",
+    const mappingSchema: Monaco.languages.json.JSONSchema = {
+        title: "PlexAniBridge Mapping Override",
         type: "object",
         required: ["anilist_id"],
         additionalProperties: false,
         properties: {
-            anilist_id: { type: ["integer", "string"], pattern: "^[0-9]+$" },
-            anidb_id: { type: ["integer", "null"] },
+            anilist_id: {
+                type: ["integer"],
+                description: "The AniList ID",
+                examples: [12345],
+            },
+            anidb_id: {
+                type: ["integer", "null"],
+                description: "The AniDB ID",
+                examples: [12345],
+            },
             imdb_id: {
                 anyOf: [
-                    { type: "string", pattern: "^tt[0-9]{7,}$" },
                     {
                         type: "array",
                         items: { type: "string", pattern: "^tt[0-9]{7,}$" },
                     },
                     { type: "null" },
                 ],
+                description: "Array of IMDB IDs in the format tt1234567",
+                examples: [["tt1234567", "tt7654321"]],
             },
             mal_id: {
                 anyOf: [
-                    { type: "integer" },
                     { type: "array", items: { type: "integer" } },
                     { type: "null" },
                 ],
+                description: "Array of MyAnimeList IDs",
+                examples: [[12345, 67890]],
             },
             tmdb_movie_id: {
                 anyOf: [
-                    { type: "integer" },
                     { type: "array", items: { type: "integer" } },
                     { type: "null" },
                 ],
+                description: "Array of TMDB movie IDs",
+                examples: [[12345, 67890]],
             },
             tmdb_show_id: {
                 anyOf: [
-                    { type: "integer" },
                     { type: "array", items: { type: "integer" } },
                     { type: "null" },
                 ],
+                description: "Array of TMDB show IDs",
+                examples: [[12345, 67890]],
             },
             tvdb_id: { type: ["integer", "null"] },
             tvdb_mappings: {
                 type: "object",
-                patternProperties: { "^s[0-9]+$": { type: "string" } },
+                patternProperties: {
+                    "^s[0-9]+$": {
+                        type: "string",
+                        description: "TVDB episode mappings pattern",
+                        examples: ["e1-e12"],
+                    },
+                },
                 additionalProperties: false,
+                description: "Season to episode mapping patterns",
+                examples: [{ s1: "e1-e12", s2: "e13-e24" }],
             },
         },
     };
