@@ -18,7 +18,6 @@
 
     import type { LogEntry, LogFile } from "$lib/types/api";
     import { apiFetch } from "$lib/utils/api";
-    import { humanDuration } from "$lib/utils/human";
     import { toast } from "$lib/utils/notify";
 
     let tab = $state<"live" | "history">("live");
@@ -86,6 +85,17 @@
             } catch {}
         }
         return "";
+    }
+
+    function formatLastReceived() {
+        try {
+            const diff = Date.now() - lastReceived!;
+            if (diff < 1000) return "just now";
+            if (diff < 60000) return Math.floor(diff / 1000) + "s ago";
+            if (diff < 3600000) return Math.floor(diff / 60000) + "m ago";
+            if (diff < 86400000) return Math.floor(diff / 3600000) + "h ago";
+            return Math.floor(diff / 86400000) + "d ago";
+        } catch {}
     }
 
     function applyFilter() {
@@ -401,7 +411,7 @@
                             title={isWsOpen ? "Connected" : "Reconnecting..."}></span>
                         {#if lastReceived}
                             <span class="hidden text-slate-500 md:inline"
-                                >Updated {humanDuration(lastReceived)}</span>
+                                >Updated {formatLastReceived()}</span>
                         {/if}
                     </div>
                     <div class="flex items-center gap-2">
