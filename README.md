@@ -22,22 +22,30 @@ The smart way to keep your AniList profile perfectly synchronized with your Plex
 ![Flowchart Diagram](https://mermaid.ink/img/pako:eNqtlN1q2zAUx19FqLC24MSfsh2zFdpmsEELo2UM1vRCkWVb1LaMJDftmjzDGLvYZW_2Arsbfan1ESY7cRLvAwqbr3R8_vqdc_6WdQcJjymMYJLzGcmwUODkbFIC_byVVNh7F4_3n762a2Bf7m8yznbGudwHYJNzt3Nut-tNTm8u9h7vPz-0S3BKY4bBORXXVOxfrjSHRxfPWZECKciL3UypSkamKfBsmDKV1dNaEwkvFS3VkPDCpDnDckrLqdkgD0t2JFicUvPVy8OxGXMiTQ0zc57yYVWmu8A8AD3hqqyOT5hUbXffuqjr6RRXFStT2WS_PPz4_rERFBS8HoMxVniKJV1Jt3wDg8HB_B1WJKMS0IpJ7bKct8W3POypCn7Nfte4reYMK614BgTVmllPtDF3QwOxbqyRY9V0Pm987U3aSo9rIbSRALfj5Pr1tnL9QVqtHjbn_KqutKQz5I86_W3ynKUNV96WZN5V3DJIqtuctjsSlufRjkNciixDKsGvaLTjIWzHo1U4mLFYZZFb3RiE51xEO0mS9DDN4EsORdiy4jWHkDCxrD7H-SunM2aJshw8SpI1ynLCkJCnojp_uvFCHHhozbJpQF3vqazlYVqCkjAZJXgN8kmAgrgPsjcgb4QsFPzKcv4jy_0nFjRgqv9BGClRUwMWVBS4CeFdU2cCVUYLOoGRXsZYXE3gpFzoPRUu33NedNsEr9MMRgnOpY7qSh98OmY4FbhYv9WHPKbimNelgpHje6OWAqM7eAMje-QN_QBZXhg6oe0gA97CyPWtIfICL0QuspHvoIUBP7RVraGPLN9DCPm-57rICw2o7zHFxenyHm2vUwPiWvFzff6XfS5-Alenxg0?type=png)
 
 ## Docker Quick Start
+Here's a step by step guide to get started using Docker.
+
+Clone the repo `git clone https://github.com/eliasbenb/PlexAniBridge.git`
+Touch `compose.yaml` and copy and paste the example below, filling in PAB_ANILIST_TOKEN, PAB_PLEX_TOKEN, PAB_PLEX_USER and PLEX_URL.
+Install docker or docker desktop
+Run docker compose -f `./compose.yaml up -d`
+Use the web UI to check for sync status and logs at `localhost:4848`
+
 
 ```yaml
 services:
     plexanibridge:
-        image: ghcr.io/eliasbenb/plexanibridge:v1
+        image: ghcr.io/eliasbenb/plexanibridge:latest
         environment:
             PUID: 1000
             PGID: 1000
             UMASK: 022
             TZ: Etc/UTC
-            PAB_ANILIST_TOKEN: ...
-            PAB_PLEX_TOKEN: ...
-            PAB_PLEX_USER: ...
-            PAB_PLEX_URL: ...
+            PAB_ANILIST_TOKEN: eyJ0ex12345
+            PAB_PLEX_TOKEN: nsF6abcdef
+            PAB_PLEX_USER: myusername123
+            PAB_PLEX_URL: http://192.168.0.229:32400
         volumes:
-            - /path/to/plexanibridge/data:/config
+            - /path/you/cloned/to/PlexAniBridge/data:/config
         ports:
          - 4848:4848
         restart: unless-stopped
