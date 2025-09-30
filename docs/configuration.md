@@ -166,7 +166,7 @@ By default, all three modes are enabled, allowing for instant, incremental updat
     3. [Configure the Plex server](https://support.plex.tv/articles/115002267687-webhooks/) to send webhook payloads to `http://<your-server-host>:<port>/webhook/plex`.
     4. Ensure PlexAniBridge is accessible to Plex over the network.
 
-Example PlexAniBridge webhook URL: `http://127.0.0.1:4848/webhook/plex`
+    Example webhook URL: `http://127.0.0.1:4848/webhook/plex`
 
 ### `FULL_SCAN`
 
