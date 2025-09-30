@@ -303,6 +303,11 @@ class AniMapClient:
         Yields:
             Matching anime mapping entries.
         """
+        log.debug(
+            f"{self.__class__.__name__}: Querying mappings with imdb={imdb}, "
+            f"tmdb={tmdb}, tvdb={tvdb}, season={season}, is_movie={is_movie}"
+        )
+
         if not imdb and not tmdb and not tvdb:
             return iter([])
 
@@ -342,7 +347,10 @@ class AniMapClient:
                         or_conditions.append(AniMap.tvdb_id.in_(tvdb_list))
                 if season:
                     and_conditions.append(
-                        json_dict_has_key(AniMap.tvdb_mappings, f"s{season}")
+                        or_(
+                            json_dict_has_key(AniMap.tmdb_mappings, f"s{season}"),
+                            json_dict_has_key(AniMap.tvdb_mappings, f"s{season}"),
+                        ),
                     )
 
             merged_conditions: list[ColumnElement[bool]] = []

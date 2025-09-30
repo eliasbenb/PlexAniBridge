@@ -393,7 +393,7 @@ class MappingsClient:
     def _deep_merge(self, d1: AniMapDict, d2: AniMapDict) -> AniMapDict:
         """Recursively merge two dictionaries.
 
-        Special handling for "tvdb_mappings" key to prevent overwriting.
+        Special handling for episode mapping keys to prevent overwriting.
 
         Args:
             d1 (AniMapDict): First dictionary
@@ -405,7 +405,7 @@ class MappingsClient:
         result = d1.copy()
 
         for key, value in d2.items():
-            if key == "tvdb_mappings" or key not in result:
+            if key in ("tmdb_mappings", "tvdb_mappings") or key not in result:
                 result[key] = value
             elif isinstance(result[key], dict) and isinstance(value, dict):
                 result[key] = self._deep_merge(result[key], value)
