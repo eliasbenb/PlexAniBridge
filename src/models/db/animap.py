@@ -151,13 +151,16 @@ class AniMap(Base):
     tmdb_show_id: Mapped[list[int] | None] = mapped_column(
         JSON, index=True, nullable=True
     )
-    tvdb_id: Mapped[int | None] = mapped_column(Integer, index=True, nullable=True)
+    tmdb_mappings: Mapped[dict[str, str] | None] = mapped_column(
+        JSON, index=True, nullable=True, default=None
+    )
     tvdb_mappings: Mapped[dict[str, str] | None] = mapped_column(
         JSON, index=True, nullable=True
     )
 
     __table_args__ = (
         Index("idx_imdb_tmdb", "imdb_id", "tmdb_movie_id"),
+        Index("idx_tmdb_season", "tmdb_show_id", "tmdb_mappings"),
         Index("idx_tvdb_season", "tvdb_id", "tvdb_mappings"),
     )
 
