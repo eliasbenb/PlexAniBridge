@@ -392,6 +392,18 @@ class MappingsService:
                         s = s.where(json_array_exists(AniMap.tmdb_show_id))
                     elif v == "tvdb":
                         s = s.where(AniMap.tvdb_id.is_not(None))
+                    elif v == "tmdb_mappings":
+                        s = s.where(
+                            and_(
+                                AniMap.tmdb_mappings.is_not(None),
+                                func.json_type(AniMap.tmdb_mappings) == "object",
+                                exists(
+                                    select(1).select_from(
+                                        func.json_each(AniMap.tmdb_mappings)
+                                    )
+                                ),
+                            )
+                        )
                     elif v == "tvdb_mappings":
                         s = s.where(
                             and_(
@@ -514,6 +526,28 @@ class MappingsService:
                         tvdb_or.append(AniMap.tvdb_id == num)
                     if tvdb_or:
                         s = s.where(or_(*tvdb_or))
+                elif key == "tmdb_mappings":
+                    if m_cmp:
+                        try:
+                            num = int(m_cmp.group(2))
+                        except Exception:
+                            return set()
+                        return set()
+                    if m_rng:
+                        return set()
+                    v = str(value)
+                    tmdbm_or: list[Any] = []
+                    if _has_wildcards(v):
+                        tmdbm_or.append(json_dict_key_like(AniMap.tmdb_mappings, v))
+                        tmdbm_or.append(json_dict_value_like(AniMap.tmdb_mappings, v))
+                    else:
+                        # Avoid generating an invalid JSON path like '$.' when empty
+                        if v != "":
+                            tmdbm_or.append(json_dict_has_key(AniMap.tmdb_mappings, v))
+                        tmdbm_or.append(json_dict_has_value(AniMap.tmdb_mappings, v))
+                    if not tmdbm_or:
+                        return set()
+                    s = s.where(or_(*tmdbm_or))
                 elif key == "tvdb_mappings":
                     if m_cmp:
                         try:
@@ -697,6 +731,7 @@ class MappingsService:
                                     "tmdb_movie_id": obj.tmdb_movie_id,
                                     "tmdb_show_id": obj.tmdb_show_id,
                                     "tvdb_id": obj.tvdb_id,
+                                    "tmdb_mappings": obj.tmdb_mappings,
                                     "tvdb_mappings": obj.tvdb_mappings,
                                     "custom": is_custom,
                                     "sources": srcs,
@@ -764,6 +799,7 @@ class MappingsService:
                             "tmdb_movie_id": animap.tmdb_movie_id,
                             "tmdb_show_id": animap.tmdb_show_id,
                             "tvdb_id": animap.tvdb_id,
+                            "tmdb_mappings": animap.tmdb_mappings,
                             "tvdb_mappings": animap.tvdb_mappings,
                             "custom": is_custom,
                             "sources": srcs,

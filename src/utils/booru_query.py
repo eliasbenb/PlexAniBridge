@@ -79,7 +79,8 @@ class OrMarker(Node):
 
 def _make_parser() -> pp.ParserElement:
     identifier = pp.oneOf(
-        "anilist id anidb imdb mal tmdb_movie tmdb_show tvdb tvdb_mappings has",
+        "anilist id anidb imdb mal tmdb_movie tmdb_show tvdb tmdb_mappings "
+        "tvdb_mappings has",
         caseless=True,
     )
 
