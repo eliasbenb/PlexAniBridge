@@ -142,20 +142,30 @@ class AniMap(Base):
     __tablename__ = "animap"
 
     anilist_id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    anidb_id: Mapped[int | None] = mapped_column(Integer, index=False, nullable=True)
-    imdb_id: Mapped[list[str] | None] = mapped_column(JSON, index=True, nullable=True)
-    mal_id: Mapped[list[int] | None] = mapped_column(JSON, index=False, nullable=True)
+    anidb_id: Mapped[int | None] = mapped_column(
+        Integer, index=False, nullable=True, default=None
+    )
+    imdb_id: Mapped[list[str] | None] = mapped_column(
+        JSON, index=True, nullable=True, default=None
+    )
+    mal_id: Mapped[list[int] | None] = mapped_column(
+        JSON, index=False, nullable=True, default=None
+    )
     tmdb_movie_id: Mapped[list[int] | None] = mapped_column(
-        JSON, index=True, nullable=True
+        JSON, index=True, nullable=True, default=None
     )
     tmdb_show_id: Mapped[list[int] | None] = mapped_column(
-        JSON, index=True, nullable=True
+        JSON, index=True, nullable=True, default=None
     )
+    tvdb_id: Mapped[int | None] = mapped_column(
+        Integer, index=True, nullable=True, default=None
+    )
+
     tmdb_mappings: Mapped[dict[str, str] | None] = mapped_column(
         JSON, index=True, nullable=True, default=None
     )
     tvdb_mappings: Mapped[dict[str, str] | None] = mapped_column(
-        JSON, index=True, nullable=True
+        JSON, index=True, nullable=True, default=None
     )
 
     __table_args__ = (
