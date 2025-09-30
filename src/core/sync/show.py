@@ -26,6 +26,11 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         - Determining watch status, ratings, progress, repeats, start/completion dates.
     """
 
+    def __init__(self, *args, **kwargs) -> None:
+        """Initialize the ShowSyncClient with a show ordering cache."""
+        super().__init__(*args, **kwargs)
+        self._show_ordering_cache: dict[str, str] = {}
+
     async def map_media(
         self, item: Show
     ) -> AsyncIterator[tuple[Season, list[Episode], AniMap, Media]]:
@@ -62,16 +67,49 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
 
         processed_seasons: set[int] = set()
 
-        animappings = list(
-            self.animap_client.get_mappings(tvdb=guids.tvdb, is_movie=False)
-        )
+        show_ordering = self._resolve_show_ordering(item)
+        is_tvdb = guids.tvdb and show_ordering in ("aired", "TheTVDB")
+        is_tmdb = guids.tmdb and show_ordering in ("tmdbAiring", "The Movie Database")
+
+        kwargs: dict = {"is_movie": False}
+        if is_tvdb:
+            kwargs["tvdb"] = guids.tvdb
+        elif is_tmdb:
+            kwargs["tmdb"] = guids.tmdb
+        else:
+            log.warning(
+                f"{self.__class__.__name__}: Unable to determine show ordering for "
+                f"{item.type} $$'{item.title}$$'"
+            )
+            if guids.tvdb:
+                kwargs["tvdb"] = guids.tvdb
+                is_tvdb = True
+            elif guids.tmdb:
+                kwargs["tmdb"] = guids.tmdb
+                is_tmdb = True
+            else:
+                log.warning(
+                    f"{self.__class__.__name__}: No suitable GUIDs found for "
+                    f"{item.type} $$'{item.title}$$'. Skipping mapping"
+                )
+                return
+
+        animappings = list(self.animap_client.get_mappings(**kwargs))
 
         for animapping in animappings:
             if not animapping.anilist_id:
                 continue
 
+            episode_mappings = (
+                animapping.parsed_tvdb_mappings
+                if is_tvdb
+                else animapping.parsed_tmdb_mappings
+                if is_tmdb
+                else []
+            )
+
             # Filter the seasons that are relevant to the current mapping
-            mapped_season_indices = {m.season for m in animapping.parsed_tvdb_mappings}
+            mapped_season_indices = {m.season for m in episode_mappings}
             relevant_seasons = {
                 idx: seasons[idx] for idx in mapped_season_indices if idx in seasons
             }
@@ -82,7 +120,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             # process seasons that have watched episodes
             elif not self.destructive_sync and not self.full_scan:
                 any_relevant_episodes = False
-                for mapping in animapping.parsed_tvdb_mappings:
+                for mapping in episode_mappings:
                     mapping_episodes = episodes_by_season.get(mapping.season, [])
                     if any(
                         (e.viewCount or e.lastViewedAt or e.lastRatedAt)
@@ -129,33 +167,35 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             episodes: list[Episode] = []
             season_episode_counts: Counter = Counter()
 
-            for tvdb_mapping in animapping.parsed_tvdb_mappings:
-                season_idx = tvdb_mapping.season
+            for episode_mapping in episode_mappings:
+                season_idx = episode_mapping.season
                 if season_idx not in relevant_seasons:
                     continue
 
                 season_episodes = episodes_by_season.get(season_idx, [])
 
                 filtered_episodes = []
-                if tvdb_mapping.end:
+                if episode_mapping.end:
                     filtered_episodes = [
                         e
                         for e in season_episodes
-                        if tvdb_mapping.start <= e.index <= tvdb_mapping.end
+                        if episode_mapping.start <= e.index <= episode_mapping.end
                     ]
                 else:
                     filtered_episodes = [
-                        e for e in season_episodes if e.index >= tvdb_mapping.start
+                        e for e in season_episodes if e.index >= episode_mapping.start
                     ]
 
                 # A negative ratio means 1 AniList episode covers multiple Plex episodes
-                if tvdb_mapping.ratio < 0:
+                if episode_mapping.ratio < 0:
                     # Duplicate every episode by the ratio
                     filtered_episodes = [
-                        e for e in filtered_episodes for _ in range(-tvdb_mapping.ratio)
+                        e
+                        for e in filtered_episodes
+                        for _ in range(-episode_mapping.ratio)
                     ]
                 # A positive ratio means 1 Plex episode covers multiple AniList episodes
-                elif tvdb_mapping.ratio > 0:
+                elif episode_mapping.ratio > 0:
                     # We include only the "representative" episodes (every ratio-th),
                     # but at the same time we need to mark the other episodes as
                     # SKIPPED to reflect that they are intentionally aggregated into
@@ -163,7 +203,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
                     included: list[Episode] = []
                     suppressed: list[Episode] = []
                     for i, e in enumerate(filtered_episodes):
-                        if i % tvdb_mapping.ratio == 0:
+                        if i % episode_mapping.ratio == 0:
                             included.append(e)
                         else:
                             suppressed.append(e)
@@ -214,13 +254,8 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             if not anilist_media:
                 _animapping = AniMap(
                     anilist_id=0,
-                    anidb_id=None,
-                    imdb_id=None,
-                    mal_id=None,
-                    tmdb_movie_id=None,
-                    tmdb_show_id=None,
-                    tvdb_id=None,
-                    tvdb_mappings={f"s{index}": ""},
+                    tmdb_mappings={f"s{index}": ""} if is_tmdb else None,
+                    tvdb_mappings={f"s{index}": ""} if is_tvdb else None,
                 )
                 log.warning(
                     f"No AniList entry could be found for "
@@ -232,14 +267,12 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             episodes = episodes_by_season.get(index, [])
 
             animapping = AniMap(
-                anidb_id=None,
                 anilist_id=anilist_media.id,
                 imdb_id=[guids.imdb] if guids.imdb else None,
-                mal_id=None,
-                tmdb_movie_id=None,
                 tmdb_show_id=[guids.tmdb] if guids.tmdb else None,
                 tvdb_id=guids.tvdb,
-                tvdb_mappings={f"s{index}": ""},
+                tmdb_mappings={f"s{index}": ""} if is_tmdb else None,
+                tvdb_mappings={f"s{index}": ""} if is_tvdb else None,
             )
 
             yield season, episodes, animapping, anilist_media
@@ -431,9 +464,16 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         Returns:
             int | float | None: User rating for the media item.
         """
+        show_ordering = self._resolve_show_ordering(item)
+        episode_mappings = (
+            animapping.parsed_tmdb_mappings
+            if show_ordering in ("tmdbAiring", "The Movie Database")
+            else animapping.parsed_tvdb_mappings
+        )
+
         if all(e.userRating for e in grandchild_items):
             score = sum(e.userRating for e in grandchild_items) / len(grandchild_items)
-        elif animapping.length == len(grandchild_items) == 1:
+        elif sum(m.length for m in episode_mappings) == 1:
             score = grandchild_items[0].userRating
         elif child_item.userRating:
             score = child_item.userRating
@@ -719,3 +759,31 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             list[Episode]: Filtered episodes.
         """
         return [e for e in episodes if e.viewCount]
+
+    def _resolve_show_ordering(self, item: Show) -> str:
+        """Resolves the effective episode ordering for a Plex show."""
+        if item.showOrdering:
+            return item.showOrdering
+
+        if not item.librarySectionKey:
+            log.debug(
+                f"Unable to resolve show ordering for {item.type} $$'{item.title}$$' "
+                f"as the library section has no key."
+            )
+            return ""
+
+        if item.librarySectionKey not in self._show_ordering_cache:
+            ordering = next(
+                (s for s in item.section().settings() if s.id == "showOrdering"), None
+            )
+            if not ordering:
+                log.debug(
+                    f"{self.__class__.__name__}: Unable to resolve show ordering for "
+                    f"{item.type} $$'{item.title}$$' as the library section has no "
+                    "showOrdering setting."
+                )
+                self._show_ordering_cache[item.librarySectionKey] = ""
+            else:
+                self._show_ordering_cache[item.librarySectionKey] = ordering.value
+
+        return self._show_ordering_cache[item.librarySectionKey]

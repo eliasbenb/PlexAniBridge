@@ -12,8 +12,8 @@ from sqlalchemy.orm import Mapped, mapped_column
 from src.models.db.base import Base
 
 
-class TVDBMapping(BaseModel):
-    """Model for parsing and validating TVDB episode mapping patterns.
+class EpisodeMapping(BaseModel):
+    """Model for parsing and validating episode mapping patterns.
 
     Handles conversion between string patterns and episode mapping objects.
     """
@@ -33,8 +33,8 @@ class TVDBMapping(BaseModel):
         return self.end - self.start + 1 if self.end else -1
 
     @classmethod
-    def from_string(cls, season: int, s: str) -> list[TVDBMapping]:
-        """Parse a string pattern into a TVDBMapping instance.
+    def from_string(cls, season: int, s: str) -> list[EpisodeMapping]:
+        """Parse a string pattern into a EpisodeMapping instance.
 
         Args:
             season (int): Season number
@@ -47,7 +47,7 @@ class TVDBMapping(BaseModel):
                     - '' (empty string for full season)
 
         Returns:
-            TVDBMapping | None: New TVDBMapping instance if pattern is valid, None
+            EpisodeMapping | None: New EpisodeMapping instance if pattern is valid, None
                                 otherwise
         """
         PATTERN = re.compile(
@@ -110,7 +110,7 @@ class TVDBMapping(BaseModel):
         return episode_ranges
 
     def __str__(self) -> str:
-        """Generate a string representation of the TVDBMapping instance.
+        """Generate a string representation of the EpisodeMapping instance.
 
         Returns:
             str: String representation in format 'S{season}E{start}-{end}|{ratio}'
@@ -128,7 +128,7 @@ class TVDBMapping(BaseModel):
         )
 
     def __hash__(self) -> int:
-        """Generate a hash for the TVDBMapping instance.
+        """Generate a hash for the EpisodeMapping instance.
 
         Returns:
             int: Hash value of the instance
@@ -200,29 +200,40 @@ class AniMap(Base):
         return v
 
     @cached_property
-    def length(self) -> int:
-        """Calculate the total length of all TVDB mappings.
+    def parsed_tvdb_mappings(self) -> list[EpisodeMapping]:
+        """Parse TVDB mappings into a list of EpisodeMapping objects.
 
         Returns:
-            int: Total length of all TVDB mappings
+            list[EpisodeMapping]: List of parsed EpisodeMapping objects
         """
-        return sum(m.length for m in self.parsed_tvdb_mappings)
-
-    @cached_property
-    def parsed_tvdb_mappings(self) -> list[TVDBMapping]:
-        """Parse TVDB mappings into a list of TVDBMapping objects.
-
-        Returns:
-            list[TVDBMapping]: List of parsed TVDBMapping objects
-        """
-        res: list[TVDBMapping] = []
+        res: list[EpisodeMapping] = []
 
         if not self.tvdb_mappings:
             return res
 
         for season, s in self.tvdb_mappings.items():
             try:
-                parsed = TVDBMapping.from_string(int(season.lstrip("s")), s)
+                parsed = EpisodeMapping.from_string(int(season.lstrip("s")), s)
+                res.extend(parsed)
+            except ValueError:
+                continue
+        return res
+
+    @cached_property
+    def parsed_tmdb_mappings(self) -> list[EpisodeMapping]:
+        """Parse TMDB mappings into a list of EpisodeMapping objects.
+
+        Returns:
+            list[EpisodeMapping]: List of parsed EpisodeMapping objects
+        """
+        res: list[EpisodeMapping] = []
+
+        if not self.tmdb_mappings:
+            return res
+
+        for season, s in self.tmdb_mappings.items():
+            try:
+                parsed = EpisodeMapping.from_string(int(season.lstrip("s")), s)
                 res.extend(parsed)
             except ValueError:
                 continue
