@@ -163,8 +163,10 @@ By default, all three modes are enabled, allowing for instant, incremental updat
 
     1. Have [`PAB_WEB_ENABLED`](#pab_web_enabled) set to `True` (the default).
     2. Include `webhook` in the enabled [`SYNC_MODES`](#sync_modes).
-    3. [Configure the Plex server](https://support.plex.tv/articles/115002267687-webhooks/) to send webhook payloads to `http://<your-server-host>/webhook/plex`.
+    3. [Configure the Plex server](https://support.plex.tv/articles/115002267687-webhooks/) to send webhook payloads to `http://<your-server-host>:<port>/webhook/plex`.
     4. Ensure PlexAniBridge is accessible to Plex over the network.
+
+    Example webhook URL: `http://127.0.0.1:4848/webhook/plex`
 
 ### `FULL_SCAN`
 
