@@ -10,6 +10,7 @@
         type ColumnConfig,
     } from "$lib/components/mappings/columns";
     import EditModal from "$lib/components/mappings/edit-modal.svelte";
+    import type { EditForm } from "$lib/components/mappings/edit-modal.svelte";
     import MappingsTable from "$lib/components/mappings/mappings-table.svelte";
     import SearchBar from "$lib/components/mappings/tool-bar.svelte";
     import Pagination from "$lib/components/pagination.svelte";
@@ -25,32 +26,6 @@
     let query = $state("");
     let customOnly = $state(false);
     let modal = $state(false);
-
-    interface TvdbMapRow {
-        season: string;
-        pattern: string;
-    }
-
-    type FieldMode = "omit" | "null" | "value";
-
-    interface EditForm {
-        _isNew: boolean;
-        anilist_id: string | number | "";
-        anidb_mode: FieldMode;
-        anidb_id: string | number | "";
-        tvdb_mode: FieldMode;
-        tvdb_id: string | number | "";
-        imdb_mode: FieldMode;
-        imdb_csv: string;
-        mal_mode: FieldMode;
-        mal_csv: string;
-        tmdb_movie_mode: FieldMode;
-        tmdb_movie_csv: string;
-        tmdb_show_mode: FieldMode;
-        tmdb_show_csv: string;
-        tvdb_map_mode: FieldMode;
-        tvdb_mappings: TvdbMapRow[];
-    }
 
     let form: EditForm = $state(emptyForm());
     let editMode: "form" | "raw" = $state("form");
@@ -72,6 +47,8 @@
             tmdb_movie_csv: "",
             tmdb_show_mode: "omit",
             tmdb_show_csv: "",
+            tmdb_map_mode: "omit",
+            tmdb_mappings: [],
             tvdb_map_mode: "omit",
             tvdb_mappings: [],
         };
@@ -155,7 +132,7 @@
         setArrayField(m.tmdb_movie_id, "tmdb_movie_mode", "tmdb_movie_csv");
         setArrayField(m.tmdb_show_id, "tmdb_show_mode", "tmdb_show_csv");
 
-        // Handle tvdb_mappings specially
+        // Handle mappings specially
         if (m.tvdb_mappings && typeof m.tvdb_mappings === "object") {
             f.tvdb_map_mode = "value";
             for (const [season, pattern] of Object.entries(m.tvdb_mappings)) {
@@ -163,6 +140,14 @@
             }
         } else if ("tvdb_mappings" in m && m.tvdb_mappings === null) {
             f.tvdb_map_mode = "null";
+        }
+        if (m.tmdb_mappings && typeof m.tmdb_mappings === "object") {
+            f.tmdb_map_mode = "value";
+            for (const [season, pattern] of Object.entries(m.tmdb_mappings)) {
+                f.tmdb_mappings.push({ season, pattern });
+            }
+        } else if ("tmdb_mappings" in m && m.tmdb_mappings === null) {
+            f.tmdb_map_mode = "null";
         }
 
         modal = true;
@@ -230,6 +215,18 @@
                 obj[key] = row.pattern ? String(row.pattern) : "";
             }
             out.tvdb_mappings = Object.keys(obj).length ? obj : null;
+        }
+
+        if (f.tmdb_map_mode === "null") out.tmdb_mappings = null;
+        else if (f.tmdb_map_mode === "value") {
+            const obj: Record<string, string> = {};
+            for (const row of f.tmdb_mappings) {
+                if (!row || !row.season) continue;
+                let key = String(row.season).trim();
+                if (!key.toLowerCase().startsWith("s")) key = "s" + key;
+                obj[key] = row.pattern ? String(row.pattern) : "";
+            }
+            out.tmdb_mappings = Object.keys(obj).length ? obj : null;
         }
         return out as Mapping;
     }
@@ -310,6 +307,19 @@
                     }));
                 }
             }
+            if (Object.prototype.hasOwnProperty.call(parsed, "tmdb_mappings")) {
+                const tm = parsed.tmdb_mappings;
+                if (tm === null) {
+                    f.tmdb_map_mode = "null";
+                } else if (tm && typeof tm === "object" && !Array.isArray(tm)) {
+                    f.tmdb_map_mode = "value";
+                    f.tmdb_mappings = Object.entries(tm).map(([season, pattern]) => ({
+                        season,
+                        pattern: String(pattern ?? ""),
+                    }));
+                }
+            }
+
             form = f;
         } catch (e) {
             alert("Invalid JSON: " + (e instanceof Error ? e.message : String(e)));
