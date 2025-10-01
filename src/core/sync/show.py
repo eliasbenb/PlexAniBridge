@@ -68,23 +68,18 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
 
         processed_seasons: set[int] = set()
 
-        show_ordering = self._resolve_show_ordering(item)
-        effective_show_ordering = (
-            show_ordering
-            if show_ordering == "tmdb" and guids.tmdb
-            else "tvdb"
-            if show_ordering == "tvdb" and guids.tvdb
-            else "tvdb"
-            if guids.tvdb
-            else "tmdb"
-            if guids.tmdb
-            else "tvdb"
-        )
-
+        effective_show_ordering = self._get_effective_show_ordering(item, guids)
         if effective_show_ordering == "tmdb":
             kwargs = {"tmdb": guids.tmdb, "is_movie": False}
-        else:
+        elif effective_show_ordering == "tvdb":
             kwargs = {"tvdb": guids.tvdb, "is_movie": False}
+        else:
+            log.warning(
+                f"Could not determine effective show ordering for "
+                f"{self._debug_log_title(item)}, skipping "
+                f"{self._debug_log_ids(item.ratingKey, item.guid, guids)}"
+            )
+            return
 
         animappings = list(self.animap_client.get_mappings(**kwargs))
 
@@ -749,35 +744,59 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         return [e for e in episodes if e.viewCount]
 
     def _resolve_show_ordering(self, item: Show) -> Literal["tmdb", "tvdb", ""]:
-        """Resolves the effective episode ordering for a Plex show."""
+        """Return the item's preferred episode ordering."""
         if item.showOrdering:
-            return (
-                "tmdb"
-                if "tmdb" in ("tmdbAiring", "The Movie Database")
-                else "tvdb"
-                if "tvdb" in ("aired", "TheTVDB")
-                else ""
-            )
+            if item.showOrdering in ("tmdbAiring", "The Movie Database"):
+                return "tmdb"
+            if item.showOrdering in ("aired", "TheTVDB"):
+                return "tvdb"
+            return ""
 
         if not item.librarySectionKey:
             return ""
 
-        if item.librarySectionKey not in self._show_ordering_cache:
-            ordering = next(
-                (s for s in item.section().settings() if s.id == "showOrdering"), None
-            )
-            if not ordering:
-                self._show_ordering_cache[item.librarySectionKey] = ""
-            else:
-                self._show_ordering_cache[item.librarySectionKey] = (
-                    "tmdb"
-                    if ordering.value in ("tmdbAiring", "The Movie Database")
-                    else "tvdb"
-                    if ordering.value in ("aired", "TheTVDB")
-                    else ""
-                )
+        cached = self._show_ordering_cache.get(item.librarySectionKey)
+        if cached is not None:
+            return cached
 
-        return self._show_ordering_cache[item.librarySectionKey]
+        ordering_setting = next(
+            (s for s in item.section().settings() if s.id == "showOrdering"), None
+        )
+        if not ordering_setting:
+            resolved = ""
+        else:
+            value = ordering_setting.value
+            if value in ("tmdbAiring", "The Movie Database"):
+                resolved = "tmdb"
+            elif value in ("aired", "TheTVDB"):
+                resolved = "tvdb"
+            else:
+                resolved = ""
+
+        self._show_ordering_cache[item.librarySectionKey] = resolved
+        return resolved
+
+    def _get_effective_show_ordering(
+        self, item: Show, guids: ParsedGuids
+    ) -> Literal["tmdb", "tvdb", ""]:
+        """Determine the effective ordering used for mapping lookups.
+
+        Preference order:
+          1. Honor the library's preferred ordering if a corresponding GUID exists.
+          2. Fall back to TVDB if a TVDB GUID exists.
+          3. Fall back to TMDB if a TMDB GUID exists.
+          4. Otherwise return empty string (no usable ordering).
+        """
+        preferred = self._resolve_show_ordering(item)
+        if preferred == "tmdb" and guids.tmdb:
+            return "tmdb"
+        if preferred == "tvdb" and guids.tvdb:
+            return "tvdb"
+        if guids.tvdb:
+            return "tvdb"
+        if guids.tmdb:
+            return "tmdb"
+        return ""
 
     def _get_effective_mappings(
         self, item: Show, animapping: AniMap
