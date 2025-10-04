@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from functools import cached_property
+from typing import Literal
 
 from pydantic import BaseModel, Field
 from sqlalchemy import JSON, Index, Integer
@@ -12,12 +13,13 @@ from sqlalchemy.orm import Mapped, mapped_column
 from src.models.db.base import Base
 
 
-class TVDBMapping(BaseModel):
-    """Model for parsing and validating TVDB episode mapping patterns.
+class EpisodeMapping(BaseModel):
+    """Model for parsing and validating episode mapping patterns.
 
     Handles conversion between string patterns and episode mapping objects.
     """
 
+    service: Literal["tmdb", "tvdb", ""] = Field(default="")
     season: int = Field(ge=0)
     start: int = Field(default=1, gt=0)
     end: int | None = Field(default=None, gt=0)
@@ -33,8 +35,10 @@ class TVDBMapping(BaseModel):
         return self.end - self.start + 1 if self.end else -1
 
     @classmethod
-    def from_string(cls, season: int, s: str) -> list[TVDBMapping]:
-        """Parse a string pattern into a TVDBMapping instance.
+    def from_string(
+        cls, season: int, s: str, service: Literal["tmdb", "tvdb", ""] = ""
+    ) -> list[EpisodeMapping]:
+        """Parse a string pattern into a EpisodeMapping instance.
 
         Args:
             season (int): Season number
@@ -45,9 +49,10 @@ class TVDBMapping(BaseModel):
                     - 'e12-,e2'
                     - 'e1-e5,e8-e10'
                     - '' (empty string for full season)
+            service (Literal["tmdb", "tvdb", ""]): Service identifier for the mapping
 
         Returns:
-            TVDBMapping | None: New TVDBMapping instance if pattern is valid, None
+            EpisodeMapping | None: New EpisodeMapping instance if pattern is valid, None
                                 otherwise
         """
         PATTERN = re.compile(
@@ -77,8 +82,10 @@ class TVDBMapping(BaseModel):
             re.VERBOSE,
         )
 
+        service = service or ""
+
         if not s:
-            return [cls(season=season)]
+            return [cls(season=season, service=service)]
 
         range_matches = list(PATTERN.finditer(s))
 
@@ -105,12 +112,14 @@ class TVDBMapping(BaseModel):
             else:
                 continue
 
-            episode_ranges.append(cls(season=season, start=start, end=end, ratio=ratio))
+            episode_ranges.append(
+                cls(season=season, start=start, end=end, ratio=ratio, service=service)
+            )
 
         return episode_ranges
 
     def __str__(self) -> str:
-        """Generate a string representation of the TVDBMapping instance.
+        """Generate a string representation of the EpisodeMapping instance.
 
         Returns:
             str: String representation in format 'S{season}E{start}-{end}|{ratio}'
@@ -128,7 +137,7 @@ class TVDBMapping(BaseModel):
         )
 
     def __hash__(self) -> int:
-        """Generate a hash for the TVDBMapping instance.
+        """Generate a hash for the EpisodeMapping instance.
 
         Returns:
             int: Hash value of the instance
@@ -142,22 +151,35 @@ class AniMap(Base):
     __tablename__ = "animap"
 
     anilist_id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    anidb_id: Mapped[int | None] = mapped_column(Integer, index=False, nullable=True)
-    imdb_id: Mapped[list[str] | None] = mapped_column(JSON, index=True, nullable=True)
-    mal_id: Mapped[list[int] | None] = mapped_column(JSON, index=False, nullable=True)
+    anidb_id: Mapped[int | None] = mapped_column(
+        Integer, index=False, nullable=True, default=None
+    )
+    imdb_id: Mapped[list[str] | None] = mapped_column(
+        JSON, index=True, nullable=True, default=None
+    )
+    mal_id: Mapped[list[int] | None] = mapped_column(
+        JSON, index=False, nullable=True, default=None
+    )
     tmdb_movie_id: Mapped[list[int] | None] = mapped_column(
-        JSON, index=True, nullable=True
+        JSON, index=True, nullable=True, default=None
     )
     tmdb_show_id: Mapped[list[int] | None] = mapped_column(
-        JSON, index=True, nullable=True
+        JSON, index=True, nullable=True, default=None
     )
-    tvdb_id: Mapped[int | None] = mapped_column(Integer, index=True, nullable=True)
+    tvdb_id: Mapped[int | None] = mapped_column(
+        Integer, index=True, nullable=True, default=None
+    )
+
+    tmdb_mappings: Mapped[dict[str, str] | None] = mapped_column(
+        JSON, index=True, nullable=True, default=None
+    )
     tvdb_mappings: Mapped[dict[str, str] | None] = mapped_column(
-        JSON, index=True, nullable=True
+        JSON, index=True, nullable=True, default=None
     )
 
     __table_args__ = (
         Index("idx_imdb_tmdb", "imdb_id", "tmdb_movie_id"),
+        Index("idx_tmdb_season", "tmdb_show_id", "tmdb_mappings"),
         Index("idx_tvdb_season", "tvdb_id", "tvdb_mappings"),
     )
 
@@ -187,29 +209,44 @@ class AniMap(Base):
         return v
 
     @cached_property
-    def length(self) -> int:
-        """Calculate the total length of all TVDB mappings.
+    def parsed_tvdb_mappings(self) -> list[EpisodeMapping]:
+        """Parse TVDB mappings into a list of EpisodeMapping objects.
 
         Returns:
-            int: Total length of all TVDB mappings
+            list[EpisodeMapping]: List of parsed EpisodeMapping objects
         """
-        return sum(m.length for m in self.parsed_tvdb_mappings)
-
-    @cached_property
-    def parsed_tvdb_mappings(self) -> list[TVDBMapping]:
-        """Parse TVDB mappings into a list of TVDBMapping objects.
-
-        Returns:
-            list[TVDBMapping]: List of parsed TVDBMapping objects
-        """
-        res: list[TVDBMapping] = []
+        res: list[EpisodeMapping] = []
 
         if not self.tvdb_mappings:
             return res
 
         for season, s in self.tvdb_mappings.items():
             try:
-                parsed = TVDBMapping.from_string(int(season.lstrip("s")), s)
+                parsed = EpisodeMapping.from_string(
+                    int(season.lstrip("s")), s, service="tvdb"
+                )
+                res.extend(parsed)
+            except ValueError:
+                continue
+        return res
+
+    @cached_property
+    def parsed_tmdb_mappings(self) -> list[EpisodeMapping]:
+        """Parse TMDB mappings into a list of EpisodeMapping objects.
+
+        Returns:
+            list[EpisodeMapping]: List of parsed EpisodeMapping objects
+        """
+        res: list[EpisodeMapping] = []
+
+        if not self.tmdb_mappings:
+            return res
+
+        for season, s in self.tmdb_mappings.items():
+            try:
+                parsed = EpisodeMapping.from_string(
+                    int(season.lstrip("s")), s, service="tmdb"
+                )
                 res.extend(parsed)
             except ValueError:
                 continue

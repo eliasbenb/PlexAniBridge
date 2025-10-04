@@ -28,6 +28,7 @@ class MappingItemModel(BaseModel):
     tmdb_movie_id: list[int] | None = None
     tmdb_show_id: list[int] | None = None
     tvdb_id: int | None = None
+    tmdb_mappings: dict[str, str] | None = None
     tvdb_mappings: dict[str, str] | None = None
     anilist: AniListMetadata | None = None
     custom: bool = False
@@ -97,6 +98,7 @@ async def get_query_capabilities() -> QueryCapabilitiesResponse:
         "tmdb_movie",
         "tmdb_show",
         "tvdb",
+        "tmdb_mappings",
         "tvdb_mappings",
     ]
 
@@ -160,6 +162,11 @@ async def get_query_capabilities() -> QueryCapabilitiesResponse:
             key="tvdb",
             desc="TVDB ID",
             **DEFAULT_INT_KWARGS,
+        ),
+        FieldCapability(
+            key="tmdb_mappings",
+            desc="Season/episode mappings",
+            **DEFAULT_STRING_KWARGS,
         ),
         FieldCapability(
             key="tvdb_mappings",
@@ -280,6 +287,7 @@ async def create_mapping(mapping: dict[str, Any]) -> MappingItemModel:
         tmdb_movie_id=obj.tmdb_movie_id,
         tmdb_show_id=obj.tmdb_show_id,
         tvdb_id=obj.tvdb_id,
+        tmdb_mappings=obj.tmdb_mappings,
         tvdb_mappings=obj.tvdb_mappings,
         custom=(src is not None and (not upstream_url or src != upstream_url)),
         sources=list(prov_list),
@@ -349,6 +357,7 @@ async def update_mapping(mapping_id: int, mapping: dict[str, Any]) -> MappingIte
         tmdb_movie_id=obj.tmdb_movie_id,
         tmdb_show_id=obj.tmdb_show_id,
         tvdb_id=obj.tvdb_id,
+        tmdb_mappings=obj.tmdb_mappings,
         tvdb_mappings=obj.tvdb_mappings,
         custom=(src is not None and (not upstream_url or src != upstream_url)),
         sources=list(prov_list),
@@ -414,6 +423,7 @@ async def get_mapping(mapping_id: int) -> MappingItemModel:
         tmdb_movie_id=obj.tmdb_movie_id,
         tmdb_show_id=obj.tmdb_show_id,
         tvdb_id=obj.tvdb_id,
+        tmdb_mappings=obj.tmdb_mappings,
         tvdb_mappings=obj.tvdb_mappings,
         custom=(src is not None and (not upstream_url or src != upstream_url)),
         sources=list(prov_list),
