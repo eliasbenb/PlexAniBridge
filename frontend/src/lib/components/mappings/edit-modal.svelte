@@ -81,7 +81,7 @@
         additionalProperties: false,
         properties: {
             anilist_id: {
-                type: ["integer"],
+                type: ["integer", "null"],
                 description: "The AniList ID",
                 examples: [12345],
             },
@@ -98,7 +98,7 @@
                     },
                     { type: "null" },
                 ],
-                description: "Array of IMDB IDs in the format tt1234567",
+                description: "Array of IMDB IDs in the format tt1234567 (or null)",
                 examples: [["tt1234567", "tt7654321"]],
             },
             mal_id: {
@@ -106,7 +106,7 @@
                     { type: "array", items: { type: "integer" } },
                     { type: "null" },
                 ],
-                description: "Array of MyAnimeList IDs",
+                description: "Array of MyAnimeList IDs (or null)",
                 examples: [[12345, 67890]],
             },
             tmdb_movie_id: {
@@ -114,7 +114,7 @@
                     { type: "array", items: { type: "integer" } },
                     { type: "null" },
                 ],
-                description: "Array of TMDB movie IDs",
+                description: "Array of TMDB movie IDs (or null)",
                 examples: [[12345, 67890]],
             },
             tmdb_show_id: {
@@ -122,34 +122,46 @@
                     { type: "array", items: { type: "integer" } },
                     { type: "null" },
                 ],
-                description: "Array of TMDB show IDs",
+                description: "Array of TMDB show IDs (or null)",
                 examples: [[12345, 67890]],
             },
             tvdb_id: { type: ["integer", "null"] },
             tmdb_mappings: {
-                type: "object",
-                patternProperties: {
-                    "^s[0-9]+$": {
-                        type: "string",
-                        description: "TMDB episode mappings pattern",
-                        examples: ["e1-e12"],
+                anyOf: [
+                    {
+                        type: "object",
+                        patternProperties: {
+                            "^s[0-9]+$": {
+                                type: "string",
+                                description: "TMDB episode mappings pattern",
+                                examples: ["e1-e12"],
+                            },
+                        },
+                        additionalProperties: false,
+                        description: "Season to episode mapping patterns",
+                        examples: [{ s1: "e1-e12", s2: "e13-e24" }],
                     },
-                },
-                additionalProperties: false,
-                description: "Season to episode mapping patterns",
+                    { type: "null" },
+                ],
                 examples: [{ s1: "e1-e12", s2: "e13-e24" }],
             },
             tvdb_mappings: {
-                type: "object",
-                patternProperties: {
-                    "^s[0-9]+$": {
-                        type: "string",
-                        description: "TVDB episode mappings pattern",
-                        examples: ["e1-e12"],
+                anyOf: [
+                    {
+                        type: "object",
+                        patternProperties: {
+                            "^s[0-9]+$": {
+                                type: "string",
+                                description: "TVDB episode mappings pattern",
+                                examples: ["e1-e12"],
+                            },
+                        },
+                        additionalProperties: false,
+                        description: "Season to episode mapping patterns",
+                        examples: [{ s1: "e1-e12", s2: "e13-e24" }],
                     },
-                },
-                additionalProperties: false,
-                description: "Season to episode mapping patterns",
+                    { type: "null" },
+                ],
                 examples: [{ s1: "e1-e12", s2: "e13-e24" }],
             },
         },
