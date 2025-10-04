@@ -329,7 +329,6 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
                 self.full_scan  # We need to either be using `FULL_SCAN`
                 or self.destructive_sync  # OR destructive sync
                 or s.viewedLeafCount  # OR the season has been viewed
-                or (item.viewedLeafCount and self.plex_client.is_online_user)
             )
         }
 
@@ -753,7 +752,9 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             return ""
 
         if not item.librarySectionKey:
-            return ""
+            if getattr(item, "_source", None) == "https://metadata.provider.plex.tv":
+                return "tmdb"  # The online metadata provider uses TMDB as default
+            return ""  # If this happens, something weird is going on
 
         cached = self._show_ordering_cache.get(item.librarySectionKey)
         if cached is not None:

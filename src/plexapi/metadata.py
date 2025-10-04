@@ -55,32 +55,6 @@ def original_server(func: Callable[..., Any]) -> Callable[..., Any]:
     return wrapper
 
 
-def discover_server(func: Callable[..., Any]) -> Callable[..., Any]:
-    """Decorator to temporarily switch to discover.plex.tv server context.
-
-    Args:
-        func (Callable): The function to wrap
-
-    Returns:
-        Callable: The wrapped function that will execute with the Discover server
-                context
-    """
-
-    @wraps(func)
-    def wrapper(self: PlexMetadataObject, *args: Any, **kwargs: Any) -> Any:
-        original_url = self._server._baseurl
-        original_token = self._server._token
-        try:
-            self._server._baseurl = self._server.myPlexAccount().DISCOVER
-            self._server._token = self._server.myPlexAccount().authToken
-            return func(self, *args, **kwargs)
-        finally:
-            self._server._baseurl = original_url
-            self._server._token = original_token
-
-    return wrapper
-
-
 def metadata_server(func: Callable[..., Any]) -> Callable[..., Any]:
     """Decorator to temporarily switch to metadata.provider.plex.tv server context.
 
@@ -162,51 +136,22 @@ class SeasonMetadataMixin:
     @metadata_server
     def episodes(self, **kwargs):
         """Fetch episodes for the season from the Metadata API."""
-        key = f"{self.key}/children?includeUserState=1&episodeOrder=tvdbAiring"  # type: ignore
+        key = f"{self.key}/children?includeUserState=1"  # type: ignore
         return self.fetchItems(key, MetadataEpisode, **kwargs)  # type: ignore
 
 
 class ShowMetadataMixin:
     """Mixin class for show objects to handle user states and seasons."""
 
-    @discover_server
-    def __loadUserStates(self, seasons):
-        if not seasons:
-            return seasons
-        rating_keys = [s.ratingKey.rsplit("/", 1)[-1] for s in seasons]
-        key = f"/library/metadata/{','.join(rating_keys)}/userState"
-
-        data = self._server.query(key)  # type: ignore
-        if data is None:
-            return seasons
-
-        user_states = {
-            elem.attrib.get("ratingKey"): elem
-            for elem in data
-            if elem.attrib.get("ratingKey")
-        }
-
-        for season in seasons:
-            rating_key = season.guid.rsplit("/", 1)[-1]
-            if rating_key in user_states:
-                user_state_elem = user_states[rating_key]
-                season._data.attrib.update(user_state_elem.attrib)
-                for child in user_state_elem:
-                    season._data.append(child)
-                season._loadData(season._data)
-        return seasons
-
     @metadata_server
     def seasons(self, **kwargs):
         """Fetch seasons for the show from the Metadata API."""
-        key = f"{self.key}/children?excludeAllLeaves=1&episodeOrder=tvdbAiring"  # type: ignore
-        return self.__loadUserStates(
-            self.fetchItems(  # type: ignore
-                key,
-                MetadataSeason,
-                container_size=self.childCount,  # type: ignore
-                **kwargs,
-            )
+        key = f"{self.key}/children?excludeAllLeaves=1&includeUserState=1"  # type: ignore
+        return self.fetchItems(  # type: ignore
+            key,
+            MetadataSeason,
+            container_size=self.childCount,  # type: ignore
+            **kwargs,
         )
 
     def episodes(self, **kwargs):
@@ -391,7 +336,6 @@ class PlexMetadataServer(PlexServer):
         url = self.url(key)
         method = method or self._session.get
         timeout = timeout or self._timeout
-        log.debug("%s %s", method.__name__.upper(), url)
         headers = self._headers(**(headers or {}))
         response = method(
             url, headers=headers, params=params, timeout=timeout, **kwargs
