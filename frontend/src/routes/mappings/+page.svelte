@@ -62,7 +62,10 @@
             });
             if (query) p.set("q", query);
             if (customOnly) p.set("custom_only", "true");
-            p.set("with_anilist", "true");
+            const titleVisible = columns.some(
+                (column) => column.id === "title" && column.visible,
+            );
+            if (titleVisible) p.set("with_anilist", "true");
             const r = await apiFetch("/api/mappings?" + p.toString());
             if (!r.ok) throw new Error("HTTP " + r.status);
             const d = await r.json();
