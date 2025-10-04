@@ -16,7 +16,7 @@ from src.core.mappings import MappingsClient
 from src.models.db.animap import AniMap
 from src.models.db.housekeeping import Housekeeping
 from src.models.db.provenance import AniMapProvenance
-from src.utils.sql import json_array_contains, json_dict_has_key
+from src.utils.sql import json_array_contains
 
 __all__ = ["AniMapClient"]
 
@@ -283,7 +283,6 @@ class AniMapClient:
         imdb: str | list[str] | None = None,
         tmdb: int | list[int] | None = None,
         tvdb: int | list[int] | None = None,
-        season: int | None = None,
         is_movie: bool = True,
     ) -> Iterator[AniMap]:
         """Retrieve anime ID mappings based on provided criteria.
@@ -305,7 +304,7 @@ class AniMapClient:
         """
         log.debug(
             f"{self.__class__.__name__}: Querying mappings with imdb={imdb}, "
-            f"tmdb={tmdb}, tvdb={tvdb}, season={season}, is_movie={is_movie}"
+            f"tmdb={tmdb}, tvdb={tvdb}, is_movie={is_movie}"
         )
 
         if not imdb and not tmdb and not tvdb:
@@ -345,13 +344,6 @@ class AniMapClient:
                         or_conditions.append(AniMap.tvdb_id == tvdb_list[0])
                     else:
                         or_conditions.append(AniMap.tvdb_id.in_(tvdb_list))
-                if season:
-                    and_conditions.append(
-                        or_(
-                            json_dict_has_key(AniMap.tmdb_mappings, f"s{season}"),
-                            json_dict_has_key(AniMap.tvdb_mappings, f"s{season}"),
-                        ),
-                    )
 
             merged_conditions: list[ColumnElement[bool]] = []
             if or_conditions:
