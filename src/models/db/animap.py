@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from functools import cached_property
+from typing import Literal
 
 from pydantic import BaseModel, Field
 from sqlalchemy import JSON, Index, Integer
@@ -18,6 +19,7 @@ class EpisodeMapping(BaseModel):
     Handles conversion between string patterns and episode mapping objects.
     """
 
+    service: Literal["tmdb", "tvdb", ""] = Field(default="")
     season: int = Field(ge=0)
     start: int = Field(default=1, gt=0)
     end: int | None = Field(default=None, gt=0)
@@ -33,7 +35,9 @@ class EpisodeMapping(BaseModel):
         return self.end - self.start + 1 if self.end else -1
 
     @classmethod
-    def from_string(cls, season: int, s: str) -> list[EpisodeMapping]:
+    def from_string(
+        cls, season: int, s: str, service: Literal["tmdb", "tvdb", ""] = ""
+    ) -> list[EpisodeMapping]:
         """Parse a string pattern into a EpisodeMapping instance.
 
         Args:
@@ -45,6 +49,7 @@ class EpisodeMapping(BaseModel):
                     - 'e12-,e2'
                     - 'e1-e5,e8-e10'
                     - '' (empty string for full season)
+            service (Literal["tmdb", "tvdb", ""]): Service identifier for the mapping
 
         Returns:
             EpisodeMapping | None: New EpisodeMapping instance if pattern is valid, None
@@ -77,8 +82,10 @@ class EpisodeMapping(BaseModel):
             re.VERBOSE,
         )
 
+        service = service or ""
+
         if not s:
-            return [cls(season=season)]
+            return [cls(season=season, service=service)]
 
         range_matches = list(PATTERN.finditer(s))
 
@@ -105,7 +112,9 @@ class EpisodeMapping(BaseModel):
             else:
                 continue
 
-            episode_ranges.append(cls(season=season, start=start, end=end, ratio=ratio))
+            episode_ranges.append(
+                cls(season=season, start=start, end=end, ratio=ratio, service=service)
+            )
 
         return episode_ranges
 
@@ -213,7 +222,9 @@ class AniMap(Base):
 
         for season, s in self.tvdb_mappings.items():
             try:
-                parsed = EpisodeMapping.from_string(int(season.lstrip("s")), s)
+                parsed = EpisodeMapping.from_string(
+                    int(season.lstrip("s")), s, service="tvdb"
+                )
                 res.extend(parsed)
             except ValueError:
                 continue
@@ -233,7 +244,9 @@ class AniMap(Base):
 
         for season, s in self.tmdb_mappings.items():
             try:
-                parsed = EpisodeMapping.from_string(int(season.lstrip("s")), s)
+                parsed = EpisodeMapping.from_string(
+                    int(season.lstrip("s")), s, service="tmdb"
+                )
                 res.extend(parsed)
             except ValueError:
                 continue

@@ -88,9 +88,13 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
 
             # Filter the seasons that are relevant to the current mapping
             parsed_mappings = self._get_effective_mappings(item, animapping)
-            mapped_season_indices = {m.season for m in parsed_mappings}
             relevant_seasons = {
-                idx: seasons[idx] for idx in mapped_season_indices if idx in seasons
+                m.season: seasons[m.season]
+                for m in parsed_mappings
+                if m.season in seasons
+                and (
+                    m.season != 0 or m.service == effective_show_ordering
+                )  # Skip specials unless explicitly mapped
             }
 
             if not relevant_seasons:
