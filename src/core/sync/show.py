@@ -75,11 +75,11 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             kwargs = {"tvdb": guids.tvdb, "is_movie": False}
         else:
             log.warning(
-                f"Could not determine effective show ordering for "
-                f"{self._debug_log_title(item)}, skipping "
+                f"Could not determine effective show ordering, looking up both TMDB "
+                f"and TVDB IDs for {self._debug_log_title(item)} "
                 f"{self._debug_log_ids(item.ratingKey, item.guid, guids)}"
             )
-            return
+            kwargs = {"tmdb": guids.tmdb, "tvdb": guids.tvdb, "is_movie": False}
 
         animappings = list(self.animap_client.get_mappings(**kwargs))
 
@@ -792,10 +792,6 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             return "tmdb"
         if preferred == "tvdb" and guids.tvdb:
             return "tvdb"
-        if guids.tvdb:
-            return "tvdb"
-        if guids.tmdb:
-            return "tmdb"
         return ""
 
     def _get_effective_mappings(
@@ -812,4 +808,4 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         elif ordering == "tvdb" and animapping.parsed_tvdb_mappings:
             return animapping.parsed_tvdb_mappings
         else:
-            return animapping.parsed_tvdb_mappings or animapping.parsed_tmdb_mappings
+            return animapping.parsed_tmdb_mappings or animapping.parsed_tvdb_mappings
