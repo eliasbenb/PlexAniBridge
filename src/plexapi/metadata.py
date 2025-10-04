@@ -129,6 +129,9 @@ class EpisodeMetadataMixin:
 class SeasonMetadataMixin:
     """Mixin class for season objects to handle parent rating keys."""
 
+    key: str
+    fetchItems: Callable[..., Any]
+
     def _loadData(self, data):
         super()._loadData(data)  # type: ignore
         self.parentRatingKey = data.attrib.get("parentRatingKey")
@@ -136,21 +139,25 @@ class SeasonMetadataMixin:
     @metadata_server
     def episodes(self, **kwargs):
         """Fetch episodes for the season from the Metadata API."""
-        key = f"{self.key}/children?includeUserState=1"  # type: ignore
-        return self.fetchItems(key, MetadataEpisode, **kwargs)  # type: ignore
+        key = f"{self.key}/children?includeUserState=1"
+        return self.fetchItems(key, MetadataEpisode, **kwargs)
 
 
 class ShowMetadataMixin:
     """Mixin class for show objects to handle user states and seasons."""
 
+    key: str
+    childCount: int
+    fetchItems: Callable[..., Any]
+
     @metadata_server
     def seasons(self, **kwargs):
         """Fetch seasons for the show from the Metadata API."""
-        key = f"{self.key}/children?excludeAllLeaves=1&includeUserState=1"  # type: ignore
-        return self.fetchItems(  # type: ignore
+        key = f"{self.key}/children?excludeAllLeaves=1&includeUserState=1"
+        return self.fetchItems(
             key,
             MetadataSeason,
-            container_size=self.childCount,  # type: ignore
+            container_size=self.childCount,
             **kwargs,
         )
 
@@ -163,6 +170,8 @@ class ShowMetadataMixin:
 
 class LibrarySectionMetadataMixin:
     """Mixin class for library section objects to handle search and item fetching."""
+
+    fetchItems: Callable[..., Any]
 
     @original_server
     def _search(self, *args, **kwargs):
@@ -201,7 +210,7 @@ class LibrarySectionMetadataMixin:
         if not metadata_guids:
             return []
 
-        return self.fetchItems(  # type: ignore
+        return self.fetchItems(
             f"/library/metadata/{','.join(metadata_guids)}?includeUserState=1",
             cls,
             **kwargs,
@@ -285,7 +294,7 @@ class MetadataLibrary(PlexMetadataObject, Library):
             "show": MetadataShowSection,
         }
 
-        for elem in self._server.query(key):  # type: ignore
+        for elem in self._server.query(key) or []:
             section = libcls.get(elem.attrib.get("type"), MetadataLibrarySection)(  # type: ignore
                 self._server, elem, initpath=key
             )
