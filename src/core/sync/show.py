@@ -69,19 +69,18 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         processed_seasons: set[int] = set()
 
         effective_show_ordering = self._get_effective_show_ordering(item, guids)
-        if effective_show_ordering == "tmdb":
-            kwargs = {"tmdb": guids.tmdb, "is_movie": False}
-        elif effective_show_ordering == "tvdb":
-            kwargs = {"tvdb": guids.tvdb, "is_movie": False}
-        else:
+        if not effective_show_ordering:
             log.warning(
-                f"Could not determine effective show ordering, looking up both TMDB "
-                f"and TVDB IDs for {self._debug_log_title(item)} "
+                f"Could not determine effective show ordering for "
+                f"{self._debug_log_title(item)} "
                 f"{self._debug_log_ids(item.ratingKey, item.guid, guids)}"
             )
-            kwargs = {"tmdb": guids.tmdb, "tvdb": guids.tvdb, "is_movie": False}
 
-        animappings = list(self.animap_client.get_mappings(**kwargs))
+        animappings = list(
+            self.animap_client.get_mappings(
+                tmdb=guids.tmdb, tvdb=guids.tvdb, is_movie=False
+            )
+        )
 
         for animapping in animappings:
             if not animapping.anilist_id:
