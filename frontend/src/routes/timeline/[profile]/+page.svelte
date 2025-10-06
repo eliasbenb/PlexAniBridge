@@ -938,28 +938,33 @@
                                 </p>
                             {/if}
                         {:else}
-                            <div class="grid items-start gap-2 md:grid-cols-2 md:gap-3">
-                                <div class="space-y-1.5">
+                            <div
+                                class="grid items-stretch gap-2 md:grid-cols-2 md:gap-3">
+                                <div class="flex h-full flex-col gap-1.5">
                                     <h5
                                         class="flex items-center gap-1 text-xs font-semibold tracking-wider text-slate-400 uppercase">
                                         Before <span
                                             class="text-[10px] font-normal text-slate-600"
                                             >{sizeLabel(item.before_state)}</span>
                                     </h5>
-                                    <JsonCodeBlock
-                                        value={item.before_state ?? {}}
-                                        class="leading-tight" />
+                                    <div class="min-h-0 flex-1">
+                                        <JsonCodeBlock
+                                            value={item.before_state ?? {}}
+                                            class="h-full leading-tight" />
+                                    </div>
                                 </div>
-                                <div class="space-y-1.5">
+                                <div class="flex h-full flex-col gap-1.5">
                                     <h5
                                         class="flex items-center gap-1 text-xs font-semibold tracking-wider text-slate-400 uppercase">
                                         After <span
                                             class="text-[10px] font-normal text-slate-600"
                                             >{sizeLabel(item.after_state)}</span>
                                     </h5>
-                                    <JsonCodeBlock
-                                        value={item.after_state ?? {}}
-                                        class="leading-tight" />
+                                    <div class="min-h-0 flex-1">
+                                        <JsonCodeBlock
+                                            value={item.after_state ?? {}}
+                                            class="h-full leading-tight" />
+                                    </div>
                                 </div>
                             </div>
                         {/if}
