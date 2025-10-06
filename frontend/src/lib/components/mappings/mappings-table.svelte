@@ -279,26 +279,29 @@
                                                             class={`inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded px-1.5 text-[10px] ring-1 ${totalSeasons > 1 ? "bg-amber-600/30 text-amber-100 ring-amber-700/40" : "bg-slate-800/60 text-slate-300 ring-slate-700/50"}`}
                                                             >{totalSeasons}</span>
                                                     </Tooltip.Trigger>
-                                                    <Tooltip.Content
-                                                        class="z-50 rounded-md border border-slate-700 bg-slate-900 p-2 shadow-lg"
-                                                        side="top">
-                                                        <ol
-                                                            class="max-h-52 space-y-1 overflow-auto text-[11px]">
-                                                            {#each entries as e (e[0])}
-                                                                <li
-                                                                    class="flex items-start gap-1">
-                                                                    <span
-                                                                        class="text-slate-500"
-                                                                        >{e[0]}</span>
-                                                                    <span
-                                                                        class="truncate text-slate-300"
-                                                                        title={e[1]}
-                                                                        >{e[1] ||
-                                                                            "All episodes"}</span>
-                                                                </li>
-                                                            {/each}
-                                                        </ol>
-                                                    </Tooltip.Content>
+                                                    <Tooltip.Portal>
+                                                        <Tooltip.Content
+                                                            collisionPadding={12}
+                                                            side="bottom"
+                                                            sideOffset={6}
+                                                            class="max-h-27 max-w-[90vw] overflow-auto rounded-md border border-slate-700 bg-slate-900 p-2 text-left text-[11px] shadow-lg">
+                                                            <ol class="space-y-1">
+                                                                {#each entries as e (e[0])}
+                                                                    <li
+                                                                        class="flex items-start gap-1 break-words">
+                                                                        <span
+                                                                            class="text-slate-500"
+                                                                            >{e[0]}</span>
+                                                                        <span
+                                                                            class="text-slate-300"
+                                                                            title={e[1]}
+                                                                            >{e[1] ||
+                                                                                "All episodes"}</span>
+                                                                    </li>
+                                                                {/each}
+                                                            </ol>
+                                                        </Tooltip.Content>
+                                                    </Tooltip.Portal>
                                                 </Tooltip.Root>
                                             {:else}
                                                 <span class="text-[10px] text-slate-500"
@@ -320,26 +323,29 @@
                                                             class={`inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded px-1.5 text-[10px] ring-1 ${totalSeasons > 1 ? "bg-amber-600/30 text-amber-100 ring-amber-700/40" : "bg-slate-800/60 text-slate-300 ring-slate-700/50"}`}
                                                             >{totalSeasons}</span>
                                                     </Tooltip.Trigger>
-                                                    <Tooltip.Content
-                                                        class="z-50 rounded-md border border-slate-700 bg-slate-900 p-2 shadow-lg"
-                                                        side="top">
-                                                        <ol
-                                                            class="max-h-52 space-y-1 overflow-auto text-[11px]">
-                                                            {#each entries as e (e[0])}
-                                                                <li
-                                                                    class="flex items-start gap-1">
-                                                                    <span
-                                                                        class="text-slate-500"
-                                                                        >{e[0]}</span>
-                                                                    <span
-                                                                        class="truncate text-slate-300"
-                                                                        title={e[1]}
-                                                                        >{e[1] ||
-                                                                            "All episodes"}</span>
-                                                                </li>
-                                                            {/each}
-                                                        </ol>
-                                                    </Tooltip.Content>
+                                                    <Tooltip.Portal>
+                                                        <Tooltip.Content
+                                                            collisionPadding={12}
+                                                            side="bottom"
+                                                            sideOffset={6}
+                                                            class="max-h-27 max-w-[90vw] overflow-auto rounded-md border border-slate-700 bg-slate-900 p-2 text-left text-[11px] shadow-lg">
+                                                            <ol class="space-y-1">
+                                                                {#each entries as e (e[0])}
+                                                                    <li
+                                                                        class="flex items-start gap-1 break-words">
+                                                                        <span
+                                                                            class="text-slate-500"
+                                                                            >{e[0]}</span>
+                                                                        <span
+                                                                            class="text-slate-300"
+                                                                            title={e[1]}
+                                                                            >{e[1] ||
+                                                                                "All episodes"}</span>
+                                                                    </li>
+                                                                {/each}
+                                                            </ol>
+                                                        </Tooltip.Content>
+                                                    </Tooltip.Portal>
                                                 </Tooltip.Root>
                                             {:else}
                                                 <span class="text-[10px] text-slate-500"
@@ -358,25 +364,29 @@
                                                             class={`inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded px-1.5 text-[10px] ring-1 ${total > 1 ? "bg-amber-600/30 text-amber-100 ring-amber-700/40" : "bg-slate-800/60 text-slate-300 ring-slate-700/50"}`}
                                                             >{total}</span>
                                                     </Tooltip.Trigger>
-                                                    <Tooltip.Content
-                                                        class="z-50 rounded-md border border-slate-700 bg-slate-900 p-2 shadow-lg"
-                                                        side="top">
-                                                        <ol
-                                                            class="space-y-1 text-[11px]">
-                                                            {#each m.sources ?? [] as s, i (i)}
-                                                                <li
-                                                                    class="flex items-start gap-1">
-                                                                    <span
-                                                                        class="text-slate-500"
-                                                                        >{i + 1}.</span>
-                                                                    <span
-                                                                        class="truncate"
-                                                                        title={s}
-                                                                        >{s}</span>
-                                                                </li>
-                                                            {/each}
-                                                        </ol>
-                                                    </Tooltip.Content>
+                                                    <Tooltip.Portal>
+                                                        <Tooltip.Content
+                                                            collisionPadding={12}
+                                                            side="bottom"
+                                                            sideOffset={6}
+                                                            class="max-h-27 max-w-[90vw] overflow-auto rounded-md border border-slate-700 bg-slate-900 p-2 text-left text-[11px] shadow-lg">
+                                                            <ol class="space-y-1">
+                                                                {#each m.sources ?? [] as s, i (i)}
+                                                                    <li
+                                                                        class="flex items-start gap-1 break-words">
+                                                                        <span
+                                                                            class="text-slate-500"
+                                                                            >{i +
+                                                                                1}.</span>
+                                                                        <span
+                                                                            class="text-slate-300"
+                                                                            title={s}
+                                                                            >{s}</span>
+                                                                    </li>
+                                                                {/each}
+                                                            </ol>
+                                                        </Tooltip.Content>
+                                                    </Tooltip.Portal>
                                                 </Tooltip.Root>
                                             {:else}
                                                 <span class="text-[10px] text-slate-500"
