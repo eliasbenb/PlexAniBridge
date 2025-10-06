@@ -21,8 +21,8 @@ WORKDIR /app
 
 ENV CI=1 \
     PNPM_HOME=/pnpm \
-    PNPM_STORE_DIR=/pnpm/store \
-    PATH="$PNPM_HOME:$PATH"
+    PNPM_STORE_DIR=/pnpm/store
+ENV PATH="$PNPM_HOME:$PATH"
 
 RUN corepack enable
 
