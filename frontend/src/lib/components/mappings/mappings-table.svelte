@@ -79,7 +79,9 @@
                             class="relative px-3 py-2 text-left font-medium"
                             style="width: {column.width}px;">
                             <div class="flex items-center justify-between">
-                                <span class="truncate">{column.title}</span>
+                                <span
+                                    class="truncate"
+                                    title={column.title}>{column.title}</span>
                             </div>
 
                             <!-- Resize handle -->
