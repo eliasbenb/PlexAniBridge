@@ -1,7 +1,7 @@
 <script lang="ts">
     import { onMount } from "svelte";
 
-    import { Check, Eye, List } from "@lucide/svelte";
+    import { Check, Eye, List, RefreshCcw } from "@lucide/svelte";
     import { Checkbox, Popover } from "bits-ui";
     import { SvelteURLSearchParams } from "svelte/reactivity";
 
@@ -391,6 +391,7 @@
     }
 
     let columns = $state<ColumnConfig[]>(restoreColumns());
+    let previousTitleVisible: boolean | null = $state(null); // when title visible changes, refetch with toggled `with_anilist`
 
     function restoreColumns(): ColumnConfig[] {
         try {
@@ -425,6 +426,20 @@
         try {
             localStorage.setItem("mappings.columns.v1", JSON.stringify(columns));
         } catch {}
+    });
+
+    $effect(() => {
+        const current = columns.some(
+            (column) => column.id === "title" && column.visible,
+        );
+        if (previousTitleVisible === null) {
+            previousTitleVisible = current;
+            return;
+        }
+        if (current !== previousTitleVisible) {
+            previousTitleVisible = current;
+            load();
+        }
     });
 
     onMount(load);
