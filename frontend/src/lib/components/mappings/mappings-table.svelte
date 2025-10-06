@@ -265,7 +265,48 @@
                                             </div>
                                         {:else}-{/if}
                                     </div>
-                                {:else if column.id === "seasons"}
+                                {:else if column.id === "tmdb_mappings"}
+                                    {#key JSON.stringify(m.tmdb_mappings ?? {})}
+                                        {@const entries = Object.entries(
+                                            m.tmdb_mappings ?? {},
+                                        )}
+                                        {@const totalSeasons = entries.length}
+                                        <div class="flex justify-center">
+                                            {#if totalSeasons > 0}
+                                                <Tooltip.Root>
+                                                    <Tooltip.Trigger>
+                                                        <span
+                                                            class={`inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded px-1.5 text-[10px] ring-1 ${totalSeasons > 1 ? "bg-amber-600/30 text-amber-100 ring-amber-700/40" : "bg-slate-800/60 text-slate-300 ring-slate-700/50"}`}
+                                                            >{totalSeasons}</span>
+                                                    </Tooltip.Trigger>
+                                                    <Tooltip.Content
+                                                        class="z-50 rounded-md border border-slate-700 bg-slate-900 p-2 shadow-lg"
+                                                        side="top">
+                                                        <ol
+                                                            class="max-h-52 space-y-1 overflow-auto text-[11px]">
+                                                            {#each entries as e (e[0])}
+                                                                <li
+                                                                    class="flex items-start gap-1">
+                                                                    <span
+                                                                        class="text-slate-500"
+                                                                        >{e[0]}</span>
+                                                                    <span
+                                                                        class="truncate text-slate-300"
+                                                                        title={e[1]}
+                                                                        >{e[1] ||
+                                                                            "All episodes"}</span>
+                                                                </li>
+                                                            {/each}
+                                                        </ol>
+                                                    </Tooltip.Content>
+                                                </Tooltip.Root>
+                                            {:else}
+                                                <span class="text-[10px] text-slate-500"
+                                                    >-</span>
+                                            {/if}
+                                        </div>
+                                    {/key}
+                                {:else if column.id === "tvdb_mappings"}
                                     {#key JSON.stringify(m.tvdb_mappings ?? {})}
                                         {@const entries = Object.entries(
                                             m.tvdb_mappings ?? {},
