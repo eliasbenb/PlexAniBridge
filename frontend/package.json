@@ -20,7 +20,7 @@
         "@ianvs/prettier-plugin-sort-imports": "^4.7.0",
         "@monaco-editor/loader": "^1.5.0",
         "@sveltejs/adapter-static": "3.0.10",
-        "@sveltejs/kit": "2.43.8",
+        "@sveltejs/kit": "2.44.0",
         "@sveltejs/vite-plugin-svelte": "6.2.1",
         "@tailwindcss/vite": "4.1.14",
         "@vite-pwa/sveltekit": "^1.0.0",
@@ -31,7 +31,7 @@
         "prettier": "3.6.2",
         "prettier-plugin-svelte": "3.4.0",
         "prettier-plugin-tailwindcss": "0.6.14",
-        "svelte": "5.39.8",
+        "svelte": "5.39.9",
         "svelte-check": "4.3.2",
         "tailwindcss": "4.1.14",
         "typescript": "5.9.3",
@@ -41,7 +41,7 @@
     "dependencies": {
         "@lucide/svelte": "^0.544.0",
         "bits-ui": "^2.11.4",
-        "monaco-editor": "^0.53.0",
+        "monaco-editor": "^0.54.0",
         "tailwind-merge": "^3.3.1"
     },
     "pnpm": {
