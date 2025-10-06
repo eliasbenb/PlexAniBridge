@@ -50,7 +50,8 @@
             "esbuild"
         ],
         "overrides": {
-            "cookie": "^0.7.2"
+            "cookie": "^0.7.2",
+            "dompurify": "^3.2.7"
         }
     }
 }
