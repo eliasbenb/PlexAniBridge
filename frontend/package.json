@@ -5,7 +5,7 @@
     "type": "module",
     "scripts": {
         "dev": "vite dev --host",
-        "build": "vite build",
+        "build": "svelte-kit sync && vite build",
         "preview": "vite preview --host",
         "prepare": "svelte-kit sync || echo ''",
         "clean": "rm -rf build",
