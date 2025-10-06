@@ -460,6 +460,13 @@
             {#if customOnly}<span class="text-emerald-400">Custom overrides only</span
                 >{/if}
             <span class="flex-1"></span>
+            <button
+                onclick={load}
+                class="mr-[-0.5rem] inline-flex h-6 w-6 items-center justify-center rounded bg-slate-800/50 text-slate-400 transition-colors hover:bg-slate-700 hover:text-slate-200"
+                title="Refresh"
+                aria-label="Refresh">
+                <RefreshCcw class="h-4 w-4" />
+            </button>
             <!-- Column settings popover -->
             <Popover.Root>
                 <Popover.Trigger
