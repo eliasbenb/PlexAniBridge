@@ -15,6 +15,8 @@
         History,
         Infinity as InfinityIcon,
         LoaderCircle,
+        Pin,
+        PinOff,
         RefreshCcw,
         RotateCw,
         Search,
@@ -30,9 +32,16 @@
     import { fade, slide } from "svelte/transition";
 
     import JsonCodeBlock from "$lib/components/json-code-block.svelte";
-    import type { CurrentSync, HistoryItem } from "$lib/types/api";
+    import type {
+        CurrentSync,
+        HistoryItem,
+        PinFieldOption,
+        PinListResponse,
+        PinOptionsResponse,
+        PinResponse,
+    } from "$lib/types/api";
     import { preferredTitle } from "$lib/utils/anilist";
-    import { apiFetch } from "$lib/utils/api";
+    import { apiFetch, apiJson } from "$lib/utils/api";
     import { toast } from "$lib/utils/notify";
 
     const { params } = $props<{ params: { profile: string } }>();
@@ -55,6 +64,14 @@
     let currentSync: CurrentSync | null = $state(null);
     let isProfileRunning = $state(false);
     let retryLoading: Record<number, boolean> = $state({});
+    let pinOptions: PinFieldOption[] = $state([]);
+    let pinEntries: PinResponse[] = $state([]);
+    let pinsByAniList: Record<number, string[]> = $state({});
+    let pinEditorOpen: Record<string, boolean> = $state({});
+    let pinSelections: Record<number, SvelteSet<string>> = $state({});
+    let pinSaving: Record<number, boolean> = $state({});
+    let managePinsExpanded = $state(false);
+    let managePinsLoading = $state(false);
 
     type ItemDiffUi = {
         tab: "changes" | "compare";
@@ -157,6 +174,199 @@
         try {
             navigator.clipboard.writeText(JSON.stringify(obj, null, 2));
         } catch {}
+    }
+
+    function ingestItemsForPins(list: HistoryItem[]) {
+        if (!list?.length) return;
+        const next = { ...pinsByAniList };
+        let changed = false;
+        for (const item of list) {
+            if (!item.anilist_id || !item.pinned_fields?.length) continue;
+            const fields = [...item.pinned_fields];
+            const existing = next[item.anilist_id];
+            if (
+                !existing ||
+                existing.length !== fields.length ||
+                existing.some((value, idx) => value !== fields[idx])
+            ) {
+                next[item.anilist_id] = fields;
+                pinSelections[item.anilist_id] = new SvelteSet(fields);
+                changed = true;
+            }
+        }
+        if (changed) pinsByAniList = next;
+    }
+
+    function setPinnedFields(anilistId: number, fields: string[]) {
+        if (!anilistId) return;
+        const next = { ...pinsByAniList };
+        next[anilistId] = [...fields];
+        pinsByAniList = next;
+        pinSelections[anilistId] = new SvelteSet(fields);
+        items = items.map((item) =>
+            item.anilist_id === anilistId
+                ? { ...item, pinned_fields: fields.length ? [...fields] : [] }
+                : item,
+        );
+    }
+
+    function removePinEntry(anilistId: number) {
+        if (!anilistId) return;
+        const next = { ...pinsByAniList };
+        delete next[anilistId];
+        pinsByAniList = next;
+        delete pinSelections[anilistId];
+        pinEntries = pinEntries.filter((entry) => entry.anilist_id !== anilistId);
+        items = items.map((item) =>
+            item.anilist_id === anilistId ? { ...item, pinned_fields: null } : item,
+        );
+    }
+
+    function ensurePinSelection(anilistId: number): SvelteSet<string> {
+        if (!anilistId) return new SvelteSet();
+        const stored = pinSelections[anilistId];
+        if (stored) return stored;
+        const base = pinsByAniList[anilistId] ?? [];
+        const selection = new SvelteSet(base);
+        pinSelections[anilistId] = selection;
+        return selection;
+    }
+
+    function selectionValues(anilistId: number): string[] {
+        return [...ensurePinSelection(anilistId)];
+    }
+
+    function togglePinField(anilistId: number, field: string) {
+        if (!anilistId) return;
+        const values = selectionValues(anilistId);
+        const idx = values.indexOf(field);
+        if (idx >= 0) {
+            values.splice(idx, 1);
+        } else {
+            values.push(field);
+        }
+        pinSelections[anilistId] = new SvelteSet(values);
+    }
+
+    function isPinDirty(anilistId: number): boolean {
+        const selection = selectionValues(anilistId);
+        const existing = pinsByAniList[anilistId] ?? [];
+        if (selection.length !== existing.length) return true;
+        return selection.some((value, index) => value !== existing[index]);
+    }
+
+    function pinFieldLabel(field: string): string {
+        return pinOptions.find((opt) => opt.value === field)?.label ?? field;
+    }
+
+    function pinEntryTitle(anilistId: number): string {
+        const match = items.find((item) => item.anilist_id === anilistId);
+        const fallback = `AniList ID ${anilistId}`;
+        return match ? displayTitle(match) || fallback : fallback;
+    }
+
+    async function loadPinOptions() {
+        try {
+            const data = await apiJson<PinOptionsResponse>("/api/pins/fields");
+            pinOptions = data.options ?? [];
+        } catch (e) {
+            console.error(e);
+            toast("Failed to load pin options", "warn");
+        }
+    }
+
+    async function loadPinEntries() {
+        managePinsLoading = true;
+        try {
+            const data = await apiJson<PinListResponse>(`/api/pins/${params.profile}`);
+            const entries = data.pins ?? [];
+            pinEntries = entries
+                .slice()
+                .sort(
+                    (a, b) =>
+                        new Date(b.updated_at).getTime() -
+                        new Date(a.updated_at).getTime(),
+                );
+            const next: Record<number, string[]> = { ...pinsByAniList };
+            for (const entry of pinEntries) {
+                next[entry.anilist_id] = [...entry.fields];
+                pinSelections[entry.anilist_id] = new SvelteSet(entry.fields);
+            }
+            pinsByAniList = next;
+        } catch (e) {
+            console.error(e);
+            toast("Failed to load pins", "warn");
+        } finally {
+            managePinsLoading = false;
+        }
+    }
+
+    function applyPinResponse(entry: PinResponse) {
+        setPinnedFields(entry.anilist_id, entry.fields);
+        pinEntries = [
+            entry,
+            ...pinEntries.filter((p) => p.anilist_id !== entry.anilist_id),
+        ].sort(
+            (a, b) =>
+                new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
+        );
+    }
+
+    function togglePinEditor(key: string, anilistId: number | null | undefined) {
+        if (!anilistId) {
+            toast("Pinning is only available when an AniList entry exists", "warn");
+            return;
+        }
+        pinEditorOpen[key] = !pinEditorOpen[key];
+        ensurePinSelection(anilistId);
+    }
+
+    function editorIsOpen(key: string): boolean {
+        return !!pinEditorOpen[key];
+    }
+
+    function isPinSaving(anilistId: number): boolean {
+        return !!pinSaving[anilistId];
+    }
+
+    async function savePins(anilistId: number) {
+        if (!anilistId) return;
+        if (isPinSaving(anilistId)) return;
+        const fields = selectionValues(anilistId);
+        pinSaving[anilistId] = true;
+        try {
+            if (!fields.length) {
+                const res = await apiFetch(
+                    `/api/pins/${params.profile}/${anilistId}`,
+                    { method: "DELETE" },
+                    { successMessage: "Pins removed" },
+                );
+                if (!res.ok) return;
+                removePinEntry(anilistId);
+            } else {
+                const res = await apiFetch(
+                    `/api/pins/${params.profile}/${anilistId}`,
+                    {
+                        method: "PUT",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ fields }),
+                    },
+                    { successMessage: "Pins saved" },
+                );
+                if (!res.ok) return;
+                const data = (await res.json()) as PinResponse;
+                applyPinResponse(data);
+            }
+        } catch (e) {
+            console.error(e);
+            toast("Failed to update pins", "error");
+        } finally {
+            pinSaving[anilistId] = false;
+        }
+    }
+
+    function pinCount(): number {
+        return pinEntries.length;
     }
 
     interface OutcomeMeta {
@@ -396,6 +606,7 @@
             perPage = d.per_page || perPage;
             knownIds = new SvelteSet(items.map((i) => i.id));
             newItemsCount = 0;
+            ingestItemsForPins(items);
         } catch (e) {
             console.error(e);
         } finally {
@@ -421,6 +632,7 @@
             pages = d.pages || pages;
             perPage = d.per_page || perPage;
             newOnes.forEach((i: HistoryItem) => knownIds.add(i.id));
+            ingestItemsForPins(newOnes);
         } catch (e) {
             console.error(e);
         } finally {
@@ -455,6 +667,7 @@
                         added++;
                     }
                 }
+                ingestItemsForPins(d.items);
                 if (added && !isNearTop) newItemsCount += added;
                 handleScroll();
             } catch {}
@@ -523,6 +736,8 @@
         loadFirst();
         initWs();
         initStatusWs();
+        loadPinOptions();
+        loadPinEntries();
         const io = new IntersectionObserver((entries) => {
             for (const e of entries) if (e.isIntersecting) loadMore();
         });
@@ -633,6 +848,167 @@
                 ><X class="inline h-3.5 w-3.5" /> Clear</button>
         </div>
     {/if}
+    <div class="rounded-md border border-slate-800/60 bg-slate-900/40 p-4 shadow-sm">
+        <div
+            class="flex flex-wrap items-center justify-between gap-3 text-[12px] text-slate-300">
+            <div class="inline-flex items-center gap-2 font-semibold">
+                <Pin class="h-4 w-4 text-sky-400" /> Manage Pins
+                <span
+                    class="rounded bg-slate-800/80 px-2 py-0.5 text-[10px] text-slate-300"
+                    >{pinCount()} active</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <button
+                    type="button"
+                    class="inline-flex items-center gap-1 rounded-md border border-slate-700/60 px-2 py-0.5 text-[11px] text-slate-200 hover:bg-slate-800/70"
+                    onclick={() => loadPinEntries()}
+                    ><RefreshCcw class="h-3.5 w-3.5" /> Refresh</button>
+                <button
+                    type="button"
+                    class="inline-flex items-center gap-1 rounded-md border border-sky-700/60 px-2 py-0.5 text-[11px] text-sky-200 hover:bg-sky-800/60"
+                    onclick={() => (managePinsExpanded = !managePinsExpanded)}
+                    >{managePinsExpanded ? "Hide" : "Show"} details
+                    <ArrowUp
+                        class={`h-3.5 w-3.5 transition-transform ${managePinsExpanded ? "rotate-0" : "rotate-180"}`} /></button>
+            </div>
+        </div>
+        {#if managePinsExpanded}
+            <div
+                class="mt-3 border-t border-slate-800/70 pt-3 text-[12px] text-slate-300">
+                {#if managePinsLoading}
+                    <div class="flex items-center gap-2 text-slate-400">
+                        <LoaderCircle class="h-4 w-4 animate-spin" /> Loading pinned entries…
+                    </div>
+                {:else if !pinEntries.length}
+                    <div class="flex items-center gap-2 text-slate-400">
+                        <PinOff class="h-4 w-4" /> No pins configured yet.
+                        <span class="text-[11px] text-slate-500"
+                            >Use the Pin buttons on timeline entries to get started.</span>
+                    </div>
+                {:else}
+                    <div class="space-y-3">
+                        {#each pinEntries as entry (entry.anilist_id)}
+                            {@const editorKey = `manage-${entry.anilist_id}`}
+                            <div
+                                class="rounded-md border border-slate-800/70 bg-slate-900/50 p-3">
+                                <div
+                                    class="flex flex-wrap items-center justify-between gap-3">
+                                    <div class="min-w-0">
+                                        <div
+                                            class="text-[13px] font-medium text-slate-200">
+                                            {pinEntryTitle(entry.anilist_id)}
+                                        </div>
+                                        <div class="text-[10px] text-slate-500">
+                                            AniList #{entry.anilist_id} • Updated {new Date(
+                                                entry.updated_at,
+                                            ).toLocaleString()}
+                                        </div>
+                                        <div
+                                            class="mt-2 flex flex-wrap gap-1 text-[10px] text-slate-300">
+                                            {#if entry.fields.length}
+                                                {#each entry.fields as field (field)}
+                                                    <span
+                                                        class="rounded bg-sky-900/40 px-1.5 py-0.5 text-sky-200">
+                                                        {pinFieldLabel(field)}
+                                                    </span>
+                                                {/each}
+                                            {:else}
+                                                <span class="text-slate-500"
+                                                    >No fields pinned</span>
+                                            {/if}
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center gap-2 text-[11px]">
+                                        <button
+                                            type="button"
+                                            class="inline-flex items-center gap-1 rounded-md border border-slate-700/60 px-2 py-0.5 hover:bg-slate-800/60"
+                                            onclick={() =>
+                                                togglePinEditor(
+                                                    editorKey,
+                                                    entry.anilist_id,
+                                                )}
+                                            >{editorIsOpen(editorKey)
+                                                ? "Close"
+                                                : "Edit"}</button>
+                                        <button
+                                            type="button"
+                                            class="inline-flex items-center gap-1 rounded-md border border-rose-700/60 px-2 py-0.5 text-rose-200 hover:bg-rose-700/60"
+                                            onclick={() => {
+                                                pinSelections[entry.anilist_id] =
+                                                    new SvelteSet();
+                                                savePins(entry.anilist_id);
+                                            }}
+                                            ><PinOff class="h-3.5 w-3.5" /> Clear</button>
+                                    </div>
+                                </div>
+                                {#if editorIsOpen(editorKey)}
+                                    <div
+                                        class="mt-3 space-y-3 rounded-md border border-slate-800/70 bg-slate-950/50 p-3 text-[11px] text-slate-200">
+                                        {#if pinOptions.length}
+                                            <div class="flex flex-wrap gap-2">
+                                                {#each pinOptions as option (option.value)}
+                                                    {@const selection =
+                                                        ensurePinSelection(
+                                                            entry.anilist_id,
+                                                        )}
+                                                    <label
+                                                        class={`inline-flex items-center gap-1 rounded border px-2 py-1 text-[11px] transition ${selection.has(option.value) ? "border-sky-600 bg-sky-900/40 text-sky-100" : "border-slate-700 bg-slate-900/60 text-slate-300 hover:border-slate-600"}`}
+                                                        ><input
+                                                            type="checkbox"
+                                                            class="h-3 w-3"
+                                                            checked={selection.has(
+                                                                option.value,
+                                                            )}
+                                                            onchange={() =>
+                                                                togglePinField(
+                                                                    entry.anilist_id,
+                                                                    option.value,
+                                                                )} />
+                                                        {option.label}</label>
+                                                {/each}
+                                            </div>
+                                        {:else}
+                                            <div class="text-slate-400">
+                                                Pin options unavailable. Try refreshing.
+                                            </div>
+                                        {/if}
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            <button
+                                                type="button"
+                                                class="inline-flex items-center gap-1 rounded-md border border-sky-600/70 bg-sky-700/40 px-2 py-0.5 text-sky-100 hover:bg-sky-600/50 disabled:opacity-50"
+                                                disabled={!isPinDirty(
+                                                    entry.anilist_id,
+                                                ) || isPinSaving(entry.anilist_id)}
+                                                onclick={() =>
+                                                    savePins(entry.anilist_id)}
+                                                >{#if isPinSaving(entry.anilist_id)}
+                                                    <LoaderCircle
+                                                        class="h-3.5 w-3.5 animate-spin" />
+                                                    Saving…
+                                                {:else}
+                                                    Save
+                                                {/if}</button>
+                                            <button
+                                                type="button"
+                                                class="inline-flex items-center gap-1 rounded-md border border-slate-700/60 px-2 py-0.5 text-slate-200 hover:bg-slate-800/60"
+                                                onclick={() => {
+                                                    pinSelections[entry.anilist_id] =
+                                                        new SvelteSet(
+                                                            pinsByAniList[
+                                                                entry.anilist_id
+                                                            ] ?? [],
+                                                        );
+                                                }}>Reset</button>
+                                        </div>
+                                    </div>
+                                {/if}
+                            </div>
+                        {/each}
+                    </div>
+                {/if}
+            </div>
+        {/if}
+    </div>
     <div
         class="flex items-center gap-2 text-[11px] text-slate-500"
         hidden={!items.length}>
@@ -651,6 +1027,11 @@
         class:hidden={!items.length && !loadingInitial}>
         {#each items as item (item.id)}
             {@const meta = metaFor(item.outcome)}
+            {@const pinEditorKey = `timeline-${item.id}`}
+            {@const currentPins = item.anilist_id
+                ? (pinsByAniList[item.anilist_id] ?? item.pinned_fields ?? [])
+                : []}
+            {@const hasPin = currentPins.length > 0}
             <div
                 class="flex gap-3 overflow-hidden rounded-md border border-slate-800 bg-slate-900/60 p-4 shadow-sm backdrop-blur-sm transition-shadow hover:shadow-md">
                 <div class={`w-1 rounded-md ${meta.color}`}></div>
@@ -738,8 +1119,103 @@
                                         {/if}
                                     </div>
                                 </div>
+                                {#if currentPins.length}
+                                    <div
+                                        class="mt-2 flex flex-wrap items-center gap-1 text-[10px] text-sky-200">
+                                        <Pin class="h-3 w-3 text-sky-300" />
+                                        <span
+                                            class="tracking-wide text-slate-400 uppercase"
+                                            >Pinned:</span>
+                                        {#each currentPins as field (field)}
+                                            <span
+                                                class="rounded bg-sky-900/50 px-1.5 py-0.5 text-sky-100">
+                                                {pinFieldLabel(field)}
+                                            </span>
+                                        {/each}
+                                    </div>
+                                {/if}
+                                {#if editorIsOpen(pinEditorKey) && item.anilist_id}
+                                    <div
+                                        class="mt-3 space-y-3 rounded-md border border-slate-800/70 bg-slate-950/40 p-3 text-[11px] text-slate-200">
+                                        {#if pinOptions.length}
+                                            <div class="flex flex-wrap gap-2">
+                                                {#each pinOptions as option (option.value)}
+                                                    {@const selection =
+                                                        ensurePinSelection(
+                                                            item.anilist_id,
+                                                        )}
+                                                    <label
+                                                        class={`inline-flex items-center gap-1 rounded border px-2 py-1 transition ${selection.has(option.value) ? "border-sky-600 bg-sky-900/40 text-sky-100" : "border-slate-700 bg-slate-900/60 text-slate-300 hover:border-slate-600"}`}
+                                                        ><input
+                                                            type="checkbox"
+                                                            class="h-3 w-3"
+                                                            checked={selection.has(
+                                                                option.value,
+                                                            )}
+                                                            onchange={() =>
+                                                                togglePinField(
+                                                                    item.anilist_id!,
+                                                                    option.value,
+                                                                )} />
+                                                        {option.label}</label>
+                                                {/each}
+                                            </div>
+                                        {:else}
+                                            <div class="text-slate-400">
+                                                Pin options unavailable. Try refreshing.
+                                            </div>
+                                        {/if}
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            <button
+                                                type="button"
+                                                class="inline-flex items-center gap-1 rounded-md border border-sky-600/70 bg-sky-700/40 px-2 py-0.5 text-sky-100 hover:bg-sky-600/50 disabled:opacity-50"
+                                                disabled={!isPinDirty(
+                                                    item.anilist_id,
+                                                ) || isPinSaving(item.anilist_id)}
+                                                onclick={() =>
+                                                    savePins(item.anilist_id!)}
+                                                >{#if isPinSaving(item.anilist_id)}
+                                                    <LoaderCircle
+                                                        class="h-3.5 w-3.5 animate-spin" />
+                                                    Saving…
+                                                {:else}
+                                                    Save
+                                                {/if}</button>
+                                            <button
+                                                type="button"
+                                                class="inline-flex items-center gap-1 rounded-md border border-slate-700/60 px-2 py-0.5 text-slate-200 hover:bg-slate-800/60"
+                                                onclick={() => {
+                                                    pinSelections[item.anilist_id!] =
+                                                        new SvelteSet(
+                                                            pinsByAniList[
+                                                                item.anilist_id!
+                                                            ] ?? [],
+                                                        );
+                                                }}>Reset</button>
+                                            <button
+                                                type="button"
+                                                class="inline-flex items-center gap-1 rounded-md border border-rose-700/60 px-2 py-0.5 text-rose-200 hover:bg-rose-700/60"
+                                                onclick={() => {
+                                                    pinSelections[item.anilist_id!] =
+                                                        new SvelteSet();
+                                                    savePins(item.anilist_id!);
+                                                }}
+                                                ><PinOff class="h-3.5 w-3.5" /> Clear</button>
+                                        </div>
+                                    </div>
+                                {/if}
                             </div>
                             <div class="flex shrink-0 items-center gap-2">
+                                <button
+                                    type="button"
+                                    disabled={!item.anilist_id}
+                                    onclick={() =>
+                                        togglePinEditor(pinEditorKey, item.anilist_id)}
+                                    class={`inline-flex h-8 items-center justify-center gap-1 rounded-md border px-2 text-[11px] font-medium transition disabled:opacity-50 ${hasPin ? "border-sky-600/60 bg-sky-700/40 text-sky-100" : "border-slate-700/60 bg-slate-800/40 text-slate-200 hover:bg-slate-700/50"}`}
+                                    title={item.anilist_id
+                                        ? "Pin AniList fields for this entry"
+                                        : "Pinning requires an AniList mapping"}
+                                    ><Pin class="inline h-4 w-4" /></button>
                                 {#if canRetry(item)}
                                     <button
                                         type="button"
