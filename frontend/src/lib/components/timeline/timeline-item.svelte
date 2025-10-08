@@ -307,8 +307,7 @@
                     <Pin class="h-4 w-4 text-sky-300" /> Pin AniList fields
                 </div>
                 <p class="mt-1 max-w-prose text-[11px] text-slate-400">
-                    Choose which AniList attributes should stay pinned to Plex for this
-                    title.
+                    Choose which AniList attributes should stay pinned and unchanging.
                 </p>
             </div>
             <div class="flex flex-col items-end gap-1 text-right text-[10px]">
@@ -416,9 +415,9 @@
         transition: color 0.25s ease;
     }
     :global(.expand-toggle.open) {
-        animation: diffPulse 900ms ease;
+        animation: expandPulse 900ms ease;
     }
-    @keyframes diffPulse {
+    @keyframes expandPulse {
         0% {
             text-shadow: 0 0 0 rgba(56, 189, 248, 0);
         }
@@ -434,7 +433,7 @@
         transition: color 0.25s ease;
     }
     :global(.expand-toggle.open) {
-        animation: diffPulse 900ms ease;
+        animation: expandPulse 900ms ease;
     }
     :global(.expand-toggle .expand-icon) {
         transition: transform 220ms ease;

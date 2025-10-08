@@ -706,19 +706,16 @@
             {@const currentPins = item.anilist_id
                 ? (pinsByAniList[item.anilist_id] ?? item.pinned_fields ?? [])
                 : []}
-            {@const hasPin = currentPins.length > 0}
             <TimelineItem
                 {item}
                 {meta}
                 {currentPins}
-                {hasPin}
                 {pinOptions}
                 {isProfileRunning}
                 {displayTitle}
                 {coverImage}
                 {anilistUrl}
                 {plexUrl}
-                {pinFieldLabel}
                 {ensurePinSelection}
                 {togglePinField}
                 {isPinDirty}
