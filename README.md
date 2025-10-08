@@ -22,15 +22,15 @@ The smart way to keep your AniList profile perfectly synchronized with your Plex
 ![Flowchart Diagram](https://mermaid.ink/img/pako:eNqtlN1q2zAUx19FqLC24MSfsh2zFdpmsEELo2UM1vRCkWVb1LaMJDftmjzDGLvYZW_2Arsbfan1ESY7cRLvAwqbr3R8_vqdc_6WdQcJjymMYJLzGcmwUODkbFIC_byVVNh7F4_3n762a2Bf7m8yznbGudwHYJNzt3Nut-tNTm8u9h7vPz-0S3BKY4bBORXXVOxfrjSHRxfPWZECKciL3UypSkamKfBsmDKV1dNaEwkvFS3VkPDCpDnDckrLqdkgD0t2JFicUvPVy8OxGXMiTQ0zc57yYVWmu8A8AD3hqqyOT5hUbXffuqjr6RRXFStT2WS_PPz4_rERFBS8HoMxVniKJV1Jt3wDg8HB_B1WJKMS0IpJ7bKct8W3POypCn7Nfte4reYMK614BgTVmllPtDF3QwOxbqyRY9V0Pm987U3aSo9rIbSRALfj5Pr1tnL9QVqtHjbn_KqutKQz5I86_W3ynKUNV96WZN5V3DJIqtuctjsSlufRjkNciixDKsGvaLTjIWzHo1U4mLFYZZFb3RiE51xEO0mS9DDN4EsORdiy4jWHkDCxrD7H-SunM2aJshw8SpI1ynLCkJCnojp_uvFCHHhozbJpQF3vqazlYVqCkjAZJXgN8kmAgrgPsjcgb4QsFPzKcv4jy_0nFjRgqv9BGClRUwMWVBS4CeFdU2cCVUYLOoGRXsZYXE3gpFzoPRUu33NedNsEr9MMRgnOpY7qSh98OmY4FbhYv9WHPKbimNelgpHje6OWAqM7eAMje-QN_QBZXhg6oe0gA97CyPWtIfICL0QuspHvoIUBP7RVraGPLN9DCPm-57rICw2o7zHFxenyHm2vUwPiWvFzff6XfS5-Alenxg0?type=png)
 
 ## Docker Quick Start
-Here's a step by step guide to get started using Docker.
+You'll need to have docker installed and be signed into your Plex server and anilist account. Then get your PlexAniBridge server running with docker and anything you watch on your Plex server should be synced to your anilist account.
 
-Clone the repo `git clone https://github.com/eliasbenb/PlexAniBridge.git`
-Touch `compose.yaml` and copy and paste the example below, filling in PAB_ANILIST_TOKEN, PAB_PLEX_TOKEN, PAB_PLEX_USER and PLEX_URL.
-Install docker or docker desktop
-Run docker compose -f `./compose.yaml up -d`
-Use the web UI to check for sync status and logs at `localhost:4848`
-
-
+1. Clone the repo `git clone https://github.com/eliasbenb/PlexAniBridge.git`
+2. Open up `PlexAniBridge/docs/compose.yaml` and fill in `PAB_ANILIST_TOKEN` ([link](https://plexanibridge.elias.eu.org/configuration/#anilist_token)), `PAB_PLEX_TOKEN` ([link](https://plexanibridge.elias.eu.org/configuration/#plex_token)), `PAB_PLEX_USER` ([link](https://plexanibridge.elias.eu.org/configuration/#plex_user), can find it under Plex Server > Settings > Account) and `PLEX_URL` (you can use the private address found under Plex Server > Settings > Remote Access. This is the minimum to get started. You can customize the behavior later using the other settings
+3. Install docker or [docker desktop](https://docs.docker.com/desktop/)
+4. Use your CLI terminal of choice to `cd` into the repo you cloned and use docker to start up PlexAniBridge by running  `docker compose -f ./docs/compose.yaml up -d`
+5. In your web browser go to `localhost:4848` to access the web UI which will show you sync status and logs
+   
+The `compose.yaml` should look something like this
 ```yaml
 services:
     plexanibridge:
@@ -41,7 +41,7 @@ services:
             UMASK: 022
             TZ: Etc/UTC
             PAB_ANILIST_TOKEN: eyJ0ex12345
-            PAB_PLEX_TOKEN: nsF6abcdef
+            PAB_PLEX_TOKEN: nsF6abcdef 
             PAB_PLEX_USER: myusername123
             PAB_PLEX_URL: http://192.168.0.229:32400
         volumes:
