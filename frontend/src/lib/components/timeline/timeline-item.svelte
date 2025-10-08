@@ -1,5 +1,6 @@
 <script lang="ts">
     import {
+        Check,
         ExternalLink,
         LoaderCircle,
         Pin,
@@ -35,7 +36,6 @@
         editorIsOpen: (key: string) => boolean;
         pinOptions?: PinFieldOption[];
         currentPins?: string[];
-        hasPin?: boolean;
         canRetry: (item: HistoryItem) => boolean;
         retryHistory: (item: HistoryItem) => void;
         retryLoading?: boolean;
@@ -69,7 +69,6 @@
         editorIsOpen,
         pinOptions = [],
         currentPins = [],
-        hasPin = false,
         canRetry,
         retryHistory,
         retryLoading = false,
@@ -85,6 +84,7 @@
     }: Props = $props();
 
     const pinEditorKey = () => `timeline-${item.id}`;
+    const isPinEditorOpen = () => editorIsOpen(pinEditorKey());
     const ui = () => ensureDiffUi(item.id);
     const selection = () => ensurePinSelection(item.anilist_id ?? 0);
 </script>
@@ -177,86 +177,31 @@
                     </div>
                     {#if currentPins.length}
                         <div
-                            class="mt-2 flex flex-wrap items-center gap-1 text-[10px] text-sky-200">
-                            <Pin class="h-3 w-3 text-sky-300" />
-                            <span class="tracking-wide text-slate-400 uppercase"
-                                >Pinned:</span>
-                            {#each currentPins as field (field)}
-                                <span
-                                    class="rounded bg-sky-900/50 px-1.5 py-0.5 text-sky-100">
-                                    {pinFieldLabel(field)}
-                                </span>
-                            {/each}
-                        </div>
-                    {/if}
-                    {#if editorIsOpen(pinEditorKey()) && item.anilist_id}
-                        <div
-                            class="mt-3 space-y-3 rounded-md border border-slate-800/70 bg-slate-950/40 p-3 text-[11px] text-slate-200">
-                            {#if pinOptions.length}
-                                <div class="flex flex-wrap gap-2">
-                                    {#each pinOptions as option (option.value)}
-                                        {@const sel = selection()}
-                                        <label
-                                            class={`inline-flex items-center gap-1 rounded border px-2 py-1 transition ${sel.has(option.value) ? "border-sky-600 bg-sky-900/40 text-sky-100" : "border-slate-700 bg-slate-900/60 text-slate-300 hover:border-slate-600"}`}
-                                            ><input
-                                                type="checkbox"
-                                                class="h-3 w-3"
-                                                checked={sel.has(option.value)}
-                                                onchange={() =>
-                                                    togglePinField(
-                                                        item.anilist_id!,
-                                                        option.value,
-                                                    )} />
-                                            {option.label}</label>
-                                    {/each}
-                                </div>
-                            {:else}
-                                <div class="text-slate-400">
-                                    Pin options unavailable. Try refreshing.
-                                </div>
-                            {/if}
+                            class="mt-3 rounded-lg border border-sky-900/50 bg-sky-950/40 p-3 text-[11px] text-sky-100">
                             <div class="flex flex-wrap items-center gap-2">
-                                <button
-                                    type="button"
-                                    class="inline-flex items-center gap-1 rounded-md border border-sky-600/70 bg-sky-700/40 px-2 py-0.5 text-sky-100 hover:bg-sky-600/50 disabled:opacity-50"
-                                    disabled={!isPinDirty(item.anilist_id!) ||
-                                        isPinSaving(item.anilist_id!)}
-                                    onclick={() => savePins(item.anilist_id!)}>
-                                    {#if isPinSaving(item.anilist_id!)}
-                                        <LoaderCircle
-                                            class="h-3.5 w-3.5 animate-spin" />
-                                        Saving…
-                                    {:else}
-                                        Save
-                                    {/if}
-                                </button>
-                                <button
-                                    type="button"
-                                    class="inline-flex items-center gap-1 rounded-md border border-slate-700/60 px-2 py-0.5 text-slate-200 hover:bg-slate-800/60"
-                                    onclick={() => resetPins(item.anilist_id!)}>
-                                    Reset
-                                </button>
-                                <button
-                                    type="button"
-                                    class="inline-flex items-center gap-1 rounded-md border border-rose-700/60 px-2 py-0.5 text-rose-200 hover:bg-rose-700/60"
-                                    onclick={() => clearPins(item.anilist_id!)}>
-                                    <PinOff class="h-3.5 w-3.5" /> Clear
-                                </button>
+                                <span
+                                    class="inline-flex items-center gap-1 rounded-full bg-sky-900/70 px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase">
+                                    <Pin class="h-3.5 w-3.5 text-sky-300" />
+                                    {currentPins.length}
+                                    {currentPins.length === 1 ? " field" : " fields"}
+                                    pinned
+                                </span>
+                                <span class="text-[10px] text-slate-400">
+                                    Pinned fields stay synced for this entry.
+                                </span>
+                            </div>
+                            <div class="mt-2 flex flex-wrap gap-1.5">
+                                {#each currentPins as field (field)}
+                                    <span
+                                        class="inline-flex items-center gap-1 rounded-md border border-sky-800/70 bg-sky-900/40 px-2 py-0.5 text-[10px] text-sky-100">
+                                        {pinFieldLabel(field)}
+                                    </span>
+                                {/each}
                             </div>
                         </div>
                     {/if}
                 </div>
                 <div class="flex shrink-0 items-center gap-2">
-                    <button
-                        type="button"
-                        disabled={!item.anilist_id}
-                        onclick={() => togglePinEditor(pinEditorKey(), item.anilist_id)}
-                        class={`inline-flex h-8 items-center justify-center gap-1 rounded-md border px-2 text-[11px] font-medium transition disabled:opacity-50 ${hasPin ? "border-sky-600/60 bg-sky-700/40 text-sky-100" : "border-slate-700/60 bg-slate-800/40 text-slate-200 hover:bg-slate-700/50"}`}
-                        title={item.anilist_id
-                            ? "Pin AniList fields for this entry"
-                            : "Pinning requires an AniList mapping"}>
-                        <Pin class="inline h-4 w-4" />
-                    </button>
                     {#if canRetry(item)}
                         <button
                             type="button"
@@ -297,12 +242,12 @@
             {#if item.error_message}
                 <div class="text-[11px] text-red-400">{item.error_message}</div>
             {/if}
-            {#if canShowDiff(item)}
-                <div class="pt-1">
+            <div class="flex flex-wrap items-center gap-3 pt-1">
+                {#if canShowDiff(item)}
                     <button
                         type="button"
                         onclick={() => toggleDiff(item.id)}
-                        class={`diff-toggle inline-flex items-center gap-1 text-xs text-sky-400 hover:text-sky-300 ${openDiff ? "open" : ""}`}
+                        class={`expand-toggle inline-flex items-center gap-1 text-xs text-sky-400 hover:text-sky-300 ${openDiff ? "open" : ""}`}
                         aria-expanded={openDiff}>
                         <span
                             class="relative inline-flex h-4 w-4 items-center justify-center overflow-hidden">
@@ -312,7 +257,7 @@
                                     out:fade={{ duration: 90 }}
                                     class="absolute inset-0 flex items-center justify-center">
                                     <SquareMinus
-                                        class="diff-icon inline h-4 w-4 text-[14px]" />
+                                        class="expand-icon inline h-4 w-4 text-[14px]" />
                                 </span>
                             {:else}
                                 <span
@@ -320,15 +265,54 @@
                                     out:fade={{ duration: 90 }}
                                     class="absolute inset-0 flex items-center justify-center">
                                     <SquarePlus
-                                        class="diff-icon inline h-4 w-4 text-[14px]" />
+                                        class="expand-icon inline h-4 w-4 text-[14px]" />
                                 </span>
                             {/if}
                         </span>
-                        <span class="diff-label relative"
+                        <span class="relative"
                             >{openDiff ? "Hide diff" : "Show diff"}</span>
                     </button>
-                </div>
-            {/if}
+                {/if}
+                <button
+                    type="button"
+                    disabled={!item.anilist_id}
+                    onclick={() => togglePinEditor(pinEditorKey(), item.anilist_id)}
+                    class={`expand-toggle inline-flex items-center gap-1 text-xs text-sky-400 transition hover:text-sky-300 disabled:cursor-not-allowed disabled:text-slate-500 ${isPinEditorOpen() ? "open" : ""}`}
+                    aria-expanded={isPinEditorOpen()}
+                    title={item.anilist_id
+                        ? "Pin AniList fields for this entry"
+                        : "Pinning requires an AniList mapping"}>
+                    <span
+                        class="relative inline-flex h-4 w-4 items-center justify-center overflow-hidden">
+                        {#if isPinEditorOpen()}
+                            <span
+                                in:fade={{ duration: 140 }}
+                                out:fade={{ duration: 90 }}
+                                class="absolute inset-0 flex items-center justify-center">
+                                <SquareMinus
+                                    class="expand-icon inline h-4 w-4 text-[14px]" />
+                            </span>
+                        {:else}
+                            <span
+                                in:fade={{ duration: 140 }}
+                                out:fade={{ duration: 90 }}
+                                class="absolute inset-0 flex items-center justify-center">
+                                <SquarePlus
+                                    class="expand-icon inline h-4 w-4 text-[14px]" />
+                            </span>
+                        {/if}
+                    </span>
+                    <span class="relative">
+                        {isPinEditorOpen() ? "Hide pins" : "Show pins"}
+                    </span>
+                    {#if currentPins.length}
+                        <span
+                            class="inline-flex min-w-[1.5rem] items-center justify-center rounded-full bg-sky-900/70 px-1.5 py-0.5 text-[10px] font-semibold text-sky-100">
+                            {currentPins.length}
+                        </span>
+                    {/if}
+                </button>
+            </div>
         </div>
     </div>
 </div>
@@ -338,12 +322,127 @@
         ui={ui()} />
 {/if}
 
+{#if isPinEditorOpen() && item.anilist_id}
+    {@const selectedFields = selection()}
+    <section
+        in:fade={{ duration: 140 }}
+        class="mt-3 space-y-4 rounded-xl border border-slate-800/80 bg-slate-950/50 p-4 text-[11px] text-slate-200 shadow-[0_15px_40px_-20px_rgba(15,23,42,0.75)]">
+        <header class="flex flex-wrap items-start justify-between gap-3">
+            <div>
+                <div
+                    class="inline-flex items-center gap-2 text-[12px] font-semibold text-slate-100">
+                    <Pin class="h-4 w-4 text-sky-300" /> Pin AniList fields
+                </div>
+                <p class="mt-1 max-w-prose text-[11px] text-slate-400">
+                    Choose which AniList attributes should stay pinned to Plex for this
+                    title.
+                </p>
+            </div>
+            <div class="flex flex-col items-end gap-1 text-right text-[10px]">
+                <span
+                    class="inline-flex items-center gap-1 rounded-full border border-sky-700/60 bg-sky-900/40 px-2 py-0.5 font-medium text-sky-100">
+                    <Pin class="h-3 w-3 text-sky-300" />
+                    {selectedFields.size}
+                    {selectedFields.size === 1 ? "field" : "fields"}
+                    selected
+                </span>
+                {#if currentPins.length === 0}
+                    <span class="text-[10px] text-slate-500">No pins saved yet.</span>
+                {/if}
+            </div>
+        </header>
+        {#if pinOptions.length}
+            <div
+                class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-7">
+                {#each pinOptions as option (option.value)}
+                    {@const isActive = selectedFields.has(option.value)}
+                    <label
+                        class={`group relative inline-flex overflow-hidden rounded-lg border px-3 py-2 text-left transition focus-within:ring-2 focus-within:ring-sky-500/70 ${isActive ? "border-sky-600/70 bg-sky-900/50 text-sky-100 shadow-[0_0_0_1px_rgba(56,189,248,0.2)]" : "border-slate-700/70 bg-slate-900/60 text-slate-300 hover:border-slate-600/80 hover:bg-slate-900/70"}`}
+                        ><input
+                            type="checkbox"
+                            class="sr-only"
+                            checked={isActive}
+                            onchange={() =>
+                                togglePinField(item.anilist_id!, option.value)} />
+                        <div class="flex w-full items-center gap-2">
+                            <span
+                                class={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[11px] transition ${isActive ? "border-transparent bg-sky-600/80 text-slate-950" : "border-slate-600/80 text-slate-500 group-hover:border-slate-500"}`}>
+                                {#if isActive}
+                                    <Check class="h-3.5 w-3.5" />
+                                {:else}
+                                    <Pin class="h-3.5 w-3.5" />
+                                {/if}
+                            </span>
+                            <span class="block text-[11px] font-medium tracking-wide">
+                                {option.label}
+                            </span>
+                        </div>
+                    </label>
+                {/each}
+            </div>
+        {:else}
+            <div
+                class="rounded-md border border-slate-800/70 bg-slate-900/60 p-3 text-slate-400">
+                Pin options unavailable. Try refreshing.
+            </div>
+        {/if}
+        <footer
+            class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-800/70 bg-slate-900/40 p-3">
+            <div class="flex items-center gap-2 text-[10px] text-slate-400">
+                {#if isPinSaving(item.anilist_id!)}
+                    <LoaderCircle class="h-3.5 w-3.5 animate-spin text-sky-300" />
+                    Saving changes…
+                {:else if isPinDirty(item.anilist_id!)}
+                    <span
+                        class="inline-flex items-center gap-1 rounded-full bg-amber-900/40 px-2 py-0.5 text-amber-200">
+                        <span class="h-1.5 w-1.5 rounded-full bg-amber-400"></span>
+                        Unsaved changes
+                    </span>
+                {:else}
+                    <span
+                        class="inline-flex items-center gap-1 rounded-full bg-emerald-900/40 px-2 py-0.5 text-emerald-200">
+                        <span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
+                        All changes saved
+                    </span>
+                {/if}
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+                <button
+                    type="button"
+                    class="inline-flex items-center gap-1 rounded-md border border-sky-500/70 bg-sky-600/70 px-3 py-1 text-[11px] font-semibold text-sky-50 shadow-sm transition hover:bg-sky-500/70 disabled:opacity-50"
+                    disabled={!isPinDirty(item.anilist_id!) ||
+                        isPinSaving(item.anilist_id!)}
+                    onclick={() => savePins(item.anilist_id!)}>
+                    {#if isPinSaving(item.anilist_id!)}
+                        <LoaderCircle class="h-3.5 w-3.5 animate-spin" />
+                        Saving…
+                    {:else}
+                        Save pins
+                    {/if}
+                </button>
+                <button
+                    type="button"
+                    class="inline-flex items-center gap-1 rounded-md border border-slate-700/70 px-3 py-1 text-[11px] text-slate-200 transition hover:bg-slate-800/60"
+                    onclick={() => resetPins(item.anilist_id!)}>
+                    Reset
+                </button>
+                <button
+                    type="button"
+                    class="inline-flex items-center gap-1 rounded-md border border-rose-700/70 px-3 py-1 text-[11px] text-rose-200 transition hover:bg-rose-700/60"
+                    onclick={() => clearPins(item.anilist_id!)}>
+                    <PinOff class="h-3.5 w-3.5" /> Clear all
+                </button>
+            </div>
+        </footer>
+    </section>
+{/if}
+
 <style>
-    :global(.diff-toggle) {
+    :global(.expand-toggle) {
         position: relative;
         transition: color 0.25s ease;
     }
-    :global(.diff-toggle.open) {
+    :global(.expand-toggle.open) {
         animation: diffPulse 900ms ease;
     }
     @keyframes diffPulse {
@@ -357,23 +456,30 @@
             text-shadow: 0 0 0 rgba(56, 189, 248, 0);
         }
     }
-    :global(.diff-toggle .diff-icon) {
+    :global(.expand-toggle) {
+        position: relative;
+        transition: color 0.25s ease;
+    }
+    :global(.expand-toggle.open) {
+        animation: diffPulse 900ms ease;
+    }
+    :global(.expand-toggle .expand-icon) {
         transition: transform 220ms ease;
     }
-    :global(.diff-toggle.open .diff-icon) {
+    :global(.expand-toggle.open .expand-icon) {
         transform: rotate(90deg) scale(1.05);
     }
-    :global(.diff-toggle:not(.open):hover .diff-icon) {
+    :global(.expand-toggle:not(.open):hover .expand-icon) {
         transform: rotate(6deg);
     }
     @media (prefers-reduced-motion: reduce) {
-        :global(.diff-toggle .diff-icon),
-        :global(.diff-toggle.open .diff-icon),
-        :global(.diff-toggle:not(.open):hover .diff-icon) {
+        :global(.expand-toggle .expand-icon),
+        :global(.expand-toggle.open .expand-icon),
+        :global(.expand-toggle:not(.open):hover .expand-icon) {
             transition: none;
             transform: none;
         }
-        :global(.diff-toggle.open) {
+        :global(.expand-toggle.open) {
             animation: none;
         }
     }
