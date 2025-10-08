@@ -4,13 +4,7 @@
             "type": "debugpy",
             "request": "launch",
             "name": "Run PlexAniBridge",
-            "program": "pab-dev backend",
-        },
-        {
-            "type": "node-terminal",
-            "request": "launch",
-            "name": "Run Frontend",
-            "command": "pab-dev frontend",
+            "program": "main.py",
         }
     ],
 }

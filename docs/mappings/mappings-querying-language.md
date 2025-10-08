@@ -64,6 +64,7 @@ tvdb_mappings:*e24 # any episode range ending with e24
 - `tmdb_movie` → TMDb Movie ID
 - `tmdb_show` → TMDb Show ID
 - `tvdb` → TVDB Show ID
+- `tmdb_mappings` → Searches keys/values in TMDB mappings dictionary
 - `tvdb_mappings` → Searches keys/values in TVDB mappings dictionary
 
 ## Example Queries

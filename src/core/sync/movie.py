@@ -50,11 +50,8 @@ class MovieSyncClient(BaseSyncClient[Movie, Movie, list[Movie]]):
                 anidb_id=None,
                 anilist_id=0,
                 imdb_id=[guids.imdb] if guids.imdb else None,
-                mal_id=None,
                 tmdb_movie_id=[guids.tmdb] if guids.tmdb else None,
-                tmdb_show_id=None,
                 tvdb_id=guids.tvdb,
-                tvdb_mappings=None,
             ),
         )
 

@@ -30,12 +30,12 @@
         save,
     }: Props = $props();
 
-    type FieldMode = "omit" | "null" | "value";
-    interface TvdbMapRow {
+    export type FieldMode = "omit" | "null" | "value";
+    export interface EpisodeMapRow {
         season: string;
         pattern: string;
     }
-    interface EditForm {
+    export interface EditForm {
         _isNew: boolean;
         anilist_id: string | number | "";
         anidb_mode: FieldMode;
@@ -50,8 +50,19 @@
         tmdb_movie_csv: string;
         tmdb_show_mode: FieldMode;
         tmdb_show_csv: string;
+        tmdb_map_mode: FieldMode;
+        tmdb_mappings: EpisodeMapRow[];
         tvdb_map_mode: FieldMode;
-        tvdb_mappings: TvdbMapRow[];
+        tvdb_mappings: EpisodeMapRow[];
+    }
+
+    function addTmdbMapping() {
+        form.tmdb_mappings.push({ season: "", pattern: "" });
+        form.tmdb_mappings = [...form.tmdb_mappings];
+    }
+    function removeTmdbMapping(i: number) {
+        form.tmdb_mappings.splice(i, 1);
+        form.tmdb_mappings = [...form.tmdb_mappings];
     }
 
     function addTvdbMapping() {
@@ -70,7 +81,7 @@
         additionalProperties: false,
         properties: {
             anilist_id: {
-                type: ["integer"],
+                type: ["integer", "null"],
                 description: "The AniList ID",
                 examples: [12345],
             },
@@ -87,7 +98,7 @@
                     },
                     { type: "null" },
                 ],
-                description: "Array of IMDB IDs in the format tt1234567",
+                description: "Array of IMDB IDs in the format tt1234567 (or null)",
                 examples: [["tt1234567", "tt7654321"]],
             },
             mal_id: {
@@ -95,7 +106,7 @@
                     { type: "array", items: { type: "integer" } },
                     { type: "null" },
                 ],
-                description: "Array of MyAnimeList IDs",
+                description: "Array of MyAnimeList IDs (or null)",
                 examples: [[12345, 67890]],
             },
             tmdb_movie_id: {
@@ -103,7 +114,7 @@
                     { type: "array", items: { type: "integer" } },
                     { type: "null" },
                 ],
-                description: "Array of TMDB movie IDs",
+                description: "Array of TMDB movie IDs (or null)",
                 examples: [[12345, 67890]],
             },
             tmdb_show_id: {
@@ -111,21 +122,46 @@
                     { type: "array", items: { type: "integer" } },
                     { type: "null" },
                 ],
-                description: "Array of TMDB show IDs",
+                description: "Array of TMDB show IDs (or null)",
                 examples: [[12345, 67890]],
             },
             tvdb_id: { type: ["integer", "null"] },
-            tvdb_mappings: {
-                type: "object",
-                patternProperties: {
-                    "^s[0-9]+$": {
-                        type: "string",
-                        description: "TVDB episode mappings pattern",
-                        examples: ["e1-e12"],
+            tmdb_mappings: {
+                anyOf: [
+                    {
+                        type: "object",
+                        patternProperties: {
+                            "^s[0-9]+$": {
+                                type: "string",
+                                description: "TMDB episode mappings pattern",
+                                examples: ["e1-e12"],
+                            },
+                        },
+                        additionalProperties: false,
+                        description: "Season to episode mapping patterns",
+                        examples: [{ s1: "e1-e12", s2: "e13-e24" }],
                     },
-                },
-                additionalProperties: false,
-                description: "Season to episode mapping patterns",
+                    { type: "null" },
+                ],
+                examples: [{ s1: "e1-e12", s2: "e13-e24" }],
+            },
+            tvdb_mappings: {
+                anyOf: [
+                    {
+                        type: "object",
+                        patternProperties: {
+                            "^s[0-9]+$": {
+                                type: "string",
+                                description: "TVDB episode mappings pattern",
+                                examples: ["e1-e12"],
+                            },
+                        },
+                        additionalProperties: false,
+                        description: "Season to episode mapping patterns",
+                        examples: [{ s1: "e1-e12", s2: "e13-e24" }],
+                    },
+                    { type: "null" },
+                ],
                 examples: [{ s1: "e1-e12", s2: "e13-e24" }],
             },
         },
@@ -335,6 +371,48 @@
                                     class="mt-1 h-8 w-full rounded-md border border-slate-800 bg-slate-950/80 px-2 text-[11px] disabled:cursor-not-allowed disabled:opacity-60"
                                     disabled={form.tmdb_show_mode !== "value"} />
                             </div>
+                            <!-- TMDB Season Mappings -->
+                            <div class="col-span-2">
+                                <div class="flex items-center justify-between">
+                                    <label
+                                        for="f-tmdb-map-mode"
+                                        class="text-[11px] text-slate-400"
+                                        >TMDB Season Mappings</label>
+                                    <select
+                                        id="f-tmdb-map-mode"
+                                        bind:value={form.tmdb_map_mode}
+                                        class="h-7 rounded-md border border-slate-700 bg-slate-900 px-2 text-[11px]">
+                                        <option value="omit">Omit</option><option
+                                            value="null">Null</option
+                                        ><option value="value">Value</option>
+                                    </select>
+                                </div>
+                                {#if form.tmdb_map_mode === "value"}
+                                    <div class="mt-2 space-y-2">
+                                        {#each form.tmdb_mappings as mapping, i (i)}
+                                            <div class="flex items-center gap-2">
+                                                <input
+                                                    bind:value={mapping.season}
+                                                    placeholder="Season (e.g., s1, s2)"
+                                                    class="h-7 flex-1 rounded-md border border-slate-800 bg-slate-950/80 px-2 text-[11px]" />
+                                                <input
+                                                    bind:value={mapping.pattern}
+                                                    placeholder="Pattern"
+                                                    class="h-7 flex-1 rounded-md border border-slate-800 bg-slate-950/80 px-2 text-[11px]" />
+                                                <button
+                                                    onclick={() => removeTmdbMapping(i)}
+                                                    class="inline-flex h-7 w-7 items-center justify-center rounded-md bg-rose-700/70 text-rose-200 hover:bg-rose-600"
+                                                    title="Remove mapping"
+                                                    ><X class="h-3 w-3" /></button>
+                                            </div>
+                                        {/each}
+                                        <button
+                                            onclick={addTmdbMapping}
+                                            class="inline-flex h-7 items-center gap-1 rounded-md bg-slate-800 px-2 text-[11px] text-slate-300 hover:bg-slate-700"
+                                            ><Plus class="h-3 w-3" />Add Mapping</button>
+                                    </div>
+                                {/if}
+                            </div>
                             <!-- TVDB Season Mappings -->
                             <div class="col-span-2">
                                 <div class="flex items-center justify-between">
@@ -373,7 +451,7 @@
                                         <button
                                             onclick={addTvdbMapping}
                                             class="inline-flex h-7 items-center gap-1 rounded-md bg-slate-800 px-2 text-[11px] text-slate-300 hover:bg-slate-700"
-                                            ><Plus class="h-3 w-3" /> Add Mapping</button>
+                                            ><Plus class="h-3 w-3" />Add Mapping</button>
                                     </div>
                                 {/if}
                             </div>

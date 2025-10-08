@@ -36,6 +36,13 @@ T = TypeVar("T", bound=Movie | Show)  # Section item
 S = TypeVar("S", bound=Movie | Season)  # Item child (season)
 E = TypeVar("E", bound=list[Movie] | list[Episode])  # Item grandchild (episode)
 
+_LEGACY_GUID_MAPPING = {
+    "com.plexapp.agents.imdb": "imdb",
+    "com.plexapp.agents.tmdb": "tmdb",
+    "com.plexapp.agents.themoviedb": "tmdb",
+    "com.plexapp.agents.thetvdb": "tvdb",
+}
+
 
 class ParsedGuids(BaseModel):
     """Container for parsed media identifiers from different services.
@@ -71,6 +78,7 @@ class ParsedGuids(BaseModel):
             ParsedGuids: New instance with parsed IDs
         """
         parsed_guids = ParsedGuids()
+
         for guid in guids:
             if not guid.id:
                 continue
@@ -79,14 +87,21 @@ class ParsedGuids(BaseModel):
             if len(split_guid) != 2:
                 continue
 
-            attr = split_guid[0]
+            service = split_guid[0]
+            id_part = split_guid[1]
+
+            # Remove query parameters if present (e.g., ?lang=en)
+            if "?" in id_part:
+                id_part = id_part.split("?")[0]
+
+            attr = _LEGACY_GUID_MAPPING.get(service, service)
             if not hasattr(parsed_guids, attr):
                 continue
 
             try:
-                setattr(parsed_guids, attr, int(split_guid[1]))
+                setattr(parsed_guids, attr, int(id_part))
             except ValueError:
-                setattr(parsed_guids, attr, str(split_guid[1]))
+                setattr(parsed_guids, attr, str(id_part))
 
         return parsed_guids
 

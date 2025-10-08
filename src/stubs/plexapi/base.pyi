@@ -24,7 +24,7 @@ class cached_data_property(cached_property): ...
 class PlexObject:
     TAG: str
     TYPE: str
-    key: str | None
+    key: str
     _server: PlexServer
     def __init__(
         self,

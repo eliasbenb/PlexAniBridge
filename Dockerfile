@@ -8,26 +8,30 @@ ENV UV_LINK_MODE=copy \
 
 RUN apk add --no-cache git
 
-RUN --mount=type=bind,source=uv.lock,target=uv.lock \
-    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+WORKDIR /tmp
+
+RUN --mount=type=bind,source=uv.lock,target=/tmp/uv.lock,ro \
+    --mount=type=bind,source=pyproject.toml,target=/tmp/pyproject.toml,ro \
+    --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev --no-install-project
-
-COPY . /app
-
-WORKDIR /app
-
-RUN uv sync --frozen --no-dev --no-editable
 
 FROM node:24-alpine AS node-builder
 
 WORKDIR /app
 
-COPY ./frontend /app
+ENV CI=1 \
+    PNPM_HOME=/pnpm \
+    PNPM_STORE_DIR=/pnpm/store
+ENV PATH="$PNPM_HOME:$PATH"
 
-ENV CI=1
+RUN corepack enable
 
-RUN corepack enable && \
+RUN --mount=type=bind,source=frontend/pnpm-lock.yaml,target=/app/pnpm-lock.yaml,ro \
+    --mount=type=bind,source=frontend/package.json,target=/app/package.json,ro \
+    --mount=type=cache,id=pnpm-store,target=/pnpm/store \
     pnpm install --frozen-lockfile
+
+COPY ./frontend /app
 
 RUN pnpm build
 

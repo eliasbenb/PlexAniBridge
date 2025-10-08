@@ -1,6 +1,6 @@
 [project]
 name = "PlexAniBridge"
-version = "1.4.1"
+version = "1.5.1"
 description = "The smart way to keep your AniList profile perfectly synchronized with your Plex library."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -33,22 +33,22 @@ classifiers = [
 ]
 dependencies = [
     "aiocache>=0.12.3",
-    "aiohttp>=3.12.13",
-    "alembic>=1.15.2",
+    "aiohttp>=3.12.15",
+    "alembic>=1.16.5",
     "async-lru>=2.0.5",
-    "cachetools>=5.5.2",
+    "cachetools>=6.2.0",
     "colorama>=0.4.6",
-    "fastapi[all]>=0.116.1",
+    "fastapi[all]>=0.118.0",
     "limiter>=0.5.0",
-    "plexapi>=4.17.0",
-    "pydantic>=2.11.1",
-    "pydantic-settings>=2.9.1",
+    "plexapi>=4.17.1",
+    "pydantic>=2.11.10",
+    "pydantic-settings>=2.11.0",
     "pyparsing>=3.2.5",
-    "pyyaml>=6.0.2",
-    "rapidfuzz>=3.13.0",
-    "requests>=2.32.3",
-    "ruamel-yaml>=0.18.14",
-    "sqlalchemy>=2.0.41",
+    "pyyaml>=6.0.3",
+    "rapidfuzz>=3.14.1",
+    "requests>=2.32.5",
+    "ruamel-yaml>=0.18.15",
+    "sqlalchemy>=2.0.43",
     "tzlocal>=5.3.1",
 ]
 

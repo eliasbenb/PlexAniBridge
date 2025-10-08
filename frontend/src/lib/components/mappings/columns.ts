@@ -73,8 +73,16 @@ export const defaultColumns: ColumnConfig[] = [
         resizable: true,
     },
     {
-        id: "seasons",
-        title: "Seasons",
+        id: "tmdb_mappings",
+        title: "TMDB Mappings",
+        visible: true,
+        width: 80,
+        minWidth: 60,
+        resizable: true,
+    },
+    {
+        id: "tvdb_mappings",
+        title: "TVDB Mappings",
         visible: true,
         width: 80,
         minWidth: 60,
