@@ -24,7 +24,6 @@
         coverImage: (item: HistoryItem) => string | null;
         anilistUrl: (item: HistoryItem) => string | null;
         plexUrl: (item: HistoryItem) => string | null;
-        pinFieldLabel: (field: string) => string;
         ensurePinSelection: (anilistId: number) => Set<string>;
         togglePinField: (anilistId: number, field: string) => void;
         isPinDirty: (anilistId: number) => boolean;
@@ -57,7 +56,6 @@
         coverImage,
         anilistUrl,
         plexUrl,
-        pinFieldLabel,
         ensurePinSelection,
         togglePinField,
         isPinDirty,
@@ -175,31 +173,6 @@
                             {/if}
                         </div>
                     </div>
-                    {#if currentPins.length}
-                        <div
-                            class="mt-3 rounded-lg border border-sky-900/50 bg-sky-950/40 p-3 text-[11px] text-sky-100">
-                            <div class="flex flex-wrap items-center gap-2">
-                                <span
-                                    class="inline-flex items-center gap-1 rounded-full bg-sky-900/70 px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase">
-                                    <Pin class="h-3.5 w-3.5 text-sky-300" />
-                                    {currentPins.length}
-                                    {currentPins.length === 1 ? " field" : " fields"}
-                                    pinned
-                                </span>
-                                <span class="text-[10px] text-slate-400">
-                                    Pinned fields stay synced for this entry.
-                                </span>
-                            </div>
-                            <div class="mt-2 flex flex-wrap gap-1.5">
-                                {#each currentPins as field (field)}
-                                    <span
-                                        class="inline-flex items-center gap-1 rounded-md border border-sky-800/70 bg-sky-900/40 px-2 py-0.5 text-[10px] text-sky-100">
-                                        {pinFieldLabel(field)}
-                                    </span>
-                                {/each}
-                            </div>
-                        </div>
-                    {/if}
                 </div>
                 <div class="flex shrink-0 items-center gap-2">
                     {#if canRetry(item)}
