@@ -17,19 +17,11 @@
 
     import TimelineHeader from "$lib/components/timeline/timeline-header.svelte";
     import TimelineItem from "$lib/components/timeline/timeline-item.svelte";
-    import TimelineManagePins from "$lib/components/timeline/timeline-manage-pins.svelte";
     import TimelineOutcomeFilters from "$lib/components/timeline/timeline-outcome-filters.svelte";
     import type { ItemDiffUi } from "$lib/components/timeline/types";
-    import type {
-        CurrentSync,
-        HistoryItem,
-        PinFieldOption,
-        PinListResponse,
-        PinOptionsResponse,
-        PinResponse,
-    } from "$lib/types/api";
+    import type { CurrentSync, HistoryItem } from "$lib/types/api";
     import { preferredTitle } from "$lib/utils/anilist";
-    import { apiFetch, apiJson } from "$lib/utils/api";
+    import { apiFetch } from "$lib/utils/api";
     import { toast } from "$lib/utils/notify";
 
     const { params } = $props<{ params: { profile: string } }>();
@@ -52,14 +44,10 @@
     let currentSync: CurrentSync | null = $state(null);
     let isProfileRunning = $state(false);
     let retryLoading: Record<number, boolean> = $state({});
-    let pinOptions: PinFieldOption[] = $state([]);
-    let pinEntries: PinResponse[] = $state([]);
-    let pinsByAniList: Record<number, string[]> = $state({});
-    let pinEditorOpen: Record<string, boolean> = $state({});
-    let pinSelections: Record<number, SvelteSet<string>> = $state({});
-    let pinSaving: Record<number, boolean> = $state({});
-    let managePinsExpanded = $state(false);
-    let managePinsLoading = $state(false);
+
+    let openPins: Record<number, boolean> = $state({});
+    let pinDraftCounts: Record<number, number> = $state({});
+    let pinBusy: Record<number, boolean> = $state({});
 
     let diffUi: Record<number, ItemDiffUi> = $state({});
 
@@ -70,210 +58,6 @@
     function toggleDiff(id: number) {
         openDiff[id] = !openDiff[id];
         ensureDiffUi(id);
-    }
-
-    function ingestItemsForPins(list: HistoryItem[]) {
-        if (!list?.length) return;
-        const next = { ...pinsByAniList };
-        let changed = false;
-        for (const item of list) {
-            if (!item.anilist_id || !item.pinned_fields?.length) continue;
-            const fields = [...item.pinned_fields];
-            const existing = next[item.anilist_id];
-            if (
-                !existing ||
-                existing.length !== fields.length ||
-                existing.some((value, idx) => value !== fields[idx])
-            ) {
-                next[item.anilist_id] = fields;
-                pinSelections[item.anilist_id] = new SvelteSet(fields);
-                changed = true;
-            }
-        }
-        if (changed) pinsByAniList = next;
-    }
-
-    function setPinnedFields(anilistId: number, fields: string[]) {
-        if (!anilistId) return;
-        const next = { ...pinsByAniList };
-        next[anilistId] = [...fields];
-        pinsByAniList = next;
-        pinSelections[anilistId] = new SvelteSet(fields);
-        items = items.map((item) =>
-            item.anilist_id === anilistId
-                ? { ...item, pinned_fields: fields.length ? [...fields] : [] }
-                : item,
-        );
-    }
-
-    function removePinEntry(anilistId: number) {
-        if (!anilistId) return;
-        const next = { ...pinsByAniList };
-        delete next[anilistId];
-        pinsByAniList = next;
-        delete pinSelections[anilistId];
-        pinEntries = pinEntries.filter((entry) => entry.anilist_id !== anilistId);
-        items = items.map((item) =>
-            item.anilist_id === anilistId ? { ...item, pinned_fields: null } : item,
-        );
-    }
-
-    function ensurePinSelection(anilistId: number): SvelteSet<string> {
-        if (!anilistId) return new SvelteSet();
-        const stored = pinSelections[anilistId];
-        if (stored) return stored;
-        const base = pinsByAniList[anilistId] ?? [];
-        const selection = new SvelteSet(base);
-        pinSelections[anilistId] = selection;
-        return selection;
-    }
-
-    function selectionValues(anilistId: number): string[] {
-        return [...ensurePinSelection(anilistId)];
-    }
-
-    function togglePinField(anilistId: number, field: string) {
-        if (!anilistId) return;
-        const values = selectionValues(anilistId);
-        const idx = values.indexOf(field);
-        if (idx >= 0) {
-            values.splice(idx, 1);
-        } else {
-            values.push(field);
-        }
-        pinSelections[anilistId] = new SvelteSet(values);
-    }
-
-    function resetPins(anilistId: number) {
-        if (!anilistId) return;
-        pinSelections[anilistId] = new SvelteSet(pinsByAniList[anilistId] ?? []);
-    }
-
-    function clearPins(anilistId: number) {
-        if (!anilistId) return;
-        pinSelections[anilistId] = new SvelteSet();
-        savePins(anilistId);
-    }
-
-    function isPinDirty(anilistId: number): boolean {
-        const selection = selectionValues(anilistId);
-        const existing = pinsByAniList[anilistId] ?? [];
-        if (selection.length !== existing.length) return true;
-        return selection.some((value, index) => value !== existing[index]);
-    }
-
-    function pinFieldLabel(field: string): string {
-        return pinOptions.find((opt) => opt.value === field)?.label ?? field;
-    }
-
-    function pinEntryTitle(anilistId: number): string {
-        const match = items.find((item) => item.anilist_id === anilistId);
-        const fallback = `AniList ID ${anilistId}`;
-        return match ? displayTitle(match) || fallback : fallback;
-    }
-
-    async function loadPinOptions() {
-        try {
-            const data = await apiJson<PinOptionsResponse>("/api/pins/fields");
-            pinOptions = data.options ?? [];
-        } catch (e) {
-            console.error(e);
-            toast("Failed to load pin options", "warn");
-        }
-    }
-
-    async function loadPinEntries() {
-        managePinsLoading = true;
-        try {
-            const data = await apiJson<PinListResponse>(`/api/pins/${params.profile}`);
-            const entries = data.pins ?? [];
-            pinEntries = entries
-                .slice()
-                .sort(
-                    (a, b) =>
-                        new Date(b.updated_at).getTime() -
-                        new Date(a.updated_at).getTime(),
-                );
-            const next: Record<number, string[]> = { ...pinsByAniList };
-            for (const entry of pinEntries) {
-                next[entry.anilist_id] = [...entry.fields];
-                pinSelections[entry.anilist_id] = new SvelteSet(entry.fields);
-            }
-            pinsByAniList = next;
-        } catch (e) {
-            console.error(e);
-            toast("Failed to load pins", "warn");
-        } finally {
-            managePinsLoading = false;
-        }
-    }
-
-    function applyPinResponse(entry: PinResponse) {
-        setPinnedFields(entry.anilist_id, entry.fields);
-        pinEntries = [
-            entry,
-            ...pinEntries.filter((p) => p.anilist_id !== entry.anilist_id),
-        ].sort(
-            (a, b) =>
-                new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
-        );
-    }
-
-    function togglePinEditor(key: string, anilistId: number | null | undefined) {
-        if (!anilistId) {
-            toast("Pinning is only available when an AniList entry exists", "warn");
-            return;
-        }
-        pinEditorOpen[key] = !pinEditorOpen[key];
-        ensurePinSelection(anilistId);
-    }
-
-    function editorIsOpen(key: string): boolean {
-        return !!pinEditorOpen[key];
-    }
-
-    function isPinSaving(anilistId: number): boolean {
-        return !!pinSaving[anilistId];
-    }
-
-    async function savePins(anilistId: number) {
-        if (!anilistId) return;
-        if (isPinSaving(anilistId)) return;
-        const fields = selectionValues(anilistId);
-        pinSaving[anilistId] = true;
-        try {
-            if (!fields.length) {
-                const res = await apiFetch(
-                    `/api/pins/${params.profile}/${anilistId}`,
-                    { method: "DELETE" },
-                    { successMessage: "Pins removed" },
-                );
-                if (!res.ok) return;
-                removePinEntry(anilistId);
-            } else {
-                const res = await apiFetch(
-                    `/api/pins/${params.profile}/${anilistId}`,
-                    {
-                        method: "PUT",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ fields }),
-                    },
-                    { successMessage: "Pins saved" },
-                );
-                if (!res.ok) return;
-                const data = (await res.json()) as PinResponse;
-                applyPinResponse(data);
-            }
-        } catch (e) {
-            console.error(e);
-            toast("Failed to update pins", "error");
-        } finally {
-            pinSaving[anilistId] = false;
-        }
-    }
-
-    function pinCount(): number {
-        return pinEntries.length;
     }
 
     interface OutcomeMeta {
@@ -439,6 +223,49 @@
         return item.outcome === "synced" || item.outcome === "undone";
     }
 
+    function applyPins(anilistId: number, fields: string[]) {
+        items = items.map((entry) =>
+            entry.anilist_id === anilistId
+                ? { ...entry, pinned_fields: fields.length ? [...fields] : null }
+                : entry,
+        );
+    }
+    function pinCountFor(item: HistoryItem): number {
+        const draft = pinDraftCounts[item.id];
+        if (typeof draft === "number") return draft;
+        return Array.isArray(item.pinned_fields) ? item.pinned_fields.length : 0;
+    }
+
+    function handlePinsDraft(item: HistoryItem, fields: string[]) {
+        pinDraftCounts[item.id] = fields.length;
+    }
+
+    function handlePinsSaved(item: HistoryItem, fields: string[]) {
+        if (item.anilist_id) applyPins(item.anilist_id, fields);
+        pinDraftCounts[item.id] = fields.length;
+    }
+
+    function handlePinsBusy(item: HistoryItem, value: boolean) {
+        pinBusy[item.id] = value;
+    }
+
+    function togglePinsPanel(item: HistoryItem) {
+        if (!item.anilist_id) {
+            toast("Pins are only available when AniList is linked", "warn");
+            return;
+        }
+        const next = !openPins[item.id];
+        openPins[item.id] = next;
+        if (next) {
+            pinDraftCounts[item.id] = Array.isArray(item.pinned_fields)
+                ? item.pinned_fields.length
+                : 0;
+        } else {
+            delete pinDraftCounts[item.id];
+            delete pinBusy[item.id];
+        }
+    }
+
     let undoLoading: Record<number, boolean> = $state({});
 
     async function undoHistory(item: HistoryItem) {
@@ -512,8 +339,10 @@
             pages = d.pages || 1;
             perPage = d.per_page || perPage;
             knownIds = new SvelteSet(items.map((i) => i.id));
+            openPins = {};
+            pinDraftCounts = {};
+            pinBusy = {};
             newItemsCount = 0;
-            ingestItemsForPins(items);
         } catch (e) {
             console.error(e);
         } finally {
@@ -539,7 +368,6 @@
             pages = d.pages || pages;
             perPage = d.per_page || perPage;
             newOnes.forEach((i: HistoryItem) => knownIds.add(i.id));
-            ingestItemsForPins(newOnes);
         } catch (e) {
             console.error(e);
         } finally {
@@ -574,7 +402,6 @@
                         added++;
                     }
                 }
-                ingestItemsForPins(d.items);
                 if (added && !isNearTop) newItemsCount += added;
                 handleScroll();
             } catch {}
@@ -631,8 +458,6 @@
         loadFirst();
         initWs();
         initStatusWs();
-        loadPinOptions();
-        loadPinEntries();
         const io = new IntersectionObserver((entries) => {
             for (const e of entries) if (e.isIntersecting) loadMore();
         });
@@ -663,27 +488,6 @@
         active={outcomeFilter}
         on:toggle={(event) => toggleOutcomeFilter(event.detail)}
         on:clear={() => ((outcomeFilter = null), loadFirst())} />
-    <TimelineManagePins
-        {pinEntries}
-        {pinOptions}
-        {managePinsExpanded}
-        {managePinsLoading}
-        pinCount={pinCount()}
-        {pinEntryTitle}
-        {pinFieldLabel}
-        {editorIsOpen}
-        {ensurePinSelection}
-        {isPinDirty}
-        {isPinSaving}
-        on:refresh={() => loadPinEntries()}
-        on:toggleExpanded={() => (managePinsExpanded = !managePinsExpanded)}
-        on:toggleEditor={(event) =>
-            togglePinEditor(event.detail.key, event.detail.anilistId)}
-        on:clear={(event) => clearPins(event.detail.anilistId)}
-        on:toggleField={(event) =>
-            togglePinField(event.detail.anilistId, event.detail.field)}
-        on:save={(event) => savePins(event.detail.anilistId)}
-        on:reset={(event) => resetPins(event.detail.anilistId)} />
     <div
         class="flex items-center gap-2 text-[11px] text-slate-500"
         hidden={!items.length}>
@@ -703,31 +507,15 @@
         class:hidden={!items.length && !loadingInitial}>
         {#each items as item (item.id)}
             {@const meta = metaFor(item.outcome)}
-            {@const currentPins = item.anilist_id
-                ? (pinsByAniList[item.anilist_id] ?? item.pinned_fields ?? [])
-                : []}
-            {@const hasPin = currentPins.length > 0}
             <TimelineItem
+                profile={params.profile}
                 {item}
                 {meta}
-                {currentPins}
-                {hasPin}
-                {pinOptions}
                 {isProfileRunning}
                 {displayTitle}
                 {coverImage}
                 {anilistUrl}
                 {plexUrl}
-                {pinFieldLabel}
-                {ensurePinSelection}
-                {togglePinField}
-                {isPinDirty}
-                {isPinSaving}
-                {savePins}
-                {resetPins}
-                {clearPins}
-                {togglePinEditor}
-                {editorIsOpen}
                 {canRetry}
                 {retryHistory}
                 retryLoading={retryLoading[item.id] || false}
@@ -738,7 +526,15 @@
                 {canShowDiff}
                 {toggleDiff}
                 openDiff={openDiff[item.id] || false}
-                {ensureDiffUi} />
+                {ensureDiffUi}
+                hasPins={!!item.anilist_id}
+                togglePins={togglePinsPanel}
+                openPins={openPins[item.id] || false}
+                pinButtonLoading={pinBusy[item.id] || false}
+                pinCount={pinCountFor(item)}
+                onPinsDraft={handlePinsDraft}
+                onPinsSaved={handlePinsSaved}
+                onPinsBusy={handlePinsBusy} />
         {/each}
     </div>
     {#if !items.length && !loadingInitial}

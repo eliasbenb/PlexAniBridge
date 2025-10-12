@@ -2,8 +2,6 @@
     import {
         ExternalLink,
         LoaderCircle,
-        Pin,
-        PinOff,
         RefreshCcw,
         RotateCw,
         SquareMinus,
@@ -13,8 +11,9 @@
     import { fade } from "svelte/transition";
 
     import TimelineDiffViewer from "$lib/components/timeline/timeline-diff-viewer.svelte";
+    import TimelineManagePins from "$lib/components/timeline/timeline-manage-pins.svelte";
     import type { ItemDiffUi, OutcomeMeta } from "$lib/components/timeline/types";
-    import type { HistoryItem, PinFieldOption } from "$lib/types/api";
+    import type { HistoryItem } from "$lib/types/api";
 
     interface Props {
         item: HistoryItem;
@@ -23,19 +22,6 @@
         coverImage: (item: HistoryItem) => string | null;
         anilistUrl: (item: HistoryItem) => string | null;
         plexUrl: (item: HistoryItem) => string | null;
-        pinFieldLabel: (field: string) => string;
-        ensurePinSelection: (anilistId: number) => Set<string>;
-        togglePinField: (anilistId: number, field: string) => void;
-        isPinDirty: (anilistId: number) => boolean;
-        isPinSaving: (anilistId: number) => boolean;
-        savePins: (anilistId: number) => void;
-        resetPins: (anilistId: number) => void;
-        clearPins: (anilistId: number) => void;
-        togglePinEditor: (key: string, anilistId: number | null | undefined) => void;
-        editorIsOpen: (key: string) => boolean;
-        pinOptions?: PinFieldOption[];
-        currentPins?: string[];
-        hasPin?: boolean;
         canRetry: (item: HistoryItem) => boolean;
         retryHistory: (item: HistoryItem) => void;
         retryLoading?: boolean;
@@ -48,6 +34,15 @@
         toggleDiff: (id: number) => void;
         openDiff?: boolean;
         ensureDiffUi: (id: number) => ItemDiffUi;
+        hasPins?: boolean;
+        togglePins?: (item: HistoryItem) => void;
+        openPins?: boolean;
+        pinButtonLoading?: boolean;
+        pinCount?: number;
+        profile: string;
+        onPinsDraft?: (item: HistoryItem, fields: string[]) => void;
+        onPinsSaved?: (item: HistoryItem, fields: string[]) => void;
+        onPinsBusy?: (item: HistoryItem, value: boolean) => void;
     }
 
     let {
@@ -57,19 +52,6 @@
         coverImage,
         anilistUrl,
         plexUrl,
-        pinFieldLabel,
-        ensurePinSelection,
-        togglePinField,
-        isPinDirty,
-        isPinSaving,
-        savePins,
-        resetPins,
-        clearPins,
-        togglePinEditor,
-        editorIsOpen,
-        pinOptions = [],
-        currentPins = [],
-        hasPin = false,
         canRetry,
         retryHistory,
         retryLoading = false,
@@ -82,11 +64,18 @@
         toggleDiff,
         openDiff = false,
         ensureDiffUi,
+        hasPins = false,
+        togglePins,
+        openPins = false,
+        pinButtonLoading = false,
+        pinCount,
+        profile,
+        onPinsDraft,
+        onPinsSaved,
+        onPinsBusy,
     }: Props = $props();
 
-    const pinEditorKey = () => `timeline-${item.id}`;
     const ui = () => ensureDiffUi(item.id);
-    const selection = () => ensurePinSelection(item.anilist_id ?? 0);
 </script>
 
 <div
@@ -175,88 +164,8 @@
                             {/if}
                         </div>
                     </div>
-                    {#if currentPins.length}
-                        <div
-                            class="mt-2 flex flex-wrap items-center gap-1 text-[10px] text-sky-200">
-                            <Pin class="h-3 w-3 text-sky-300" />
-                            <span class="tracking-wide text-slate-400 uppercase"
-                                >Pinned:</span>
-                            {#each currentPins as field (field)}
-                                <span
-                                    class="rounded bg-sky-900/50 px-1.5 py-0.5 text-sky-100">
-                                    {pinFieldLabel(field)}
-                                </span>
-                            {/each}
-                        </div>
-                    {/if}
-                    {#if editorIsOpen(pinEditorKey()) && item.anilist_id}
-                        <div
-                            class="mt-3 space-y-3 rounded-md border border-slate-800/70 bg-slate-950/40 p-3 text-[11px] text-slate-200">
-                            {#if pinOptions.length}
-                                <div class="flex flex-wrap gap-2">
-                                    {#each pinOptions as option (option.value)}
-                                        {@const sel = selection()}
-                                        <label
-                                            class={`inline-flex items-center gap-1 rounded border px-2 py-1 transition ${sel.has(option.value) ? "border-sky-600 bg-sky-900/40 text-sky-100" : "border-slate-700 bg-slate-900/60 text-slate-300 hover:border-slate-600"}`}
-                                            ><input
-                                                type="checkbox"
-                                                class="h-3 w-3"
-                                                checked={sel.has(option.value)}
-                                                onchange={() =>
-                                                    togglePinField(
-                                                        item.anilist_id!,
-                                                        option.value,
-                                                    )} />
-                                            {option.label}</label>
-                                    {/each}
-                                </div>
-                            {:else}
-                                <div class="text-slate-400">
-                                    Pin options unavailable. Try refreshing.
-                                </div>
-                            {/if}
-                            <div class="flex flex-wrap items-center gap-2">
-                                <button
-                                    type="button"
-                                    class="inline-flex items-center gap-1 rounded-md border border-sky-600/70 bg-sky-700/40 px-2 py-0.5 text-sky-100 hover:bg-sky-600/50 disabled:opacity-50"
-                                    disabled={!isPinDirty(item.anilist_id!) ||
-                                        isPinSaving(item.anilist_id!)}
-                                    onclick={() => savePins(item.anilist_id!)}>
-                                    {#if isPinSaving(item.anilist_id!)}
-                                        <LoaderCircle
-                                            class="h-3.5 w-3.5 animate-spin" />
-                                        Saving…
-                                    {:else}
-                                        Save
-                                    {/if}
-                                </button>
-                                <button
-                                    type="button"
-                                    class="inline-flex items-center gap-1 rounded-md border border-slate-700/60 px-2 py-0.5 text-slate-200 hover:bg-slate-800/60"
-                                    onclick={() => resetPins(item.anilist_id!)}>
-                                    Reset
-                                </button>
-                                <button
-                                    type="button"
-                                    class="inline-flex items-center gap-1 rounded-md border border-rose-700/60 px-2 py-0.5 text-rose-200 hover:bg-rose-700/60"
-                                    onclick={() => clearPins(item.anilist_id!)}>
-                                    <PinOff class="h-3.5 w-3.5" /> Clear
-                                </button>
-                            </div>
-                        </div>
-                    {/if}
                 </div>
                 <div class="flex shrink-0 items-center gap-2">
-                    <button
-                        type="button"
-                        disabled={!item.anilist_id}
-                        onclick={() => togglePinEditor(pinEditorKey(), item.anilist_id)}
-                        class={`inline-flex h-8 items-center justify-center gap-1 rounded-md border px-2 text-[11px] font-medium transition disabled:opacity-50 ${hasPin ? "border-sky-600/60 bg-sky-700/40 text-sky-100" : "border-slate-700/60 bg-slate-800/40 text-slate-200 hover:bg-slate-700/50"}`}
-                        title={item.anilist_id
-                            ? "Pin AniList fields for this entry"
-                            : "Pinning requires an AniList mapping"}>
-                        <Pin class="inline h-4 w-4" />
-                    </button>
                     {#if canRetry(item)}
                         <button
                             type="button"
@@ -297,8 +206,8 @@
             {#if item.error_message}
                 <div class="text-[11px] text-red-400">{item.error_message}</div>
             {/if}
-            {#if canShowDiff(item)}
-                <div class="pt-1">
+            <div class="flex gap-3 pt-1">
+                {#if canShowDiff(item)}
                     <button
                         type="button"
                         onclick={() => toggleDiff(item.id)}
@@ -327,8 +236,58 @@
                         <span class="diff-label relative"
                             >{openDiff ? "Hide diff" : "Show diff"}</span>
                     </button>
-                </div>
-            {/if}
+                {/if}
+                {#if hasPins && togglePins}
+                    <button
+                        type="button"
+                        class={`diff-toggle inline-flex items-center gap-1 text-xs text-sky-400 hover:text-sky-300 ${
+                            openPins ? "open" : ""
+                        }`}
+                        onclick={() => togglePins(item)}
+                        aria-expanded={openPins}
+                        aria-pressed={openPins}
+                        aria-busy={pinButtonLoading}
+                        disabled={pinButtonLoading}>
+                        <span
+                            class="relative inline-flex h-4 w-4 items-center justify-center overflow-hidden">
+                            {#if openPins}
+                                <span
+                                    in:fade={{ duration: 140 }}
+                                    out:fade={{ duration: 90 }}
+                                    class="absolute inset-0 flex items-center justify-center">
+                                    <SquareMinus
+                                        class="diff-icon inline h-4 w-4 text-[14px]" />
+                                </span>
+                            {:else}
+                                <span
+                                    in:fade={{ duration: 140 }}
+                                    out:fade={{ duration: 90 }}
+                                    class="absolute inset-0 flex items-center justify-center">
+                                    <SquarePlus
+                                        class="diff-icon inline h-4 w-4 text-[14px]" />
+                                </span>
+                            {/if}
+                            {#if pinButtonLoading}
+                                <span
+                                    class="absolute inset-0 flex items-center justify-center rounded-full bg-slate-950/70"
+                                    in:fade={{ duration: 100 }}
+                                    out:fade={{ duration: 100 }}>
+                                    <LoaderCircle
+                                        class="inline h-3.5 w-3.5 animate-spin text-sky-300" />
+                                </span>
+                            {/if}
+                        </span>
+                        <span class="diff-label relative"
+                            >{openPins ? "Hide pins" : "Show pins"}</span>
+                        {#if typeof pinCount === "number"}
+                            <span
+                                class="rounded bg-slate-800/70 px-1 text-[10px] font-semibold text-slate-300">
+                                {pinCount}
+                            </span>
+                        {/if}
+                    </button>
+                {/if}
+            </div>
         </div>
     </div>
 </div>
@@ -336,6 +295,26 @@
     <TimelineDiffViewer
         {item}
         ui={ui()} />
+{/if}
+{#if openPins && hasPins}
+    <TimelineManagePins
+        {profile}
+        {item}
+        on:draft={(event) =>
+            onPinsDraft?.(
+                item,
+                (event as CustomEvent<{ fields: string[] }>).detail.fields,
+            )}
+        on:saved={(event) =>
+            onPinsSaved?.(
+                item,
+                (event as CustomEvent<{ fields: string[] }>).detail.fields,
+            )}
+        on:busy={(event) =>
+            onPinsBusy?.(
+                item,
+                (event as CustomEvent<{ value: boolean }>).detail.value,
+            )} />
 {/if}
 
 <style>
@@ -365,6 +344,10 @@
     }
     :global(.diff-toggle:not(.open):hover .diff-icon) {
         transform: rotate(6deg);
+    }
+    :global(.diff-toggle:disabled) {
+        cursor: not-allowed;
+        opacity: 0.6;
     }
     @media (prefers-reduced-motion: reduce) {
         :global(.diff-toggle .diff-icon),
