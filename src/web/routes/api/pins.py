@@ -189,12 +189,14 @@ async def search_pins(
 async def get_pin(
     profile: str = Path(..., min_length=1),
     anilist_id: int = Path(..., ge=1),
+    with_anilist: bool = Query(False),
 ) -> PinEntry:
     """Retrieve pin configuration for a specific AniList entry.
 
     Args:
         profile (str): Profile name.
         anilist_id (int): AniList ID.
+        with_anilist (bool): Include AniList metadata for the pin when true.
 
     Returns:
         PinEntry: Pin configuration.
@@ -203,6 +205,18 @@ async def get_pin(
     entry = service.get_pin(profile, anilist_id)
     if not entry:
         raise HTTPException(status_code=404, detail="Pin not found")
+
+    if with_anilist:
+        try:
+            client = await get_app_state().ensure_public_anilist()
+            media = await client.get_anime(anilist_id)
+            metadata = AniListMetadata.model_validate(
+                media.model_dump(exclude_none=True)
+            )
+            return entry.model_copy(update={"anilist": metadata})
+        except ClientError:
+            pass
+
     return entry
 
 
@@ -211,6 +225,7 @@ async def upsert_pin(
     request: UpdatePinRequest,
     profile: str = Path(..., min_length=1),
     anilist_id: int = Path(..., ge=1),
+    with_anilist: bool = Query(False),
 ) -> PinEntry:
     """Create or update pin fields for an AniList entry.
 
@@ -218,6 +233,7 @@ async def upsert_pin(
         request (UpdatePinRequest): Request body with fields to pin.
         profile (str): Profile name.
         anilist_id (int): AniList ID.
+        with_anilist (bool): Include AniList metadata for the pin when true.
 
     Returns:
         PinEntry: Updated pin configuration.
@@ -227,6 +243,19 @@ async def upsert_pin(
         entry = get_pin_service().upsert_pin(profile, anilist_id, payload.normalized())
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    if with_anilist:
+        try:
+            client = await get_app_state().ensure_public_anilist()
+            media = await client.get_anime(anilist_id)
+            metadata = AniListMetadata.model_validate(
+                media.model_dump(exclude_none=True)
+            )
+            return entry.model_copy(update={"anilist": metadata})
+        except ClientError:
+            # Don't fail the save if AniList lookup fails; return bare entry
+            pass
+
     return entry
 
 

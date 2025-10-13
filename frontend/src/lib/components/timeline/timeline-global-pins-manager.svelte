@@ -157,7 +157,7 @@
                 return;
             }
             const r = await apiFetch(
-                `/api/pins/${profile}/${aid}`,
+                `/api/pins/${profile}/${aid}?with_anilist=true`,
                 {
                     method: "PUT",
                     headers: { "Content-Type": "application/json" },
@@ -169,11 +169,24 @@
             const d = (await r.json()) as PinResponse;
             const next = d.fields || [];
             setRow(aid, next, true);
+
+            const existing = pinned.find((p) => p.anilist_id === aid) || null;
+            let anilistMeta = d.anilist ?? existing?.anilist ?? null;
+            if (!anilistMeta) {
+                const resMatch = results.find((res) => Number(res.anilist.id) === aid);
+                anilistMeta = resMatch?.anilist ?? null;
+            }
+            const merged: PinResponse = {
+                ...(existing ?? {}),
+                ...d,
+                anilist: anilistMeta,
+            } as PinResponse;
+
             const idx = pinned.findIndex((p) => p.anilist_id === aid);
-            if (idx >= 0) pinned[idx] = d;
-            else pinned = [d, ...pinned];
+            if (idx >= 0) pinned[idx] = merged;
+            else pinned = [merged, ...pinned];
             results = results.map((res) =>
-                Number(res.anilist.id) === aid ? { ...res, pin: d } : res,
+                Number(res.anilist.id) === aid ? { ...res, pin: merged } : res,
             );
         } catch (e) {
             console.error(e);
