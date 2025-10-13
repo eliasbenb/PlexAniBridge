@@ -15,6 +15,7 @@
     } from "@lucide/svelte";
     import { SvelteSet, SvelteURLSearchParams } from "svelte/reactivity";
 
+    import TimelineGlobalPinsManager from "$lib/components/timeline/timeline-global-pins-manager.svelte";
     import TimelineHeader from "$lib/components/timeline/timeline-header.svelte";
     import TimelineItem from "$lib/components/timeline/timeline-item.svelte";
     import TimelineOutcomeFilters from "$lib/components/timeline/timeline-outcome-filters.svelte";
@@ -483,12 +484,16 @@
         onFullSync={() => triggerSync(false)}
         onPollSync={() => triggerSync(true)}
         onRefresh={loadFirst} />
+    <div class="-mt-1">
+        <TimelineGlobalPinsManager profile={params.profile} />
+    </div>
     <TimelineOutcomeFilters
         meta={OUTCOME_META}
         {stats}
         active={outcomeFilter}
         on:toggle={(event) => toggleOutcomeFilter(event.detail)}
         on:clear={() => ((outcomeFilter = null), loadFirst())} />
+
     <div
         class="flex items-center gap-2 text-[11px] text-slate-500"
         hidden={!items.length}>

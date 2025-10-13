@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 from src.config.database import db
 from src.config.settings import SyncField
 from src.models.db.pin import Pin
+from src.models.schemas.anilist import MediaWithoutList as AniListMetadata
 
 __all__ = [
     "PinEntry",
@@ -48,6 +49,7 @@ class PinEntry(BaseModel):
     fields: list[str]
     created_at: datetime
     updated_at: datetime
+    anilist: AniListMetadata | None = None
 
 
 class UpdatePinPayload(BaseModel):
@@ -183,13 +185,14 @@ class PinService:
         return sanitized
 
     @staticmethod
-    def _serialize(pin: Pin) -> PinEntry:
+    def _serialize(pin: Pin, media: AniListMetadata | None = None) -> PinEntry:
         return PinEntry(
             profile_name=pin.profile_name,
             anilist_id=pin.anilist_id,
             fields=list(pin.fields or []),
             created_at=pin.created_at,
             updated_at=pin.updated_at,
+            anilist=media,
         )
 
 

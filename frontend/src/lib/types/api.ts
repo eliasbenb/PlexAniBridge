@@ -183,6 +183,7 @@ export interface PinResponse {
     fields: string[];
     created_at: string;
     updated_at: string;
+    anilist?: AniListMediaWithoutList | null;
 }
 
 export interface PinListResponse {
@@ -191,6 +192,15 @@ export interface PinListResponse {
 
 export interface PinOptionsResponse {
     options: PinFieldOption[];
+}
+
+export interface PinSearchResult {
+    anilist: AniListMediaWithoutList;
+    pin?: PinResponse | null;
+}
+
+export interface PinSearchResponse {
+    results: PinSearchResult[];
 }
 
 // --- Backups API ---

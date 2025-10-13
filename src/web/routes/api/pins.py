@@ -1,15 +1,18 @@
 """API routes for managing AniList field pins."""
 
-from fastapi import APIRouter, HTTPException, Path
+from aiohttp import ClientError
+from fastapi import APIRouter, HTTPException, Path, Query
 from pydantic import BaseModel, Field
 
 from src.config.settings import SyncField
+from src.models.schemas.anilist import MediaWithoutList as AniListMetadata
 from src.web.services.pin_service import (
     PinEntry,
     PinFieldOption,
     UpdatePinPayload,
     get_pin_service,
 )
+from src.web.state import get_app_state
 
 router = APIRouter()
 
@@ -24,6 +27,19 @@ class PinOptionsResponse(BaseModel):
     """Response model for available pin field options."""
 
     options: list[PinFieldOption]
+
+
+class PinSearchItem(BaseModel):
+    """Search result item combining AniList metadata with existing pin state."""
+
+    anilist: AniListMetadata
+    pin: PinEntry | None = None
+
+
+class PinSearchResponse(BaseModel):
+    """Response model for AniList search results within the pin manager."""
+
+    results: list[PinSearchItem]
 
 
 class UpdatePinRequest(BaseModel):
@@ -60,18 +76,129 @@ async def get_pin_fields() -> PinOptionsResponse:
 
 
 @router.get("/{profile}", response_model=PinListResponse)
-async def list_pins(profile: str = Path(..., min_length=1)) -> PinListResponse:
+async def list_pins(
+    profile: str = Path(..., min_length=1),
+    with_anilist: bool = Query(False),
+) -> PinListResponse:
     """List all pinned AniList entries for a profile.
 
     Args:
         profile (str): Profile name.
+        with_anilist (bool): Include AniList metadata for each pin when true.
 
     Returns:
         PinListResponse: List of pinned entries.
     """
     service = get_pin_service()
     entries = service.list_pins(profile)
+    if with_anilist and entries:
+        try:
+            client = await get_app_state().ensure_public_anilist()
+            media_list = await client.batch_get_anime(
+                [entry.anilist_id for entry in entries]
+            )
+        except ClientError as exc:
+            raise HTTPException(502, detail="Failed to fetch AniList metadata") from exc
+        media_by_id = {
+            int(media.id): AniListMetadata.model_validate(
+                media.model_dump(exclude_none=True)
+            )
+            for media in media_list
+            if getattr(media, "id", None) is not None
+        }
+        entries = [
+            entry.model_copy(update={"anilist": media_by_id.get(entry.anilist_id)})
+            if media_by_id.get(entry.anilist_id)
+            else entry
+            for entry in entries
+        ]
     return PinListResponse(pins=entries)
+
+
+@router.get("/{profile}/search", response_model=PinSearchResponse)
+async def search_pins(
+    profile: str = Path(..., min_length=1),
+    q: str | None = Query(None, min_length=1),
+    anilist_id: int | None = Query(None, ge=1),
+    limit: int = Query(10, ge=1, le=50),
+) -> PinSearchResponse:
+    """Search AniList for entries to manage pins against.
+
+    Args:
+        profile: Profile name to scope existing pins.
+        q: Optional text query to search AniList titles.
+        anilist_id: Optional AniList ID to look up directly.
+        limit: Maximum number of search results to return.
+
+    Returns:
+        PinSearchResponse: Matched AniList titles with pin status.
+    """
+    query = (q or "").strip()
+    if not query and not anilist_id:
+        raise HTTPException(status_code=400, detail="Provide a query or AniList ID")
+
+    service = get_pin_service()
+    existing = {entry.anilist_id: entry for entry in service.list_pins(profile)}
+
+    try:
+        client = await get_app_state().ensure_public_anilist()
+    except Exception as exc:
+        raise HTTPException(503, detail="AniList client unavailable") from exc
+
+    results: list[PinSearchItem] = []
+    seen: set[int] = set()
+
+    async def add_media(media) -> None:
+        if media is None or getattr(media, "id", None) is None:
+            return
+        aid = int(media.id)
+        if aid in seen:
+            return
+        seen.add(aid)
+        metadata = AniListMetadata.model_validate(media.model_dump(exclude_none=True))
+        pin = existing.get(aid)
+        if pin is not None:
+            pin = pin.model_copy(update={"anilist": metadata})
+        results.append(PinSearchItem(anilist=metadata, pin=pin))
+
+    try:
+        if anilist_id is not None:
+            try:
+                media = await client.get_anime(anilist_id)
+            except ClientError as exc:
+                raise HTTPException(
+                    status_code=404, detail="AniList title not found"
+                ) from exc
+            except (KeyError, TypeError) as exc:
+                raise HTTPException(
+                    status_code=404, detail="AniList title not found"
+                ) from exc
+            else:
+                await add_media(media)
+
+        if query:
+            try:
+                count = 0
+                async for media in client.search_anime(
+                    query,
+                    is_movie=None,
+                    episodes=None,
+                    limit=limit,
+                ):
+                    await add_media(media)
+                    count += 1
+                    if count >= limit:
+                        break
+            except ClientError as exc:
+                raise HTTPException(502, detail="Failed to query AniList") from exc
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(
+            500, detail="Unexpected error during AniList search"
+        ) from exc
+
+    return PinSearchResponse(results=results)
 
 
 @router.get("/{profile}/{anilist_id}", response_model=PinEntry)
