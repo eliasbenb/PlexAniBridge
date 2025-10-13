@@ -545,8 +545,8 @@ class MediaWithoutList(AniListBaseModel):
     type: MediaType | None = None
     format: MediaFormat | None = None
     status: MediaStatus | None = None
-    # season: MediaSeason | None = None
-    # season_year: int | None = None
+    season: MediaSeason | None = None
+    season_year: int | None = None
     episodes: int | None = None
     duration: int | None = None
     cover_image: MediaCoverImage | None = None

@@ -230,6 +230,7 @@
                 : entry,
         );
     }
+
     function pinCountFor(item: HistoryItem): number {
         const draft = pinDraftCounts[item.id];
         if (typeof draft === "number") return draft;

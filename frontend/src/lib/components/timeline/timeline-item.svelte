@@ -158,6 +158,13 @@
                                     {item.anilist.status}
                                 </span>
                             {/if}
+                            {#if item.anilist?.season && item.anilist?.seasonYear}
+                                <span
+                                    class="rounded bg-slate-800/70 px-1 py-0.5 tracking-wide uppercase">
+                                    {item.anilist.season}
+                                    {item.anilist.seasonYear}
+                                </span>
+                            {/if}
                             {#if item.anilist?.episodes}
                                 <span class="rounded bg-slate-800/70 px-1 py-0.5"
                                     >EP {item.anilist.episodes}</span>
