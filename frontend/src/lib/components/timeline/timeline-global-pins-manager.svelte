@@ -2,12 +2,13 @@
     import { onMount } from "svelte";
 
     import {
-        ChevronDown,
-        ChevronRight,
+        ExternalLink,
         LoaderCircle,
         Pin,
         RefreshCcw,
         Search,
+        SquareMinus,
+        SquarePlus,
         X,
     } from "@lucide/svelte";
 
@@ -28,10 +29,9 @@
     interface Props {
         profile: string;
     }
-
     let { profile }: Props = $props();
 
-    // Inline panel open state
+    // Panel open state
     let open = $state(false);
 
     // Shared pin options
@@ -67,6 +67,12 @@
         m?.coverImage?.extraLarge ||
         null;
 
+    const anilistUrlFor = (m?: AniListMediaWithoutList | null): string | null => {
+        if (!m?.id) return null;
+        const typePath = m?.type === "MANGA" ? "manga" : "anime";
+        return `https://anilist.co/${typePath}/${m.id}`;
+    };
+
     function setRow(aid: number, fields: string[], updateBaseline = false) {
         selections[aid] = [...fields];
         if (updateBaseline) baselines[aid] = [...fields];
@@ -95,7 +101,6 @@
             if (!r.ok) throw new Error("HTTP " + r.status);
             const d = (await r.json()) as PinListResponse;
             pinned = d.pins || [];
-
             for (const p of pinned) setRow(p.anilist_id, p.fields || [], true);
         } catch (e) {
             console.error(e);
@@ -121,7 +126,6 @@
             if (!r.ok) throw new Error("HTTP " + r.status);
             const d = (await r.json()) as PinSearchResponse;
             results = d.results || [];
-
             for (const res of results) {
                 const base = res.pin?.fields || [];
                 setRow(Number(res.anilist.id), base, true);
@@ -144,17 +148,14 @@
                     method: "DELETE",
                 });
                 if (!r.ok) throw new Error("HTTP " + r.status);
-
                 setRow(aid, [], true);
                 pinned = pinned.filter((p) => p.anilist_id !== aid);
-
                 results = results.map((res) =>
                     Number(res.anilist.id) === aid ? { ...res, pin: null } : res,
                 );
                 toast("Pins cleared", "success");
                 return;
             }
-
             const r = await apiFetch(
                 `/api/pins/${profile}/${aid}`,
                 {
@@ -168,11 +169,9 @@
             const d = (await r.json()) as PinResponse;
             const next = d.fields || [];
             setRow(aid, next, true);
-
             const idx = pinned.findIndex((p) => p.anilist_id === aid);
             if (idx >= 0) pinned[idx] = d;
             else pinned = [d, ...pinned];
-
             results = results.map((res) =>
                 Number(res.anilist.id) === aid ? { ...res, pin: d } : res,
             );
@@ -207,7 +206,6 @@
 
     $effect(() => {
         if (!open) {
-            // collapse all rows and reset transient states when panel is closed
             expanded = {};
             saving = {};
             rowError = {};
@@ -217,9 +215,158 @@
     onMount(() => {
         void ensureOptions(false);
     });
+
+    interface RowEntryProps {
+        aid: number;
+        anilist?: AniListMediaWithoutList | null;
+        sel: string[];
+        base: string[];
+        accentClass: string;
+        options: PinFieldOption[];
+        optionsLoading: boolean;
+        savingFlag: boolean;
+        rowErr: string | null;
+        disabled: boolean;
+        onSave: (value: string[]) => void;
+        onChange: (value: string[]) => void;
+        onRefresh: () => void;
+    }
 </script>
 
-<!-- Toggle chip -->
+{#snippet RowEntry(props: RowEntryProps)}
+    {@const {
+        aid,
+        anilist,
+        sel,
+        base,
+        accentClass,
+        options,
+        optionsLoading,
+        savingFlag,
+        rowErr,
+        disabled,
+        onSave,
+        onChange,
+        onRefresh,
+    } = props}
+    <div class="px-3 py-2">
+        <div
+            class="flex gap-3 overflow-hidden rounded-md border border-slate-800 bg-slate-900/60 p-4 shadow-sm backdrop-blur-sm transition-shadow hover:shadow-md">
+            <div class={`w-1 rounded-md ${accentClass}`}></div>
+            <div class="flex min-w-0 flex-1 gap-3">
+                {#if coverOf(anilist)}
+                    <div
+                        class="relative h-20 w-14 shrink-0 overflow-hidden rounded-md border border-slate-800 bg-slate-800/40">
+                        <img
+                            src={coverOf(anilist)!}
+                            alt={titleOf(anilist) || "Cover"}
+                            loading="lazy"
+                            class="h-full w-full object-cover" />
+                    </div>
+                {:else}
+                    <div
+                        class="flex h-20 w-14 shrink-0 items-center justify-center rounded-md border border-dashed border-slate-700 bg-slate-800/30 text-[9px] text-slate-500">
+                        No Art
+                    </div>
+                {/if}
+                <div class="min-w-0 flex-1 space-y-1">
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="min-w-0">
+                            <div class="flex items-center gap-2">
+                                <span
+                                    class="truncate text-base font-medium"
+                                    title={titleOf(anilist)}>{titleOf(anilist)}</span>
+                            </div>
+                            <div
+                                class="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-400">
+                                {#if anilist?.id}
+                                    <!-- eslint-disable svelte/no-navigation-without-resolve -->
+                                    <a
+                                        href={anilistUrlFor(anilist)!}
+                                        target="_blank"
+                                        rel="noopener"
+                                        class="inline-flex items-center gap-1 rounded-md border border-sky-600/60 bg-sky-700/50 px-1 py-0.5 text-[9px] font-semibold text-sky-100 hover:bg-sky-600/60"
+                                        title="Open in AniList">
+                                        <ExternalLink
+                                            class="inline h-3.5 w-3.5 text-[11px]" />
+                                        AniList
+                                    </a>
+                                    <!-- eslint-enable svelte/no-navigation-without-resolve -->
+                                {/if}
+                                <div
+                                    class="hidden flex-wrap gap-1 text-[9px] text-slate-400 sm:flex">
+                                    {#if anilist?.format}
+                                        <span
+                                            class="rounded bg-slate-800/70 px-1 py-0.5 tracking-wide uppercase"
+                                            title={anilist.format}
+                                            >{anilist.format}</span>
+                                    {/if}
+                                    {#if anilist?.status}
+                                        <span
+                                            class="rounded bg-slate-800/70 px-1 py-0.5 tracking-wide uppercase"
+                                            title={anilist.status}
+                                            >{anilist.status}</span>
+                                    {/if}
+                                    {#if anilist?.season && anilist?.seasonYear}
+                                        <span
+                                            class="rounded bg-slate-800/70 px-1 py-0.5 tracking-wide uppercase"
+                                            title={`${anilist.season} ${anilist.seasonYear}`}
+                                            >{anilist.season}{anilist.seasonYear}</span>
+                                    {/if}
+                                    {#if anilist?.episodes}
+                                        <span
+                                            class="rounded bg-slate-800/70 px-1 py-0.5"
+                                            >EP {anilist.episodes}</span>
+                                    {/if}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex shrink-0 items-center gap-2"></div>
+                    </div>
+                    <div class="flex gap-3 pt-1">
+                        <button
+                            type="button"
+                            class={`diff-toggle inline-flex items-center gap-1 text-xs text-sky-400 hover:text-sky-300 ${expanded[aid] ? "open" : ""}`}
+                            onclick={() => toggleRow(aid)}
+                            aria-expanded={expanded[aid] || false}>
+                            <span
+                                class="relative inline-flex h-4 w-4 items-center justify-center overflow-hidden">
+                                {#if expanded[aid]}
+                                    <SquareMinus
+                                        class="diff-icon inline h-4 w-4 text-[14px]" />
+                                {:else}
+                                    <SquarePlus
+                                        class="diff-icon inline h-4 w-4 text-[14px]" />
+                                {/if}
+                            </span>
+                            <span class="diff-label relative"
+                                >{expanded[aid] ? "Hide pins" : "Show pins"}</span>
+                            <span
+                                class="rounded bg-slate-800/70 px-1 text-[10px] font-semibold text-slate-300"
+                                >{sel.length}</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {#if expanded[aid]}
+            <PinFieldsEditor
+                value={sel}
+                baseline={base}
+                {options}
+                loading={optionsLoading}
+                saving={savingFlag}
+                error={rowErr}
+                {disabled}
+                title="Pin fields"
+                subtitle="Keep these fields unchanged for this entry when syncing."
+                on:save={(e) => onSave(e.detail.value as string[])}
+                on:change={(e) => onChange(e.detail.value as string[])}
+                on:refresh={onRefresh} />
+        {/if}
+    </div>
+{/snippet}
+
 <div class="relative inline-flex items-center gap-2">
     <button
         type="button"
@@ -246,7 +393,6 @@
     </button>
 </div>
 
-<!-- Inline collapsible panel -->
 {#if open}
     <section
         id="global-pins-panel"
@@ -260,7 +406,7 @@
                         class="pointer-events-none absolute top-1/2 left-2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
                     <input
                         class="h-8 w-full rounded-md border border-slate-700 bg-slate-900 pr-8 pl-8 text-[12px] text-slate-100 placeholder-slate-500 focus:border-slate-500 focus:outline-none"
-                        placeholder="Search AniList titles or paste an ID"
+                        placeholder="Search AniList titles"
                         bind:value={q}
                         onkeydown={(e) => (e.key === "Enter" ? search() : undefined)} />
                     {#if q}
@@ -331,66 +477,24 @@
                     {/if}
                     {#each pinned as p (p.anilist_id)}
                         {@const aid = p.anilist_id}
-                        <div class="px-3 py-2">
-                            <div class="flex items-center gap-3">
-                                <button
-                                    class="rounded-md border border-slate-700 bg-slate-900/50 p-1 text-slate-300 hover:border-slate-600"
-                                    title={expanded[aid] ? "Collapse" : "Expand"}
-                                    aria-expanded={expanded[aid] || false}
-                                    onclick={() => toggleRow(aid)}>
-                                    {#if expanded[aid]}
-                                        <ChevronDown class="h-4 w-4" />
-                                    {:else}
-                                        <ChevronRight class="h-4 w-4" />
-                                    {/if}
-                                </button>
-                                {#if coverOf(p.anilist)}
-                                    <div
-                                        class="relative h-16 w-11 shrink-0 overflow-hidden rounded-md border border-slate-800 bg-slate-800/40">
-                                        <img
-                                            src={coverOf(p.anilist)!}
-                                            alt={titleOf(p.anilist) || "Cover"}
-                                            loading="lazy"
-                                            class="h-full w-full object-cover" />
-                                    </div>
-                                {:else}
-                                    <div
-                                        class="flex h-16 w-11 shrink-0 items-center justify-center rounded-md border border-dashed border-slate-700 bg-slate-800/30 text-[9px] text-slate-500">
-                                        No Art
-                                    </div>
-                                {/if}
-                                <div class="min-w-0 flex-1">
-                                    <div
-                                        class="truncate text-[12px] font-medium text-slate-100">
-                                        {titleOf(p.anilist)}
-                                    </div>
-                                    <div class="text-[10px] text-slate-400">
-                                        AniList ID: {aid}
-                                    </div>
-                                </div>
-                                <div class="text-[11px] text-slate-400">
-                                    <span
-                                        class="rounded-md border border-slate-700 bg-slate-900/60 px-2 py-0.5"
-                                        >{(selections[aid] || []).length} selected</span>
-                                </div>
-                            </div>
-                            {#if expanded[aid]}
-                                <PinFieldsEditor
-                                    value={selections[aid] || []}
-                                    baseline={baselines[aid] || []}
-                                    {options}
-                                    loading={optionsLoading}
-                                    saving={saving[aid] || false}
-                                    error={rowError[aid] || null}
-                                    disabled={!!optionsError}
-                                    title="Pin fields"
-                                    subtitle="Keep these fields unchanged for this entry when syncing."
-                                    on:save={(e) => save(aid, e.detail.value)}
-                                    on:change={(e) =>
-                                        (selections[aid] = [...e.detail.value])}
-                                    on:refresh={() => ensureOptions(true)} />
-                            {/if}
-                        </div>
+                        {@const base = p.fields || []}
+                        {@const sel = selections[aid] ?? base}
+                        {@render RowEntry({
+                            aid,
+                            anilist: p.anilist,
+                            sel,
+                            base: baselines[aid] ?? base,
+                            accentClass: "bg-fuchsia-700/60",
+                            options,
+                            optionsLoading,
+                            savingFlag: saving[aid] || false,
+                            rowErr: rowError[aid] || null,
+                            disabled: !!optionsError,
+                            onSave: (value: string[]) => save(aid, value),
+                            onChange: (value: string[]) =>
+                                (selections[aid] = [...value]),
+                            onRefresh: () => ensureOptions(true),
+                        })}
                     {/each}
                 </div>
             </div>
@@ -425,69 +529,27 @@
                     {#each results as r (r.anilist.id)}
                         {@const aid = Number(r.anilist.id)}
                         {@const base = r.pin?.fields || []}
-                        <div class="px-3 py-2">
-                            <div class="flex items-center gap-3">
-                                <button
-                                    class="rounded-md border border-slate-700 bg-slate-900/50 p-1 text-slate-300 hover:border-slate-600"
-                                    title={expanded[aid] ? "Collapse" : "Expand"}
-                                    aria-expanded={expanded[aid] || false}
-                                    onclick={() => toggleRow(aid)}>
-                                    {#if expanded[aid]}
-                                        <ChevronDown class="h-4 w-4" />
-                                    {:else}
-                                        <ChevronRight class="h-4 w-4" />
-                                    {/if}
-                                </button>
-                                {#if coverOf(r.anilist)}
-                                    <div
-                                        class="relative h-16 w-11 shrink-0 overflow-hidden rounded-md border border-slate-800 bg-slate-800/40">
-                                        <img
-                                            src={coverOf(r.anilist)!}
-                                            alt={titleOf(r.anilist) || "Cover"}
-                                            loading="lazy"
-                                            class="h-full w-full object-cover" />
-                                    </div>
-                                {:else}
-                                    <div
-                                        class="flex h-16 w-11 shrink-0 items-center justify-center rounded-md border border-dashed border-slate-700 bg-slate-800/30 text-[9px] text-slate-500">
-                                        No Art
-                                    </div>
-                                {/if}
-                                <div class="min-w-0 flex-1">
-                                    <div
-                                        class="truncate text-[12px] font-medium text-slate-100">
-                                        {titleOf(r.anilist)}
-                                    </div>
-                                    <div class="text-[10px] text-slate-400">
-                                        AniList ID: {aid}
-                                    </div>
-                                </div>
-                                <div class="text-[11px] text-slate-400">
-                                    <span
-                                        class="rounded-md border border-slate-700 bg-slate-900/60 px-2 py-0.5"
-                                        >{(selections[aid] || base).length} selected</span>
-                                </div>
-                            </div>
-                            {#if expanded[aid]}
-                                <PinFieldsEditor
-                                    value={selections[aid] ?? base}
-                                    baseline={baselines[aid] ?? base}
-                                    {options}
-                                    loading={optionsLoading}
-                                    saving={saving[aid] || false}
-                                    error={rowError[aid] || null}
-                                    disabled={!!optionsError}
-                                    title="Pin fields"
-                                    subtitle="Keep these fields unchanged for this entry when syncing."
-                                    on:save={(e) => save(aid, e.detail.value)}
-                                    on:change={(e) =>
-                                        (selections[aid] = [...e.detail.value])}
-                                    on:refresh={() => ensureOptions(true)} />
-                            {/if}
-                        </div>
+                        {@const sel = selections[aid] ?? base}
+                        {@render RowEntry({
+                            aid,
+                            anilist: r.anilist,
+                            sel,
+                            base: baselines[aid] ?? base,
+                            accentClass: "bg-sky-700/60",
+                            options,
+                            optionsLoading,
+                            savingFlag: saving[aid] || false,
+                            rowErr: rowError[aid] || null,
+                            disabled: !!optionsError,
+                            onSave: (value: string[]) => save(aid, value),
+                            onChange: (value: string[]) =>
+                                (selections[aid] = [...value]),
+                            onRefresh: () => ensureOptions(true),
+                        })}
                     {/each}
                 </div>
             </div>
+
             <div
                 class="mt-2 flex items-center justify-between gap-2 border-t border-slate-800 bg-slate-950/60 px-3 py-2 text-[11px] text-slate-400">
                 <div class="flex items-center gap-3">
@@ -514,3 +576,48 @@
         </div>
     </section>
 {/if}
+
+<style>
+    :global(.diff-toggle) {
+        position: relative;
+        transition: color 0.25s ease;
+    }
+    :global(.diff-toggle.open) {
+        animation: diffPulse 900ms ease;
+    }
+    @keyframes diffPulse {
+        0% {
+            text-shadow: 0 0 0 rgba(56, 189, 248, 0);
+        }
+        35% {
+            text-shadow: 0 0 6px rgba(56, 189, 248, 0.7);
+        }
+        100% {
+            text-shadow: 0 0 0 rgba(56, 189, 248, 0);
+        }
+    }
+    :global(.diff-toggle .diff-icon) {
+        transition: transform 220ms ease;
+    }
+    :global(.diff-toggle.open .diff-icon) {
+        transform: rotate(90deg) scale(1.05);
+    }
+    :global(.diff-toggle:not(.open):hover .diff-icon) {
+        transform: rotate(6deg);
+    }
+    :global(.diff-toggle:disabled) {
+        cursor: not-allowed;
+        opacity: 0.6;
+    }
+    @media (prefers-reduced-motion: reduce) {
+        :global(.diff-toggle .diff-icon),
+        :global(.diff-toggle.open .diff-icon),
+        :global(.diff-toggle:not(.open):hover .diff-icon) {
+            transition: none;
+            transform: none;
+        }
+        :global(.diff-toggle.open) {
+            animation: none;
+        }
+    }
+</style>

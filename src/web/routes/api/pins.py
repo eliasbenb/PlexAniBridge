@@ -119,23 +119,21 @@ async def list_pins(
 async def search_pins(
     profile: str = Path(..., min_length=1),
     q: str | None = Query(None, min_length=1),
-    anilist_id: int | None = Query(None, ge=1),
     limit: int = Query(10, ge=1, le=50),
 ) -> PinSearchResponse:
     """Search AniList for entries to manage pins against.
 
     Args:
-        profile: Profile name to scope existing pins.
-        q: Optional text query to search AniList titles.
-        anilist_id: Optional AniList ID to look up directly.
+        profile (str): Profile name to scope existing pins.
+        q (str | None): Text query to search AniList titles.
         limit: Maximum number of search results to return.
 
     Returns:
         PinSearchResponse: Matched AniList titles with pin status.
     """
     query = (q or "").strip()
-    if not query and not anilist_id:
-        raise HTTPException(status_code=400, detail="Provide a query or AniList ID")
+    if not query:
+        raise HTTPException(status_code=400, detail="Provide a search query")
 
     service = get_pin_service()
     existing = {entry.anilist_id: entry for entry in service.list_pins(profile)}
@@ -162,20 +160,6 @@ async def search_pins(
         results.append(PinSearchItem(anilist=metadata, pin=pin))
 
     try:
-        if anilist_id is not None:
-            try:
-                media = await client.get_anime(anilist_id)
-            except ClientError as exc:
-                raise HTTPException(
-                    status_code=404, detail="AniList title not found"
-                ) from exc
-            except (KeyError, TypeError) as exc:
-                raise HTTPException(
-                    status_code=404, detail="AniList title not found"
-                ) from exc
-            else:
-                await add_media(media)
-
         if query:
             try:
                 count = 0
