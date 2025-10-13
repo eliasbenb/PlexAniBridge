@@ -186,7 +186,9 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             ),
         }
         self._extra_fields = {
-            k: v for k, v in extra_fields.items() if k not in self.excluded_sync_fields
+            k: v
+            for k, v in extra_fields.items()
+            if k.value not in self.excluded_sync_fields
         }
 
         self.queued_batch_requests: list[MediaList] = []
@@ -559,9 +561,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             )
             return SyncOutcome.SKIPPED
 
-        pinned_fields: list[str] = []
-        if working_anilist_media_list and original_anilist_media_list:
-            pinned_fields = self._get_pinned_fields(anilist_media.id)
+        pinned_fields: list[str] = self._get_pinned_fields(anilist_media.id)
 
         if pinned_fields:
             effective_excluded_fields = list(
