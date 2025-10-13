@@ -22,6 +22,7 @@ from src.core.sync.stats import (
     SyncStats,
 )
 from src.models.db.animap import AniMap
+from src.models.db.pin import Pin
 from src.models.db.sync_history import MediaType, SyncHistory
 from src.models.schemas.anilist import (
     FuzzyDate,
@@ -171,6 +172,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         self.profile_name = profile_name
 
         self.sync_stats = SyncStats()
+        self._pin_cache: dict[int, list[str]] = {}
 
         extra_fields: dict[SyncField, Callable] = {
             SyncField.STATUS: lambda **kwargs: self._calculate_status(**kwargs),
@@ -184,7 +186,9 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             ),
         }
         self._extra_fields = {
-            k: v for k, v in extra_fields.items() if k not in self.excluded_sync_fields
+            k: v
+            for k, v in extra_fields.items()
+            if k.value not in self.excluded_sync_fields
         }
 
         self.queued_batch_requests: list[MediaList] = []
@@ -202,6 +206,30 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
                 getattr(self, attr), "cache_clear"
             ):
                 getattr(self, attr).cache_clear()
+        self._pin_cache.clear()
+
+    def _get_pinned_fields(self, anilist_id: int | None) -> list[str]:
+        """Retrieve pinned fields for the current profile and AniList entry."""
+        if not anilist_id:
+            return []
+
+        cached = self._pin_cache.get(anilist_id)
+        if cached is not None:
+            return cached
+
+        with db() as ctx:
+            pin: Pin | None = (
+                ctx.session.query(Pin)
+                .filter(
+                    Pin.profile_name == self.profile_name,
+                    Pin.anilist_id == anilist_id,
+                )
+                .first()
+            )
+
+        fields = list(pin.fields) if pin and pin.fields else []
+        self._pin_cache[anilist_id] = fields
+        return fields
 
     async def _create_sync_history(
         self,
@@ -492,7 +520,17 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             anilist_id=anilist_media.id,
         )
 
-        anilist_media_list = anilist_media.media_list_entry
+        original_anilist_media_list = (
+            anilist_media.media_list_entry.model_copy(deep=True)
+            if anilist_media.media_list_entry
+            else None
+        )
+        working_anilist_media_list = (
+            original_anilist_media_list.model_copy(deep=True)
+            if original_anilist_media_list
+            else None
+        )
+
         plex_media_list = await self._get_plex_media_list(
             item=item,
             child_item=child_item,
@@ -501,15 +539,21 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             animapping=animapping,
         )
 
-        if anilist_media_list:
-            anilist_media_list.unset_fields(self.excluded_sync_fields)
+        base_plex_media_list = plex_media_list.model_copy(deep=True)
+
+        if working_anilist_media_list:
+            working_anilist_media_list.unset_fields(self.excluded_sync_fields)
         plex_media_list.unset_fields(self.excluded_sync_fields)
 
         final_media_list = self._merge_media_lists(
-            anilist_media_list=anilist_media_list, plex_media_list=plex_media_list
+            anilist_media_list=working_anilist_media_list,
+            plex_media_list=plex_media_list,
         )
 
-        if final_media_list == anilist_media_list:
+        if (
+            working_anilist_media_list
+            and final_media_list == working_anilist_media_list
+        ):
             log.info(
                 f"{self.__class__.__name__}: [{self.profile_name}] Skipping "
                 f"{item.type} because it is already up to date "
@@ -517,12 +561,67 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             )
             return SyncOutcome.SKIPPED
 
-        if self.destructive_sync and anilist_media_list and not plex_media_list.status:
+        pinned_fields: list[str] = self._get_pinned_fields(anilist_media.id)
+
+        if pinned_fields:
+            effective_excluded_fields = list(
+                {*self.excluded_sync_fields, *pinned_fields}
+            )
+
+            working_anilist_media_list = (
+                original_anilist_media_list.model_copy(deep=True)
+                if original_anilist_media_list
+                else None
+            )
+            plex_media_list = base_plex_media_list.model_copy(deep=True)
+
+            if working_anilist_media_list:
+                working_anilist_media_list.unset_fields(effective_excluded_fields)
+            plex_media_list.unset_fields(effective_excluded_fields)
+
+            final_media_list = self._merge_media_lists(
+                anilist_media_list=working_anilist_media_list,
+                plex_media_list=plex_media_list,
+            )
+
+            if original_anilist_media_list:
+                for field in pinned_fields:
+                    if hasattr(final_media_list, field):
+                        setattr(
+                            final_media_list,
+                            field,
+                            getattr(original_anilist_media_list, field),
+                        )
+                    if working_anilist_media_list and hasattr(
+                        working_anilist_media_list, field
+                    ):
+                        setattr(
+                            working_anilist_media_list,
+                            field,
+                            getattr(original_anilist_media_list, field),
+                        )
+
+            if (
+                working_anilist_media_list
+                and final_media_list == working_anilist_media_list
+            ):
+                log.info(
+                    f"{self.__class__.__name__}: [{self.profile_name}] Skipping "
+                    f"{item.type} because it is already up to date "
+                    f"{debug_log_title} {debug_log_ids}"
+                )
+                return SyncOutcome.SKIPPED
+
+        if (
+            self.destructive_sync
+            and original_anilist_media_list
+            and not plex_media_list.status
+        ):
             log.success(
                 f"{self.__class__.__name__}: [{self.profile_name}] Deleting AniList "
                 f"entry for {item.type} {debug_log_title} {debug_log_ids}"
             )
-            log.success(f"\t\tDELETE: {anilist_media_list}")
+            log.success(f"\t\tDELETE: {original_anilist_media_list}")
 
             if anilist_media.media_list_entry:
                 await self.anilist_client.delete_anime_entry(
@@ -534,7 +633,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
                     item=item,
                     child_item=child_item,
                     grandchild_items=grandchild_items,
-                    media_list_pair=(anilist_media_list, None),
+                    media_list_pair=(original_anilist_media_list, None),
                     animapping=animapping,
                     outcome=SyncOutcome.DELETED,
                 )
@@ -557,14 +656,14 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             )
             log.success(
                 f"\t\tQUEUED UPDATE: {
-                    MediaList.diff(anilist_media_list, final_media_list)
+                    MediaList.diff(original_anilist_media_list, final_media_list)
                 }"
             )
             self.queued_batch_requests.append(final_media_list)
 
             # Store for batch history tracking
             self.batch_history_items.append(
-                (item, child_item, anilist_media_list, final_media_list)
+                (item, child_item, original_anilist_media_list, final_media_list)
             )
 
             return SyncOutcome.SYNCED  # Will be synced in batch
@@ -574,7 +673,8 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
                 f"entry for {item.type} {debug_log_title} {debug_log_ids}"
             )
             log.success(
-                f"\t\tUPDATE: {MediaList.diff(anilist_media_list, final_media_list)}"
+                "\t\tUPDATE: "
+                f"{MediaList.diff(original_anilist_media_list, final_media_list)}"
             )
 
             try:
@@ -589,7 +689,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
                     item=item,
                     child_item=child_item,
                     grandchild_items=grandchild_items,
-                    media_list_pair=(anilist_media_list, final_media_list),
+                    media_list_pair=(original_anilist_media_list, final_media_list),
                     animapping=animapping,
                     outcome=SyncOutcome.SYNCED,
                 )
@@ -606,7 +706,7 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
                     item=item,
                     child_item=child_item,
                     grandchild_items=grandchild_items,
-                    media_list_pair=(anilist_media_list, final_media_list),
+                    media_list_pair=(original_anilist_media_list, final_media_list),
                     animapping=animapping,
                     outcome=SyncOutcome.FAILED,
                     error_message=str(e),

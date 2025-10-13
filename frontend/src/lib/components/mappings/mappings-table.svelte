@@ -155,6 +155,12 @@
                                                             title={m.anilist.status}
                                                             >{m.anilist.status}</span
                                                         >{/if}
+                                                    {#if m.anilist.season && m.anilist.seasonYear}<span
+                                                            class="truncate rounded bg-slate-800/70 px-1 py-0.5 tracking-wide uppercase"
+                                                            title={`${m.anilist.season} ${m.anilist.seasonYear}`}
+                                                            >{m.anilist.season}
+                                                            {m.anilist.seasonYear}</span
+                                                        >{/if}
                                                     {#if m.anilist.episodes}<span
                                                             class="truncate rounded bg-slate-800/70 px-1 py-0.5"
                                                             title={`${m.anilist.episodes} episodes`}

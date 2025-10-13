@@ -19,6 +19,8 @@ export type MediaStatus =
     | "CANCELLED"
     | "HIATUS";
 
+export type MediaSeason = "WINTER" | "SPRING" | "SUMMER" | "FALL";
+
 export interface MediaTitle {
     romaji?: string | null;
     english?: string | null;
@@ -38,6 +40,8 @@ export interface MediaWithoutList {
     type?: MediaType | null;
     format?: MediaFormat | null;
     status?: MediaStatus | null;
+    season?: MediaSeason | null;
+    seasonYear?: number | null;
     episodes?: number | null;
     duration?: number | null;
     coverImage?: MediaCoverImage | null;
@@ -46,5 +50,12 @@ export interface MediaWithoutList {
 
 export type Media = Pick<
     MediaWithoutList,
-    "id" | "format" | "status" | "episodes" | "coverImage" | "title"
+    | "id"
+    | "format"
+    | "status"
+    | "season"
+    | "seasonYear"
+    | "episodes"
+    | "coverImage"
+    | "title"
 >;

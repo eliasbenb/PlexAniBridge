@@ -18,6 +18,7 @@ from src.exceptions import (
     ProfileNotFoundError,
     SchedulerNotInitializedError,
 )
+from src.models.db.pin import Pin
 from src.models.db.sync_history import SyncHistory, SyncOutcome
 from src.models.schemas.anilist import MediaList as AniMediaList
 from src.web.state import get_app_state
@@ -44,6 +45,7 @@ class HistoryItem(BaseModel):
     timestamp: str
     anilist: dict | None = None
     plex: dict | None = None
+    pinned_fields: list[str] | None = None
 
 
 class HistoryPage(BaseModel):
@@ -290,6 +292,20 @@ class HistoryService:
             )
             rows = ctx.session.execute(stmt).scalars().all()
 
+            anilist_ids = [r.anilist_id for r in rows if r.anilist_id]
+            pin_map: dict[tuple[str, int], Pin] = {}
+            if anilist_ids:
+                pin_rows = (
+                    ctx.session.query(Pin)
+                    .filter(
+                        Pin.profile_name == profile,
+                        Pin.anilist_id.in_(anilist_ids),
+                    )
+                    .all()
+                )
+
+                pin_map = {(p.profile_name, p.anilist_id): p for p in pin_rows}
+
         # Fetch AniList data with caching
         anilist_map: dict[int, dict[str, Any]] = {}
         if include_anilist:
@@ -323,6 +339,11 @@ class HistoryService:
                     timestamp=r.timestamp.isoformat(),
                     anilist=anilist_map.get(r.anilist_id) if r.anilist_id else None,
                     plex=plex_map.get(r.plex_guid) if r.plex_guid else None,
+                    pinned_fields=(
+                        pin_map[(r.profile_name, r.anilist_id)].fields
+                        if r.anilist_id and (r.profile_name, r.anilist_id) in pin_map
+                        else None
+                    ),
                 )
             )
 

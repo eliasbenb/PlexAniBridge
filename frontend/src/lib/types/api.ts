@@ -156,6 +156,7 @@ export interface HistoryItem {
         art?: string | null;
         thumb?: string | null;
     } | null;
+    pinned_fields?: string[] | null;
 }
 
 export interface GetHistoryResponse {
@@ -169,6 +170,37 @@ export interface GetHistoryResponse {
 
 export interface UndoResponse {
     item: HistoryItem;
+}
+
+export interface PinFieldOption {
+    value: string;
+    label: string;
+}
+
+export interface PinResponse {
+    profile_name: string;
+    anilist_id: number;
+    fields: string[];
+    created_at: string;
+    updated_at: string;
+    anilist?: AniListMediaWithoutList | null;
+}
+
+export interface PinListResponse {
+    pins: PinResponse[];
+}
+
+export interface PinOptionsResponse {
+    options: PinFieldOption[];
+}
+
+export interface PinSearchResult {
+    anilist: AniListMediaWithoutList;
+    pin?: PinResponse | null;
+}
+
+export interface PinSearchResponse {
+    results: PinSearchResult[];
 }
 
 // --- Backups API ---
