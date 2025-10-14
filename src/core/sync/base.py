@@ -11,6 +11,7 @@ from plexapi.media import Guid
 from plexapi.video import Episode, Movie, Season, Show
 from pydantic import BaseModel
 from rapidfuzz import fuzz
+from sqlalchemy import or_
 
 from src import log
 from src.config.database import db
@@ -261,7 +262,35 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             _after_state.model_dump(mode="json") if _after_state is not None else None
         )
 
+        plex_rating_key = str(item.ratingKey)
+        plex_child_rating_key = str(child_item.ratingKey) if child_item else None
+        plex_type = MediaType.from_item(item)
+
         with db() as ctx:
+            if outcome == SyncOutcome.SYNCED:
+                delete_query = ctx.session.query(SyncHistory).filter(
+                    SyncHistory.profile_name == self.profile_name,
+                    SyncHistory.plex_rating_key == plex_rating_key,
+                    SyncHistory.plex_type == plex_type,
+                    SyncHistory.outcome.in_(
+                        [SyncOutcome.NOT_FOUND, SyncOutcome.FAILED]
+                    ),
+                )
+
+                if plex_child_rating_key is not None:
+                    delete_query = delete_query.filter(
+                        or_(
+                            SyncHistory.plex_child_rating_key == plex_child_rating_key,
+                            SyncHistory.plex_child_rating_key.is_(None),
+                        )
+                    )
+                else:
+                    delete_query = delete_query.filter(
+                        SyncHistory.plex_child_rating_key.is_(None)
+                    )
+
+                delete_query.delete(synchronize_session=False)
+
             if outcome == SyncOutcome.SKIPPED:
                 # If skipped, no need to create a history record
                 return
@@ -271,10 +300,9 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
                     ctx.session.query(SyncHistory)
                     .filter(
                         SyncHistory.profile_name == self.profile_name,
-                        SyncHistory.plex_rating_key == str(item.ratingKey),
-                        SyncHistory.plex_child_rating_key
-                        == (str(child_item.ratingKey) if child_item else None),
-                        SyncHistory.plex_type == MediaType.from_item(item),
+                        SyncHistory.plex_rating_key == plex_rating_key,
+                        SyncHistory.plex_child_rating_key == plex_child_rating_key,
+                        SyncHistory.plex_type == plex_type,
                         SyncHistory.outcome == outcome,
                     )
                     .first()
@@ -293,11 +321,9 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
                 history_record = SyncHistory(
                     profile_name=self.profile_name,
                     plex_guid=item.guid,
-                    plex_rating_key=str(item.ratingKey),
-                    plex_child_rating_key=str(child_item.ratingKey)
-                    if child_item
-                    else None,
-                    plex_type=MediaType.from_item(item),
+                    plex_rating_key=plex_rating_key,
+                    plex_child_rating_key=plex_child_rating_key,
+                    plex_type=plex_type,
                     anilist_id=animapping.anilist_id if animapping else None,
                     outcome=outcome,
                     before_state=before_state,
