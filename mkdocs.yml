@@ -9,6 +9,9 @@ extra:
 plugins:
   - git-tag
   - search
+  - awesome-nav
+  - swagger-ui-tag
+  - redoc-tag
 theme:
   name: material
   logo: img/logo.png

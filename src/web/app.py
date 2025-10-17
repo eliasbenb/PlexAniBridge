@@ -15,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from src import log
+from src import __version__, log
 from src.core.sched import SchedulerClient
 from src.exceptions import PlexAniBridgeError
 from src.web.routes import router
@@ -132,7 +132,7 @@ def create_app(scheduler: SchedulerClient | None = None) -> FastAPI:
     Returns:
         FastAPI: The created FastAPI application.
     """
-    app = FastAPI(title="PlexAniBridge", lifespan=lifespan)
+    app = FastAPI(title="PlexAniBridge", lifespan=lifespan, version=__version__)
 
     if scheduler:
         app.extra["scheduler"] = scheduler

@@ -10,6 +10,6 @@ __all__ = ["router"]
 
 router = APIRouter()
 
-router.include_router(api_router, prefix="/api", tags=["api"])
-router.include_router(webhook_router, prefix="/webhook", tags=["webhook"])
-router.include_router(ws_router, prefix="/ws", tags=["ws"])
+router.include_router(api_router, prefix="/api", tags=[])
+router.include_router(webhook_router, prefix="/webhook", tags=[])
+router.include_router(ws_router, prefix="/ws", tags=[])
