@@ -1,0 +1,17 @@
+nav:
+  - index.md
+  - configuration.md
+  - Quick start:
+      - quick-start/docker.md
+      - quick-start/source.md
+  - Web:
+      - web/screenshots.md
+      - web/timeline.md
+      - web/mappings.md
+      - web/logs.md
+      - web/backups.md
+  - Mappings:
+      - mappings/custom-mappings.md
+      - mappings/mappings-querying-language.md
+  - Recovery:
+      - recovery/disaster-recovery.md

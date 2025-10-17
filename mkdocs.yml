@@ -9,6 +9,7 @@ extra:
 plugins:
   - git-tag
   - search
+  - awesome-nav
 theme:
   name: material
   logo: img/logo.png
