@@ -1,0 +1,14 @@
+/* Source: https://github.com/dilanx/redark */
+
+body {
+  background-color: #1e2129;
+}
+  
+.react-tabs__tab--selected {
+  border: none !important;
+  background-color: #3f3f46 !important;
+}
+
+:root {
+  color-scheme: dark;
+}
