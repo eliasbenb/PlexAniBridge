@@ -6,6 +6,7 @@ nav:
       - quick-start/source.md
   - Web:
       - web/screenshots.md
+      - web/api.md
       - web/timeline.md
       - web/mappings.md
       - web/logs.md
