@@ -567,13 +567,12 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
 
         base_plex_media_list = plex_media_list.model_copy(deep=True)
 
-        if working_anilist_media_list:
-            working_anilist_media_list.unset_fields(self.excluded_sync_fields)
         plex_media_list.unset_fields(self.excluded_sync_fields)
 
         final_media_list = self._merge_media_lists(
             anilist_media_list=working_anilist_media_list,
             plex_media_list=plex_media_list,
+            excluded_fields=set(self.excluded_sync_fields),
         )
 
         if (
@@ -601,13 +600,12 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             )
             plex_media_list = base_plex_media_list.model_copy(deep=True)
 
-            if working_anilist_media_list:
-                working_anilist_media_list.unset_fields(effective_excluded_fields)
             plex_media_list.unset_fields(effective_excluded_fields)
 
             final_media_list = self._merge_media_lists(
                 anilist_media_list=working_anilist_media_list,
                 plex_media_list=plex_media_list,
+                excluded_fields=set(effective_excluded_fields),
             )
 
             if original_anilist_media_list:
@@ -1115,12 +1113,14 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
         self,
         anilist_media_list: MediaList | None,
         plex_media_list: MediaList,
+        excluded_fields: set[str],
     ) -> MediaList:
         """Merges Plex and AniList states using defined comparison rules.
 
         Args:
             anilist_media_list (MediaList | None): Current AniList state.
             plex_media_list (MediaList): Current Plex state.
+            excluded_fields (set[str]): Fields excluded from synchronization.
 
         Returns:
             MediaList: New MediaList containing merged state based on comparison rules.
@@ -1143,26 +1143,41 @@ class BaseSyncClient(ABC, Generic[T, S, E]):
             plex_val = getattr(plex_media_list, key)
             anilist_val = getattr(anilist_media_list, key)
 
-            if (
-                self.destructive_sync and plex_val is not None
-            ) or self._should_update_field(rule, plex_val, anilist_val):
+            if self._should_update_field(
+                op=rule,
+                field_name=key,
+                excluded_fields=excluded_fields,
+                plex_val=plex_val,
+                anilist_val=anilist_val,
+            ):
                 setattr(res_media_list, key, plex_val)
 
         return res_media_list
 
     def _should_update_field(
-        self, op: str, plex_val: Comparable | None, anilist_val: Comparable | None
+        self,
+        op: str,
+        field_name: str,
+        excluded_fields: set[str],
+        plex_val: Comparable | None,
+        anilist_val: Comparable | None,
     ) -> bool:
         """Determines if a field should be updated based on the comparison rule.
 
         Args:
             op (str): Comparison rule.
+            field_name (str): Field being evaluated.
+            excluded_fields (set[str]): Fields excluded from synchronization.
             plex_val (Comparable | None): Plex value to compare against.
             anilist_val (Comparable | None): AniList value to compare against.
 
         Returns:
             bool: True if the field should be updated, False otherwise.
         """
+        if field_name in excluded_fields:
+            return False
+        if self.destructive_sync and plex_val is not None:
+            return True
         if anilist_val == plex_val:
             return False
         if anilist_val is None:
