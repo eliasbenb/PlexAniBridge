@@ -17,7 +17,7 @@ export interface Mapping {
     imdb_id?: string[] | null;
     mal_id?: number[] | null;
     tmdb_movie_id?: number[] | null;
-    tmdb_show_id?: number[] | null;
+    tmdb_show_id?: number | null;
     tvdb_id?: number | null;
     tmdb_mappings?: Record<string, string> | null;
     tvdb_mappings?: Record<string, string> | null;

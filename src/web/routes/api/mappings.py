@@ -26,7 +26,7 @@ class MappingItemModel(BaseModel):
     imdb_id: list[str] | None = None
     mal_id: list[int] | None = None
     tmdb_movie_id: list[int] | None = None
-    tmdb_show_id: list[int] | None = None
+    tmdb_show_id: int | None = None
     tvdb_id: int | None = None
     tmdb_mappings: dict[str, str] | None = None
     tvdb_mappings: dict[str, str] | None = None

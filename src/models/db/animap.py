@@ -163,8 +163,8 @@ class AniMap(Base):
     tmdb_movie_id: Mapped[list[int] | None] = mapped_column(
         JSON, index=True, nullable=True, default=None
     )
-    tmdb_show_id: Mapped[list[int] | None] = mapped_column(
-        JSON, index=True, nullable=True, default=None
+    tmdb_show_id: Mapped[int | None] = mapped_column(
+        Integer, index=True, nullable=True, default=None
     )
     tvdb_id: Mapped[int | None] = mapped_column(
         Integer, index=True, nullable=True, default=None
@@ -186,7 +186,7 @@ class AniMap(Base):
     def __init__(self, **kwargs) -> None:
         """Initialize AniMap with data validation."""
         # Convert single values to lists for specific fields
-        for field in ("imdb_id", "mal_id", "tmdb_movie_id", "tmdb_show_id"):
+        for field in ("imdb_id", "mal_id", "tmdb_movie_id"):
             if field in kwargs:
                 kwargs[field] = self._convert_to_list(kwargs[field])
 

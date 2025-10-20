@@ -230,20 +230,14 @@
                                     </div>
                                 {:else if column.id === "tmdb_show"}
                                     <div class="truncate font-mono">
-                                        {#if m.tmdb_show_id && m.tmdb_show_id.length}
-                                            <div
-                                                class="truncate"
-                                                title={m.tmdb_show_id.join(", ")}>
-                                                {#each m.tmdb_show_id as id, i (id)}<a
-                                                        rel="noopener"
-                                                        target="_blank"
-                                                        class="text-emerald-400 hover:underline"
-                                                        href={"https://www.themoviedb.org/tv/" +
-                                                            id}>{id}</a
-                                                    >{#if m.tmdb_show_id && i < m.tmdb_show_id.length - 1},
-                                                    {/if}{/each}
-                                            </div>
-                                        {:else}-{/if}
+                                        {#if m.tmdb_show_id}<a
+                                                rel="noopener"
+                                                target="_blank"
+                                                class="block truncate text-emerald-400 hover:underline"
+                                                title={m.tmdb_show_id.toString()}
+                                                href={"https://www.themoviedb.org/tv/" +
+                                                    m.tmdb_show_id}>{m.tmdb_show_id}</a
+                                            >{:else}-{/if}
                                     </div>
                                 {:else if column.id === "tvdb"}
                                     <div class="truncate font-mono">

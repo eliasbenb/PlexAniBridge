@@ -38,6 +38,7 @@
             anidb_mode: "omit",
             anidb_id: "",
             tvdb_mode: "omit",
+            tmdb_show_id: "",
             tvdb_id: "",
             imdb_mode: "omit",
             imdb_csv: "",
@@ -46,7 +47,6 @@
             tmdb_movie_mode: "omit",
             tmdb_movie_csv: "",
             tmdb_show_mode: "omit",
-            tmdb_show_csv: "",
             tmdb_map_mode: "omit",
             tmdb_mappings: [],
             tvdb_map_mode: "omit",
@@ -93,8 +93,11 @@
 
         function setScalarField(
             value: unknown,
-            modeField: keyof Pick<EditForm, "anidb_mode" | "tvdb_mode">,
-            valueField: keyof Pick<EditForm, "anidb_id" | "tvdb_id">,
+            modeField: keyof Pick<
+                EditForm,
+                "anidb_mode" | "tmdb_show_mode" | "tvdb_mode"
+            >,
+            valueField: keyof Pick<EditForm, "anidb_id" | "tmdb_show_id" | "tvdb_id">,
         ) {
             if (value === undefined) return;
             if (value === null) {
@@ -109,12 +112,9 @@
             value: unknown,
             modeField: keyof Pick<
                 EditForm,
-                "imdb_mode" | "mal_mode" | "tmdb_movie_mode" | "tmdb_show_mode"
+                "imdb_mode" | "mal_mode" | "tmdb_movie_mode"
             >,
-            csvField: keyof Pick<
-                EditForm,
-                "imdb_csv" | "mal_csv" | "tmdb_movie_csv" | "tmdb_show_csv"
-            >,
+            csvField: keyof Pick<EditForm, "imdb_csv" | "mal_csv" | "tmdb_movie_csv">,
         ) {
             if (value === undefined) return;
             if (value === null) {
@@ -127,13 +127,13 @@
 
         // Set scalar fields
         setScalarField(m.anidb_id, "anidb_mode", "anidb_id");
+        setScalarField(m.imdb_id, "tmdb_show_mode", "tmdb_show_id");
         setScalarField(m.tvdb_id, "tvdb_mode", "tvdb_id");
 
         // Set array fields
         setArrayField(m.imdb_id, "imdb_mode", "imdb_csv");
         setArrayField(m.mal_id, "mal_mode", "mal_csv");
         setArrayField(m.tmdb_movie_id, "tmdb_movie_mode", "tmdb_movie_csv");
-        setArrayField(m.tmdb_show_id, "tmdb_show_mode", "tmdb_show_csv");
 
         // Handle mappings specially
         if (m.tvdb_mappings && typeof m.tvdb_mappings === "object") {
@@ -189,6 +189,9 @@
         if (f.anidb_mode === "null") out.anidb_id = null;
         else if (f.anidb_mode === "value") out.anidb_id = toInt(f.anidb_id);
 
+        if (f.tmdb_show_mode === "null") out.tmdb_show_id = null;
+        else if (f.tmdb_show_mode === "value") out.tmdb_show_id = toInt(f.tmdb_show_id);
+
         if (f.tvdb_mode === "null") out.tvdb_id = null;
         else if (f.tvdb_mode === "value") out.tvdb_id = toInt(f.tvdb_id);
 
@@ -203,10 +206,6 @@
         if (f.tmdb_movie_mode === "null") out.tmdb_movie_id = null;
         else if (f.tmdb_movie_mode === "value")
             out.tmdb_movie_id = parseCSV(f.tmdb_movie_csv, "int") as number[] | null;
-
-        if (f.tmdb_show_mode === "null") out.tmdb_show_id = null;
-        else if (f.tmdb_show_mode === "value")
-            out.tmdb_show_id = parseCSV(f.tmdb_show_csv, "int") as number[] | null;
 
         if (f.tvdb_map_mode === "null") out.tvdb_mappings = null;
         else if (f.tvdb_map_mode === "value") {
@@ -275,12 +274,8 @@
 
             function updateArrayField(
                 value: unknown,
-                modeField:
-                    | "imdb_mode"
-                    | "mal_mode"
-                    | "tmdb_movie_mode"
-                    | "tmdb_show_mode",
-                csvField: "imdb_csv" | "mal_csv" | "tmdb_movie_csv" | "tmdb_show_csv",
+                modeField: "imdb_mode" | "mal_mode" | "tmdb_movie_mode",
+                csvField: "imdb_csv" | "mal_csv" | "tmdb_movie_csv",
             ) {
                 if (value === undefined) return;
                 if (value === null) {
@@ -296,7 +291,6 @@
             updateArrayField(parsed.imdb_id, "imdb_mode", "imdb_csv");
             updateArrayField(parsed.mal_id, "mal_mode", "mal_csv");
             updateArrayField(parsed.tmdb_movie_id, "tmdb_movie_mode", "tmdb_movie_csv");
-            updateArrayField(parsed.tmdb_show_id, "tmdb_show_mode", "tmdb_show_csv");
 
             if (Object.prototype.hasOwnProperty.call(parsed, "tvdb_mappings")) {
                 const tv = parsed.tvdb_mappings;

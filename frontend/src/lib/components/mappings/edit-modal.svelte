@@ -41,6 +41,7 @@
         anidb_mode: FieldMode;
         anidb_id: string | number | "";
         tvdb_mode: FieldMode;
+        tmdb_show_id: string | number | "";
         tvdb_id: string | number | "";
         imdb_mode: FieldMode;
         imdb_csv: string;
@@ -49,7 +50,6 @@
         tmdb_movie_mode: FieldMode;
         tmdb_movie_csv: string;
         tmdb_show_mode: FieldMode;
-        tmdb_show_csv: string;
         tmdb_map_mode: FieldMode;
         tmdb_mappings: EpisodeMapRow[];
         tvdb_map_mode: FieldMode;
@@ -118,14 +118,15 @@
                 examples: [[12345, 67890]],
             },
             tmdb_show_id: {
-                anyOf: [
-                    { type: "array", items: { type: "integer" } },
-                    { type: "null" },
-                ],
-                description: "Array of TMDB show IDs (or null)",
-                examples: [[12345, 67890]],
+                type: ["integer", "null"],
+                description: "The TMDB Show ID",
+                examples: [12345],
             },
-            tvdb_id: { type: ["integer", "null"] },
+            tvdb_id: {
+                type: ["integer", "null"],
+                description: "The TVDB ID",
+                examples: [12345],
+            },
             tmdb_mappings: {
                 anyOf: [
                     {
@@ -251,30 +252,8 @@
                                     class="mt-1 h-8 w-full rounded-md border border-slate-800 bg-slate-950/80 px-2 text-[11px] disabled:cursor-not-allowed disabled:opacity-60"
                                     disabled={form.anidb_mode !== "value"} />
                             </div>
-                            <!-- TVDB -->
-                            <div>
-                                <div class="flex items-center justify-between">
-                                    <label
-                                        for="f-tvdb-mode"
-                                        class="text-[11px] text-slate-400"
-                                        >TVDB ID</label>
-                                    <select
-                                        id="f-tvdb-mode"
-                                        bind:value={form.tvdb_mode}
-                                        class="h-7 rounded-md border border-slate-700 bg-slate-900 px-2 text-[11px]">
-                                        <option value="omit">Omit</option><option
-                                            value="null">Null</option
-                                        ><option value="value">Value</option>
-                                    </select>
-                                </div>
-                                <input
-                                    bind:value={form.tvdb_id}
-                                    type="number"
-                                    class="mt-1 h-8 w-full rounded-md border border-slate-800 bg-slate-950/80 px-2 text-[11px] disabled:cursor-not-allowed disabled:opacity-60"
-                                    disabled={form.tvdb_mode !== "value"} />
-                            </div>
                             <!-- IMDB -->
-                            <div class="col-span-2">
+                            <div>
                                 <div class="flex items-center justify-between">
                                     <label
                                         for="f-imdb-mode"
@@ -298,7 +277,7 @@
                                     disabled={form.imdb_mode !== "value"} />
                             </div>
                             <!-- MAL -->
-                            <div class="col-span-2">
+                            <div>
                                 <div class="flex items-center justify-between">
                                     <label
                                         for="f-mal-mode"
@@ -322,7 +301,7 @@
                                     disabled={form.mal_mode !== "value"} />
                             </div>
                             <!-- TMDB Movie -->
-                            <div class="col-span-2">
+                            <div>
                                 <div class="flex items-center justify-between">
                                     <label
                                         for="f-tmdb-movie-mode"
@@ -347,15 +326,13 @@
                                     disabled={form.tmdb_movie_mode !== "value"} />
                             </div>
                             <!-- TMDB Show -->
-                            <div class="col-span-2">
+                            <div>
                                 <div class="flex items-center justify-between">
                                     <label
                                         for="f-tmdb-show-mode"
                                         class="text-[11px] text-slate-400"
-                                        >TMDB Show IDs <span
-                                            class="text-xs text-slate-500"
-                                            >(comma separated)</span
-                                        ></label>
+                                        >TMDB Show ID
+                                    </label>
                                     <select
                                         id="f-tmdb-show-mode"
                                         bind:value={form.tmdb_show_mode}
@@ -366,10 +343,32 @@
                                     </select>
                                 </div>
                                 <input
-                                    bind:value={form.tmdb_show_csv}
+                                    bind:value={form.tmdb_show_id}
                                     type="text"
                                     class="mt-1 h-8 w-full rounded-md border border-slate-800 bg-slate-950/80 px-2 text-[11px] disabled:cursor-not-allowed disabled:opacity-60"
                                     disabled={form.tmdb_show_mode !== "value"} />
+                            </div>
+                            <!-- TVDB -->
+                            <div>
+                                <div class="flex items-center justify-between">
+                                    <label
+                                        for="f-tvdb-mode"
+                                        class="text-[11px] text-slate-400"
+                                        >TVDB ID</label>
+                                    <select
+                                        id="f-tvdb-mode"
+                                        bind:value={form.tvdb_mode}
+                                        class="h-7 rounded-md border border-slate-700 bg-slate-900 px-2 text-[11px]">
+                                        <option value="omit">Omit</option><option
+                                            value="null">Null</option
+                                        ><option value="value">Value</option>
+                                    </select>
+                                </div>
+                                <input
+                                    bind:value={form.tvdb_id}
+                                    type="number"
+                                    class="mt-1 h-8 w-full rounded-md border border-slate-800 bg-slate-950/80 px-2 text-[11px] disabled:cursor-not-allowed disabled:opacity-60"
+                                    disabled={form.tvdb_mode !== "value"} />
                             </div>
                             <!-- TMDB Season Mappings -->
                             <div class="col-span-2">

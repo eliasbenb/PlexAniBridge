@@ -189,7 +189,7 @@ class AniMapClient:
                     if field_name in entry:
                         processed_entry[field_name] = entry[field_name]
 
-                for attr in ("mal_id", "imdb_id", "tmdb_movie_id", "tmdb_show_id"):
+                for attr in ("mal_id", "imdb_id", "tmdb_movie_id"):
                     if attr in processed_entry:
                         processed_entry[attr] = single_val_to_list(
                             processed_entry[attr]
@@ -335,10 +335,10 @@ class AniMapClient:
                 if imdb_list:
                     or_conditions.append(json_array_contains(AniMap.imdb_id, imdb_list))
                 if tmdb_list:
-                    or_conditions.append(
-                        json_array_contains(AniMap.tmdb_show_id, tmdb_list)
-                    )
-
+                    if len(tmdb_list) == 1:
+                        or_conditions.append(AniMap.tmdb_show_id == tmdb_list[0])
+                    else:
+                        or_conditions.append(AniMap.tmdb_show_id.in_(tmdb_list))
                 if tvdb_list:
                     if len(tvdb_list) == 1:
                         or_conditions.append(AniMap.tvdb_id == tvdb_list[0])

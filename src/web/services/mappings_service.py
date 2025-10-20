@@ -151,7 +151,7 @@ class MappingsService:
         payload: dict[str, Any] = {**defaults, **mapping, "anilist_id": anilist_id}
 
         # List normalization
-        for field in ("imdb_id", "mal_id", "tmdb_movie_id", "tmdb_show_id"):
+        for field in ("imdb_id", "mal_id", "tmdb_movie_id"):
             if field in payload:
                 v = payload[field]
                 if v is None:
@@ -207,7 +207,7 @@ class MappingsService:
                     continue
                 if k not in AniMap.__table__.columns:
                     continue
-                if k in ("imdb_id", "mal_id", "tmdb_movie_id", "tmdb_show_id"):
+                if k in ("imdb_id", "mal_id", "tmdb_movie_id"):
                     if v is None:
                         setattr(obj, k, None)
                     elif isinstance(v, list):
@@ -228,7 +228,8 @@ class MappingsService:
                 continue
             if k not in AniMap.__table__.columns:
                 continue
-            entry[k] = v
+            else:
+                entry[k] = v
 
         content[str(anilist_id)] = entry
         self._dump_custom(af, content)
@@ -389,7 +390,7 @@ class MappingsService:
                     elif v == "tmdb_movie":
                         s = s.where(json_array_exists(AniMap.tmdb_movie_id))
                     elif v == "tmdb_show":
-                        s = s.where(json_array_exists(AniMap.tmdb_show_id))
+                        s = s.where(AniMap.tmdb_show_id.is_not(None))
                     elif v == "tvdb":
                         s = s.where(AniMap.tvdb_id.is_not(None))
                     elif v == "tmdb_mappings":
@@ -486,20 +487,24 @@ class MappingsService:
                     try:
                         if m_cmp:
                             num = int(m_cmp.group(2))
-                            s = s.where(
-                                json_array_compare(
-                                    AniMap.tmdb_show_id, m_cmp.group(1), num
-                                )
-                            )
+                            cond = _scalar_cmp(AniMap.tmdb_show_id, m_cmp.group(1), num)
+                            if cond is None:
+                                return set()
+                            s = s.where(cond)
                             return set(int(r[0]) for r in ctx.session.execute(s).all())
                         if m_rng:
                             lo, hi = int(m_rng.group(1)), int(m_rng.group(2))
-                            s = s.where(json_array_between(AniMap.tmdb_show_id, lo, hi))
+                            s = s.where(
+                                and_(
+                                    AniMap.tmdb_show_id >= lo,
+                                    AniMap.tmdb_show_id <= hi,
+                                )
+                            )
                             return set(int(r[0]) for r in ctx.session.execute(s).all())
                         num = int(value)
                     except Exception:
                         return set()
-                    s = s.where(json_array_contains(AniMap.tmdb_show_id, [num]))
+                    s = s.where(AniMap.tmdb_show_id == num)
                 elif key == "tvdb":
                     try:
                         if m_cmp:

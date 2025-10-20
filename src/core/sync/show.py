@@ -254,7 +254,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             animapping = AniMap(
                 anilist_id=anilist_media.id,
                 imdb_id=[guids.imdb] if guids.imdb else None,
-                tmdb_show_id=[guids.tmdb] if guids.tmdb else None,
+                tmdb_show_id=guids.tmdb,
                 tvdb_id=guids.tvdb,
                 tmdb_mappings={f"s{index}": ""}
                 if effective_show_ordering == "tmdb"
