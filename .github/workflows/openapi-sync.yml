@@ -1,10 +1,14 @@
 name: OpenAPI Schema Sync
 
+permissions:
+  contents: write
+
 on:
   push:
     branches: [main]
     paths:
       - pyproject.toml
+  workflow_dispatch:
 
 jobs:
   openapi-sync:
