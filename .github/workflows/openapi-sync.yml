@@ -1,0 +1,38 @@
+name: OpenAPI Schema Sync
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - pyproject.toml
+
+jobs:
+  openapi-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out Repository
+        uses: actions/checkout@v4
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install Dependencies
+        run: uv sync --frozen --no-dev
+
+      - name: Regenerate OpenAPI schema
+        run: uv run scripts/openapi.py --output docs/web/openapi.json
+
+      - name: Check Diff
+        id: verify_diff
+        run: |
+          git diff .
+          git diff --quiet . || echo "changed=true" >> $GITHUB_OUTPUT
+
+      - name: Commit and Push Changes
+        if: steps.verify_diff.outputs.changed == 'true'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add ./docs/web/openapi.json
+          git commit -m "chore: Synchronize OpenAPI schema"
+          git push

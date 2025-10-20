@@ -61,6 +61,7 @@ pab-dev = "scripts.dev:dev"
 pab-format = "scripts.dev:format"
 pab-lint = "scripts.dev:lint"
 pab-start = "scripts.dev:start"
+pab-openapi = "scripts.openapi:main"
 
 [project.urls]
 Documentation = "https://plexanibridge.elias.eu.org"
