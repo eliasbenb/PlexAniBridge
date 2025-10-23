@@ -34,6 +34,7 @@
         toggleDiff: (id: number) => void;
         openDiff?: boolean;
         ensureDiffUi: (id: number) => ItemDiffUi;
+        diffCount?: number;
         hasPins?: boolean;
         togglePins?: (item: HistoryItem) => void;
         openPins?: boolean;
@@ -64,6 +65,7 @@
         toggleDiff,
         openDiff = false,
         ensureDiffUi,
+        diffCount,
         hasPins = false,
         togglePins,
         openPins = false,
@@ -242,6 +244,12 @@
                         </span>
                         <span class="diff-label relative"
                             >{openDiff ? "Hide diff" : "Show diff"}</span>
+                        {#if diffCount !== undefined}
+                            <span
+                                class="rounded bg-slate-800/70 px-1 text-[10px] font-semibold text-slate-300">
+                                {diffCount}
+                            </span>
+                        {/if}
                     </button>
                 {/if}
                 {#if hasPins && togglePins}
@@ -286,7 +294,7 @@
                         </span>
                         <span class="diff-label relative"
                             >{openPins ? "Hide pins" : "Show pins"}</span>
-                        {#if typeof pinCount === "number"}
+                        {#if pinCount !== undefined}
                             <span
                                 class="rounded bg-slate-800/70 px-1 text-[10px] font-semibold text-slate-300">
                                 {pinCount}

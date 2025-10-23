@@ -224,6 +224,19 @@
         return item.outcome === "synced" || item.outcome === "undone";
     }
 
+    function diffCountFor(item: HistoryItem): number {
+        let count = 0;
+        const before = item.before_state || {};
+        const after = item.after_state || {};
+        const keys = new Set<string>([...Object.keys(before), ...Object.keys(after)]);
+        for (const k of keys) {
+            if (JSON.stringify(before[k]) !== JSON.stringify(after[k])) {
+                count++;
+            }
+        }
+        return count;
+    }
+
     function applyPins(anilistId: number, fields: string[]) {
         items = items.map((entry) =>
             entry.anilist_id === anilistId
@@ -533,6 +546,7 @@
                 {toggleDiff}
                 openDiff={openDiff[item.id] || false}
                 {ensureDiffUi}
+                diffCount={diffCountFor(item)}
                 hasPins={!!item.anilist_id}
                 togglePins={togglePinsPanel}
                 openPins={openPins[item.id] || false}
