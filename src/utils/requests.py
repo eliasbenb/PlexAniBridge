@@ -18,7 +18,7 @@ class SelectiveVerifySession(requests.Session):
         self.whitelist = set(whitelist or [])
         if self.whitelist:
             log.debug(
-                f"{self.__class__.__name__}: SSL verify disabled for domains: "
+                "SSL verify disabled for domains: "
                 + ", ".join([f"$$'{d}'$$" for d in sorted(self.whitelist)])
             )
 
@@ -35,10 +35,7 @@ class SelectiveVerifySession(requests.Session):
                     return super().request(method, url, **kwargs)
                 except Exception as e:
                     log.error(
-                        (
-                            f"{self.__class__.__name__}: Error during request to "
-                            f"$$'{domain}'$$: {e}"
-                        ),
+                        (f"Error during request to $$'{domain}'$$: {e}"),
                         exc_info=True,
                     )
                     raise

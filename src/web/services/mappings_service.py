@@ -143,9 +143,7 @@ class MappingsService:
         if "anilist_id" not in mapping:
             raise MissingAnilistIdError("anilist_id is required")
         anilist_id = int(mapping["anilist_id"])
-        log.info(
-            f"{self.__class__.__name__}: Replacing mapping for anilist_id={anilist_id}"
-        )
+        log.info(f"Replacing mapping for anilist_id={anilist_id}")
 
         defaults = {c.name: None for c in AniMap.__table__.columns}
         payload: dict[str, Any] = {**defaults, **mapping, "anilist_id": anilist_id}
@@ -172,9 +170,7 @@ class MappingsService:
         self._dump_custom(af, content)
 
         self._set_provenance_custom_last(anilist_id, str(af.path))
-        log.success(
-            f"{self.__class__.__name__}: Replaced mapping for anilist_id={anilist_id}"
-        )
+        log.success(f"Replaced mapping for anilist_id={anilist_id}")
 
         return obj
 
@@ -192,9 +188,7 @@ class MappingsService:
             UnsupportedMappingFileExtensionError: If the custom file extension is
                 unsupported.
         """
-        log.info(
-            f"{self.__class__.__name__}: Upserting mapping for anilist_id={anilist_id}"
-        )
+        log.info(f"Upserting mapping for anilist_id={anilist_id}")
         with db() as ctx:
             obj = ctx.session.get(AniMap, anilist_id)
             if not obj:
@@ -235,9 +229,7 @@ class MappingsService:
         self._dump_custom(af, content)
 
         self._set_provenance_custom_last(anilist_id, str(af.path))
-        log.success(
-            f"{self.__class__.__name__}: Upserted mapping for anilist_id={anilist_id}"
-        )
+        log.success(f"Upserted mapping for anilist_id={anilist_id}")
 
         return obj
 
@@ -251,9 +243,7 @@ class MappingsService:
             UnsupportedMappingFileExtensionError: If the custom file extension is
                 unsupported.
         """
-        log.info(
-            f"{self.__class__.__name__}: Deleting mapping for anilist_id={anilist_id}"
-        )
+        log.info(f"Deleting mapping for anilist_id={anilist_id}")
         with db() as ctx:
             ctx.session.execute(
                 delete(AniMapProvenance).where(
@@ -266,9 +256,7 @@ class MappingsService:
         af, content = self._load_custom()
         content[str(anilist_id)] = None
         self._dump_custom(af, content)
-        log.success(
-            f"{self.__class__.__name__}: Deleted mapping for anilist_id={anilist_id}"
-        )
+        log.success(f"Deleted mapping for anilist_id={anilist_id}")
 
     async def list_mappings(
         self,

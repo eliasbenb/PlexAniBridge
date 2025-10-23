@@ -168,15 +168,12 @@ class MappingsClient:
 
             if resolved_include in loaded_chain:
                 log.warning(
-                    f"{self.__class__.__name__}: Circular include detected: "
+                    f"Circular include detected: "
                     f"$$'{resolved_include}'$$ has already been loaded in this chain"
                 )
                 continue
             if resolved_include in self._loaded_sources:
-                log.info(
-                    f"{self.__class__.__name__}: Skipping already loaded include: "
-                    f"$$'{resolved_include}'$$"
-                )
+                log.info(f"Skipping already loaded include: $$'{resolved_include}'$$")
                 continue
 
             new_loaded_chain = loaded_chain | {resolved_include}
@@ -212,24 +209,19 @@ class MappingsClient:
                         mappings = self._dict_str_keys(yaml.safe_load(f))
         except (json.JSONDecodeError, yaml.YAMLError):
             log.error(
-                f"{self.__class__.__name__}: Error decoding file "
-                f"$$'{file_path.resolve()!s}'$$",
+                f"Error decoding file $$'{file_path.resolve()!s}'$$",
                 exc_info=True,
             )
         except Exception:
             log.error(
-                f"{self.__class__.__name__}: Unexpected error reading file "
-                f"$$'{file_path.resolve()!s}'$$",
+                f"Unexpected error reading file $$'{file_path.resolve()!s}'$$",
                 exc_info=True,
             )
 
         self._loaded_sources.add(file)
 
         if not mappings:
-            log.warning(
-                f"{self.__class__.__name__}: No mappings found in file "
-                f"$$'{file_path.resolve()!s}'$$"
-            )
+            log.warning(f"No mappings found in file $$'{file_path.resolve()!s}'$$")
             return {}
 
         includes: list[str] = []
@@ -238,7 +230,7 @@ class MappingsClient:
             includes = [str(item) for item in includes_value]
         else:
             log.warning(
-                f"{self.__class__.__name__}: The $includes key in "
+                f"The $includes key in "
                 f"$$'{file_path.resolve()!s}'$$ is not a list, ignoring all entries"
             )
 
@@ -282,20 +274,18 @@ class MappingsClient:
         except (TimeoutError, aiohttp.ClientError):
             if retry_count < 2:
                 log.warning(
-                    f"{self.__class__.__name__}: Error reaching mappings URL "
-                    f"$$'{url}'$$, retrying...",
+                    f"Error reaching mappings URL $$'{url}'$$, retrying...",
                     exc_info=True,
                 )
                 await asyncio.sleep(1)
                 return await self._load_mappings_url(url, loaded_chain, retry_count + 1)
             log.error(
-                f"{self.__class__.__name__}: Error reaching mappings URL $$'{url}'$$",
+                f"Error reaching mappings URL $$'{url}'$$",
                 exc_info=True,
             )
         except Exception:
             log.error(
-                f"{self.__class__.__name__}: Unexpected error fetching mappings from "
-                f"URL $$'{url}'$$",
+                f"Unexpected error fetching mappings from URL $$'{url}'$$",
                 exc_info=True,
             )
 
@@ -307,28 +297,25 @@ class MappingsClient:
                     mappings = self._dict_str_keys(yaml.safe_load(mappings_raw))
                 case _:
                     log.warning(
-                        f"{self.__class__.__name__}: Unknown file type for URL "
+                        f"Unknown file type for URL "
                         f"$$'{url}'$$, defaulting to JSON parsing"
                     )
                     mappings = json.loads(mappings_raw)
         except (json.JSONDecodeError, yaml.YAMLError):
             log.error(
-                f"{self.__class__.__name__}: Error decoding file $$'{url!s}'$$",
+                f"Error decoding file $$'{url!s}'$$",
                 exc_info=True,
             )
         except Exception:
             log.error(
-                f"{self.__class__.__name__}: Unexpected error reading file "
-                f"$$'{url!s}'$$",
+                f"Unexpected error reading file $$'{url!s}'$$",
                 exc_info=True,
             )
 
         self._loaded_sources.add(url)
 
         if not mappings:
-            log.warning(
-                f"{self.__class__.__name__}: No mappings found in URL $$'{url}'$$"
-            )
+            log.warning(f"No mappings found in URL $$'{url}'$$")
             return {}
 
         includes: list[str] = []
@@ -336,9 +323,7 @@ class MappingsClient:
         if isinstance(includes_value, list):
             includes = [str(item) for item in includes_value]
         else:
-            log.warning(
-                f"{self.__class__.__name__}: $includes in {url} is not a list, ignoring"
-            )
+            log.warning(f"$includes in {url} is not a list, ignoring")
 
         merged = self._deep_merge(
             await self._load_includes(includes, loaded_chain, url),
@@ -374,20 +359,13 @@ class MappingsClient:
         loaded_chain = loaded_chain | {src}
 
         if self._is_file(src):
-            log.info(
-                f"{self.__class__.__name__}: Loading mappings from file $$'{src}'$$"
-            )
+            log.info(f"Loading mappings from file $$'{src}'$$")
             return await self._load_mappings_file(src, loaded_chain)
         elif self._is_url(src):
-            log.info(
-                f"{self.__class__.__name__}: Loading mappings from URL $$'{src}'$$"
-            )
+            log.info(f"Loading mappings from URL $$'{src}'$$")
             return await self._load_mappings_url(src, loaded_chain)
         else:
-            log.warning(
-                f"{self.__class__.__name__}: Invalid mappings source: $$'{src}'$$, "
-                f"skipping"
-            )
+            log.warning(f"Invalid mappings source: $$'{src}'$$, skipping")
             return {}
 
     def _deep_merge(self, d1: AniMapDict, d2: AniMapDict) -> AniMapDict:
@@ -428,16 +406,10 @@ class MappingsClient:
         self._provenance = {}
 
         if self.upstream_url is not None:
-            log.debug(
-                f"{self.__class__.__name__}: Using upstream mappings URL "
-                f"$$'{self.upstream_url}'$$"
-            )
+            log.debug(f"Using upstream mappings URL $$'{self.upstream_url}'$$")
             db_mappings = await self._load_mappings(str(self.upstream_url))
         else:
-            log.debug(
-                f"{self.__class__.__name__}: No upstream mappings URL configured, "
-                f"skipping"
-            )
+            log.debug("No upstream mappings URL configured, skipping")
             db_mappings = {}
 
         existing_custom_mapping_files = [
@@ -455,7 +427,7 @@ class MappingsClient:
 
         if len(existing_custom_mapping_files) > 1:
             log.warning(
-                f"{self.__class__.__name__}: Found multiple custom mappings files: "
+                f"Found multiple custom mappings files: "
                 f"{existing_custom_mapping_files}. Only one mappings file can be used "
                 f"at a time. Defaulting to $$'{custom_mappings_path}'$$"
             )
@@ -475,10 +447,7 @@ class MappingsClient:
             try:
                 anilist_id = int(k)
             except ValueError:
-                log.warning(
-                    f"{self.__class__.__name__}: Skipping invalid anilist_id in "
-                    f"provenance: $$'{k}'$$"
-                )
+                log.warning(f"Skipping invalid anilist_id in provenance: $$'{k}'$$")
                 continue
             result[anilist_id] = [str(s) for s in sources]
 

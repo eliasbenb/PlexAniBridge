@@ -1,4 +1,4 @@
-"""Logging Utilities Module."""
+"""Logging utilities module."""
 
 import logging
 import re
@@ -10,8 +10,6 @@ from typing import ClassVar
 
 import colorama
 from colorama import Fore, Style
-
-from src.utils.terminal import supports_color
 
 __all__ = ["Logger", "get_logger"]
 
@@ -43,6 +41,8 @@ class ColorFormatter(logging.Formatter):
         "ERROR": Fore.RED,
         "CRITICAL": Fore.RED + Style.BRIGHT,
     }
+    QUOTED_PATTERN = re.compile(r"\$\$'((?:[^']|'(?!\$\$))*)'\$\$")
+    BRACED_PATTERN = re.compile(r"\$\$\{(.*?)\}\$\$")
 
     def format(self, record: logging.LogRecord) -> str:
         """Formats a log record with ANSI color codes.
@@ -62,14 +62,12 @@ class ColorFormatter(logging.Formatter):
 
         if isinstance(record.msg, str):
             # Color strings in quotes
-            record.msg = re.sub(
-                r"\$\$'((?:[^']|'(?!\$\$))*)'\$\$",
+            record.msg = self.QUOTED_PATTERN.sub(
                 f"{Fore.LIGHTBLUE_EX}'\\1'{Style.RESET_ALL}",
                 record.msg,
             )
             # Color curly brace values
-            record.msg = re.sub(
-                r"\$\$\{(.*?)\}\$\$",
+            record.msg = self.BRACED_PATTERN.sub(
                 f"{Style.DIM}{{\\1}}{Style.RESET_ALL}",
                 record.msg,
             )
@@ -118,7 +116,7 @@ class CleanFormatter(logging.Formatter):
 
 
 class Logger(logging.Logger):
-    """Extended Logger class with additional log levels and color support."""
+    """Extended Logger class with class name prefixing and additional log levels."""
 
     SUCCESS = logging.INFO + 5
 
@@ -134,6 +132,56 @@ class Logger(logging.Logger):
         if not hasattr(logging, "SUCCESS"):
             logging.addLevelName(self.SUCCESS, "SUCCESS")
 
+    def _log(
+        self,
+        level,
+        msg,
+        args,
+        exc_info=None,
+        extra=None,
+        stack_info=False,
+        stacklevel=1,
+    ):
+        """Override _log to automatically prefix messages with class name.
+
+        Inspects the call stack to determine if the log call originated from
+        within a class method. If so, prefixes the message with the class name.
+        """
+        try:
+            # From _log's perspective, the call stack is:
+            # Frame 0: _log itself
+            # Frame 1: The logging method (info, debug, success, etc.)
+            # Frame 2: User's code (the actual caller we want)
+            # We always inspect frame 2 to get the user's class context
+            frame = sys._getframe(2)
+            class_name = None
+            if "self" in frame.f_locals:
+                obj = frame.f_locals["self"]
+                # Make sure it's not the Logger instance itself
+                if not isinstance(obj, logging.Logger):
+                    class_name = obj.__class__.__name__
+
+            elif "cls" in frame.f_locals:
+                cls = frame.f_locals["cls"]
+                if isinstance(cls, type):
+                    class_name = cls.__name__
+
+            if class_name and isinstance(msg, str):
+                msg = f"{class_name}: {msg}"
+        except (ValueError, KeyError, AttributeError):
+            pass
+
+        # Add 1 to stacklevel to account for this wrapper method
+        super()._log(
+            level,
+            msg,
+            args,
+            exc_info=exc_info,
+            extra=extra,
+            stack_info=stack_info,
+            stacklevel=stacklevel + 1,
+        )
+
     def success(self, msg, *args, **kwargs):
         """Log a message with SUCCESS level.
 
@@ -142,11 +190,7 @@ class Logger(logging.Logger):
             *args: Variable length argument list
             **kwargs: Arbitrary keyword arguments
         """
-        if self.isEnabledFor(self.SUCCESS):
-            # Report caller's location (file:line) instead of this wrapper
-            # Respect an explicitly provided stacklevel if passed
-            kwargs.setdefault("stacklevel", 2)
-            self._log(self.SUCCESS, msg, args, **kwargs)
+        self.log(self.SUCCESS, msg, *args, **kwargs)
 
     def setup(self, log_level: str, log_dir: str | None = None) -> None:
         """Configure the logger with console and file output.
@@ -159,15 +203,17 @@ class Logger(logging.Logger):
             log_dir (str | None, optional): Directory where log files will be stored.
         """
         has_color_support = False
-        if supports_color():
-            try:
+        try:
+            from src.utils.terminal import supports_color
+
+            if supports_color():
                 if sys.platform == "win32":
                     colorama.just_fix_windows_console()
                 else:
                     colorama.init()
                 has_color_support = True
-            except (AttributeError, ImportError, OSError):
-                has_color_support = False
+        except (AttributeError, ImportError, OSError):
+            has_color_support = False
 
         if log_level == "SUCCESS":
             log_level_literal = self.SUCCESS

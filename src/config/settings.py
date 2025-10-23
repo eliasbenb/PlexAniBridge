@@ -475,10 +475,7 @@ class PlexAnibridgeConfig(BaseSettings):
                 profile._parent = self
                 self.profiles[profile_name] = profile
             except Exception as e:
-                _log.error(
-                    f"{self.__class__.__name__}: Failed to create profile "
-                    f"$$'{profile_name}'$$: {e}"
-                )
+                _log.error(f"Failed to create profile $$'{profile_name}'$$: {e}")
                 raise ProfileConfigError(
                     f"Invalid configuration for profile '{profile_name}': {e}"
                 ) from e
@@ -538,7 +535,7 @@ class PlexAnibridgeConfig(BaseSettings):
         if not self.raw_profiles and not self.profiles:
             if self.anilist_token and self.plex_token and self.plex_user:
                 _log.info(
-                    f"{self.__class__.__name__}: No profiles configured; "
+                    "No profiles configured; "
                     "creating implicit 'default' profile from globals"
                 )
                 default_config = {}

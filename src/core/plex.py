@@ -163,7 +163,7 @@ class PlexClient:
         else:
             if self.plex_metadata_source == PlexMetadataSource.ONLINE:
                 log.warning(
-                    f"{self.__class__.__name__}: PLEX_METADATA_SOURCE=online was "
+                    f"PLEX_METADATA_SOURCE=online was "
                     f"configured but the user $$'{self.plex_user}'$$ is not an admin "
                     f"user. Online data will not be available for this user."
                 )
@@ -175,18 +175,17 @@ class PlexClient:
                 ).id
             except Exception as e:
                 raise PlexUserNotFoundError(
-                    f"{self.__class__.__name__}: Failed to switch to user "
-                    f"'{self.plex_user}'"
+                    f"Failed to switch to user '{self.plex_user}'"
                 ) from e
 
         log.debug(
-            f"{self.__class__.__name__}: Initialized Plex client for user "
+            f"Initialized Plex client for user "
             f"$$'{self.plex_user}'$$ $${{plex_account_id: {self.user_account_id}}}$$"
         )
         log.debug(
-            f"{self.__class__.__name__}: User is an admin, using admin client"
+            "User is an admin, using admin client"
             if self.is_admin_user
-            else f"{self.__class__.__name__}: User is not an admin, using user client"
+            else "User is not an admin, using user client"
         )
 
     def _init_community_client(self) -> None:
@@ -222,8 +221,7 @@ class PlexClient:
                 return u
 
         raise PlexUserNotFoundError(
-            f"{self.__class__.__name__}: User $$'{self.plex_user}'$$ not found "
-            f"in Plex users list"
+            f"User $$'{self.plex_user}'$$ not found in Plex users list"
         )
 
     def _get_on_deck_window(self) -> timedelta:
@@ -246,9 +244,7 @@ class PlexClient:
             str: GUID rating key
         """
         if not guid:
-            raise InvalidGuidError(
-                f"{self.__class__.__name__}: GUID cannot be None or empty"
-            )
+            raise InvalidGuidError("GUID cannot be None or empty")
         return guid.rsplit("/", 1)[-1]
 
     def get_sections(self) -> list[Section]:
@@ -261,12 +257,10 @@ class PlexClient:
             list[MovieSection] | list[ShowSection]: List of configured library sections.
                 Returns empty list if no sections match the configuration.
         """
-        log.debug(f"{self.__class__.__name__}: Getting all sections")
+        log.debug("Getting all sections")
 
         if not self.user_client:
-            raise PlexClientNotInitializedError(
-                f"{self.__class__.__name__}: User client is not initialized."
-            )
+            raise PlexClientNotInitializedError("User client is not initialized.")
 
         sections = {
             section.title: section
@@ -310,7 +304,7 @@ class PlexClient:
 
         if min_last_modified:
             log.debug(
-                f"{self.__class__.__name__}: Filtering section $$'{section.title}'$$ "
+                f"Filtering section $$'{section.title}'$$ "
                 f"by items last updated, viewed, or rated after "
                 f"{min_last_modified.astimezone(get_localzone())}"
             )
@@ -354,14 +348,11 @@ class PlexClient:
                     }
                 )
             else:
-                raise MediaTypeError(
-                    f"{self.__class__.__name__}: Unsupported section type "
-                    f"$$'{section.TYPE}'$$"
-                )
+                raise MediaTypeError(f"Unsupported section type $$'{section.TYPE}'$$")
 
         if require_watched:
             log.debug(
-                f"{self.__class__.__name__}: Filtering section $$'{section.title}'$$ "
+                f"Filtering section $$'{section.title}'$$ "
                 f"by items that have been watched"
             )
 
@@ -401,15 +392,11 @@ class PlexClient:
                     }
                 )
             else:
-                raise MediaTypeError(
-                    f"{self.__class__.__name__}: Unsupported section type "
-                    f"$$'{section.TYPE}'$$"
-                )
+                raise MediaTypeError(f"Unsupported section type $$'{section.TYPE}'$$")
 
         if self.plex_genres:
             log.debug(
-                f"{self.__class__.__name__}: Filtering section $$'{section.title}'$$ "
-                f"by genres: {self.plex_genres}"
+                f"Filtering section $$'{section.title}'$$ by genres: {self.plex_genres}"
             )
             filters["and"].append({"genre": self.plex_genres})
 
@@ -447,7 +434,7 @@ class PlexClient:
 
         try:
             log.debug(
-                f"{self.__class__.__name__}: Getting reviews for {item.type} "
+                f"Getting reviews for {item.type} "
                 f"$$'{item.title}'$$ $${{ plex_id: {item.guid}}}$$"
             )
             return await self.community_client.get_reviews(self._guid_to_key(item.guid))
@@ -566,7 +553,7 @@ class PlexClient:
                     )
                 else:
                     log.debug(
-                        f"{self.__class__.__name__}: Unexpected media type "
+                        f"Unexpected media type "
                         f"$$'{metadata['type']}'$$ in watch history for item "
                         f"$$'{item.title}'$$ $${{plex_id: {item.guid}}}$$"
                     )

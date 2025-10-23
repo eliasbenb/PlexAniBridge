@@ -76,17 +76,14 @@ class ProfileScheduler:
                 await self._current_task
             except asyncio.CancelledError:
                 if self._current_task and not self._current_task.done():
-                    log.info(
-                        f"{self.__class__.__name__}: [{self.profile_name}] Cancelling "
-                        f"sync task..."
-                    )
+                    log.info(f"[{self.profile_name}] Cancelling sync task...")
                     self._current_task.cancel()
                     with contextlib.suppress(asyncio.CancelledError):
                         await self._current_task
                 raise
             except Exception:
                 log.error(
-                    f"{self.__class__.__name__}: [{self.profile_name}] Sync error",
+                    f"[{self.profile_name}] Sync error",
                     exc_info=True,
                 )
             finally:
@@ -99,7 +96,7 @@ class ProfileScheduler:
 
         if not self.sync_modes:
             log.debug(
-                f"{self.__class__.__name__}: [{self.profile_name}] No sync modes "
+                f"[{self.profile_name}] No sync modes "
                 f"configured, triggering single run before exiting"
             )
             await self.sync()
@@ -109,7 +106,7 @@ class ProfileScheduler:
 
         if SyncMode.PERIODIC in self.sync_modes:
             log.debug(
-                f"{self.__class__.__name__}: [{self.profile_name}] Starting periodic "
+                f"[{self.profile_name}] Starting periodic "
                 f"sync every {self.sync_interval}s"
             )
             task = asyncio.create_task(self._periodic_loop())
@@ -118,7 +115,7 @@ class ProfileScheduler:
 
         if SyncMode.POLL in self.sync_modes:
             log.debug(
-                f"{self.__class__.__name__}: [{self.profile_name}] Starting polling "
+                f"[{self.profile_name}] Starting polling "
                 f"sync every {self.poll_interval}s"
             )
             task = asyncio.create_task(self._poll_loop())
@@ -144,22 +141,18 @@ class ProfileScheduler:
 
                 next_sync = datetime.now(UTC) + timedelta(seconds=self.sync_interval)
                 log.info(
-                    f"{self.__class__.__name__}: [{self.profile_name}] Next periodic "
+                    f"[{self.profile_name}] Next periodic "
                     f"sync scheduled for: {next_sync.astimezone(get_localzone())}"
                 )
 
                 with contextlib.suppress(asyncio.TimeoutError):
                     await asyncio.wait_for(self.stop_event.wait(), self.sync_interval)
             except asyncio.CancelledError:
-                log.debug(
-                    f"{self.__class__.__name__}: [{self.profile_name}] Periodic sync "
-                    f"cancelled"
-                )
+                log.debug(f"[{self.profile_name}] Periodic sync cancelled")
                 break
             except Exception:
                 log.error(
-                    f"{self.__class__.__name__}: [{self.profile_name}] Periodic sync "
-                    f"error",
+                    f"[{self.profile_name}] Periodic sync error",
                     exc_info=True,
                 )
                 await asyncio.sleep(10)
@@ -171,14 +164,11 @@ class ProfileScheduler:
                 await self.sync(poll=True)
                 await asyncio.sleep(self.poll_interval)
             except asyncio.CancelledError:
-                log.info(
-                    f"{self.__class__.__name__}: [{self.profile_name}] Poll sync "
-                    f"cancelled"
-                )
+                log.info(f"[{self.profile_name}] Poll sync cancelled")
                 break
             except Exception:
                 log.error(
-                    f"{self.__class__.__name__}: [{self.profile_name}] Poll sync error",
+                    f"[{self.profile_name}] Poll sync error",
                     exc_info=True,
                 )
                 await asyncio.sleep(10)
@@ -214,16 +204,14 @@ class SchedulerClient:
 
     async def initialize(self) -> None:
         """Initialize the application scheduler and all components."""
-        log.info(f"{self.__class__.__name__}: Initializing application scheduler")
+        log.info("Initializing application scheduler")
 
-        log.info(f"{self.__class__.__name__}: Initializing anime mapping database")
+        log.info("Initializing anime mapping database")
         await self.shared_animap_client.initialize()
-        log.success(f"{self.__class__.__name__}: Anime mapping database ready")
+        log.success("Anime mapping database ready")
 
         for profile_name, profile_config in self.global_config.profiles.items():
-            log.info(
-                f"{self.__class__.__name__}: [{profile_name}] Setting up bridge client"
-            )
+            log.info(f"[{profile_name}] Setting up bridge client")
 
             bridge_client = BridgeClient(
                 profile_name=profile_name,
@@ -235,10 +223,10 @@ class SchedulerClient:
             await bridge_client.initialize()
             self.bridge_clients[profile_name] = bridge_client
 
-            log.info(f"{self.__class__.__name__}: [{profile_name}] Bridge client ready")
+            log.info(f"[{profile_name}] Bridge client ready")
 
         log.info(
-            f"{self.__class__.__name__}: Application scheduler initialized with "
+            f"Application scheduler initialized with "
             f"{len(self.bridge_clients)} profile(s)"
         )
 
@@ -249,7 +237,7 @@ class SchedulerClient:
 
         self._running = True
 
-        log.info(f"{self.__class__.__name__}: Starting application scheduler")
+        log.info("Starting application scheduler")
 
         self._daily_sync_task = asyncio.create_task(self._daily_db_sync_loop())
 
@@ -257,7 +245,7 @@ class SchedulerClient:
             profile_config = self.global_config.get_profile(profile_name)
 
             log.info(
-                f"{self.__class__.__name__}: [{profile_name}] Starting scheduler: "
+                f"[{profile_name}] Starting scheduler: "
                 f"interval={profile_config.sync_interval}s, "
                 f"modes={profile_config.sync_modes}, "
                 f"full_scan={'enabled' if profile_config.full_scan else 'disabled'}, "
@@ -288,8 +276,7 @@ class SchedulerClient:
                     next_sync_time = f"at {next_sync.strftime('%Y-%m-%d %H:%M:%S')}"
 
                 log.info(
-                    f"{self.__class__.__name__}: [{profile_name}] Scheduler started, "
-                    f"next sync: {next_sync_time}"
+                    f"[{profile_name}] Scheduler started, next sync: {next_sync_time}"
                 )
 
         # If every profile is a single-run profile (no sync_modes), exit
@@ -297,22 +284,17 @@ class SchedulerClient:
             not self.global_config.get_profile(name).sync_modes
             for name in self.profile_schedulers
         ):
-            log.info(
-                f"{self.__class__.__name__}: All profiles are single-run, stopping "
-                f"application"
-            )
+            log.info("All profiles are single-run, stopping application")
             self.stop_event.set()
             return
 
         if self.profile_schedulers:
             log.info(
-                f"{self.__class__.__name__}: Application scheduler started with "
+                f"Application scheduler started with "
                 f"{len(self.profile_schedulers)} profile(s)"
             )
         else:
-            log.warning(
-                f"{self.__class__.__name__}: No profile schedulers were started"
-            )
+            log.warning("No profile schedulers were started")
 
     async def stop(self) -> None:
         """Stop all schedulers and clean up resources."""
@@ -321,7 +303,7 @@ class SchedulerClient:
 
         self._running = False
 
-        log.info(f"{self.__class__.__name__}: Stopping application scheduler")
+        log.info("Stopping application scheduler")
 
         self.stop_event.set()
 
@@ -332,7 +314,7 @@ class SchedulerClient:
 
         stop_tasks = []
         for profile_name, scheduler in self.profile_schedulers.items():
-            log.debug(f"{self.__class__.__name__}: [{profile_name}] Stopping scheduler")
+            log.debug(f"[{profile_name}] Stopping scheduler")
             stop_tasks.append(scheduler.stop())
 
         if stop_tasks:
@@ -340,9 +322,7 @@ class SchedulerClient:
 
         close_tasks = []
         for profile_name, bridge_client in self.bridge_clients.items():
-            log.debug(
-                f"{self.__class__.__name__}: [{profile_name}] Closing bridge client"
-            )
+            log.debug(f"[{profile_name}] Closing bridge client")
             close_tasks.append(bridge_client.close())
 
         if close_tasks:
@@ -353,7 +333,7 @@ class SchedulerClient:
         self.profile_schedulers.clear()
         self.bridge_clients.clear()
 
-        log.info(f"{self.__class__.__name__}: Application scheduler stopped")
+        log.info("Application scheduler stopped")
 
     async def wait_for_completion(self) -> None:
         """Wait for the application to complete or be stopped."""
@@ -387,20 +367,14 @@ class SchedulerClient:
             if profile_name not in self.bridge_clients:
                 raise ProfileNotFoundError(f"Profile '{profile_name}' not found")
 
-            log.info(
-                f"{self.__class__.__name__}: [{profile_name}] Manually triggering sync "
-                f"(poll={poll})"
-            )
+            log.info(f"[{profile_name}] Manually triggering sync (poll={poll})")
             scheduler = self.profile_schedulers[profile_name]
             await scheduler.sync(poll=poll, rating_keys=rating_keys)
         else:
-            log.info(
-                f"{self.__class__.__name__}: Manually triggering sync for all profiles "
-                f"(poll={poll})"
-            )
+            log.info(f"Manually triggering sync for all profiles (poll={poll})")
             sync_tasks = []
             for name, scheduler in self.profile_schedulers.items():
-                log.info(f"{self.__class__.__name__}: [{name}] Triggering sync")
+                log.info(f"[{name}] Triggering sync")
                 sync_tasks.append(scheduler.sync(poll=poll, rating_keys=rating_keys))
 
             if sync_tasks:
@@ -463,7 +437,7 @@ class SchedulerClient:
 
     async def _daily_db_sync_loop(self) -> None:
         """Handle daily database synchronization at 1:00 AM UTC."""
-        log.info(f"{self.__class__.__name__}: Starting daily database sync scheduler")
+        log.info("Starting daily database sync scheduler")
 
         while self._running and not self.stop_event.is_set():
             try:
@@ -473,7 +447,7 @@ class SchedulerClient:
                 sleep_duration = (next_sync_time - now).total_seconds()
 
                 log.info(
-                    f"{self.__class__.__name__}: Next database sync scheduled for: "
+                    f"Next database sync scheduled for: "
                     f"{next_sync_time.astimezone(get_localzone())} "
                     f"(in {sleep_duration / 3600:.1f} hours)"
                 )
@@ -487,30 +461,26 @@ class SchedulerClient:
                 if not self._running or self.stop_event.is_set():
                     break
 
-                log.info(f"{self.__class__.__name__}: Starting daily database sync")
+                log.info("Starting daily database sync")
                 try:
                     await self.shared_animap_client._sync_db()
-                    log.success(
-                        f"{self.__class__.__name__}: Daily database sync completed"
-                    )
+                    log.success("Daily database sync completed")
 
-                    log.info(
-                        f"{self.__class__.__name__}: Reinitializing all AniList clients"
-                    )
+                    log.info("Reinitializing all AniList clients")
                     for bridge_client in self.bridge_clients.values():
                         await bridge_client.anilist_client.initialize()
                 except Exception as e:
                     log.error(
-                        f"{self.__class__.__name__}: Daily database sync failed: {e}",
+                        f"Daily database sync failed: {e}",
                         exc_info=True,
                     )
 
             except asyncio.CancelledError:
-                log.debug(f"{self.__class__.__name__}: Daily database sync cancelled")
+                log.debug("Daily database sync cancelled")
                 break
             except Exception:
                 log.error(
-                    f"{self.__class__.__name__}: Daily database sync error",
+                    "Daily database sync error",
                     exc_info=True,
                 )
                 await asyncio.sleep(3600)  # Retry after 1 hour on error

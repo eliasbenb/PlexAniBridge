@@ -213,10 +213,7 @@ class PlexCommunityClient:
             ) as response:
                 if response.status == 429:  # Handle rate limit retries
                     retry_after = int(response.headers.get("Retry-After", 60))
-                    log.warning(
-                        f"{self.__class__.__name__}: Rate limit exceeded, waiting "
-                        f"{retry_after} seconds"
-                    )
+                    log.warning(f"Rate limit exceeded, waiting {retry_after} seconds")
                     await asyncio.sleep(retry_after + 1)
                     return await self._make_request(
                         query=query,
@@ -225,9 +222,7 @@ class PlexCommunityClient:
                         retry_count=retry_count,
                     )
                 elif response.status == 502:  # Bad Gateway
-                    log.warning(
-                        f"{self.__class__.__name__}: Received 502 Bad Gateway, retrying"
-                    )
+                    log.warning("Received 502 Bad Gateway, retrying")
                     await asyncio.sleep(1)
                     return await self._make_request(
                         query=query,
@@ -239,10 +234,7 @@ class PlexCommunityClient:
                 try:
                     response.raise_for_status()
                 except aiohttp.ClientResponseError as e:
-                    log.error(
-                        f"{self.__class__.__name__}: Failed to make request to the "
-                        f"Plex Community API"
-                    )
+                    log.error("Failed to make request to the Plex Community API")
                     response_text = await response.text()
                     log.error(f"\t\t{response_text}")
                     raise e
@@ -251,8 +243,7 @@ class PlexCommunityClient:
 
         except (TimeoutError, aiohttp.ClientError):
             log.error(
-                f"{self.__class__.__name__}: Connection error while making request to "
-                f"the Plex Community API"
+                "Connection error while making request to the Plex Community API"
             )
             await asyncio.sleep(1)
             return await self._make_request(

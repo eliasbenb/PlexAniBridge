@@ -204,7 +204,7 @@ class AniListClient:
 
         if self.dry_run:  # Skip the request, only log the variables
             log.info(
-                f"{self.__class__.__name__}: Dry run enabled, skipping anime entry "
+                f"Dry run enabled, skipping anime entry "
                 f"update $${{anilist_id: {media_list_entry.media_id}}}$$"
             )
             return None
@@ -243,7 +243,7 @@ class AniListClient:
         for i in range(0, len(media_list_entries), BATCH_SIZE):
             batch = media_list_entries[i : i + BATCH_SIZE]
             log.debug(
-                f"{self.__class__.__name__}: Updating batch of anime entries "
+                f"Updating batch of anime entries "
                 f"$${{anilist_id: {[m.media_id for m in batch]}}}$$"
             )
 
@@ -295,7 +295,7 @@ class AniListClient:
 
             if self.dry_run:
                 log.info(
-                    f"{self.__class__.__name__}: Dry run enabled, skipping anime entry "
+                    f"Dry run enabled, skipping anime entry "
                     f"update $${{anilist_id: {[m.media_id for m in batch]}}}$$"
                 )
                 continue
@@ -339,7 +339,7 @@ class AniListClient:
 
         if self.dry_run:
             log.info(
-                f"{self.__class__.__name__}: Dry run enabled, skipping anime entry "
+                f"Dry run enabled, skipping anime entry "
                 f"deletion $${{anilist_id: {media_id}}}$$"
             )
             return False
@@ -386,7 +386,7 @@ class AniListClient:
         """
         kind = "all" if is_movie is None else ("movie" if is_movie else "show")
         log.debug(
-            f"{self.__class__.__name__}: Searching for {kind} "
+            f"Searching for {kind} "
             f"with title $$'{search_str}'$$ that is releasing and has "
             f"{episodes or 'unknown'} episodes"
         )
@@ -467,7 +467,7 @@ class AniListClient:
         """
         if anilist_id in self.offline_anilist_entries:
             log.debug(
-                f"{self.__class__.__name__}: Pulling AniList data from local cache "
+                f"Pulling AniList data from local cache "
                 f"$${{anilist_id: {anilist_id}}}$$"
             )
             return self.offline_anilist_entries[anilist_id]
@@ -480,10 +480,7 @@ class AniListClient:
         }}
         """
 
-        log.debug(
-            f"{self.__class__.__name__}: Pulling AniList data from API "
-            f"$${{anilist_id: {anilist_id}}}$$"
-        )
+        log.debug(f"Pulling AniList data from API $${{anilist_id: {anilist_id}}}$$")
 
         response = await self._make_request(query, {"id": anilist_id})
         result = Media(**response["data"]["Media"])
@@ -519,7 +516,7 @@ class AniListClient:
         cached_ids = [id for id in anilist_ids if id in self.offline_anilist_entries]
         if cached_ids:
             log.debug(
-                f"{self.__class__.__name__}: Pulling AniList data from local cache in "
+                f"Pulling AniList data from local cache in "
                 f"batched mode $${{anilist_ids: {cached_ids}}}$$"
             )
             result.extend(self.offline_anilist_entries[id] for id in cached_ids)
@@ -533,7 +530,7 @@ class AniListClient:
         for i in range(0, len(missing_ids), BATCH_SIZE):
             batch_ids = missing_ids[i : i + BATCH_SIZE]
             log.debug(
-                f"{self.__class__.__name__}: Pulling AniList data from API in batched "
+                f"Pulling AniList data from API in batched "
                 f"mode $${{anilist_ids: {batch_ids}}}$$"
             )
 
@@ -580,9 +577,7 @@ class AniListClient:
         """
         self._ensure_authenticated()
         if self.backup_dir is None:
-            raise aiohttp.ClientError(
-                f"{self.__class__.__name__}: backup_dir must be set for backups"
-            )
+            raise aiohttp.ClientError("backup_dir must be set for backups")
 
         query = f"""
         query MediaListCollection($userId: Int, $type: MediaType, $chunk: Int) {{
@@ -655,9 +650,7 @@ class AniListClient:
         )
 
         backup_file.write_text(data_without_media.model_dump_json())
-        log.info(
-            f"{self.__class__.__name__}: Exported AniList data to $$'{backup_file}'$$"
-        )
+        log.info(f"Exported AniList data to $$'{backup_file}'$$")
 
         cutoff_date = datetime.now() - timedelta(days=self.BACKUP_RETENTION_DAYS)
 
@@ -666,7 +659,7 @@ class AniListClient:
             file_mtime = datetime.fromtimestamp(file.stat().st_mtime)
             if file_mtime < cutoff_date:
                 file.unlink()
-                log.debug(f"{self.__class__.__name__}: Deleted old backup '{file}'")
+                log.debug(f"Deleted old backup '{file}'")
 
     def _media_list_entry_to_media(self, media_list_entry: MediaListWithMedia) -> Media:
         """Converts a MediaListWithMedia object to a Media object.
@@ -741,18 +734,13 @@ class AniListClient:
             ) as response:
                 if response.status == 429:  # Handle rate limit retries
                     retry_after = int(response.headers.get("Retry-After", 60))
-                    log.warning(
-                        f"{self.__class__.__name__}: Rate limit exceeded, waiting "
-                        f"{retry_after} seconds"
-                    )
+                    log.warning(f"Rate limit exceeded, waiting {retry_after} seconds")
                     await asyncio.sleep(retry_after + 1)
                     return await self._make_request(
                         query=query, variables=variables, retry_count=retry_count + 1
                     )
                 elif response.status == 502:  # Bad Gateway
-                    log.warning(
-                        f"{self.__class__.__name__}: Received 502 Bad Gateway, retrying"
-                    )
+                    log.warning("Received 502 Bad Gateway, retrying")
                     await asyncio.sleep(1)
                     return await self._make_request(
                         query=query, variables=variables, retry_count=retry_count + 1
@@ -761,10 +749,7 @@ class AniListClient:
                 try:
                     response.raise_for_status()
                 except aiohttp.ClientResponseError as e:
-                    log.error(
-                        f"{self.__class__.__name__}: Failed to make request to AniList "
-                        f"API"
-                    )
+                    log.error("Failed to make request to AniList API")
                     response_text = await response.text()
                     log.error(f"\t\t{response_text}")
                     raise e
@@ -772,10 +757,7 @@ class AniListClient:
                 return await response.json()
 
         except (TimeoutError, aiohttp.ClientError):
-            log.error(
-                f"{self.__class__.__name__}: Connection error while making request to "
-                f"AniList API"
-            )
+            log.error("Connection error while making request to AniList API")
             await asyncio.sleep(1)
             return await self._make_request(
                 query=query, variables=variables, retry_count=retry_count + 1

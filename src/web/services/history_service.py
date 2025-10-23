@@ -90,10 +90,7 @@ class HistoryService:
         Returns:
             Dictionary mapping AniList ID to serialized media data
         """
-        logger.debug(
-            f"{self.__class__.__name__}: Fetching AniList batch for profile {profile}: "
-            f"{ids_tuple}"
-        )
+        logger.debug(f"Fetching AniList batch for profile {profile}: {ids_tuple}")
         bridge = self._get_bridge(profile)
         medias = await bridge.anilist_client.batch_get_anime(list(ids_tuple))
 
@@ -103,10 +100,7 @@ class HistoryService:
             copy_m = m.model_copy(deep=True)
             copy_m.media_list_entry = None
             result[m.id] = copy_m.model_dump(mode="json")
-        logger.debug(
-            f"{self.__class__.__name__}: Fetched {len(result)} AniList entries for "
-            f"profile {profile}"
-        )
+        logger.debug(f"Fetched {len(result)} AniList entries for profile {profile}")
         return result
 
     @alru_cache(maxsize=256, ttl=600)  # Cache for 10 minutes
@@ -146,8 +140,7 @@ class HistoryService:
             # Plex public metadata API endpoint with comma-separated GUIDs
             url = f"https://metadata.provider.plex.tv/library/metadata/{guids_str}"
             logger.debug(
-                f"{self.__class__.__name__}: Fetching Plex metadata batch for profile "
-                f"{profile}: {guids_str}"
+                f"Fetching Plex metadata batch for profile {profile}: {guids_str}"
             )
 
             async with (
@@ -196,7 +189,7 @@ class HistoryService:
                             }
 
                 logger.debug(
-                    f"{self.__class__.__name__}: Received Plex metadata for "
+                    f"Received Plex metadata for "
                     f"{sum(1 for v in result.values() if v)}/{len(result)} GUIDs"
                 )
                 return result
@@ -233,9 +226,7 @@ class HistoryService:
                 .all()
             )
             stats = {str(outcome): count for outcome, count in stats_rows}
-            logger.debug(
-                f"{self.__class__.__name__}: Stats for profile {profile}: {stats}"
-            )
+            logger.debug(f"Stats for profile {profile}: {stats}")
             return stats
 
     async def get_page(
@@ -265,7 +256,7 @@ class HistoryService:
             ProfileNotFoundError: If the profile is unknown.
         """
         logger.debug(
-            f"{self.__class__.__name__}: get_page(profile={profile}, page={page}, "
+            f"get_page(profile={profile}, page={page}, "
             f"per_page={per_page}, outcome={outcome}, include_anilist={include_anilist}"
             f", include_plex={include_plex})"
         )
@@ -356,8 +347,7 @@ class HistoryService:
             stats=stats,
         )
         logger.debug(
-            f"{self.__class__.__name__}: Returning {len(dto_items)} items "
-            f"(total={total}, pages={page_obj.pages})"
+            f"Returning {len(dto_items)} items (total={total}, pages={page_obj.pages})"
         )
         return page_obj
 
@@ -371,10 +361,7 @@ class HistoryService:
         Raises:
             HistoryItemNotFoundError: If the item does not exist.
         """
-        logger.info(
-            f"{self.__class__.__name__}: Deleting history item id={item_id} for "
-            f"profile {profile}"
-        )
+        logger.info(f"Deleting history item id={item_id} for profile {profile}")
         with db() as ctx:
             row = (
                 ctx.session.query(SyncHistory)
@@ -404,10 +391,7 @@ class HistoryService:
             ProfileNotFoundError: If the profile is unknown.
             HistoryItemNotFoundError: If the specified item does not exist.
         """
-        logger.info(
-            f"{self.__class__.__name__}: Undoing history item id={item_id} for "
-            f"profile {profile}"
-        )
+        logger.info(f"Undoing history item id={item_id} for profile {profile}")
         bridge = self._get_bridge(profile)
         with db() as ctx:
             row: SyncHistory | None = (

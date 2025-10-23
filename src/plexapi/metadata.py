@@ -352,18 +352,13 @@ class PlexMetadataServer(PlexServer):
 
         if response.status_code == 429:  # Handle rate limit retries
             retry_after = int(response.headers.get("Retry-After", 60))
-            log.warning(
-                f"{self.__class__.__name__}: Rate limit exceeded, waiting "
-                f"{retry_after} seconds"
-            )
+            log.warning(f"Rate limit exceeded, waiting {retry_after} seconds")
             sleep(retry_after + 1)
             return self.query(
                 key, method, headers, params, timeout, retry_count, **kwargs
             )
         elif response.status_code == 500:  # Bad Gateway
-            log.warning(
-                f"{self.__class__.__name__}: Received 502 Bad Gateway, retrying"
-            )
+            log.warning("Received 502 Bad Gateway, retrying")
             sleep(1)
             return self.query(
                 key, method, headers, params, timeout, retry_count + 1, **kwargs

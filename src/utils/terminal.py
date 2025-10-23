@@ -3,10 +3,12 @@
 import locale
 import os
 import sys
+from functools import lru_cache
 
 import colorama
 
 
+@lru_cache(maxsize=1)
 def supports_utf8() -> bool:
     """Check if the terminal supports UTF-8 encoding.
 
@@ -17,6 +19,7 @@ def supports_utf8() -> bool:
     return encoding.lower().startswith("utf")
 
 
+@lru_cache(maxsize=1)
 def supports_color() -> bool:
     """Check if the terminal supports ANSI color codes.
 

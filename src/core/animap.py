@@ -60,7 +60,7 @@ class AniMapClient:
             await self._sync_db()
         except Exception as e:
             log.error(
-                f"{self.__class__.__name__}: Failed to sync database: {e}",
+                f"Failed to sync database: {e}",
                 exc_info=True,
             )
             raise
@@ -146,7 +146,7 @@ class AniMapClient:
                     valid_count += 1
                 except (ValueError, ValidationError, TypeError) as e:
                     log.warning(
-                        f"{self.__class__.__name__}: Found an invalid mapping entry "
+                        f"Found an invalid mapping entry "
                         f"$${{anilist_id: {anilist_id}}}$$: {e}"
                     )
                     mappings.pop(key)
@@ -157,13 +157,11 @@ class AniMapClient:
             ).hexdigest()
 
             if last_mappings_hash and last_mappings_hash.value == curr_mappings_hash:
-                log.debug(
-                    f"{self.__class__.__name__}: Cache is still valid, skipping sync"
-                )
+                log.debug("Cache is still valid, skipping sync")
                 return
 
             log.debug(
-                f"{self.__class__.__name__}: Anime mapping changes detected, syncing "
+                f"Anime mapping changes detected, syncing "
                 f"database.  Validated {valid_count} entries, removed {invalid_count} "
                 f"invalid entries"
             )
@@ -216,10 +214,10 @@ class AniMapClient:
             operations_count = len(to_delete) + len(to_insert) + len(to_update)
 
             if operations_count == 0:
-                log.debug(f"{self.__class__.__name__}: No database changes needed")
+                log.debug("No database changes needed")
             else:
                 log.debug(
-                    f"{self.__class__.__name__}: Syncing database with upstream: "
+                    f"Syncing database with upstream: "
                     f"{len(to_delete)} deletions, {len(to_insert)} insertions, "
                     f"{len(to_update)} updates"
                 )
@@ -276,7 +274,7 @@ class AniMapClient:
 
             ctx.session.commit()
 
-            log.debug(f"{self.__class__.__name__}: Database sync complete")
+            log.debug("Database sync complete")
 
     def get_mappings(
         self,
@@ -303,7 +301,7 @@ class AniMapClient:
             Matching anime mapping entries.
         """
         log.debug(
-            f"{self.__class__.__name__}: Querying mappings with imdb={imdb}, "
+            f"Querying mappings with imdb={imdb}, "
             f"tmdb={tmdb}, tvdb={tvdb}, is_movie={is_movie}"
         )
 

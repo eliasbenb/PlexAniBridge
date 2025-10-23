@@ -82,25 +82,20 @@ class BridgeClient:
 
         This should be called after creating the bridge instance.
         """
-        log.info(
-            f"{self.__class__.__name__}: [{self.profile_name}] Initializing bridge "
-            "client"
-        )
+        log.info(f"[{self.profile_name}] Initializing bridge client")
 
         self.plex_client.clear_cache()
         await self.anilist_client.initialize()
 
         log.info(
-            f"{self.__class__.__name__}: [{self.profile_name}] Bridge client "
+            f"[{self.profile_name}] Bridge client "
             f"initialized for Plex user $$'{self.profile_config.plex_user}'$$ -> "
             f"AniList user $$'{self.anilist_client.user.name}'$$"
         )
 
     async def close(self) -> None:
         """Close all async clients."""
-        log.debug(
-            f"{self.__class__.__name__}: [{self.profile_name}] Closing bridge client"
-        )
+        log.debug(f"[{self.profile_name}] Closing bridge client")
         await self.anilist_client.close()
         await self.plex_client.close()
 
@@ -180,7 +175,7 @@ class BridgeClient:
                 restrict the sync to.
         """
         log.info(
-            f"{self.__class__.__name__}: [{self.profile_name}] Starting "
+            f"[{self.profile_name}] Starting "
             f"{'full ' if self.profile_config.full_scan else 'partial '}"
             f"{'and destructive ' if self.profile_config.destructive_sync else ''}"
             f"sync for Plex user $$'{self.profile_config.plex_user}'$$ "
@@ -257,7 +252,7 @@ class BridgeClient:
             self._set_last_synced(sync_start_time)
 
             log.info(
-                f"{self.__class__.__name__}: [{self.profile_name}] Sync completed: "
+                f"[{self.profile_name}] Sync completed: "
                 f"{sync_stats.synced} synced, {sync_stats.deleted} deleted, "
                 f"{sync_stats.skipped} skipped, {sync_stats.not_found} not found, "
                 f"{sync_stats.failed} failed. Coverage: {sync_stats.coverage:.2%} "
@@ -270,7 +265,7 @@ class BridgeClient:
             )
             if unprocessed_items:
                 log.debug(
-                    f"{self.__class__.__name__}: [{self.profile_name}] "
+                    f"[{self.profile_name}] "
                     f"Unprocessed items: {
                         ', '.join([repr(i) for i in unprocessed_items])
                     }"
@@ -281,7 +276,7 @@ class BridgeClient:
             duration = end_time - sync_start_time
 
             log.error(
-                f"{self.__class__.__name__}: [{self.profile_name}] Sync failed after "
+                f"[{self.profile_name}] Sync failed after "
                 f"{duration.total_seconds():.2f} seconds: {e}",
                 exc_info=True,
             )
@@ -318,10 +313,7 @@ class BridgeClient:
         Returns:
             SyncStats: Statistics about the sync operation for the section
         """
-        log.info(
-            f"{self.__class__.__name__}: [{self.profile_name}] Syncing "
-            f"section $$'{section.title}'$$"
-        )
+        log.info(f"[{self.profile_name}] Syncing section $$'{section.title}'$$")
 
         min_last_modified = (self.last_synced or datetime.now(UTC)) - timedelta(
             seconds=15
@@ -368,7 +360,7 @@ class BridgeClient:
             ]
 
             log.info(
-                f"{self.__class__.__name__}: [{self.profile_name}] Prefetching "
+                f"[{self.profile_name}] Prefetching "
                 f"{len(anilist_ids)} entries from the AniList API in batch requests"
                 f"(this may take a while)"
             )
@@ -401,8 +393,7 @@ class BridgeClient:
 
             except Exception:
                 log.error(
-                    f"{self.__class__.__name__}: [{self.profile_name}] Failed "
-                    f"to sync item $$'{item.title}'$$",
+                    f"[{self.profile_name}] Failed to sync item $$'{item.title}'$$",
                     exc_info=True,
                 )
 

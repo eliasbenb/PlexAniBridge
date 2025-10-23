@@ -352,7 +352,7 @@ class BaseSyncClient[
         )
 
         log.debug(
-            f"{self.__class__.__name__}: [{self.profile_name}] Processing {item.type} "
+            f"[{self.profile_name}] Processing {item.type} "
             f"{debug_log_title} {debug_log_ids}"
         )
 
@@ -364,7 +364,7 @@ class BaseSyncClient[
             self.sync_stats.track_item(item_id, SyncOutcome.PENDING)
         else:
             log.debug(
-                f"{self.__class__.__name__}: [{self.profile_name}] "
+                f"[{self.profile_name}] "
                 f"Skipping {item.type} because it has no eligible child items "
                 f"{debug_log_title} {debug_log_ids}"
             )
@@ -390,7 +390,7 @@ class BaseSyncClient[
             )
 
             log.debug(
-                f"{self.__class__.__name__}: [{self.profile_name}] Found AniList entry "
+                f"[{self.profile_name}] Found AniList entry "
                 f"for {item.type} {debug_log_title} {debug_log_ids}"
             )
 
@@ -407,7 +407,7 @@ class BaseSyncClient[
 
             except Exception as e:
                 log.error(
-                    f"{self.__class__.__name__}: [{self.profile_name}] Failed to "
+                    f"[{self.profile_name}] Failed to "
                     f"process {item.type} {debug_log_title} {debug_log_ids}",
                     exc_info=True,
                 )
@@ -574,7 +574,7 @@ class BaseSyncClient[
             and final_media_list == working_anilist_media_list
         ):
             log.info(
-                f"{self.__class__.__name__}: [{self.profile_name}] Skipping "
+                f"[{self.profile_name}] Skipping "
                 f"{item.type} because it is already up to date "
                 f"{debug_log_title} {debug_log_ids}"
             )
@@ -624,7 +624,7 @@ class BaseSyncClient[
                 and final_media_list == working_anilist_media_list
             ):
                 log.info(
-                    f"{self.__class__.__name__}: [{self.profile_name}] Skipping "
+                    f"[{self.profile_name}] Skipping "
                     f"{item.type} because it is already up to date "
                     f"{debug_log_title} {debug_log_ids}"
                 )
@@ -636,7 +636,7 @@ class BaseSyncClient[
             and not plex_media_list.status
         ):
             log.success(
-                f"{self.__class__.__name__}: [{self.profile_name}] Deleting AniList "
+                f"[{self.profile_name}] Deleting AniList "
                 f"entry for {item.type} {debug_log_title} {debug_log_ids}"
             )
             log.success(f"\t\tDELETE: {original_anilist_media_list}")
@@ -662,14 +662,14 @@ class BaseSyncClient[
 
         if not final_media_list.status:
             log.info(
-                f"{self.__class__.__name__}: [{self.profile_name}] Skipping "
+                f"[{self.profile_name}] Skipping "
                 f"{item.type} due to no activity {debug_log_title} {debug_log_ids}"
             )
             return SyncOutcome.SKIPPED
 
         if self.batch_requests:
             log.info(
-                f"{self.__class__.__name__}: [{self.profile_name}] Queuing {item.type} "
+                f"[{self.profile_name}] Queuing {item.type} "
                 f"for batch sync {debug_log_title} {debug_log_ids}"
             )
             log.success(
@@ -687,7 +687,7 @@ class BaseSyncClient[
             return SyncOutcome.SYNCED  # Will be synced in batch
         else:
             log.info(
-                f"{self.__class__.__name__}: [{self.profile_name}] Syncing AniList "
+                f"[{self.profile_name}] Syncing AniList "
                 f"entry for {item.type} {debug_log_title} {debug_log_ids}"
             )
             log.success(
@@ -699,7 +699,7 @@ class BaseSyncClient[
                 await self.anilist_client.update_anime_entry(final_media_list)
 
                 log.success(
-                    f"{self.__class__.__name__}: [{self.profile_name}] Synced "
+                    f"[{self.profile_name}] Synced "
                     f"{item.type} {debug_log_title} {debug_log_ids}"
                 )
 
@@ -742,7 +742,7 @@ class BaseSyncClient[
             return
 
         log.info(
-            f"{self.__class__.__name__}: [{self.profile_name}] Syncing "
+            f"[{self.profile_name}] Syncing "
             f"{len(self.queued_batch_requests)} items to AniList "
             f"with batch mode "
             f"$${{anilist_id: {[m.media_id for m in self.queued_batch_requests]}}}$$"
@@ -754,7 +754,7 @@ class BaseSyncClient[
             )
 
             log.success(
-                f"{self.__class__.__name__}: [{self.profile_name}] Synced "
+                f"[{self.profile_name}] Synced "
                 f"{len(self.queued_batch_requests)} items to AniList "
                 f"with batch mode $${{anilist_id: "
                 f"{[m.media_id for m in self.queued_batch_requests]}}}$$"
