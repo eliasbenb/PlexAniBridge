@@ -86,6 +86,9 @@ class CleanFormatter(logging.Formatter):
     the content within them.
     """
 
+    QUOTED_PATTERN = re.compile(r"\$\$'((?:[^']|'(?!\$\$))*)'\$\$")
+    BRACED_PATTERN = re.compile(r"\$\$\{(.*?)\}\$\$")
+
     def format(self, record: logging.LogRecord) -> str:
         """Formats a log record by removing color markers.
 
@@ -100,8 +103,8 @@ class CleanFormatter(logging.Formatter):
             orig_msg = record.msg
 
             # Remove the $$ markers and keep the content
-            cleaned_msg = re.sub(r"\$\$\'(.*?)\'\$\$", "'\\1'", record.msg)
-            cleaned_msg = re.sub(r"\$\$\{(.*?)\}\$\$", "{\\1}", cleaned_msg)
+            cleaned_msg = re.sub(self.QUOTED_PATTERN, "'\\1'", record.msg)
+            cleaned_msg = re.sub(self.BRACED_PATTERN, "{\\1}", cleaned_msg)
             record.msg = cleaned_msg
 
             result = super().format(record)
