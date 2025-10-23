@@ -154,7 +154,7 @@ class BaseSyncClient[
         self.animap_client = animap_client
         self.plex_client = plex_client
 
-        self.excluded_sync_fields = [field.value for field in excluded_sync_fields]
+        self.excluded_sync_fields = set(field.value for field in excluded_sync_fields)
         self.full_scan = full_scan
         self.destructive_sync = destructive_sync
         self.search_fallback_threshold = search_fallback_threshold
@@ -559,7 +559,7 @@ class BaseSyncClient[
         final_media_list = self._merge_media_lists(
             anilist_media_list=working_anilist_media_list,
             plex_media_list=plex_media_list,
-            excluded_fields=set(self.excluded_sync_fields),
+            excluded_fields=self.excluded_sync_fields,
         )
 
         if (
