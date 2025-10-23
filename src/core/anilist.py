@@ -271,7 +271,7 @@ class AniListClient:
                         score: $score{j},
                         progress: $progress{j},
                         repeat: $repeat{j},
-                        notes: $notes{j},  
+                        notes: $notes{j},
                         startedAt: $startedAt{j},
                         completedAt: $completedAt{j}
                     ) {{

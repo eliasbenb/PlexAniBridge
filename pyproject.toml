@@ -80,6 +80,7 @@ include = ["main.py", "src"]
 include = ["pyproject.toml", "src/**/*.py", "scripts/**/*.py"]
 indent-width = 4
 line-length = 88
+extend-select = ["I"]
 
 [tool.ruff.format]
 docstring-code-format = true
@@ -87,7 +88,7 @@ indent-style = "space"
 quote-style = "double"
 
 [tool.ruff.lint]
-select = ["E", "F", "UP", "B", "SIM", "I", "D", "RUF"]
+select = ["B", "D", "DOC", "E", "F", "I", "RUF", "SIM", "UP", "W"]
 
 [tool.ruff.lint.flake8-bugbear]
 extend-immutable-calls = [
