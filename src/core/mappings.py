@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 from pathlib import Path
-from typing import Any, ClassVar, TypeAlias
+from typing import Any, ClassVar
 from urllib.parse import urljoin, urlparse
 
 import aiohttp
@@ -15,7 +15,7 @@ from src import __version__, log
 
 __all__ = ["AniMapDict", "MappingsClient"]
 
-AniMapDict: TypeAlias = dict[str, dict[str, Any]]
+type AniMapDict = dict[str, dict[str, Any]]
 
 
 class MappingsClient:

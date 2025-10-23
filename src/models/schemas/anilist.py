@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, date, datetime, timedelta
 from enum import StrEnum
 from functools import cache
-from typing import Annotated, Any, ClassVar, Generic, TypeVar, get_args, get_origin
+from typing import Annotated, Any, ClassVar, get_args, get_origin
 
 from pydantic import AfterValidator, BaseModel, ConfigDict
 from pydantic.alias_generators import to_camel
@@ -496,11 +496,7 @@ class MediaList(AniListBaseModel):
         )
 
 
-EntryType = TypeVar("EntryType", bound=MediaList)
-GroupType = TypeVar("GroupType", bound="MediaListGroup")
-
-
-class MediaListGroup(AniListBaseModel, Generic[EntryType]):
+class MediaListGroup[EntryType: MediaList](AniListBaseModel):
     """Model representing a group of media list entries."""
 
     entries: list[EntryType] = []
@@ -510,7 +506,7 @@ class MediaListGroup(AniListBaseModel, Generic[EntryType]):
     status: MediaListStatus | None = None
 
 
-class MediaListCollection(AniListBaseModel, Generic[GroupType]):
+class MediaListCollection[GroupType: "MediaListGroup"](AniListBaseModel):
     """Model representing a collection of media list groups for a user."""
 
     user: User | None = None

@@ -5,7 +5,6 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator, Callable
 from datetime import UTC, datetime
-from typing import Generic, TypeVar
 
 from plexapi.media import Guid
 from plexapi.video import Episode, Movie, Season, Show
@@ -33,10 +32,6 @@ from src.models.schemas.anilist import (
     ScoreFormat,
 )
 from src.utils.types import Comparable
-
-T = TypeVar("T", bound=Movie | Show)  # Section item
-S = TypeVar("S", bound=Movie | Season)  # Item child (season)
-E = TypeVar("E", bound=list[Movie] | list[Episode])  # Item grandchild (episode)
 
 _LEGACY_GUID_MAPPING = {
     "com.plexapp.agents.imdb": "imdb",
@@ -116,7 +111,11 @@ class ParsedGuids(BaseModel):
         )
 
 
-class BaseSyncClient(ABC, Generic[T, S, E]):
+class BaseSyncClient[
+    T: Movie | Show,  # Main media type
+    S: Movie | Season,  # Child item type
+    E: list[Movie] | list[Episode],  # Grandchild item type
+](ABC):
     """Abstract base class for media synchronization between Plex and AniList.
 
     Provides core synchronization logic while allowing specialized implementations

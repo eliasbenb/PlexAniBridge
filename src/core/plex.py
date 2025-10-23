@@ -5,7 +5,6 @@ from __future__ import annotations
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from math import isnan
-from typing import TypeAlias
 from urllib.parse import urlparse
 from xml.etree import ElementTree
 
@@ -39,9 +38,9 @@ from src.utils.requests import SelectiveVerifySession
 
 __all__ = ["Media", "MediaHistory", "PlexClient", "Section"]
 
-Media: TypeAlias = Movie | Show | Season | Episode
-MediaHistory: TypeAlias = MovieHistory | EpisodeHistory
-Section: TypeAlias = MovieSection | ShowSection
+type Media = Movie | Show | Season | Episode
+type MediaHistory = MovieHistory | EpisodeHistory
+type Section = MovieSection | ShowSection
 
 
 class PlexClient:
@@ -272,7 +271,7 @@ class PlexClient:
         sections = {
             section.title: section
             for section in self.user_client.library.sections()
-            if isinstance(section, Section)
+            if isinstance(section, (MovieSection, ShowSection))
         }
         if self.plex_sections:
             return [
