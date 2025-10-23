@@ -8,12 +8,13 @@ from io import BytesIO
 from logging import DEBUG
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi.applications import FastAPI
 from fastapi.exception_handlers import http_exception_handler
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
 
 from src import __version__, log
 from src.core.sched import SchedulerClient

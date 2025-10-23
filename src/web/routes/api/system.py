@@ -4,7 +4,7 @@ import platform
 from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi.routing import APIRouter
 from pydantic import BaseModel
 
 from src import __git_hash__, __version__

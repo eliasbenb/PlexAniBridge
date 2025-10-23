@@ -1,6 +1,6 @@
 """API status endpoints."""
 
-from fastapi import APIRouter
+from fastapi.routing import APIRouter
 from pydantic import BaseModel
 
 from src.web.state import get_app_state

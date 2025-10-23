@@ -2,7 +2,9 @@
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, Request
+from fastapi.param_functions import Depends
+from fastapi.routing import APIRouter
+from starlette.requests import Request
 
 from src import log
 from src.config.settings import SyncMode

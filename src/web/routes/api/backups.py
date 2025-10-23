@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi.routing import APIRouter
 from pydantic import BaseModel
 
 from src.web.services.backup_service import (

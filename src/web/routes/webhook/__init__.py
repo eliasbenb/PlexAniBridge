@@ -1,6 +1,6 @@
 """Webhook route aggregator."""
 
-from fastapi import APIRouter
+from fastapi.routing import APIRouter
 
 from .plex import router as plex_router
 

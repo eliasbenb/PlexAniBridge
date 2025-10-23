@@ -1,6 +1,6 @@
 """API routes."""
 
-from fastapi import APIRouter
+from fastapi.routing import APIRouter
 
 from src.web.routes.api.backups import router as backups_router
 from src.web.routes.api.history import router as history_router

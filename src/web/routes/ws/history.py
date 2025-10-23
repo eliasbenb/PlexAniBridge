@@ -2,7 +2,8 @@
 
 import asyncio
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi.routing import APIRouter
+from fastapi.websockets import WebSocket, WebSocketDisconnect
 
 from src.web.services.history_service import get_history_service
 

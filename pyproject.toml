@@ -92,15 +92,15 @@ select = ["B", "D", "DOC", "E", "F", "I", "RUF", "SIM", "UP", "W"]
 
 [tool.ruff.lint.flake8-bugbear]
 extend-immutable-calls = [
-    "fastapi.Body",
-    "fastapi.Cookie",
-    "fastapi.Depends",
-    "fastapi.File",
-    "fastapi.Form",
-    "fastapi.Header",
-    "fastapi.Path",
-    "fastapi.Query",
-    "fastapi.Security",
+    "fastapi.param_functions.Body",
+    "fastapi.param_functions.Cookie",
+    "fastapi.param_functions.Depends",
+    "fastapi.param_functions.File",
+    "fastapi.param_functions.Form",
+    "fastapi.param_functions.Header",
+    "fastapi.param_functions.Path",
+    "fastapi.param_functions.Query",
+    "fastapi.param_functions.Security",
 ]
 
 [tool.ruff.lint.pydocstyle]

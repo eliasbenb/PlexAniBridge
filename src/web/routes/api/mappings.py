@@ -3,7 +3,8 @@
 from enum import StrEnum
 from typing import Any
 
-from fastapi import APIRouter, Query
+from fastapi.param_functions import Query
+from fastapi.routing import APIRouter
 from pydantic import BaseModel
 from sqlalchemy import and_, func, select
 
