@@ -289,8 +289,7 @@ class HistoryService:
                 pin_rows = (
                     ctx.session.query(Pin)
                     .filter(
-                        Pin.profile_name == profile,
-                        Pin.anilist_id.in_(anilist_ids),
+                        Pin.profile_name == profile, Pin.anilist_id.in_(anilist_ids)
                     )
                     .all()
                 )
@@ -396,10 +395,7 @@ class HistoryService:
         with db() as ctx:
             row: SyncHistory | None = (
                 ctx.session.query(SyncHistory)
-                .filter(
-                    SyncHistory.profile_name == profile,
-                    SyncHistory.id == item_id,
-                )
+                .filter(SyncHistory.profile_name == profile, SyncHistory.id == item_id)
                 .first()
             )
             if not row:

@@ -59,10 +59,7 @@ class AniMapClient:
         try:
             await self._sync_db()
         except Exception as e:
-            log.error(
-                f"Failed to sync database: {e}",
-                exc_info=True,
-            )
+            log.error(f"Failed to sync database: {e}", exc_info=True)
             raise
 
     async def close(self) -> None:

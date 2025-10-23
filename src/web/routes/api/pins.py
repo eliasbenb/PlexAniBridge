@@ -77,8 +77,7 @@ async def get_pin_fields() -> PinOptionsResponse:
 
 @router.get("/{profile}", response_model=PinListResponse)
 async def list_pins(
-    profile: str = Path(..., min_length=1),
-    with_anilist: bool = Query(False),
+    profile: str = Path(..., min_length=1), with_anilist: bool = Query(False)
 ) -> PinListResponse:
     """List all pinned AniList entries for a profile.
 
@@ -164,10 +163,7 @@ async def search_pins(
             try:
                 count = 0
                 async for media in client.search_anime(
-                    query,
-                    is_movie=None,
-                    episodes=None,
-                    limit=limit,
+                    query, is_movie=None, episodes=None, limit=limit
                 ):
                     await add_media(media)
                     count += 1
@@ -261,8 +257,7 @@ async def upsert_pin(
 
 @router.delete("/{profile}/{anilist_id}", response_model=OkResponse)
 async def delete_pin(
-    profile: str = Path(..., min_length=1),
-    anilist_id: int = Path(..., ge=1),
+    profile: str = Path(..., min_length=1), anilist_id: int = Path(..., ge=1)
 ) -> OkResponse:
     """Delete pin configuration for an AniList entry.
 

@@ -82,10 +82,7 @@ class ProfileScheduler:
                         await self._current_task
                 raise
             except Exception:
-                log.error(
-                    f"[{self.profile_name}] Sync error",
-                    exc_info=True,
-                )
+                log.error(f"[{self.profile_name}] Sync error", exc_info=True)
             finally:
                 self._current_task = None
 
@@ -151,10 +148,7 @@ class ProfileScheduler:
                 log.debug(f"[{self.profile_name}] Periodic sync cancelled")
                 break
             except Exception:
-                log.error(
-                    f"[{self.profile_name}] Periodic sync error",
-                    exc_info=True,
-                )
+                log.error(f"[{self.profile_name}] Periodic sync error", exc_info=True)
                 await asyncio.sleep(10)
 
     async def _poll_loop(self) -> None:
@@ -167,10 +161,7 @@ class ProfileScheduler:
                 log.info(f"[{self.profile_name}] Poll sync cancelled")
                 break
             except Exception:
-                log.error(
-                    f"[{self.profile_name}] Poll sync error",
-                    exc_info=True,
-                )
+                log.error(f"[{self.profile_name}] Poll sync error", exc_info=True)
                 await asyncio.sleep(10)
 
 
@@ -470,19 +461,13 @@ class SchedulerClient:
                     for bridge_client in self.bridge_clients.values():
                         await bridge_client.anilist_client.initialize()
                 except Exception as e:
-                    log.error(
-                        f"Daily database sync failed: {e}",
-                        exc_info=True,
-                    )
+                    log.error(f"Daily database sync failed: {e}", exc_info=True)
 
             except asyncio.CancelledError:
                 log.debug("Daily database sync cancelled")
                 break
             except Exception:
-                log.error(
-                    "Daily database sync error",
-                    exc_info=True,
-                )
+                log.error("Daily database sync error", exc_info=True)
                 await asyncio.sleep(3600)  # Retry after 1 hour on error
 
         log.info("Daily database sync scheduler stopped")

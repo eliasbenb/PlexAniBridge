@@ -542,8 +542,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         first_history = min(history, key=lambda h: h.viewedAt) if history else None
 
         last_viewed_dt = min(
-            (e.lastViewedAt for e in grandchild_items if e.lastViewedAt),
-            default=None,
+            (e.lastViewedAt for e in grandchild_items if e.lastViewedAt), default=None
         )
         last_viewed = FuzzyDate.from_date(
             last_viewed_dt.replace(tzinfo=get_localzone()).astimezone(
@@ -589,8 +588,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
         last_history = max(history, key=lambda h: h.viewedAt) if history else None
 
         last_viewed_at = max(
-            (e.lastViewedAt for e in grandchild_items if e.lastViewedAt),
-            default=None,
+            (e.lastViewedAt for e in grandchild_items if e.lastViewedAt), default=None
         )
         last_viewed = (
             FuzzyDate.from_date(
@@ -641,11 +639,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             return review
         return await self.plex_client.get_user_review(item)
 
-    def _debug_log_title(
-        self,
-        item: Show,
-        animapping: AniMap | None = None,
-    ) -> str:
+    def _debug_log_title(self, item: Show, animapping: AniMap | None = None) -> str:
         """Creates a debug-friendly string of media titles.
 
         The outputted string uses color formatting syntax with the `$$` delimiters.

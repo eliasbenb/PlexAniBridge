@@ -109,10 +109,7 @@ class PinService:
         with db() as ctx:
             pin = (
                 ctx.session.query(Pin)
-                .filter(
-                    Pin.profile_name == profile,
-                    Pin.anilist_id == anilist_id,
-                )
+                .filter(Pin.profile_name == profile, Pin.anilist_id == anilist_id)
                 .first()
             )
 
@@ -129,10 +126,7 @@ class PinService:
         with db() as ctx:
             pin = (
                 ctx.session.query(Pin)
-                .filter(
-                    Pin.profile_name == profile,
-                    Pin.anilist_id == anilist_id,
-                )
+                .filter(Pin.profile_name == profile, Pin.anilist_id == anilist_id)
                 .first()
             )
 
@@ -160,10 +154,7 @@ class PinService:
         with db() as ctx:
             pin = (
                 ctx.session.query(Pin)
-                .filter(
-                    Pin.profile_name == profile,
-                    Pin.anilist_id == anilist_id,
-                )
+                .filter(Pin.profile_name == profile, Pin.anilist_id == anilist_id)
                 .first()
             )
             if not pin:

@@ -35,8 +35,7 @@ class SelectiveVerifySession(requests.Session):
                     return super().request(method, url, **kwargs)
                 except Exception as e:
                     log.error(
-                        (f"Error during request to $$'{domain}'$$: {e}"),
-                        exc_info=True,
+                        (f"Error during request to $$'{domain}'$$: {e}"), exc_info=True
                     )
                     raise
         return super().request(method, url, *_, **kwargs)

@@ -1,12 +1,11 @@
 from collections.abc import Generator, Iterable
 from datetime import datetime
 from functools import cached_property
-from typing import Any, Generic, TypeVar
+from typing import Any, Self, TypeVar
 from xml.etree.ElementTree import Element
 
 import requests
 from _typeshed import Incomplete
-from typing_extensions import Self
 
 from plexapi.client import PlexClient
 from plexapi.library import LibrarySection
@@ -103,10 +102,7 @@ class Playable:
     def lyricStreams(self) -> list[LyricStream]: ...
     def play(self, client: PlexClient.__class__) -> None: ...
     def download(
-        self,
-        savepath: str | None = None,
-        keep_original_name: bool = False,
-        **kwargs,
+        self, savepath: str | None = None, keep_original_name: bool = False, **kwargs
     ): ...
     def updateProgress(self, time: int, state: str = "stopped") -> Self: ...
     def updateTimeline(
@@ -123,7 +119,7 @@ class PlexHistory:
     def source(self): ...
     def delete(self): ...
 
-class MediaContainer(list[PlexObjectT], PlexObject, Generic[PlexObjectT]):
+class MediaContainer[PlexObjectT: PlexObject](list[PlexObjectT], PlexObject):
     def __init__(
         self,
         server: PlexServer,

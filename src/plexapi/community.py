@@ -242,9 +242,7 @@ class PlexCommunityClient:
                 return await response.json()
 
         except (TimeoutError, aiohttp.ClientError):
-            log.error(
-                "Connection error while making request to the Plex Community API"
-            )
+            log.error("Connection error while making request to the Plex Community API")
             await asyncio.sleep(1)
             return await self._make_request(
                 query=query, variables=variables, retry_count=retry_count + 1

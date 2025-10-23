@@ -58,10 +58,7 @@ async def get_history(
         ProfileNotFoundError: If the profile is unknown.
     """
     hp: HistoryPage = await get_history_service().get_page(
-        profile=profile,
-        page=page,
-        per_page=per_page,
-        outcome=outcome,
+        profile=profile, page=page, per_page=per_page, outcome=outcome
     )
     return GetHistoryResponse(**hp.model_dump())
 

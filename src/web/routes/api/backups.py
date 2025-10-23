@@ -55,8 +55,7 @@ async def restore_backup(profile: str, req: RestoreRequest) -> RestoreSummary:
         BackupFileNotFoundError: If the backup file does not exist.
     """
     return await get_backup_service().restore_backup(
-        profile=profile,
-        filename=req.filename,
+        profile=profile, filename=req.filename
     )
 
 

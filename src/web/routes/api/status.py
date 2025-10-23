@@ -62,7 +62,6 @@ async def status() -> StatusResponse:
         cfg = data.get("config", {})
         st = data.get("status", {})
         converted[name] = ProfileStatusModel(
-            config=ProfileConfigModel(**cfg),
-            status=ProfileRuntimeStatusModel(**st),
+            config=ProfileConfigModel(**cfg), status=ProfileRuntimeStatusModel(**st)
         )
     return StatusResponse(profiles=converted)

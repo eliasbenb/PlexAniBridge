@@ -209,8 +209,7 @@ class MappingsClient:
                         mappings = self._dict_str_keys(yaml.safe_load(f))
         except (json.JSONDecodeError, yaml.YAMLError):
             log.error(
-                f"Error decoding file $$'{file_path.resolve()!s}'$$",
-                exc_info=True,
+                f"Error decoding file $$'{file_path.resolve()!s}'$$", exc_info=True
             )
         except Exception:
             log.error(
@@ -235,8 +234,7 @@ class MappingsClient:
             )
 
         merged = self._deep_merge(
-            await self._load_includes(includes, loaded_chain, str(file_path)),
-            mappings,
+            await self._load_includes(includes, loaded_chain, str(file_path)), mappings
         )
 
         # Record provenance for keys present in this file or its includes
@@ -279,10 +277,7 @@ class MappingsClient:
                 )
                 await asyncio.sleep(1)
                 return await self._load_mappings_url(url, loaded_chain, retry_count + 1)
-            log.error(
-                f"Error reaching mappings URL $$'{url}'$$",
-                exc_info=True,
-            )
+            log.error(f"Error reaching mappings URL $$'{url}'$$", exc_info=True)
         except Exception:
             log.error(
                 f"Unexpected error fetching mappings from URL $$'{url}'$$",
@@ -302,15 +297,9 @@ class MappingsClient:
                     )
                     mappings = json.loads(mappings_raw)
         except (json.JSONDecodeError, yaml.YAMLError):
-            log.error(
-                f"Error decoding file $$'{url!s}'$$",
-                exc_info=True,
-            )
+            log.error(f"Error decoding file $$'{url!s}'$$", exc_info=True)
         except Exception:
-            log.error(
-                f"Unexpected error reading file $$'{url!s}'$$",
-                exc_info=True,
-            )
+            log.error(f"Unexpected error reading file $$'{url!s}'$$", exc_info=True)
 
         self._loaded_sources.add(url)
 
@@ -326,8 +315,7 @@ class MappingsClient:
             log.warning(f"$includes in {url} is not a list, ignoring")
 
         merged = self._deep_merge(
-            await self._load_includes(includes, loaded_chain, url),
-            mappings,
+            await self._load_includes(includes, loaded_chain, url), mappings
         )
 
         # Record provenance for keys present at this URL or its includes

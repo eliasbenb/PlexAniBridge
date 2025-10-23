@@ -10,11 +10,7 @@ from src import log
 from src.config.database import db
 from src.config.settings import PlexAnibridgeConfig, PlexAnibridgeProfileConfig
 from src.core import AniListClient, AniMapClient, PlexClient
-from src.core.sync import (
-    BaseSyncClient,
-    MovieSyncClient,
-    ShowSyncClient,
-)
+from src.core.sync import BaseSyncClient, MovieSyncClient, ShowSyncClient
 from src.core.sync.base import ParsedGuids
 from src.core.sync.stats import SyncProgress, SyncStats
 from src.models.db.housekeeping import Housekeeping

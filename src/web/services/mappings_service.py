@@ -349,10 +349,7 @@ class MappingsService:
                         if m_rng:
                             lo, hi = int(m_rng.group(1)), int(m_rng.group(2))
                             s = s.where(
-                                and_(
-                                    AniMap.anilist_id >= lo,
-                                    AniMap.anilist_id <= hi,
-                                )
+                                and_(AniMap.anilist_id >= lo, AniMap.anilist_id <= hi)
                             )
                             return set(int(r[0]) for r in ctx.session.execute(s).all())
                         num = int(value)
@@ -420,10 +417,7 @@ class MappingsService:
                         if m_rng:
                             lo, hi = int(m_rng.group(1)), int(m_rng.group(2))
                             s = s.where(
-                                and_(
-                                    AniMap.anidb_id >= lo,
-                                    AniMap.anidb_id <= hi,
-                                )
+                                and_(AniMap.anidb_id >= lo, AniMap.anidb_id <= hi)
                             )
                             return set(int(r[0]) for r in ctx.session.execute(s).all())
                         num = int(value)
@@ -484,8 +478,7 @@ class MappingsService:
                             lo, hi = int(m_rng.group(1)), int(m_rng.group(2))
                             s = s.where(
                                 and_(
-                                    AniMap.tmdb_show_id >= lo,
-                                    AniMap.tmdb_show_id <= hi,
+                                    AniMap.tmdb_show_id >= lo, AniMap.tmdb_show_id <= hi
                                 )
                             )
                             return set(int(r[0]) for r in ctx.session.execute(s).all())
@@ -505,10 +498,7 @@ class MappingsService:
                         if m_rng:
                             lo, hi = int(m_rng.group(1)), int(m_rng.group(2))
                             s = s.where(
-                                and_(
-                                    AniMap.tvdb_id >= lo,
-                                    AniMap.tvdb_id <= hi,
-                                )
+                                and_(AniMap.tvdb_id >= lo, AniMap.tvdb_id <= hi)
                             )
                             return set(int(r[0]) for r in ctx.session.execute(s).all())
                         num = int(value)
@@ -689,8 +679,7 @@ class MappingsService:
                         )
                         .where(AniMapProvenance.anilist_id.in_(page_ids))
                         .order_by(
-                            AniMapProvenance.anilist_id.asc(),
-                            AniMapProvenance.n.asc(),
+                            AniMapProvenance.anilist_id.asc(), AniMapProvenance.n.asc()
                         )
                     ).all()
                     sources_by_id: dict[int, list[str]] = {aid: [] for aid in page_ids}
@@ -768,8 +757,7 @@ class MappingsService:
                         )
                         .where(AniMapProvenance.anilist_id.in_(anilist_ids))
                         .order_by(
-                            AniMapProvenance.anilist_id.asc(),
-                            AniMapProvenance.n.asc(),
+                            AniMapProvenance.anilist_id.asc(), AniMapProvenance.n.asc()
                         )
                     ).all()
                     for aid, _n, src in prov_rows:

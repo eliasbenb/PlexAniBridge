@@ -128,56 +128,22 @@ async def get_query_capabilities() -> QueryCapabilitiesResponse:
 
     fields = [
         FieldCapability(
-            key="anilist",
-            desc="AniList ID",
-            aliases=["id"],
-            **DEFAULT_INT_KWARGS,
+            key="anilist", desc="AniList ID", aliases=["id"], **DEFAULT_INT_KWARGS
+        ),
+        FieldCapability(key="anidb", desc="AniDB ID", **DEFAULT_INT_KWARGS),
+        FieldCapability(key="imdb", desc="IMDb ID", **DEFAULT_STRING_KWARGS),
+        FieldCapability(key="mal", desc="MyAnimeList ID", **DEFAULT_INT_KWARGS),
+        FieldCapability(key="tmdb_movie", desc="TMDb Movie ID", **DEFAULT_INT_KWARGS),
+        FieldCapability(key="tmdb_show", desc="TMDb TV Show ID", **DEFAULT_INT_KWARGS),
+        FieldCapability(key="tvdb", desc="TVDB ID", **DEFAULT_INT_KWARGS),
+        FieldCapability(
+            key="tmdb_mappings", desc="Season/episode mappings", **DEFAULT_STRING_KWARGS
         ),
         FieldCapability(
-            key="anidb",
-            desc="AniDB ID",
-            **DEFAULT_INT_KWARGS,
+            key="tvdb_mappings", desc="Season/episode mappings", **DEFAULT_STRING_KWARGS
         ),
         FieldCapability(
-            key="imdb",
-            desc="IMDb ID",
-            **DEFAULT_STRING_KWARGS,
-        ),
-        FieldCapability(
-            key="mal",
-            desc="MyAnimeList ID",
-            **DEFAULT_INT_KWARGS,
-        ),
-        FieldCapability(
-            key="tmdb_movie",
-            desc="TMDb Movie ID",
-            **DEFAULT_INT_KWARGS,
-        ),
-        FieldCapability(
-            key="tmdb_show",
-            desc="TMDb TV Show ID",
-            **DEFAULT_INT_KWARGS,
-        ),
-        FieldCapability(
-            key="tvdb",
-            desc="TVDB ID",
-            **DEFAULT_INT_KWARGS,
-        ),
-        FieldCapability(
-            key="tmdb_mappings",
-            desc="Season/episode mappings",
-            **DEFAULT_STRING_KWARGS,
-        ),
-        FieldCapability(
-            key="tvdb_mappings",
-            desc="Season/episode mappings",
-            **DEFAULT_STRING_KWARGS,
-        ),
-        FieldCapability(
-            key="has",
-            desc="Presence filter",
-            values=has_values,
-            **DEFAULT_ENUM_KWARGS,
+            key="has", desc="Presence filter", values=has_values, **DEFAULT_ENUM_KWARGS
         ),
     ]
 
@@ -250,8 +216,7 @@ async def create_mapping(mapping: dict[str, Any]) -> MappingItemModel:
     with db() as ctx:
         sub = (
             select(
-                AniMapProvenance.anilist_id,
-                func.max(AniMapProvenance.n).label("maxn"),
+                AniMapProvenance.anilist_id, func.max(AniMapProvenance.n).label("maxn")
             )
             .where(AniMapProvenance.anilist_id == obj.anilist_id)
             .group_by(AniMapProvenance.anilist_id)
@@ -321,8 +286,7 @@ async def update_mapping(mapping_id: int, mapping: dict[str, Any]) -> MappingIte
     with db() as ctx:
         sub = (
             select(
-                AniMapProvenance.anilist_id,
-                func.max(AniMapProvenance.n).label("maxn"),
+                AniMapProvenance.anilist_id, func.max(AniMapProvenance.n).label("maxn")
             )
             .where(AniMapProvenance.anilist_id == obj.anilist_id)
             .group_by(AniMapProvenance.anilist_id)
@@ -384,8 +348,7 @@ async def get_mapping(mapping_id: int) -> MappingItemModel:
 
         sub = (
             select(
-                AniMapProvenance.anilist_id,
-                func.max(AniMapProvenance.n).label("maxn"),
+                AniMapProvenance.anilist_id, func.max(AniMapProvenance.n).label("maxn")
             )
             .where(AniMapProvenance.anilist_id == obj.anilist_id)
             .group_by(AniMapProvenance.anilist_id)

@@ -1,11 +1,10 @@
 from collections.abc import Callable
 from datetime import datetime
-from typing import Any
+from typing import Any, Self
 from xml.etree.ElementTree import Element
 
 import requests
 from _typeshed import Incomplete
-from typing_extensions import Self
 
 from plexapi.base import PlexHistory, PlexObject
 from plexapi.client import PlexClient
@@ -323,9 +322,7 @@ class MyPlexPinLogin:
     def pin(self) -> str: ...
     def oauthUrl(self, forwardUrl: str | None = None) -> str: ...
     def run(
-        self,
-        callback: Callable[[str], Any] | None = None,
-        timeout: int | None = None,
+        self, callback: Callable[[str], Any] | None = None, timeout: int | None = None
     ) -> None: ...
     def waitForLogin(self) -> bool: ...
     def stop(self) -> None: ...

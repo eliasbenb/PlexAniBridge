@@ -75,10 +75,7 @@ def gattl_cache(ttl: int = 60):
         # Create a unique alias for the cache configuration.
         cache_alias = f"galru_{func.__module__}.{func.__qualname__}_{id(func)}"
 
-        aiocache.caches.add(
-            cache_alias,
-            {"cache": aiocache.Cache.MEMORY, "ttl": ttl},
-        )
+        aiocache.caches.add(cache_alias, {"cache": aiocache.Cache.MEMORY, "ttl": ttl})
 
         def key_builder_adapter(f, *args, **kwargs):
             return generic_hash(*args, **kwargs)

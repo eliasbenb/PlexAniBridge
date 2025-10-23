@@ -16,11 +16,7 @@ from src import log
 from src.config.database import db
 from src.config.settings import SyncField
 from src.core import AniListClient, AniMapClient, PlexClient
-from src.core.sync.stats import (
-    ItemIdentifier,
-    SyncOutcome,
-    SyncStats,
-)
+from src.core.sync.stats import ItemIdentifier, SyncOutcome, SyncStats
 from src.models.db.animap import AniMap
 from src.models.db.pin import Pin
 from src.models.db.sync_history import MediaType, SyncHistory
@@ -216,8 +212,7 @@ class BaseSyncClient[
             pin: Pin | None = (
                 ctx.session.query(Pin)
                 .filter(
-                    Pin.profile_name == self.profile_name,
-                    Pin.anilist_id == anilist_id,
+                    Pin.profile_name == self.profile_name, Pin.anilist_id == anilist_id
                 )
                 .first()
             )
@@ -346,9 +341,7 @@ class BaseSyncClient[
 
         debug_log_title = self._debug_log_title(item=item)
         debug_log_ids = self._debug_log_ids(
-            key=item.ratingKey,
-            plex_id=item.guid,
-            guids=guids,
+            key=item.ratingKey, plex_id=item.guid, guids=guids
         )
 
         log.debug(
@@ -1028,11 +1021,7 @@ class BaseSyncClient[
         pass
 
     @abstractmethod
-    def _debug_log_title(
-        self,
-        item: T,
-        animapping: AniMap | None = None,
-    ) -> str:
+    def _debug_log_title(self, item: T, animapping: AniMap | None = None) -> str:
         """Creates a debug-friendly string of media titles.
 
         Must be implemented by subclasses to handle different media types.

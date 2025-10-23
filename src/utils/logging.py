@@ -63,13 +63,11 @@ class ColorFormatter(logging.Formatter):
         if isinstance(record.msg, str):
             # Color strings in quotes
             record.msg = self.QUOTED_PATTERN.sub(
-                f"{Fore.LIGHTBLUE_EX}'\\1'{Style.RESET_ALL}",
-                record.msg,
+                f"{Fore.LIGHTBLUE_EX}'\\1'{Style.RESET_ALL}", record.msg
             )
             # Color curly brace values
             record.msg = self.BRACED_PATTERN.sub(
-                f"{Style.DIM}{{\\1}}{Style.RESET_ALL}",
-                record.msg,
+                f"{Style.DIM}{{\\1}}{Style.RESET_ALL}", record.msg
             )
 
         result = super().format(record)
@@ -232,21 +230,12 @@ class Logger(logging.Logger):
             else "%(asctime)s - %(name)s - %(levelname)s\t%(message)s"
         )
 
-        file_formatter = CleanFormatter(
-            log_format,
-            datefmt="%Y-%m-%d %H:%M:%S",
-        )
+        file_formatter = CleanFormatter(log_format, datefmt="%Y-%m-%d %H:%M:%S")
 
         console_formatter = (
-            ColorFormatter(
-                log_format,
-                datefmt="%Y-%m-%d %H:%M:%S",
-            )
+            ColorFormatter(log_format, datefmt="%Y-%m-%d %H:%M:%S")
             if has_color_support
-            else CleanFormatter(
-                log_format,
-                datefmt="%Y-%m-%d %H:%M:%S",
-            )
+            else CleanFormatter(log_format, datefmt="%Y-%m-%d %H:%M:%S")
         )
 
         if log_dir is not None:

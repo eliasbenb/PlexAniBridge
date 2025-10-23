@@ -14,14 +14,7 @@ from cachetools.func import ttl_cache
 from plexapi.library import LibrarySection, MovieSection, ShowSection
 from plexapi.myplex import MyPlexUser
 from plexapi.server import PlexServer
-from plexapi.video import (
-    Episode,
-    EpisodeHistory,
-    Movie,
-    MovieHistory,
-    Season,
-    Show,
-)
+from plexapi.video import Episode, EpisodeHistory, Movie, MovieHistory, Season, Show
 from tzlocal import get_localzone
 
 from src import log
@@ -492,10 +485,7 @@ class PlexClient:
             )
 
     @alru_cache(maxsize=1024, ttl=30)
-    async def get_history(
-        self,
-        item: Media,
-    ) -> list[EpisodeHistory | MovieHistory]:
+    async def get_history(self, item: Media) -> list[EpisodeHistory | MovieHistory]:
         """Retrieves watch history for a media item.
 
         Args:
@@ -540,16 +530,14 @@ class PlexClient:
 
                     history_data = ElementTree.Element("History", attrib=attrib)
                     h = EpisodeHistory(
-                        server=self.online_client._server,
-                        data=history_data,
+                        server=self.online_client._server, data=history_data
                     )
                     h.parentRatingKey = metadata["parent"]["id"]
                     h.grandparentRatingKey = metadata["grandparent"]["id"]
                 elif metadata["type"] == "MOVIE":
                     history_data = ElementTree.Element("History", attrib=attrib)
                     h = MovieHistory(
-                        server=self.online_client._server,
-                        data=history_data,
+                        server=self.online_client._server, data=history_data
                     )
                 else:
                     log.debug(

@@ -144,8 +144,7 @@ async def api_about() -> AboutResponse:
         cfg = data.get("config", {})
         st = data.get("status", {})
         converted[name] = ProfileStatusModel(
-            config=ProfileConfigModel(**cfg),
-            status=ProfileRuntimeStatusModel(**st),
+            config=ProfileConfigModel(**cfg), status=ProfileRuntimeStatusModel(**st)
         )
     return AboutResponse(info=info, status=converted)
 

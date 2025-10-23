@@ -402,10 +402,7 @@ class AniListClient:
 
     @alru_cache(maxsize=None, ttl=604800)
     async def _search_anime(
-        self,
-        search_str: str,
-        is_movie: bool | None,
-        limit: int = 10,
+        self, search_str: str, is_movie: bool | None, limit: int = 10
     ) -> list[Media]:
         """Cached helper function for anime searches."""
         query = f"""
@@ -447,10 +444,7 @@ class AniListClient:
         response = await self._make_request(query, variables)
         return [Media(**m) for m in response["data"]["Page"]["media"]]
 
-    async def get_anime(
-        self,
-        anilist_id: int,
-    ) -> Media:
+    async def get_anime(self, anilist_id: int) -> Media:
         """Retrieves detailed information about a specific anime.
 
         Attempts to fetch anime data from local cache first, falling back to
@@ -644,9 +638,7 @@ class AniListClient:
             )
 
         data_without_media = MediaListCollection(
-            user=data.user,
-            lists=sanitized_lists,
-            has_next_chunk=data.has_next_chunk,
+            user=data.user, lists=sanitized_lists, has_next_chunk=data.has_next_chunk
         )
 
         backup_file.write_text(data_without_media.model_dump_json())
@@ -729,8 +721,7 @@ class AniListClient:
 
         try:
             async with session.post(
-                self.API_URL,
-                json={"query": query, "variables": variables},
+                self.API_URL, json={"query": query, "variables": variables}
             ) as response:
                 if response.status == 429:  # Handle rate limit retries
                     retry_after = int(response.headers.get("Retry-After", 60))

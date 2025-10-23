@@ -24,10 +24,7 @@ async def history_websocket(websocket: WebSocket, profile: str) -> None:
     try:
         while True:
             page_data = await get_history_service().get_page(
-                profile=profile,
-                page=1,
-                per_page=25,
-                outcome=None,
+                profile=profile, page=1, per_page=25, outcome=None
             )
 
             # Check if items have changed

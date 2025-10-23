@@ -76,7 +76,7 @@ class PlexAniBridgeDB:
             log.error(f"Invalid data path $$'{self.data_path}'$$ is a file")
             raise DataPathError(
                 f"The path '{self.data_path}' is a file, "
-                "please delete it first or choose a different data folder path",
+                "please delete it first or choose a different data folder path"
             )
 
         engine = create_engine(
@@ -119,8 +119,7 @@ class PlexAniBridgeDB:
         log.debug("Running database migrations")
         cfg = Config()
         cfg.set_main_option(
-            "script_location",
-            str(Path(src_file).resolve().parent.parent / "alembic"),
+            "script_location", str(Path(src_file).resolve().parent.parent / "alembic")
         )
         cfg.set_main_option("sqlalchemy.url", f"sqlite:///{self.db_path}")
 
@@ -128,10 +127,7 @@ class PlexAniBridgeDB:
             command.upgrade(cfg, "head")
             log.debug("Database migrations up-to-date")
         except Exception as e:
-            log.error(
-                f"Database migration failed: {e}",
-                exc_info=True,
-            )
+            log.error(f"Database migration failed: {e}", exc_info=True)
             raise
 
     def __enter__(self) -> PlexAniBridgeDB:

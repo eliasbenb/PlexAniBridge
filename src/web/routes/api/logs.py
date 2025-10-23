@@ -8,10 +8,7 @@ from fastapi import APIRouter, Query
 from pydantic import BaseModel
 
 from src import config
-from src.exceptions import (
-    InvalidLogFileNameError,
-    LogFileNotFoundError,
-)
+from src.exceptions import InvalidLogFileNameError, LogFileNotFoundError
 
 __all__ = ["router"]
 
@@ -51,9 +48,7 @@ def _list_log_files() -> list[Path]:
 
 
 @router.get(
-    "/files",
-    summary="List available log files",
-    response_model=list[LogFileModel],
+    "/files", summary="List available log files", response_model=list[LogFileModel]
 )
 async def list_log_files() -> list[LogFileModel]:
     """Return metadata about available log files.
@@ -192,9 +187,7 @@ async def get_log_file(
             gd = m.groupdict()
             res.append(
                 LogEntryModel(
-                    timestamp=gd["timestamp"],
-                    level=gd["level"],
-                    message=gd["message"],
+                    timestamp=gd["timestamp"], level=gd["level"], message=gd["message"]
                 )
             )
         else:

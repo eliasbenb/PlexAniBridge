@@ -269,10 +269,7 @@ class AniListBaseModel(BaseModel):
             )
         }>"
 
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        populate_by_name=True,
-    )
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
 
 class UserOptions(AniListBaseModel):

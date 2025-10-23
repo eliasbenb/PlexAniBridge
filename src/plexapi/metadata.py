@@ -14,12 +14,7 @@ import requests
 from limiter import Limiter
 from plexapi.base import PlexObject, cached_data_property
 from plexapi.exceptions import BadRequest, NotFound, Unauthorized
-from plexapi.library import (
-    Library,
-    LibrarySection,
-    MovieSection,
-    ShowSection,
-)
+from plexapi.library import Library, LibrarySection, MovieSection, ShowSection
 from plexapi.server import PlexServer
 from plexapi.utils import cleanXMLString
 from plexapi.video import Episode, Movie, Season, Show, Video
@@ -155,10 +150,7 @@ class ShowMetadataMixin:
         """Fetch seasons for the show from the Metadata API."""
         key = f"{self.key}/children?excludeAllLeaves=1&includeUserState=1"
         return self.fetchItems(
-            key,
-            MetadataSeason,
-            container_size=self.childCount,
-            **kwargs,
+            key, MetadataSeason, container_size=self.childCount, **kwargs
         )
 
     def episodes(self, **kwargs):

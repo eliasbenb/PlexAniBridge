@@ -1,15 +1,9 @@
 from collections.abc import Iterator
 from datetime import datetime
 from functools import cached_property
+from typing import Self
 
-from typing_extensions import Self
-
-from plexapi.base import (
-    Playable,
-    PlexHistory,
-    PlexPartialObject,
-    PlexSession,
-)
+from plexapi.base import Playable, PlexHistory, PlexPartialObject, PlexSession
 from plexapi.media import Review, Role, SubtitleStream
 from plexapi.mixins import (
     AdvancedSettingsMixin,
@@ -306,10 +300,7 @@ class Season(
     def watched(self) -> list[Episode]: ...
     def unwatched(self) -> list[Episode]: ...
     def download(
-        self,
-        savepath: str | None = None,
-        keep_original_name: bool = False,
-        **kwargs,
+        self, savepath: str | None = None, keep_original_name: bool = False, **kwargs
     ) -> list[str]: ...
     @property
     def metadataDirectory(self) -> str: ...
