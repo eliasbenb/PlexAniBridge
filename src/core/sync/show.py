@@ -313,7 +313,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
 
         return ItemIdentifier.from_items(episodes)
 
-    @glru_cache(maxsize=1)
+    @glru_cache(maxsize=1, key=lambda self, item: item.ratingKey)
     def __get_wanted_seasons(self, item: Show) -> dict[int, Season]:
         """Get seasons that are wanted for syncing.
 
@@ -335,7 +335,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             )
         }
 
-    @glru_cache(maxsize=1)
+    @glru_cache(maxsize=1, key=lambda self, item: item.ratingKey)
     def __get_wanted_episodes(self, item: Show) -> list[Episode]:
         """Get episodes that are wanted for syncing.
 
