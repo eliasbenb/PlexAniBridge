@@ -50,21 +50,6 @@ class PlexClient:
     This client provides methods to interact with both the Plex Media Server and Plex
     API, including accessing media sections, retrieving watch history, and managing
     user-specific features like watchlists and continue watching states.
-
-    Attributes:
-        plex_token: Authentication token for Plex.
-        plex_user: Username or email of the Plex user.
-        plex_url: Base URL of the Plex server.
-        plex_sections: List of enabled Plex library section names.
-        plex_genres: List of genres to filter media items.
-        plex_metadata_source: Source of metadata for Plex.
-        admin_client: PlexServer instance with admin privileges.
-        user_client: PlexServer instance for the specified user.
-        online_client: PlexMetadataServer instance for online metadata, if applicable.
-        community_client: PlexCommunityClient instance for community API interactions.
-        is_admin_user: Whether the specified user has admin privileges.
-        user_account_id: Unique identifier for the user account.
-        on_deck_window: Time delta for the cutoff duration of Continue Watching items.
     """
 
     def __init__(

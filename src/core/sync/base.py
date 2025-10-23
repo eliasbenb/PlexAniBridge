@@ -53,16 +53,11 @@ class ParsedGuids(BaseModel):
     from Plex's GUID format into a structured format. Provides iteration and string
     representation for debugging.
 
-    Attributes:
-        tvdb (int | None): TVDB ID if available
-        tmdb (int | None): TMDB ID if available
-        imdb (str | None): IMDB ID if available
-
     Note:
         GUID formats expected from Plex:
-        - TVDB: "tvdb://123456"
-        - TMDB: "tmdb://123456"
-        - IMDB: "imdb://tt1234567"
+        - TVDB: "tvdb://123456" OR "com.plexapp.agents.thetvdb://123456"
+        - TMDB: "tmdb://123456" OR "com.plexapp.agents.tmdb://123456" OR "com.plexapp.agents.themoviedb://123456"
+        - IMDB: "imdb://tt1234567" OR "com.plexapp.agents.imdb://tt1234567"
     """
 
     tvdb: int | None = None

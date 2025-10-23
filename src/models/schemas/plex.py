@@ -28,13 +28,7 @@ class PlexWebhookEventType(StrEnum):
 
 
 class Account(BaseModel):
-    """Represents a Plex account involved in a webhook event.
-
-    Attributes:
-        id (int | None): Unique identifier for the account.
-        thumb (str | None): URL or path to the account's thumbnail image.
-        title (str | None): Display name of the account.
-    """
+    """Represents a Plex account involved in a webhook event."""
 
     id: int | None = None
     thumb: str | None = None
@@ -42,26 +36,14 @@ class Account(BaseModel):
 
 
 class Server(BaseModel):
-    """Represents a Plex server involved in a webhook event.
-
-    Attributes:
-        title (str | None): Display name of the server.
-        uuid (str | None): Unique identifier for the server.
-    """
+    """Represents a Plex server involved in a webhook event."""
 
     title: str | None = None
     uuid: str | None = None
 
 
 class Player(BaseModel):
-    """Represents a Plex player involved in a webhook event.
-
-    Attributes:
-        local (bool): Indicates if the player is local.
-        publicAddress (str | None): Public IP address of the player.
-        title (str | None): Display name of the player.
-        uuid (str | None): Unique identifier for the player.
-    """
+    """Represents a Plex player involved in a webhook event."""
 
     local: bool
     publicAddress: str | None = None
@@ -70,35 +52,7 @@ class Player(BaseModel):
 
 
 class Metadata(BaseModel):
-    """Represents metadata information received from a Plex webhook event.
-
-    Attributes:
-        librarySectionType (str | None): The type of the library section.
-        ratingKey (str | None): Unique key identifying the media item.
-        key (str | None): The key path to the media item.
-        parentRatingKey (str | None): Unique key for the parent media item.
-        grandparentRatingKey (str | None): Unique key for the grandparent media item.
-        guid (str | None): Globally unique identifier for the media item.
-        librarySectionID (int | None): ID of the library section.
-        type (str | None): The type of media (e.g., 'episode', 'movie').
-        title (str | None): Title of the media item.
-        year (int | None): Release year.
-        grandparentKey (str | None): Key path to the grandparent media item.
-        parentKey (str | None): Key path to the parent media item.
-        grandparentTitle (str | None): Title of the grandparent media item.
-        parentTitle (str | None): Title of the parent media item.
-        summary (str | None): Summary or description of the media item.
-        index (int | None): Index of the media item within its parent.
-        parentIndex (int | None): Index of the parent media item within its grandparent.
-        ratingCount (int | None): Number of ratings for the media item.
-        thumb (str | None): URL or path to the thumbnail image of the media item.
-        art (str | None): URL or path to the artwork image of the media item.
-        parentThumb (str | None): URL or path to the thumbnail of the parent media item.
-        grandparentThumb (str | None): URL/path to the thumbnail of the grandparent.
-        grandparentArt (str | None): URL/path to the artwork of the grandparent.
-        addedAt (int | None): Unix timestamp when the media item was added.
-        updatedAt (int | None): Unix timestamp when the media item was last updated.
-    """
+    """Represents metadata information received from a Plex webhook event."""
 
     librarySectionType: str | None = None
     ratingKey: str | None = None
@@ -128,17 +82,7 @@ class Metadata(BaseModel):
 
 
 class PlexWebhook(BaseModel):
-    """Represents a Plex webhook event.
-
-    Attributes:
-        event (str | None): Type of the event.
-        user (bool): Indicates if the event was triggered by a user.
-        owner (bool): Indicates if the event was triggered by the owner.
-        account (Account | None): Account information.
-        server (Server | None): Server information.
-        player (Player | None): Player information.
-        metadata (Metadata | None): Metadata information.
-    """
+    """Represents a Plex webhook event."""
 
     event: str | None = None
     user: bool

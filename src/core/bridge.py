@@ -35,15 +35,6 @@ class BridgeClient:
                                                      settings
         global_config (PlexAnibridgeConfig): Global application configuration
         shared_animap_client (AniMapClient): Shared anime mapping client
-
-    Attributes:
-        profile_name (str): Name of the sync profile
-        profile_config (PlexAnibridgeProfileConfig): Profile-specific configuration
-        global_config (PlexAnibridgeConfig): Global configuration
-        animap_client (AniMapClient): Shared anime mapping client
-        anilist_client (AniListClient): AniList API client for this profile
-        plex_client (PlexClient): Plex API client for this profile
-        last_synced (datetime | None): Timestamp of last successful sync
     """
 
     def __init__(
