@@ -64,3 +64,4 @@ os.environ["PLEXAPI_HEADER_IDENTIFIER"] = uuid.uuid3(
 os.environ["PLEXAPI_HEADER_DEVICE_NAME"] = "PlexAniBridge"
 os.environ["PLEXAPI_HEADER_VERSION"] = __version__
 os.environ["PLEXAPI_HEADER_PROVIDES"] = ""
+os.environ["PLEXAPI_PLEXAPI_AUTORELOAD"] = "0"

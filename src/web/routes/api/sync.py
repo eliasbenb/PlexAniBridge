@@ -1,6 +1,7 @@
 """API endpoints to trigger sync operations."""
 
-from fastapi import APIRouter, Body, Path, Query
+from fastapi.param_functions import Body, Path, Query
+from fastapi.routing import APIRouter
 from pydantic import BaseModel
 
 from src.exceptions import SchedulerNotInitializedError

@@ -7,7 +7,7 @@ from typing import Any
 
 import aiohttp
 from async_lru import alru_cache
-from fastapi import Query
+from fastapi.param_functions import Query
 from pydantic import BaseModel
 from sqlalchemy import func, select
 

@@ -1,7 +1,9 @@
 """API routes for managing AniList field pins."""
 
 from aiohttp import ClientError
-from fastapi import APIRouter, HTTPException, Path, Query
+from fastapi.exceptions import HTTPException
+from fastapi.param_functions import Path, Query
+from fastapi.routing import APIRouter
 from pydantic import BaseModel, Field
 
 from src.config.settings import SyncField

@@ -1,6 +1,6 @@
 """Websocket routes."""
 
-from fastapi import APIRouter
+from fastapi.routing import APIRouter
 
 from src.web.routes.ws.history import router as history_router
 from src.web.routes.ws.logs import router as logs_router

@@ -4,7 +4,8 @@ import logging
 import re
 from pathlib import Path
 
-from fastapi import APIRouter, Query
+from fastapi.param_functions import Query
+from fastapi.routing import APIRouter
 from pydantic import BaseModel
 
 from src import config

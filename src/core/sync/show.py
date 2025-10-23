@@ -5,6 +5,7 @@ import sys
 from collections import Counter
 from collections.abc import AsyncIterator
 from datetime import datetime
+from math import isnan
 from typing import Literal
 
 from plexapi.video import Episode, EpisodeHistory, MovieHistory, Season, Show
@@ -313,7 +314,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
 
         return ItemIdentifier.from_items(episodes)
 
-    @glru_cache(maxsize=1)
+    @glru_cache(maxsize=1, key=lambda self, item: item.ratingKey)
     def __get_wanted_seasons(self, item: Show) -> dict[int, Season]:
         """Get seasons that are wanted for syncing.
 
@@ -335,7 +336,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             )
         }
 
-    @glru_cache(maxsize=1)
+    @glru_cache(maxsize=1, key=lambda self, item: item.ratingKey)
     def __get_wanted_episodes(self, item: Show) -> list[Episode]:
         """Get episodes that are wanted for syncing.
 
@@ -748,12 +749,12 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
                 return "tvdb"
             return ""
 
-        if not item.librarySectionKey:
+        if not item.librarySectionID or isnan(item.librarySectionID):
             if getattr(item, "_source", None) == "https://metadata.provider.plex.tv":
                 return "tmdb"  # The online metadata provider uses TMDB as default
             return ""  # If this happens, something weird is going on
 
-        cached = self._show_ordering_cache.get(item.librarySectionKey)
+        cached = self._show_ordering_cache.get(str(item.librarySectionID))
         if cached is not None:
             return cached
 
@@ -771,7 +772,7 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             else:
                 resolved = ""
 
-        self._show_ordering_cache[item.librarySectionKey] = resolved
+        self._show_ordering_cache[str(item.librarySectionID)] = resolved
         return resolved
 
     def _get_effective_show_ordering(

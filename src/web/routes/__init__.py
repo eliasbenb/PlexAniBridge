@@ -1,6 +1,6 @@
 """Route aggregators for the web application."""
 
-from fastapi import APIRouter
+from fastapi.routing import APIRouter
 
 from src.web.routes.api import router as api_router
 from src.web.routes.webhook import router as webhook_router

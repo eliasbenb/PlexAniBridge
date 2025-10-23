@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import UTC, date, datetime, timedelta
 from enum import StrEnum
 from functools import cache
@@ -211,11 +212,11 @@ class AniListBaseModel(BaseModel):
         """
         return super().model_dump_json(by_alias=True, **kwargs)
 
-    def unset_fields(self, fields: list[str]) -> None:
+    def unset_fields(self, fields: Iterable[str]) -> None:
         """Unset specified fields to their default values.
 
         Args:
-            fields (list[str]): List of field names to unset.
+            fields (Iterable[str]): Field names to unset.
         """
         for field, field_info in self.__class__.model_fields.items():
             if field in fields:

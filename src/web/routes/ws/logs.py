@@ -1,6 +1,7 @@
 """Websocket endpoint for live logs."""
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi.routing import APIRouter
+from fastapi.websockets import WebSocket, WebSocketDisconnect
 
 from src.web.services.logging_handler import get_log_ws_handler
 

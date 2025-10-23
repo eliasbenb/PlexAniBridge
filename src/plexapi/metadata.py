@@ -20,7 +20,6 @@ from plexapi.utils import cleanXMLString
 from plexapi.video import Episode, Movie, Season, Show, Video
 
 from src import log
-from src.utils.cache import gttl_cache
 
 plex_metadata_limiter = Limiter(rate=300 / 60, capacity=30, jitter=True)
 
@@ -316,7 +315,6 @@ class PlexMetadataServer(PlexServer):
         return MetadataLibrary(self, data)
 
     @plex_metadata_limiter()
-    @gttl_cache(maxsize=None, ttl=30)
     def query(
         self,
         key,
