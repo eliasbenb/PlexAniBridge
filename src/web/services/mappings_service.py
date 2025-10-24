@@ -68,7 +68,7 @@ class MappingsService:
             QueryFieldKind.ANILIST_ENUM,
         }
     )
-    _ANILIST_MAX_RESULTS: ClassVar[int] = 50
+    _ANILIST_MAX_RESULTS: ClassVar[int] = 1000
     _CMP_RE: ClassVar[re.Pattern[str]] = re.compile(r"^(>=|>|<=|<)(\d+)$")
     _RANGE_RE: ClassVar[re.Pattern[str]] = re.compile(r"^(\d+)\.\.(\d+)$")
 

@@ -27,6 +27,7 @@ from src.models.schemas.anilist import (
     MediaStatus,
     User,
 )
+from src.utils.cache import gattl_cache, generic_hash
 
 __all__ = ["AniListClient"]
 
@@ -444,11 +445,17 @@ class AniListClient:
         response = await self._make_request(query, variables)
         return [Media(**m) for m in response["data"]["Page"]["media"]]
 
+    @gattl_cache(
+        ttl=3600,
+        key=lambda self, *, filters, max_results=1000, per_page=50: generic_hash(
+            filters, max_results, per_page
+        ),
+    )
     async def search_media_ids(
         self,
         *,
         filters: dict[str, Any],
-        max_results: int = 50,
+        max_results: int = 1000,
         per_page: int = 50,
     ) -> list[int]:
         """Execute a filtered media search returning AniList identifiers only.
@@ -500,9 +507,9 @@ class AniListClient:
             "sort": "[MediaSort]",
         }
 
-        variables: dict[str, Any] = {"page": 1, "perPage": per_page}
+        base_variables: dict[str, Any] = {"perPage": per_page}
         arg_parts = ["type: ANIME"]
-        var_defs = ["$page: Int!", "$perPage: Int!"]
+        base_var_defs = ["$perPage: Int!"]
 
         for key, value in filters.items():
             if value is None:
@@ -510,54 +517,87 @@ class AniListClient:
             var_type = variable_types.get(key)
             if not var_type:
                 continue
-            var_defs.append(f"${key}: {var_type}")
+            base_var_defs.append(f"${key}: {var_type}")
             arg_parts.append(f"{key}: ${key}")
-            variables[key] = value
+            base_variables[key] = value
 
         if len(arg_parts) == 1:
             return []
 
-        query = f"""
-        query ({", ".join(var_defs)}) {{
-            Page(page: $page, perPage: $perPage) {{
-                pageInfo {{ hasNextPage }}
-                media({", ".join(arg_parts)}) {{
-                    id
-                }}
-            }}
-        }}
-        """
-
+        arg_str = ", ".join(arg_parts)
         result: list[int] = []
         seen: set[int] = set()
-        page = 1
+        current_page = 1
+        pages_per_request = 20
 
-        while True:
-            variables["page"] = page
-            response = await self._make_request(query, variables)
-            page_data = response.get("data", {}).get("Page", {})
-            media = page_data.get("media") or []
-            if not media:
+        while len(result) < max_results:
+            pages_remaining = (max_results - len(result) + per_page - 1) // per_page
+            if pages_remaining <= 0:
                 break
 
-            for item in media:
-                try:
-                    aid = int(item["id"])
-                except (KeyError, TypeError, ValueError):
-                    continue
-                if aid not in seen:
-                    result.append(aid)
-                    seen.add(aid)
+            batch_size = min(pages_per_request, pages_remaining)
+            batch_var_defs = list(base_var_defs)
+            request_vars = dict(base_variables)
+            page_aliases: list[tuple[str, str, int]] = []
+
+            for idx in range(batch_size):
+                alias = f"batch{idx + 1}"
+                page_var = f"page_{idx + 1}"
+                page_number = current_page + idx
+                batch_var_defs.append(f"${page_var}: Int!")
+                request_vars[page_var] = page_number
+                page_aliases.append((alias, page_var, page_number))
+
+            query_sections = [
+                f"""
+                {alias}: Page(page: ${page_var}, perPage: $perPage) {{
+                    pageInfo {{ hasNextPage }}
+                    media({arg_str}) {{ id }}
+                }}
+                """
+                for alias, page_var, _page_number in page_aliases
+            ]
+
+            query = f"""
+            query ({", ".join(batch_var_defs)}) {{
+                {", ".join(query_sections)}
+            }}
+            """
+
+            response = await self._make_request(query, request_vars)
+            data = response.get("data", {}) or {}
+
+            stop = False
+            for alias, _page_var, _page_number in page_aliases:
+                page_data = data.get(alias) or {}
+                media = page_data.get("media") or []
+
+                if not media:
+                    stop = True
+                    break
+
+                for item in media:
+                    try:
+                        aid = int(item["id"])
+                    except (KeyError, TypeError, ValueError):
+                        continue
+                    if aid not in seen:
+                        result.append(aid)
+                        seen.add(aid)
+                    if len(result) >= max_results:
+                        break
+
                 if len(result) >= max_results:
                     break
 
-            if len(result) >= max_results:
-                break
+                page_info = page_data.get("pageInfo") or {}
+                if not page_info.get("hasNextPage"):
+                    stop = True
+                    break
 
-            page_info = page_data.get("pageInfo") or {}
-            if not page_info.get("hasNextPage"):
+            current_page += batch_size
+            if len(result) >= max_results or stop:
                 break
-            page += 1
 
         return result[:max_results]
 
