@@ -3,8 +3,6 @@ title: Backups
 icon: material/archive-refresh
 ---
 
-# AniList Backups
-
 ![Backups view](../img/screenshots/backups.png)
 
 Use the backups page to browse, preview, and restore the AniList snapshots PlexAniBridge creates for you. The page has two stops: a profile picker at `/backups` and a detailed table at `/backups/{profile}`. Everything you see reflects the real files stored in `PAB_DATA_PATH/backups`, so you always know what is available.

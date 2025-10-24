@@ -3,8 +3,6 @@ title: Logs
 icon: material/file-chart
 ---
 
-# Logs Console
-
 ![Logs view](../img/screenshots/logs.png)
 
 The logs page has two tabs for real-time streaming output and archived log files. It connects to `/ws/logs` for live events and `/api/logs/*` for history.

@@ -3,8 +3,6 @@ title: Timeline
 icon: material/timeline-clock
 ---
 
-# Sync Timeline
-
 ![Timeline view](../img/screenshots/timeline.png)
 
 The sync timeline gives you a live feed of Plex to AniList activity for a specific profile. It combines current sync progress, websocket updates, and stored history so you can see exactly what changed, when, and why.

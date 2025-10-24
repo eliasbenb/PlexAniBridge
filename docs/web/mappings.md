@@ -3,8 +3,6 @@ title: Mappings
 icon: material/table-large
 ---
 
-# Mappings Explorer
-
 ![Mappings view](../img/screenshots/mappings.png)
 
 The mappings page lets you browse and manage the AniList ↔ Plex mapping database. You can search existing records with a powerful query language and manage mapping overrides.
