@@ -288,9 +288,9 @@ class AniListClient:
 
             nl = "\n"
             query = f"""
-                mutation BatchUpdateEntries({", ".join(variable_declarations)}) {{
-                    {nl.join(mutation_fields)}
-                }}
+            mutation BatchUpdateEntries({", ".join(variable_declarations)}) {{
+                {nl.join(mutation_fields)}
+            }}
             """
 
             if self.dry_run:
@@ -406,13 +406,13 @@ class AniListClient:
     ) -> list[Media]:
         """Cached helper function for anime searches."""
         query = f"""
-            query ($search: String, $formats: [MediaFormat], $limit: Int) {{
-                Page(perPage: $limit) {{
-                    media(search: $search, type: ANIME, format_in: $formats) {{
-                        {Media.model_dump_graphql()}
-                    }}
+        query ($search: String, $formats: [MediaFormat], $limit: Int) {{
+            Page(perPage: $limit) {{
+                media(search: $search, type: ANIME, format_in: $formats) {{
+                    {Media.model_dump_graphql()}
                 }}
             }}
+        }}
         """
 
         formats = (
@@ -443,6 +443,123 @@ class AniListClient:
 
         response = await self._make_request(query, variables)
         return [Media(**m) for m in response["data"]["Page"]["media"]]
+
+    async def search_media_ids(
+        self,
+        *,
+        filters: dict[str, Any],
+        max_results: int = 50,
+        per_page: int = 50,
+    ) -> list[int]:
+        """Execute a filtered media search returning AniList identifiers only.
+
+        Args:
+            filters (dict[str, Any]): GraphQL-compatible media arguments. Keys must
+                match AniList's ``Media`` query arguments (e.g. ``search`` or
+                ``duration_greater``).
+            max_results (int): Maximum number of identifiers to return.
+            per_page (int): AniList page size to request per API call.
+
+        Returns:
+            list[int]: Ordered AniList identifiers matching the filter.
+        """
+        if not filters:
+            return []
+
+        per_page = max(1, min(int(per_page), 50))
+        max_results = max(1, int(max_results))
+
+        variable_types = {
+            "search": "String",
+            "format": "MediaFormat",
+            "format_in": "[MediaFormat]",
+            "duration": "Int",
+            "duration_greater": "Int",
+            "duration_lesser": "Int",
+            "episodes": "Int",
+            "episodes_greater": "Int",
+            "episodes_lesser": "Int",
+            "genre": "String",
+            "genre_in": "[String]",
+            "genre_not_in": "[String]",
+            "tag": "String",
+            "tag_in": "[String]",
+            "tag_not_in": "[String]",
+            "averageScore": "Int",
+            "averageScore_greater": "Int",
+            "averageScore_lesser": "Int",
+            "popularity": "Int",
+            "popularity_greater": "Int",
+            "popularity_lesser": "Int",
+            "startDate": "FuzzyDateInt",
+            "startDate_greater": "FuzzyDateInt",
+            "startDate_lesser": "FuzzyDateInt",
+            "endDate": "FuzzyDateInt",
+            "endDate_greater": "FuzzyDateInt",
+            "endDate_lesser": "FuzzyDateInt",
+            "sort": "[MediaSort]",
+        }
+
+        variables: dict[str, Any] = {"page": 1, "perPage": per_page}
+        arg_parts = ["type: ANIME"]
+        var_defs = ["$page: Int!", "$perPage: Int!"]
+
+        for key, value in filters.items():
+            if value is None:
+                continue
+            var_type = variable_types.get(key)
+            if not var_type:
+                continue
+            var_defs.append(f"${key}: {var_type}")
+            arg_parts.append(f"{key}: ${key}")
+            variables[key] = value
+
+        if len(arg_parts) == 1:
+            return []
+
+        query = f"""
+        query ({", ".join(var_defs)}) {{
+            Page(page: $page, perPage: $perPage) {{
+                pageInfo {{ hasNextPage }}
+                media({", ".join(arg_parts)}) {{
+                    id
+                }}
+            }}
+        }}
+        """
+
+        result: list[int] = []
+        seen: set[int] = set()
+        page = 1
+
+        while True:
+            variables["page"] = page
+            response = await self._make_request(query, variables)
+            page_data = response.get("data", {}).get("Page", {})
+            media = page_data.get("media") or []
+            if not media:
+                break
+
+            for item in media:
+                try:
+                    aid = int(item["id"])
+                except (KeyError, TypeError, ValueError):
+                    continue
+                if aid not in seen:
+                    result.append(aid)
+                    seen.add(aid)
+                if len(result) >= max_results:
+                    break
+
+            if len(result) >= max_results:
+                break
+
+            page_info = page_data.get("pageInfo") or {}
+            if not page_info.get("hasNextPage"):
+                break
+            page += 1
+
+        return result[:max_results]
 
     async def get_anime(self, anilist_id: int) -> Media:
         """Retrieves detailed information about a specific anime.
@@ -530,11 +647,11 @@ class AniListClient:
 
             query = f"""
             query BatchGetAnime($ids: [Int]) {{
-            Page(perPage: {len(batch_ids)}) {{
-                media(id_in: $ids, type: ANIME) {{
-                    {Media.model_dump_graphql()}
+                Page(perPage: {len(batch_ids)}) {{
+                    media(id_in: $ids, type: ANIME) {{
+                        {Media.model_dump_graphql()}
+                    }}
                 }}
-            }}
             }}
             """
 
