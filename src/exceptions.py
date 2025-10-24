@@ -84,6 +84,24 @@ class AniListTokenRequiredError(AniListError, RuntimeError):
     status_code = 401
 
 
+class AniListQueryError(AniListError):
+    """Base class for AniList query and search issues."""
+
+    status_code = 502
+
+
+class AniListFilterError(AniListQueryError, ValueError):
+    """AniList filter arguments supplied by the user are invalid."""
+
+    status_code = 400
+
+
+class AniListSearchError(AniListQueryError):
+    """AniList search failed or returned an unexpected response."""
+
+    status_code = 502
+
+
 # Plex client errors
 class PlexError(PlexAniBridgeError):
     """Base class for Plex-related failures."""
@@ -189,6 +207,24 @@ class MappingNotFoundError(MappingError, KeyError):
     """Requested mapping entry could not be located."""
 
     status_code = 404
+
+
+class BooruQueryError(MappingError):
+    """Base class for booru-like query failures."""
+
+    status_code = 400
+
+
+class BooruQuerySyntaxError(BooruQueryError, ValueError):
+    """Query string could not be parsed due to invalid syntax."""
+
+    status_code = 400
+
+
+class BooruQueryEvaluationError(BooruQueryError, RuntimeError):
+    """Evaluation of a booru query AST failed unexpectedly."""
+
+    status_code = 400
 
 
 # Logs errors

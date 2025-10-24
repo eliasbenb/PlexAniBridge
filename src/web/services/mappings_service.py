@@ -19,7 +19,14 @@ from src.config.database import db
 from src.config.settings import get_config
 from src.core.anilist import AniListClient
 from src.core.mappings import MappingsClient
-from src.exceptions import MissingAnilistIdError, UnsupportedMappingFileExtensionError
+from src.exceptions import (
+    AniListFilterError,
+    AniListSearchError,
+    BooruQueryEvaluationError,
+    BooruQuerySyntaxError,
+    MissingAnilistIdError,
+    UnsupportedMappingFileExtensionError,
+)
 from src.models.db.animap import AniMap
 from src.models.db.provenance import AniMapProvenance
 from src.models.schemas.anilist import MediaWithoutList as AniListMetadata
@@ -226,23 +233,28 @@ class MappingsService:
         """Resolve AniList-backed query terms into identifier sets."""
         value = raw_value.strip()
 
+        if not spec.anilist_field:
+            raise AniListFilterError(f"AniList field mapping missing for '{spec.key}'")
+
         if spec.kind == QueryFieldKind.ANILIST_STRING:
-            if not spec.anilist_field:
-                return set()
             text = self._normalize_text_query(value)
             if not text:
-                return set()
+                raise AniListFilterError(
+                    f"AniList filter '{spec.key}' requires a non-empty value"
+                )
             filters = {spec.anilist_field: text}
 
         elif spec.kind == QueryFieldKind.ANILIST_ENUM:
-            if not spec.anilist_field:
-                return set()
             allowed = spec.values or ()
             if not allowed:
-                return set()
+                raise AniListFilterError(
+                    f"AniList filter '{spec.key}' is not configured with values"
+                )
             candidate = value
             if not candidate:
-                return set()
+                raise AniListFilterError(
+                    f"AniList filter '{spec.key}' requires a value"
+                )
             lookup = {val: val for val in allowed}
             lookup.update({val.lower(): val for val in allowed})
             lookup.update({val.upper(): val for val in allowed})
@@ -252,7 +264,10 @@ class MappingsService:
             if resolved is None:
                 resolved = lookup.get(candidate.upper())
             if resolved is None:
-                return set()
+                raise AniListFilterError(
+                    f"'{candidate}' is not a valid value for AniList filter "
+                    f"'{spec.key}'"
+                )
             filters = {spec.anilist_field: resolved}
 
         elif spec.kind == QueryFieldKind.ANILIST_NUMERIC:
@@ -261,15 +276,24 @@ class MappingsService:
                 spec, cmp_filter, range_filter, text_value
             )
             if not filters_dict:
-                return set()
+                raise AniListFilterError(
+                    f"AniList filter '{spec.key}' has an invalid numeric value"
+                )
             filters = filters_dict
 
         else:
-            return set()
+            raise AniListFilterError(f"AniList filter '{spec.key}' is not supported")
 
-        ids = await client.search_media_ids(
-            filters=filters, max_results=self._ANILIST_MAX_RESULTS
-        )
+        try:
+            ids = await client.search_media_ids(
+                filters=filters, max_results=self._ANILIST_MAX_RESULTS
+            )
+        except (AniListFilterError, AniListSearchError):
+            raise
+        except Exception as exc:
+            raise AniListSearchError(
+                f"Failed to resolve AniList filter '{spec.key}'"
+            ) from exc
         return set(ids)
 
     @staticmethod
@@ -839,7 +863,12 @@ class MappingsService:
                 return set()
 
             if q and q.strip():
-                node = parse_query(q)
+                try:
+                    node = parse_query(q)
+                except BooruQuerySyntaxError:
+                    raise
+                except Exception as exc:
+                    raise BooruQuerySyntaxError("Invalid query syntax") from exc
 
                 bare_cache: dict[str, list[int]] = {}
                 for term in collect_bare_terms(node):
@@ -863,14 +892,13 @@ class MappingsService:
                             ids = await self._resolve_anilist_term(
                                 client, spec, term_value
                             )
-                        except Exception:
-                            log.warning(
-                                "Failed to resolve AniList filter %s:%s",
-                                spec.key,
-                                term_value,
-                                exc_info=True,
-                            )
-                            ids = set()
+                        except (AniListFilterError, AniListSearchError):
+                            raise
+                        except Exception as exc:
+                            raise AniListSearchError(
+                                f"Failed to resolve AniList filter "
+                                f"'{spec.key}:{term_value}'"
+                            ) from exc
                         ani_cache[cache_key] = ids
 
                 def db_resolver(k: str, v: str) -> set[int]:
@@ -880,12 +908,17 @@ class MappingsService:
                     return bare_cache.get(term, [])
 
                 all_ids = self._fetch_ids(ctx, select(AniMap.anilist_id))
-                eval_res = evaluate(
-                    node,
-                    db_resolver=db_resolver,
-                    anilist_resolver=anilist_resolver,
-                    universe_ids=all_ids,
-                )
+                try:
+                    eval_res = evaluate(
+                        node,
+                        db_resolver=db_resolver,
+                        anilist_resolver=anilist_resolver,
+                        universe_ids=all_ids,
+                    )
+                except Exception as exc:
+                    raise BooruQueryEvaluationError(
+                        "Failed to evaluate booru query"
+                    ) from exc
 
                 if eval_res.used_bare and eval_res.order_hint:
                     final_ids = sorted(

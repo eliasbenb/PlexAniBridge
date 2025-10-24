@@ -23,6 +23,8 @@ from typing import Any, cast
 
 import pyparsing as pp
 
+from src.exceptions import BooruQuerySyntaxError
+
 pp.ParserElement.enablePackrat()  # Supposed to speed up parsing
 
 DbResolver = Callable[[str, str], set[int]]
@@ -212,7 +214,10 @@ def parse_query(q: str) -> Node:
     if not q:
         return And([])
 
-    res = PARSER.parseString(q, parseAll=True)
+    try:
+        res = PARSER.parseString(q, parseAll=True)
+    except pp.ParseBaseException as exc:
+        raise BooruQuerySyntaxError(str(exc)) from exc
     node_any = res[0]
 
     # Normalize single grouped result
@@ -232,7 +237,7 @@ def parse_query(q: str) -> Node:
         if isinstance(first, Node):
             return first
 
-    raise ValueError("Invalid parsed AST for query")
+    raise BooruQuerySyntaxError("Invalid parsed AST for query")
 
 
 @dataclass

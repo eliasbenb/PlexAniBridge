@@ -15,7 +15,11 @@ from async_lru import alru_cache
 from limiter import Limiter
 
 from src import __version__, log
-from src.exceptions import AniListTokenRequiredError
+from src.exceptions import (
+    AniListFilterError,
+    AniListSearchError,
+    AniListTokenRequiredError,
+)
 from src.models.schemas.anilist import (
     Media,
     MediaFormat,
@@ -471,7 +475,7 @@ class AniListClient:
             list[int]: Ordered AniList identifiers matching the filter.
         """
         if not filters:
-            return []
+            raise AniListFilterError("AniList search requires at least one filter")
 
         per_page = max(1, min(int(per_page), 50))
         max_results = max(1, int(max_results))
@@ -516,13 +520,15 @@ class AniListClient:
                 continue
             var_type = variable_types.get(key)
             if not var_type:
-                continue
+                raise AniListFilterError(f"Unsupported AniList filter argument '{key}'")
             base_var_defs.append(f"${key}: {var_type}")
             arg_parts.append(f"{key}: ${key}")
             base_variables[key] = value
 
         if len(arg_parts) == 1:
-            return []
+            raise AniListFilterError(
+                "AniList search requires at least one supported filter"
+            )
 
         arg_str = ", ".join(arg_parts)
         result: list[int] = []
@@ -564,7 +570,10 @@ class AniListClient:
             }}
             """
 
-            response = await self._make_request(query, request_vars)
+            try:
+                response = await self._make_request(query, request_vars)
+            except Exception as exc:
+                raise AniListSearchError("AniList search request failed") from exc
             data = response.get("data", {}) or {}
 
             stop = False
