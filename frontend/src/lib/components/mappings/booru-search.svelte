@@ -95,9 +95,8 @@
         if (!name) return undefined;
         const lname = name.toLowerCase();
         for (const k of KEYS) {
-            const aliases = k.aliases ?? [];
-            if (k.key === lname || (Array.isArray(aliases) && aliases.includes(lname)))
-                return k;
+            const aliases = (k.aliases ?? []).map((alias) => alias.toLowerCase());
+            if (k.key === lname || aliases.includes(lname)) return k;
         }
         return undefined;
     }
@@ -122,8 +121,8 @@
                 const needle = name;
                 if (!needle && prefix === "" && t.trim() === t) {
                     out.push({
-                        label: '"title"',
-                        detail: "AniList search by title",
+                        label: '"search anilist"',
+                        detail: "AniList database search",
                         kind: "helper",
                         apply: ({ replace }) => {
                             replace(seg.start, seg.end, '""');
@@ -144,13 +143,15 @@
                 }
             } else {
                 // Value suggestions depending on key type
-                if (kinfo?.key === "has") {
+                if (kinfo?.type === "enum") {
                     const opts = kinfo.values || [];
                     for (const opt of opts) {
-                        if (vpart && !opt.startsWith(vpart.toLowerCase())) continue;
+                        const optLower = opt.toLowerCase();
+                        if (vpart && !optLower.startsWith(vpart.toLowerCase()))
+                            continue;
                         out.push({
                             label: `${prefix}${kinfo.key}:${opt}`,
-                            detail: "Has field",
+                            detail: kinfo.key === "has" ? "Has field" : "Enum",
                             kind: "value",
                             apply: ({ replace }) => {
                                 replace(
@@ -221,15 +222,22 @@
             }
         }
 
-        if (out.length < 6 && val.trim() === "") {
-            for (const k of KEYS) {
-                if (out.length >= 6) break;
+        if (val.trim() === "") {
+            const added: Record<string, true> = {};
+            const addKeySuggestion = (cap: FieldCapability | undefined) => {
+                if (!cap) return;
+                if (added[cap.key]) return;
                 out.push({
-                    label: `${k.key}:`,
-                    detail: k.desc ?? undefined,
+                    label: `${cap.key}:`,
+                    detail: cap.desc ?? undefined,
                     kind: "key",
-                    apply: ({ insert }) => insert(`${k.key}:`),
+                    apply: ({ insert }) => insert(`${cap.key}:`),
                 });
+                added[cap.key] = true;
+            };
+
+            for (const k of KEYS) {
+                addKeySuggestion(k);
             }
         }
 
@@ -241,7 +249,7 @@
             seen[s.label] = true;
             uniq.push(s);
         }
-        return uniq.slice(0, 12);
+        return uniq;
     }
 
     function applySuggestion(idx: number) {
