@@ -2,10 +2,11 @@
 
 import json
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 import yaml
 from sqlalchemy import and_, delete, func, or_, select
@@ -44,6 +45,22 @@ class _ActiveFile:
 
 class MappingsService:
     """Service to manage custom mappings and DB provenance."""
+
+    _LIST_FIELDS: ClassVar[tuple[str, ...]] = ("imdb_id", "mal_id", "tmdb_movie_id")
+    _SCALAR_FIELDS: ClassVar[dict[str, Any]] = {
+        "anilist": AniMap.anilist_id,
+        "id": AniMap.anilist_id,
+        "anidb": AniMap.anidb_id,
+        "tmdb_show": AniMap.tmdb_show_id,
+        "tvdb": AniMap.tvdb_id,
+    }
+    _JSON_ARRAY_FIELDS: ClassVar[dict[str, tuple[Any, bool]]] = {
+        "imdb": (AniMap.imdb_id, False),
+        "mal": (AniMap.mal_id, True),
+        "tmdb_movie": (AniMap.tmdb_movie_id, True),
+    }
+    _CMP_RE: ClassVar[re.Pattern[str]] = re.compile(r"^(>=|>|<=|<)(\d+)$")
+    _RANGE_RE: ClassVar[re.Pattern[str]] = re.compile(r"^(\d+)\.\.(\d+)$")
 
     def __init__(self) -> None:
         """Initialize service with config and paths."""
@@ -95,11 +112,259 @@ class MappingsService:
                 f"Unsupported file extension: {af.ext}"
             )
 
-    def _set_provenance_custom_last(self, anilist_id: int, custom_src: str) -> None:
-        """Replace provenance entries so that custom is the last source.
+    def _update_custom_file(
+        self,
+        anilist_id: int,
+        entry: Any,
+        *,
+        update_provenance: bool = True,
+        active_file: _ActiveFile | None = None,
+        content: dict[str, Any] | None = None,
+    ) -> None:
+        """Persists a mapping entry and optionally updates provenance ordering."""
+        if active_file and content is not None:
+            af, data = active_file, content
+        else:
+            af, data = self._load_custom()
+        data[str(anilist_id)] = entry
+        self._dump_custom(af, data)
+        if update_provenance:
+            self._set_provenance_custom_last(anilist_id, str(af.path))
 
-        Order becomes [upstream_url? (n=0)], custom (n=last)
-        """
+    @staticmethod
+    def _normalize_list_value(value: Any) -> list[Any] | None:
+        """Normalizes scalar or iterable inputs into list form."""
+        if value is None:
+            return None
+        return value if isinstance(value, list) else [value]
+
+    def _normalize_list_fields(
+        self, payload: dict[str, Any], fields: Iterable[str] | None = None
+    ) -> None:
+        """Applies list normalization across the provided payload fields."""
+        for field in fields or self._LIST_FIELDS:
+            if field in payload:
+                payload[field] = self._normalize_list_value(payload[field])
+
+    @staticmethod
+    def _fetch_ids(ctx, stmt) -> set[int]:
+        """Executes a statement and returns AniList identifiers."""
+        return {int(aid) for aid in ctx.session.execute(stmt).scalars()}
+
+    def _parse_numeric_filters(
+        self, raw: Any
+    ) -> tuple[tuple[str, int] | None, tuple[int, int] | None, str]:
+        """Parses comparison and range tokens from raw filter input."""
+        text = "" if raw is None else str(raw)
+        cmp_match = self._CMP_RE.match(text)
+        range_match = self._RANGE_RE.match(text)
+        cmp_filter = (
+            (cmp_match.group(1), int(cmp_match.group(2))) if cmp_match else None
+        )
+        range_filter = (
+            (int(range_match.group(1)), int(range_match.group(2)))
+            if range_match
+            else None
+        )
+        return cmp_filter, range_filter, text
+
+    @staticmethod
+    def _scalar_cmp(column, operator: str, num: int):
+        """Builds a scalar comparison expression for numeric columns."""
+        if operator == ">":
+            return column > num
+        if operator == ">=":
+            return column >= num
+        if operator == "<":
+            return column < num
+        if operator == "<=":
+            return column <= num
+        return None
+
+    def _filter_scalar(
+        self,
+        ctx,
+        column,
+        cmp_filter: tuple[str, int] | None,
+        range_filter: tuple[int, int] | None,
+        raw_value: str,
+    ) -> set[int]:
+        """Filters scalar columns using comparison or range syntax."""
+        stmt = select(AniMap.anilist_id)
+        if cmp_filter:
+            op, num = cmp_filter
+            cond = self._scalar_cmp(column, op, num)
+            if cond is None:
+                return set()
+            return self._fetch_ids(ctx, stmt.where(cond))
+        if range_filter:
+            lo, hi = range_filter
+            return self._fetch_ids(ctx, stmt.where(and_(column >= lo, column <= hi)))
+        try:
+            num = int(raw_value)
+        except Exception:
+            return set()
+        return self._fetch_ids(ctx, stmt.where(column == num))
+
+    def _filter_json_array(
+        self,
+        ctx,
+        column,
+        numeric: bool,
+        raw_value: str,
+        cmp_filter: tuple[str, int] | None,
+        range_filter: tuple[int, int] | None,
+    ) -> set[int]:
+        """Filters JSON array columns using scalar or wildcard logic."""
+        stmt = select(AniMap.anilist_id)
+        if numeric:
+            if cmp_filter:
+                op, num = cmp_filter
+                return self._fetch_ids(
+                    ctx, stmt.where(json_array_compare(column, op, num))
+                )
+            if range_filter:
+                lo, hi = range_filter
+                return self._fetch_ids(
+                    ctx, stmt.where(json_array_between(column, lo, hi))
+                )
+            try:
+                num = int(raw_value)
+            except Exception:
+                return set()
+            return self._fetch_ids(ctx, stmt.where(json_array_contains(column, [num])))
+        text = raw_value
+        if self._has_wildcards(text):
+            return self._fetch_ids(ctx, stmt.where(json_array_like(column, text)))
+        return self._fetch_ids(ctx, stmt.where(json_array_contains(column, [text])))
+
+    def _filter_json_dict(self, ctx, column, raw_value: str) -> set[int]:
+        """Filters JSON dictionary columns using key/value lookups."""
+        text = raw_value
+        conditions: list[Any] = []
+        if self._has_wildcards(text):
+            conditions.append(json_dict_key_like(column, text))
+            conditions.append(json_dict_value_like(column, text))
+        else:
+            if text != "":
+                conditions.append(json_dict_has_key(column, text))
+            conditions.append(json_dict_has_value(column, text))
+        if not conditions:
+            return set()
+        stmt = select(AniMap.anilist_id).where(or_(*conditions))
+        return self._fetch_ids(ctx, stmt)
+
+    @staticmethod
+    def _non_empty_json_object(column):
+        """Builds a predicate ensuring a JSON object column contains entries."""
+        return and_(
+            column.is_not(None),
+            func.json_type(column) == "object",
+            exists(select(1).select_from(func.json_each(column))),
+        )
+
+    def _resolve_has(self, ctx, value: str) -> set[int]:
+        """Evaluates ``has`` filters and returns matching identifiers."""
+        norm = value.strip().lower()
+        if norm in ("anilist", "id"):
+            return self._fetch_ids(ctx, select(AniMap.anilist_id))
+        conditions = {
+            "anidb": AniMap.anidb_id.is_not(None),
+            "imdb": json_array_exists(AniMap.imdb_id),
+            "mal": json_array_exists(AniMap.mal_id),
+            "tmdb_movie": json_array_exists(AniMap.tmdb_movie_id),
+            "tmdb_show": AniMap.tmdb_show_id.is_not(None),
+            "tvdb": AniMap.tvdb_id.is_not(None),
+            "tmdb_mappings": self._non_empty_json_object(AniMap.tmdb_mappings),
+            "tvdb_mappings": self._non_empty_json_object(AniMap.tvdb_mappings),
+        }
+        cond = conditions.get(norm)
+        if cond is None:
+            return set()
+        return self._fetch_ids(ctx, select(AniMap.anilist_id).where(cond))
+
+    @staticmethod
+    def _has_wildcards(s: str) -> bool:
+        """Checks whether a search string includes wildcard characters."""
+        return "*" in s or "?" in s
+
+    @staticmethod
+    def _collect_provenance(ctx, anilist_ids: Iterable[int]) -> dict[int, list[str]]:
+        """Collects provenance sources for the provided AniList identifiers."""
+        ids = [int(aid) for aid in anilist_ids]
+        result: dict[int, list[str]] = {aid: [] for aid in ids}
+        if not ids:
+            return result
+        rows = ctx.session.execute(
+            select(
+                AniMapProvenance.anilist_id,
+                AniMapProvenance.n,
+                AniMapProvenance.source,
+            )
+            .where(AniMapProvenance.anilist_id.in_(ids))
+            .order_by(
+                AniMapProvenance.anilist_id.asc(),
+                AniMapProvenance.n.asc(),
+            )
+        ).all()
+        for aid, _n, src in rows:
+            result.setdefault(int(aid), []).append(src)
+        return result
+
+    def _is_custom_source(self, sources: list[str]) -> bool:
+        """Determines whether the latest provenance source is a custom entry."""
+        if not sources:
+            return False
+        last_src = sources[-1]
+        if last_src is None:
+            return False
+        if self.upstream_url:
+            return last_src != self.upstream_url
+        return True
+
+    def _build_item(
+        self,
+        anilist_id: int,
+        animap: AniMap | None,
+        sources: list[str],
+    ) -> dict[str, Any]:
+        """Builds a response item for list endpoints."""
+        item = {
+            "anilist_id": anilist_id,
+            "custom": self._is_custom_source(sources),
+            "sources": sources,
+        }
+        if not animap:
+            return item
+        item.update(
+            {
+                "anidb_id": animap.anidb_id,
+                "imdb_id": animap.imdb_id,
+                "mal_id": animap.mal_id,
+                "tmdb_movie_id": animap.tmdb_movie_id,
+                "tmdb_show_id": animap.tmdb_show_id,
+                "tvdb_id": animap.tvdb_id,
+                "tmdb_mappings": animap.tmdb_mappings,
+                "tvdb_mappings": animap.tvdb_mappings,
+            }
+        )
+        return item
+
+    @staticmethod
+    def _load_animaps(ctx, anilist_ids: Iterable[int]) -> dict[int, AniMap]:
+        """Loads mapping models keyed by AniList identifier."""
+        ids = list({int(aid) for aid in anilist_ids})
+        if not ids:
+            return {}
+        result: dict[int, AniMap] = {}
+        for animap in ctx.session.execute(
+            select(AniMap).where(AniMap.anilist_id.in_(ids))
+        ).scalars():
+            result[animap.anilist_id] = animap
+        return result
+
+    def _set_provenance_custom_last(self, anilist_id: int, custom_src: str) -> None:
+        """Replace provenance entries so that custom is the last source."""
         with db() as ctx:
             if ctx.session.get(AniMap, anilist_id) is None:
                 return
@@ -148,14 +413,7 @@ class MappingsService:
         defaults = {c.name: None for c in AniMap.__table__.columns}
         payload: dict[str, Any] = {**defaults, **mapping, "anilist_id": anilist_id}
 
-        # List normalization
-        for field in ("imdb_id", "mal_id", "tmdb_movie_id"):
-            if field in payload:
-                v = payload[field]
-                if v is None:
-                    payload[field] = None
-                elif not isinstance(v, list):
-                    payload[field] = [v]
+        self._normalize_list_fields(payload)
 
         with db() as ctx:
             ctx.session.execute(delete(AniMap).where(AniMap.anilist_id == anilist_id))
@@ -163,13 +421,8 @@ class MappingsService:
             ctx.session.add(obj)
             ctx.session.commit()
 
-        af, content = self._load_custom()
-        # Preserve $includes if present
         entry = {k: payload[k] for k in payload if k != "anilist_id"}
-        content[str(anilist_id)] = entry
-        self._dump_custom(af, content)
-
-        self._set_provenance_custom_last(anilist_id, str(af.path))
+        self._update_custom_file(anilist_id, entry)
         log.success(f"Replaced mapping for anilist_id={anilist_id}")
 
         return obj
@@ -189,6 +442,7 @@ class MappingsService:
                 unsupported.
         """
         log.info(f"Upserting mapping for anilist_id={anilist_id}")
+        updates: dict[str, Any] = {}
         with db() as ctx:
             obj = ctx.session.get(AniMap, anilist_id)
             if not obj:
@@ -201,34 +455,26 @@ class MappingsService:
                     continue
                 if k not in AniMap.__table__.columns:
                     continue
-                if k in ("imdb_id", "mal_id", "tmdb_movie_id"):
-                    if v is None:
-                        setattr(obj, k, None)
-                    elif isinstance(v, list):
-                        setattr(obj, k, v)
-                    else:
-                        setattr(obj, k, [v])
+                if k in self._LIST_FIELDS:
+                    normalized = self._normalize_list_value(v)
+                    setattr(obj, k, normalized)
+                    updates[k] = normalized
                 else:
                     setattr(obj, k, v)
+                    updates[k] = v
 
             ctx.session.commit()
 
-        # Persist partial overlay in custom file
         af, content = self._load_custom()
         existing = content.get(str(anilist_id))
-        entry: dict[str, Any] = existing if isinstance(existing, dict) else {}
-        for k, v in partial.items():
-            if k == "anilist_id":
-                continue
-            if k not in AniMap.__table__.columns:
-                continue
-            else:
-                entry[k] = v
-
-        content[str(anilist_id)] = entry
-        self._dump_custom(af, content)
-
-        self._set_provenance_custom_last(anilist_id, str(af.path))
+        entry: dict[str, Any] = existing.copy() if isinstance(existing, dict) else {}
+        entry.update(updates)
+        self._update_custom_file(
+            anilist_id,
+            entry,
+            active_file=af,
+            content=content,
+        )
         log.success(f"Upserted mapping for anilist_id={anilist_id}")
 
         return obj
@@ -253,9 +499,11 @@ class MappingsService:
             ctx.session.execute(delete(AniMap).where(AniMap.anilist_id == anilist_id))
             ctx.session.commit()
 
-        af, content = self._load_custom()
-        content[str(anilist_id)] = None
-        self._dump_custom(af, content)
+        self._update_custom_file(
+            anilist_id,
+            None,
+            update_provenance=False,
+        )
         log.success(f"Deleted mapping for anilist_id={anilist_id}")
 
     async def list_mappings(
@@ -282,13 +530,13 @@ class MappingsService:
         upstream_url = self.upstream_url
 
         async def resolve_anilist(term: str) -> list[int]:
-            """Resolve bare term to AniList IDs using AniList search.
+            """Resolves a search term to AniList identifiers via the public client.
 
             Args:
-                term (str): The search term to resolve.
+                term (str): User supplied search term.
 
             Returns:
-                list[int]: List of matching AniList IDs.
+                list[int]: Matching AniList identifiers in discovery order.
             """
             client = await get_app_state().ensure_public_anilist()
             search_limit = 50  # Max results AniList API allows
@@ -303,268 +551,11 @@ class MappingsService:
                     seen.add(aid)
             return ids
 
-        def resolve_db(key: str, value: str) -> set[int]:
-            """Resolve and return matching AniList IDs for a key/value pair.
-
-            Args:
-                key (str): The field to query (e.g., "anilist", "mal", "imdb", etc.).
-                value (str): The value or pattern to match.
-
-            Returns:
-                set[int]: Set of matching AniList IDs.
-            """
-
-            def _has_wildcards(s: str) -> bool:
-                return "*" in s or "?" in s
-
-            with db() as ctx:
-                s = select(AniMap.anilist_id)
-
-                def _scalar_cmp(col, op: str, num: int):
-                    """Helpers for comparisons on scalar int columns.
-
-                    JSON numeric array comparisons are delegated to utils.sql
-                    """
-                    if op == ">":
-                        return col > num
-                    if op == ">=":
-                        return col >= num
-                    if op == "<":
-                        return col < num
-                    if op == "<=":
-                        return col <= num
-                    return None
-
-                m_cmp = re.match(r"^(>=|>|<=|<)(\d+)$", str(value))
-                m_rng = re.match(r"^(\d+)\.\.(\d+)$", str(value))
-                if key in ("anilist", "id"):
-                    try:
-                        if m_cmp:
-                            num = int(m_cmp.group(2))
-                            cond = _scalar_cmp(AniMap.anilist_id, m_cmp.group(1), num)
-                            if cond is None:
-                                return set()
-                            s = s.where(cond)
-                            return set(int(r[0]) for r in ctx.session.execute(s).all())
-                        if m_rng:
-                            lo, hi = int(m_rng.group(1)), int(m_rng.group(2))
-                            s = s.where(
-                                and_(AniMap.anilist_id >= lo, AniMap.anilist_id <= hi)
-                            )
-                            return set(int(r[0]) for r in ctx.session.execute(s).all())
-                        num = int(value)
-                    except Exception:
-                        return set()
-                    s = s.where(AniMap.anilist_id == num)
-                elif key == "has":
-                    v = str(value or "").strip().lower()
-                    if v in ("anilist", "id"):
-                        # Every mapping has an AniList id; return all
-                        return set(
-                            int(r[0])
-                            for r in ctx.session.execute(
-                                select(AniMap.anilist_id)
-                            ).all()
-                        )
-                    if v == "anidb":
-                        s = s.where(AniMap.anidb_id.is_not(None))
-                    elif v == "imdb":
-                        s = s.where(json_array_exists(AniMap.imdb_id))
-                    elif v == "mal":
-                        s = s.where(json_array_exists(AniMap.mal_id))
-                    elif v == "tmdb_movie":
-                        s = s.where(json_array_exists(AniMap.tmdb_movie_id))
-                    elif v == "tmdb_show":
-                        s = s.where(AniMap.tmdb_show_id.is_not(None))
-                    elif v == "tvdb":
-                        s = s.where(AniMap.tvdb_id.is_not(None))
-                    elif v == "tmdb_mappings":
-                        s = s.where(
-                            and_(
-                                AniMap.tmdb_mappings.is_not(None),
-                                func.json_type(AniMap.tmdb_mappings) == "object",
-                                exists(
-                                    select(1).select_from(
-                                        func.json_each(AniMap.tmdb_mappings)
-                                    )
-                                ),
-                            )
-                        )
-                    elif v == "tvdb_mappings":
-                        s = s.where(
-                            and_(
-                                AniMap.tvdb_mappings.is_not(None),
-                                func.json_type(AniMap.tvdb_mappings) == "object",
-                                exists(
-                                    select(1).select_from(
-                                        func.json_each(AniMap.tvdb_mappings)
-                                    )
-                                ),
-                            )
-                        )
-                    else:
-                        return set()
-                    return set(int(r[0]) for r in ctx.session.execute(s).all())
-                elif key == "anidb":
-                    try:
-                        if m_cmp:
-                            num = int(m_cmp.group(2))
-                            cond = _scalar_cmp(AniMap.anidb_id, m_cmp.group(1), num)
-                            if cond is None:
-                                return set()
-                            s = s.where(cond)
-                            return set(int(r[0]) for r in ctx.session.execute(s).all())
-                        if m_rng:
-                            lo, hi = int(m_rng.group(1)), int(m_rng.group(2))
-                            s = s.where(
-                                and_(AniMap.anidb_id >= lo, AniMap.anidb_id <= hi)
-                            )
-                            return set(int(r[0]) for r in ctx.session.execute(s).all())
-                        num = int(value)
-                    except Exception:
-                        return set()
-                    s = s.where(AniMap.anidb_id == num)
-                elif key == "imdb":
-                    if _has_wildcards(value):
-                        s = s.where(json_array_like(AniMap.imdb_id, value))
-                    else:
-                        s = s.where(json_array_contains(AniMap.imdb_id, [value]))
-                elif key == "mal":
-                    try:
-                        if m_cmp:
-                            num = int(m_cmp.group(2))
-                            s = s.where(
-                                json_array_compare(AniMap.mal_id, m_cmp.group(1), num)
-                            )
-                            return set(int(r[0]) for r in ctx.session.execute(s).all())
-                        if m_rng:
-                            lo, hi = int(m_rng.group(1)), int(m_rng.group(2))
-                            s = s.where(json_array_between(AniMap.mal_id, lo, hi))
-                            return set(int(r[0]) for r in ctx.session.execute(s).all())
-                        num = int(value)
-                    except Exception:
-                        return set()
-                    s = s.where(json_array_contains(AniMap.mal_id, [num]))
-                elif key == "tmdb_movie":
-                    try:
-                        if m_cmp:
-                            num = int(m_cmp.group(2))
-                            s = s.where(
-                                json_array_compare(
-                                    AniMap.tmdb_movie_id, m_cmp.group(1), num
-                                )
-                            )
-                            return set(int(r[0]) for r in ctx.session.execute(s).all())
-                        if m_rng:
-                            lo, hi = int(m_rng.group(1)), int(m_rng.group(2))
-                            s = s.where(
-                                json_array_between(AniMap.tmdb_movie_id, lo, hi)
-                            )
-                            return set(int(r[0]) for r in ctx.session.execute(s).all())
-                        num = int(value)
-                    except Exception:
-                        return set()
-                    s = s.where(json_array_contains(AniMap.tmdb_movie_id, [num]))
-                elif key == "tmdb_show":
-                    try:
-                        if m_cmp:
-                            num = int(m_cmp.group(2))
-                            cond = _scalar_cmp(AniMap.tmdb_show_id, m_cmp.group(1), num)
-                            if cond is None:
-                                return set()
-                            s = s.where(cond)
-                            return set(int(r[0]) for r in ctx.session.execute(s).all())
-                        if m_rng:
-                            lo, hi = int(m_rng.group(1)), int(m_rng.group(2))
-                            s = s.where(
-                                and_(
-                                    AniMap.tmdb_show_id >= lo, AniMap.tmdb_show_id <= hi
-                                )
-                            )
-                            return set(int(r[0]) for r in ctx.session.execute(s).all())
-                        num = int(value)
-                    except Exception:
-                        return set()
-                    s = s.where(AniMap.tmdb_show_id == num)
-                elif key == "tvdb":
-                    try:
-                        if m_cmp:
-                            num = int(m_cmp.group(2))
-                            cond = _scalar_cmp(AniMap.tvdb_id, m_cmp.group(1), num)
-                            if cond is None:
-                                return set()
-                            s = s.where(cond)
-                            return set(int(r[0]) for r in ctx.session.execute(s).all())
-                        if m_rng:
-                            lo, hi = int(m_rng.group(1)), int(m_rng.group(2))
-                            s = s.where(
-                                and_(AniMap.tvdb_id >= lo, AniMap.tvdb_id <= hi)
-                            )
-                            return set(int(r[0]) for r in ctx.session.execute(s).all())
-                        num = int(value)
-                    except Exception:
-                        num = None
-                    tvdb_or: list[Any] = []
-                    if num is not None:
-                        tvdb_or.append(AniMap.tvdb_id == num)
-                    if tvdb_or:
-                        s = s.where(or_(*tvdb_or))
-                elif key == "tmdb_mappings":
-                    if m_cmp:
-                        try:
-                            num = int(m_cmp.group(2))
-                        except Exception:
-                            return set()
-                        return set()
-                    if m_rng:
-                        return set()
-                    v = str(value)
-                    tmdbm_or: list[Any] = []
-                    if _has_wildcards(v):
-                        tmdbm_or.append(json_dict_key_like(AniMap.tmdb_mappings, v))
-                        tmdbm_or.append(json_dict_value_like(AniMap.tmdb_mappings, v))
-                    else:
-                        # Avoid generating an invalid JSON path like '$.' when empty
-                        if v != "":
-                            tmdbm_or.append(json_dict_has_key(AniMap.tmdb_mappings, v))
-                        tmdbm_or.append(json_dict_has_value(AniMap.tmdb_mappings, v))
-                    if not tmdbm_or:
-                        return set()
-                    s = s.where(or_(*tmdbm_or))
-                elif key == "tvdb_mappings":
-                    if m_cmp:
-                        try:
-                            num = int(m_cmp.group(2))
-                        except Exception:
-                            return set()
-                        return set()
-                    if m_rng:
-                        return set()
-                    v = str(value)
-                    tvdm_or: list[Any] = []
-                    if _has_wildcards(v):
-                        tvdm_or.append(json_dict_key_like(AniMap.tvdb_mappings, v))
-                        tvdm_or.append(json_dict_value_like(AniMap.tvdb_mappings, v))
-                    else:
-                        # Avoid generating an invalid JSON path like '$.' when empty
-                        if v != "":
-                            tvdm_or.append(json_dict_has_key(AniMap.tvdb_mappings, v))
-                        tvdm_or.append(json_dict_has_value(AniMap.tvdb_mappings, v))
-                    if not tvdm_or:
-                        return set()
-                    s = s.where(or_(*tvdm_or))
-                else:
-                    return set()
-
-                return set(int(r[0]) for r in ctx.session.execute(s).all())
-
         items: list[dict[str, Any]] = []
         total: int = 0
 
         with db() as ctx:
             stmt = select(AniMap)
-
-            # Join last provenance source
             sub = (
                 select(
                     AniMapProvenance.anilist_id,
@@ -573,27 +564,60 @@ class MappingsService:
                 .group_by(AniMapProvenance.anilist_id)
                 .subquery()
             )
-            stmt = (
-                stmt.outerjoin(sub, sub.c.anilist_id == AniMap.anilist_id)
-                .outerjoin(
-                    AniMapProvenance,
-                    and_(
-                        AniMapProvenance.anilist_id == sub.c.anilist_id,
-                        AniMapProvenance.n == sub.c.maxn,
-                    ),
-                )
-                .add_columns(AniMapProvenance.source)
+            stmt = stmt.outerjoin(
+                sub,
+                sub.c.anilist_id == AniMap.anilist_id,
+            )
+            stmt = stmt.outerjoin(
+                AniMapProvenance,
+                and_(
+                    AniMapProvenance.anilist_id == sub.c.anilist_id,
+                    AniMapProvenance.n == sub.c.maxn,
+                ),
             )
 
-            # Precedence: id_search > title_search > none
+            def resolve_db(key: str, value: str) -> set[int]:
+                """Resolves a query key/value pair to matching AniList identifiers.
+
+                Args:
+                    key (str): Field name provided by the booru query.
+                    value (str): Raw query value including operators or wildcards.
+
+                Returns:
+                    set[int]: AniList identifiers matching the filter.
+                """
+                cmp_filter, range_filter, text_value = self._parse_numeric_filters(
+                    value
+                )
+                lowered = key.lower()
+                if lowered in self._SCALAR_FIELDS:
+                    column = self._SCALAR_FIELDS[lowered]
+                    return self._filter_scalar(
+                        ctx, column, cmp_filter, range_filter, text_value
+                    )
+                if lowered == "has":
+                    return self._resolve_has(ctx, text_value)
+                if lowered in self._JSON_ARRAY_FIELDS:
+                    column, numeric = self._JSON_ARRAY_FIELDS[lowered]
+                    return self._filter_json_array(
+                        ctx, column, numeric, text_value, cmp_filter, range_filter
+                    )
+                if lowered in ("tmdb_mappings", "tvdb_mappings"):
+                    if cmp_filter or range_filter:
+                        return set()
+                    column = (
+                        AniMap.tmdb_mappings
+                        if lowered == "tmdb_mappings"
+                        else AniMap.tvdb_mappings
+                    )
+                    return self._filter_json_dict(ctx, column, text_value)
+                return set()
+
             if q and q.strip():
                 node = parse_query(q)
 
-                # Prefetch AniList results for bare terms once (async) and then
-                # pass a sync resolver backed by the cache to the evaluator.
                 bare_cache: dict[str, list[int]] = {}
-                bare_terms = collect_bare_terms(node)
-                for term in bare_terms:
+                for term in collect_bare_terms(node):
                     bare_cache[term] = await resolve_anilist(term)
 
                 def db_resolver(k: str, v: str) -> set[int]:
@@ -602,11 +626,7 @@ class MappingsService:
                 def anilist_resolver(term: str) -> list[int]:
                     return bare_cache.get(term, [])
 
-                # Build a full-universe id set so negations work relative to all ids.
-                all_ids = set(
-                    int(r[0])
-                    for r in ctx.session.execute(select(AniMap.anilist_id)).all()
-                )
+                all_ids = self._fetch_ids(ctx, select(AniMap.anilist_id))
                 eval_res = evaluate(
                     node,
                     db_resolver=db_resolver,
@@ -614,7 +634,6 @@ class MappingsService:
                     universe_ids=all_ids,
                 )
 
-                final_ids: list[int]
                 if eval_res.used_bare and eval_res.order_hint:
                     final_ids = sorted(
                         list(eval_res.ids),
@@ -623,104 +642,33 @@ class MappingsService:
                 else:
                     final_ids = sorted(list(eval_res.ids))
 
+                sources_by_id = self._collect_provenance(ctx, final_ids)
                 if custom_only and final_ids:
-                    # Filter based on provenance
-                    sub = (
-                        select(
-                            AniMapProvenance.anilist_id,
-                            func.max(AniMapProvenance.n).label("maxn"),
-                        )
-                        .where(AniMapProvenance.anilist_id.in_(final_ids))
-                        .group_by(AniMapProvenance.anilist_id)
-                        .subquery()
-                    )
-                    last_rows = ctx.session.execute(
-                        select(
-                            AniMapProvenance.anilist_id, AniMapProvenance.source
-                        ).join(
-                            sub,
-                            and_(
-                                AniMapProvenance.anilist_id == sub.c.anilist_id,
-                                AniMapProvenance.n == sub.c.maxn,
-                            ),
-                        )
-                    ).all()
-                    by_id_src = {int(a): s for a, s in last_rows}
                     final_ids = [
                         aid
                         for aid in final_ids
-                        if (src := by_id_src.get(aid))
-                        and (
-                            src is not None
-                            and (not upstream_url or src != upstream_url)
-                        )
+                        if self._is_custom_source(sources_by_id.get(aid, []))
                     ]
+                sources_by_id = {aid: sources_by_id.get(aid, []) for aid in final_ids}
 
                 total = len(final_ids)
                 start = (page - 1) * per_page
                 end = start + per_page
                 page_ids = final_ids[start:end]
 
-                if not page_ids:
-                    items = []
+                if page_ids:
+                    rows_map = self._load_animaps(ctx, page_ids)
+                    items = [
+                        self._build_item(
+                            aid,
+                            rows_map.get(aid),
+                            sources_by_id.get(aid, []),
+                        )
+                        for aid in page_ids
+                    ]
                 else:
-                    rows = ctx.session.execute(
-                        select(AniMap).where(AniMap.anilist_id.in_(page_ids))
-                    ).all()
-                    rows_map: dict[int, AniMap] = {
-                        row[0].anilist_id: row[0] for row in rows
-                    }
-
-                    prov_rows = ctx.session.execute(
-                        select(
-                            AniMapProvenance.anilist_id,
-                            AniMapProvenance.n,
-                            AniMapProvenance.source,
-                        )
-                        .where(AniMapProvenance.anilist_id.in_(page_ids))
-                        .order_by(
-                            AniMapProvenance.anilist_id.asc(), AniMapProvenance.n.asc()
-                        )
-                    ).all()
-                    sources_by_id: dict[int, list[str]] = {aid: [] for aid in page_ids}
-                    for aid, _n, src in prov_rows:
-                        sources_by_id.setdefault(int(aid), []).append(src)
-
-                    # maintain page_ids order
-                    for aid in page_ids:
-                        obj = rows_map.get(aid)
-                        srcs = sources_by_id.get(aid, [])
-                        last_src = srcs[-1] if srcs else None
-                        is_custom = bool(
-                            last_src is not None
-                            and (not upstream_url or last_src != upstream_url)
-                        )
-                        if obj is None:
-                            items.append(
-                                {
-                                    "anilist_id": aid,
-                                    "custom": False,
-                                    "sources": srcs,
-                                }
-                            )
-                        else:
-                            items.append(
-                                {
-                                    "anilist_id": obj.anilist_id,
-                                    "anidb_id": obj.anidb_id,
-                                    "imdb_id": obj.imdb_id,
-                                    "mal_id": obj.mal_id,
-                                    "tmdb_movie_id": obj.tmdb_movie_id,
-                                    "tmdb_show_id": obj.tmdb_show_id,
-                                    "tvdb_id": obj.tvdb_id,
-                                    "tmdb_mappings": obj.tmdb_mappings,
-                                    "tvdb_mappings": obj.tvdb_mappings,
-                                    "custom": is_custom,
-                                    "sources": srcs,
-                                }
-                            )
+                    items = []
             else:
-                # No search: list all
                 where_clauses: list[Any] = []
                 if custom_only:
                     if upstream_url:
@@ -739,53 +687,22 @@ class MappingsService:
                 count_stmt = select(func.count()).select_from(stmt.subquery())
                 total = ctx.session.execute(count_stmt).scalar_one()
 
-                stmt = (
+                paged_stmt = (
                     stmt.order_by(AniMap.anilist_id.asc())
                     .offset((page - 1) * per_page)
                     .limit(per_page)
                 )
-                rows = ctx.session.execute(stmt).all()
-
-                anilist_ids = [row[0].anilist_id for row in rows]
-                sources_by_id: dict[int, list[str]] = {aid: [] for aid in anilist_ids}
-                if anilist_ids:
-                    prov_rows = ctx.session.execute(
-                        select(
-                            AniMapProvenance.anilist_id,
-                            AniMapProvenance.n,
-                            AniMapProvenance.source,
-                        )
-                        .where(AniMapProvenance.anilist_id.in_(anilist_ids))
-                        .order_by(
-                            AniMapProvenance.anilist_id.asc(), AniMapProvenance.n.asc()
-                        )
-                    ).all()
-                    for aid, _n, src in prov_rows:
-                        sources_by_id.setdefault(aid, []).append(src)
-
-                for row in rows:
-                    animap: AniMap = row[0]
-                    srcs = sources_by_id.get(animap.anilist_id, [])
-                    last_src = srcs[-1] if srcs else None
-                    is_custom = bool(
-                        last_src is not None
-                        and (not upstream_url or last_src != upstream_url)
+                animaps = list(ctx.session.execute(paged_stmt).scalars())
+                anilist_ids = [animap.anilist_id for animap in animaps]
+                sources_by_id = self._collect_provenance(ctx, anilist_ids)
+                items = [
+                    self._build_item(
+                        animap.anilist_id,
+                        animap,
+                        sources_by_id.get(animap.anilist_id, []),
                     )
-                    items.append(
-                        {
-                            "anilist_id": animap.anilist_id,
-                            "anidb_id": animap.anidb_id,
-                            "imdb_id": animap.imdb_id,
-                            "mal_id": animap.mal_id,
-                            "tmdb_movie_id": animap.tmdb_movie_id,
-                            "tmdb_show_id": animap.tmdb_show_id,
-                            "tvdb_id": animap.tvdb_id,
-                            "tmdb_mappings": animap.tmdb_mappings,
-                            "tvdb_mappings": animap.tvdb_mappings,
-                            "custom": is_custom,
-                            "sources": srcs,
-                        }
-                    )
+                    for animap in animaps
+                ]
 
         # Optionally fetch AniList metadata for page items only.
         if with_anilist and items:
@@ -809,5 +726,9 @@ class MappingsService:
 
 @lru_cache(maxsize=1)
 def get_mappings_service() -> MappingsService:
-    """Get the singleton instance of the mappings service."""
+    """Returns the cached singleton instance of the mappings service.
+
+    Returns:
+        MappingsService: Shared service instance.
+    """
     return MappingsService()
