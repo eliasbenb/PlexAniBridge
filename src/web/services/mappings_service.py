@@ -1,9 +1,11 @@
 """Mappings service for CRUD operations, listing, and provenance updates."""
 
+import calendar
 import json
 import re
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, ClassVar
@@ -15,12 +17,18 @@ from sqlalchemy.sql import exists
 from src import log
 from src.config.database import db
 from src.config.settings import get_config
+from src.core.anilist import AniListClient
 from src.core.mappings import MappingsClient
 from src.exceptions import MissingAnilistIdError, UnsupportedMappingFileExtensionError
 from src.models.db.animap import AniMap
 from src.models.db.provenance import AniMapProvenance
 from src.models.schemas.anilist import MediaWithoutList as AniListMetadata
-from src.utils.booru_query import collect_bare_terms, evaluate, parse_query
+from src.utils.booru_query import (
+    collect_bare_terms,
+    collect_key_terms,
+    evaluate,
+    parse_query,
+)
 from src.utils.sql import (
     json_array_between,
     json_array_compare,
@@ -31,6 +39,11 @@ from src.utils.sql import (
     json_dict_has_value,
     json_dict_key_like,
     json_dict_value_like,
+)
+from src.web.services.mappings_query_spec import (
+    QueryFieldKind,
+    QueryFieldSpec,
+    get_query_field_map,
 )
 from src.web.state import get_app_state
 
@@ -47,18 +60,15 @@ class MappingsService:
     """Service to manage custom mappings and DB provenance."""
 
     _LIST_FIELDS: ClassVar[tuple[str, ...]] = ("imdb_id", "mal_id", "tmdb_movie_id")
-    _SCALAR_FIELDS: ClassVar[dict[str, Any]] = {
-        "anilist": AniMap.anilist_id,
-        "id": AniMap.anilist_id,
-        "anidb": AniMap.anidb_id,
-        "tmdb_show": AniMap.tmdb_show_id,
-        "tvdb": AniMap.tvdb_id,
-    }
-    _JSON_ARRAY_FIELDS: ClassVar[dict[str, tuple[Any, bool]]] = {
-        "imdb": (AniMap.imdb_id, False),
-        "mal": (AniMap.mal_id, True),
-        "tmdb_movie": (AniMap.tmdb_movie_id, True),
-    }
+    _FIELD_MAP: ClassVar[Mapping[str, QueryFieldSpec]] = get_query_field_map()
+    _ANILIST_KINDS: ClassVar[frozenset[QueryFieldKind]] = frozenset(
+        {
+            QueryFieldKind.ANILIST_STRING,
+            QueryFieldKind.ANILIST_NUMERIC,
+            QueryFieldKind.ANILIST_ENUM,
+        }
+    )
+    _ANILIST_MAX_RESULTS: ClassVar[int] = 50
     _CMP_RE: ClassVar[re.Pattern[str]] = re.compile(r"^(>=|>|<=|<)(\d+)$")
     _RANGE_RE: ClassVar[re.Pattern[str]] = re.compile(r"^(\d+)\.\.(\d+)$")
 
@@ -167,6 +177,201 @@ class MappingsService:
             else None
         )
         return cmp_filter, range_filter, text
+
+    @staticmethod
+    def _normalize_text_query(value: str) -> str:
+        """Collapse whitespace and strip wildcard markers for AniList text search."""
+        cleaned = value.replace("*", " ").replace("?", " ")
+        return re.sub(r"\s+", " ", cleaned).strip()
+
+    @staticmethod
+    def _parse_int_value(raw_value: str) -> int | None:
+        """Safely convert a string to integer if possible."""
+        try:
+            return int(raw_value)
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _parse_fuzzy_date_int(raw_value: str) -> int | None:
+        """Parse fuzzy date input (YYYYMMDD) into AniList integer format."""
+        digits = "".join(ch for ch in str(raw_value) if ch.isdigit())
+        if not digits:
+            return None
+        if len(digits) > 8:
+            digits = digits[:8]
+        digits = digits.ljust(8, "0")
+        try:
+            return int(digits)
+        except ValueError:
+            return None
+
+    @staticmethod
+    def _normalize_fuzzy_date_number(value: int) -> int:
+        """Expand shorthand numeric values (e.g., 2016) into fuzzy date ints."""
+        parsed = MappingsService._parse_fuzzy_date_int(str(value))
+        return parsed if parsed is not None else value
+
+    @staticmethod
+    def _datetime_to_fuzzy(dt: datetime) -> int:
+        """Convert datetime into AniList fuzzy integer representation."""
+        return dt.year * 10000 + dt.month * 100 + dt.day
+
+    async def _resolve_anilist_term(
+        self,
+        client: AniListClient,
+        spec: QueryFieldSpec,
+        raw_value: str,
+    ) -> set[int]:
+        """Resolve AniList-backed query terms into identifier sets."""
+        value = raw_value.strip()
+
+        if spec.kind == QueryFieldKind.ANILIST_STRING:
+            if not spec.anilist_field:
+                return set()
+            text = self._normalize_text_query(value)
+            if not text:
+                return set()
+            filters = {spec.anilist_field: text}
+
+        elif spec.kind == QueryFieldKind.ANILIST_ENUM:
+            if not spec.anilist_field:
+                return set()
+            allowed = spec.values or ()
+            if not allowed:
+                return set()
+            candidate = value
+            if not candidate:
+                return set()
+            lookup = {val: val for val in allowed}
+            lookup.update({val.lower(): val for val in allowed})
+            lookup.update({val.upper(): val for val in allowed})
+            resolved = lookup.get(candidate)
+            if resolved is None:
+                resolved = lookup.get(candidate.lower())
+            if resolved is None:
+                resolved = lookup.get(candidate.upper())
+            if resolved is None:
+                return set()
+            filters = {spec.anilist_field: resolved}
+
+        elif spec.kind == QueryFieldKind.ANILIST_NUMERIC:
+            cmp_filter, range_filter, text_value = self._parse_numeric_filters(value)
+            filters_dict = self._build_anilist_numeric_filters(
+                spec, cmp_filter, range_filter, text_value
+            )
+            if not filters_dict:
+                return set()
+            filters = filters_dict
+
+        else:
+            return set()
+
+        ids = await client.search_media_ids(
+            filters=filters, max_results=self._ANILIST_MAX_RESULTS
+        )
+        return set(ids)
+
+    @staticmethod
+    def _fuzzy_to_datetime(value: int, bias: str) -> datetime:
+        """Convert fuzzy integer into datetime, biasing toward range edge."""
+        year = max(1, value // 10000)
+        month = (value // 100) % 100
+        day = value % 100
+
+        if month <= 0:
+            month = 1 if bias == "lower" else 12
+        if day <= 0:
+            day = 1 if bias == "lower" else calendar.monthrange(year, month)[1]
+
+        return datetime(year=year, month=month, day=day)
+
+    @classmethod
+    def _fuzzy_lower_threshold(cls, value: int) -> int:
+        """Inclusive lower bound helper for AniList fuzzy dates."""
+        try:
+            dt = cls._fuzzy_to_datetime(value, "lower") - timedelta(days=1)
+        except Exception:
+            return value
+        return cls._datetime_to_fuzzy(dt)
+
+    @classmethod
+    def _fuzzy_upper_threshold(cls, value: int) -> int:
+        """Inclusive upper bound helper for AniList fuzzy dates."""
+        try:
+            dt = cls._fuzzy_to_datetime(value, "upper") + timedelta(days=1)
+        except Exception:
+            return value
+        return cls._datetime_to_fuzzy(dt)
+
+    def _build_anilist_numeric_filters(
+        self,
+        spec: QueryFieldSpec,
+        cmp_filter: tuple[str, int] | None,
+        range_filter: tuple[int, int] | None,
+        raw_value: str,
+    ) -> dict[str, Any] | None:
+        """Translate numeric filters into AniList GraphQL arguments."""
+        field = spec.anilist_field
+        if not field:
+            return None
+
+        value_type = spec.anilist_value_type or "int"
+        is_fuzzy = value_type == "fuzzy_date"
+
+        def _inclusive_lower(num: int) -> int:
+            if value_type == "fuzzy_date":
+                return self._fuzzy_lower_threshold(num)
+            return num - 1
+
+        def _inclusive_upper(num: int) -> int:
+            if value_type == "fuzzy_date":
+                return self._fuzzy_upper_threshold(num)
+            return num + 1
+
+        if range_filter:
+            lo, hi = range_filter
+            if lo > hi:
+                lo, hi = hi, lo
+            if is_fuzzy:
+                lo = self._normalize_fuzzy_date_number(lo)
+                hi = self._normalize_fuzzy_date_number(hi)
+            return {
+                f"{field}_greater": _inclusive_lower(lo),
+                f"{field}_lesser": _inclusive_upper(hi),
+            }
+
+        if cmp_filter:
+            op, num = cmp_filter
+            if is_fuzzy:
+                num = self._normalize_fuzzy_date_number(num)
+            if value_type == "fuzzy_date":
+                if op == ">":
+                    return {f"{field}_greater": num}
+                if op == ">=":
+                    return {f"{field}_greater": self._fuzzy_lower_threshold(num)}
+                if op == "<":
+                    return {f"{field}_lesser": num}
+                if op == "<=":
+                    return {f"{field}_lesser": self._fuzzy_upper_threshold(num)}
+            else:
+                if op == ">":
+                    return {f"{field}_greater": num}
+                if op == ">=":
+                    return {f"{field}_greater": num - 1}
+                if op == "<":
+                    return {f"{field}_lesser": num}
+                if op == "<=":
+                    return {f"{field}_lesser": num + 1}
+            return None
+
+        if value_type == "fuzzy_date":
+            parsed = self._parse_fuzzy_date_int(raw_value)
+        else:
+            parsed = self._parse_int_value(raw_value)
+        if parsed is None:
+            return None
+        return {field: parsed}
 
     @staticmethod
     def _scalar_cmp(column, operator: str, num: int):
@@ -576,6 +781,8 @@ class MappingsService:
                 ),
             )
 
+            ani_cache: dict[tuple[str, str], set[int]] = {}
+
             def resolve_db(key: str, value: str) -> set[int]:
                 """Resolves a query key/value pair to matching AniList identifiers.
 
@@ -586,31 +793,49 @@ class MappingsService:
                 Returns:
                     set[int]: AniList identifiers matching the filter.
                 """
-                cmp_filter, range_filter, text_value = self._parse_numeric_filters(
-                    value
-                )
                 lowered = key.lower()
-                if lowered in self._SCALAR_FIELDS:
-                    column = self._SCALAR_FIELDS[lowered]
-                    return self._filter_scalar(
-                        ctx, column, cmp_filter, range_filter, text_value
+                spec = self._FIELD_MAP.get(lowered)
+                if not spec:
+                    return set()
+                value_key = value.strip()
+
+                if spec.kind == QueryFieldKind.DB_SCALAR:
+                    cmp_filter, range_filter, text_value = self._parse_numeric_filters(
+                        value
                     )
-                if lowered == "has":
-                    return self._resolve_has(ctx, text_value)
-                if lowered in self._JSON_ARRAY_FIELDS:
-                    column, numeric = self._JSON_ARRAY_FIELDS[lowered]
-                    return self._filter_json_array(
-                        ctx, column, numeric, text_value, cmp_filter, range_filter
-                    )
-                if lowered in ("tmdb_mappings", "tvdb_mappings"):
-                    if cmp_filter or range_filter:
+                    if not spec.column:
                         return set()
-                    column = (
-                        AniMap.tmdb_mappings
-                        if lowered == "tmdb_mappings"
-                        else AniMap.tvdb_mappings
+                    return self._filter_scalar(
+                        ctx, spec.column, cmp_filter, range_filter, text_value
                     )
-                    return self._filter_json_dict(ctx, column, text_value)
+
+                if spec.kind == QueryFieldKind.DB_JSON_ARRAY:
+                    cmp_filter, range_filter, text_value = self._parse_numeric_filters(
+                        value
+                    )
+                    if not spec.column:
+                        return set()
+                    return self._filter_json_array(
+                        ctx,
+                        spec.column,
+                        bool(spec.json_array_numeric),
+                        text_value,
+                        cmp_filter,
+                        range_filter,
+                    )
+
+                if spec.kind == QueryFieldKind.DB_JSON_DICT:
+                    if not spec.column:
+                        return set()
+                    return self._filter_json_dict(ctx, spec.column, value)
+
+                if spec.kind == QueryFieldKind.DB_HAS:
+                    return self._resolve_has(ctx, value)
+
+                if spec.kind in self._ANILIST_KINDS:
+                    cache_key = (spec.key, value_key)
+                    return ani_cache.get(cache_key, set())
+
                 return set()
 
             if q and q.strip():
@@ -619,6 +844,34 @@ class MappingsService:
                 bare_cache: dict[str, list[int]] = {}
                 for term in collect_bare_terms(node):
                     bare_cache[term] = await resolve_anilist(term)
+
+                ani_cache.clear()
+                key_terms = collect_key_terms(node)
+                client = None
+                if key_terms:
+                    for term in key_terms:
+                        spec = self._FIELD_MAP.get(term.key.lower())
+                        if not spec or spec.kind not in self._ANILIST_KINDS:
+                            continue
+                        term_value = term.value.strip()
+                        cache_key = (spec.key, term_value)
+                        if cache_key in ani_cache:
+                            continue
+                        if client is None:
+                            client = await get_app_state().ensure_public_anilist()
+                        try:
+                            ids = await self._resolve_anilist_term(
+                                client, spec, term_value
+                            )
+                        except Exception:
+                            log.warning(
+                                "Failed to resolve AniList filter %s:%s",
+                                spec.key,
+                                term_value,
+                                exc_info=True,
+                            )
+                            ids = set()
+                        ani_cache[cache_key] = ids
 
                 def db_resolver(k: str, v: str) -> set[int]:
                     return resolve_db(k, v)

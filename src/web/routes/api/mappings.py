@@ -1,6 +1,5 @@
 """API endpoints for mappings."""
 
-from enum import StrEnum
 from typing import Any
 
 from fastapi.param_functions import Query
@@ -13,6 +12,12 @@ from src.exceptions import MappingIdMismatchError, MappingNotFoundError
 from src.models.db.animap import AniMap
 from src.models.db.provenance import AniMapProvenance
 from src.models.schemas.anilist import MediaWithoutList as AniListMetadata
+from src.web.services.mappings_query_spec import (
+    QueryFieldOperator,
+    QueryFieldSpec,
+    QueryFieldType,
+    get_query_field_specs,
+)
 from src.web.services.mappings_service import get_mappings_service
 from src.web.state import get_app_state
 
@@ -49,30 +54,13 @@ class DeleteMappingResponse(BaseModel):
     ok: bool
 
 
-class FieldType(StrEnum):
-    INT = "int"
-    STRING = "string"
-    ENUM = "enum"
-
-
-class FieldOperator(StrEnum):
-    EQ = "="
-    GT = ">"
-    GTE = ">="
-    LT = "<"
-    LTE = "<="
-    STAR_WILDCARD = "*"
-    QMARK_WILDCARD = "?"
-    RANGE = "range"
-
-
 class FieldCapability(BaseModel):
     """Describes supported operators and value type for a query field."""
 
     key: str
     aliases: list[str] = []
-    type: FieldType
-    operators: list[FieldOperator]
+    type: QueryFieldType
+    operators: list[QueryFieldOperator]
     values: list[str] | None = None  # for enums like has:*
     desc: str | None = None
 
@@ -90,62 +78,17 @@ async def get_query_capabilities() -> QueryCapabilitiesResponse:
 
     This allows the frontend to tailor suggestions based on backend capabilities.
     """
-    has_values = [
-        "anilist",
-        "id",
-        "anidb",
-        "imdb",
-        "mal",
-        "tmdb_movie",
-        "tmdb_show",
-        "tvdb",
-        "tmdb_mappings",
-        "tvdb_mappings",
-    ]
-
-    DEFAULT_INT_KWARGS = {
-        "type": FieldType.INT,
-        "operators": [
-            FieldOperator.EQ,
-            FieldOperator.GT,
-            FieldOperator.GTE,
-            FieldOperator.LT,
-            FieldOperator.LTE,
-            FieldOperator.RANGE,
-        ],
-    }
-    DEFAULT_STRING_KWARGS = {
-        "type": FieldType.STRING,
-        "operators": [
-            FieldOperator.EQ,
-            FieldOperator.STAR_WILDCARD,
-            FieldOperator.QMARK_WILDCARD,
-        ],
-    }
-    DEFAULT_ENUM_KWARGS = {
-        "type": FieldType.ENUM,
-        "operators": [FieldOperator.EQ],
-    }
-
+    specs: tuple[QueryFieldSpec, ...] = get_query_field_specs()
     fields = [
         FieldCapability(
-            key="anilist", desc="AniList ID", aliases=["id"], **DEFAULT_INT_KWARGS
-        ),
-        FieldCapability(key="anidb", desc="AniDB ID", **DEFAULT_INT_KWARGS),
-        FieldCapability(key="imdb", desc="IMDb ID", **DEFAULT_STRING_KWARGS),
-        FieldCapability(key="mal", desc="MyAnimeList ID", **DEFAULT_INT_KWARGS),
-        FieldCapability(key="tmdb_movie", desc="TMDb Movie ID", **DEFAULT_INT_KWARGS),
-        FieldCapability(key="tmdb_show", desc="TMDb TV Show ID", **DEFAULT_INT_KWARGS),
-        FieldCapability(key="tvdb", desc="TVDB ID", **DEFAULT_INT_KWARGS),
-        FieldCapability(
-            key="tmdb_mappings", desc="Season/episode mappings", **DEFAULT_STRING_KWARGS
-        ),
-        FieldCapability(
-            key="tvdb_mappings", desc="Season/episode mappings", **DEFAULT_STRING_KWARGS
-        ),
-        FieldCapability(
-            key="has", desc="Presence filter", values=has_values, **DEFAULT_ENUM_KWARGS
-        ),
+            key=spec.key,
+            aliases=list(spec.aliases),
+            type=spec.type,
+            operators=list(spec.operators),
+            values=list(spec.values) if spec.values else None,
+            desc=spec.desc,
+        )
+        for spec in specs
     ]
 
     return QueryCapabilitiesResponse(fields=fields)

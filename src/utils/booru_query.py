@@ -78,11 +78,7 @@ class OrMarker(Node):
 
 
 def _make_parser() -> pp.ParserElement:
-    identifier = pp.oneOf(
-        "anilist id anidb imdb mal tmdb_movie tmdb_show tvdb tmdb_mappings "
-        "tvdb_mappings has",
-        caseless=True,
-    )
+    identifier = pp.Word(pp.alphas, pp.alphanums + "_")
 
     # Normalize identifier to lowercase
     identifier = identifier.setParseAction(lambda _s, _loc, t: str(t[0]).lower())
@@ -283,6 +279,32 @@ def collect_bare_terms(node: Node) -> list[str]:
             seen.add(t)
 
     return unique
+
+
+def collect_key_terms(node: Node) -> list[KeyTerm]:
+    """Collect key:value terms from the AST for pre-resolution.
+
+    Args:
+        node (Node): The root AST node.
+
+    Returns:
+        list[KeyTerm]: Ordered list of encountered KeyTerm nodes.
+    """
+    out: list[KeyTerm] = []
+
+    def _walk(n: Node) -> None:
+        if isinstance(n, KeyTerm):
+            out.append(n)
+            return
+        if isinstance(n, Not):
+            _walk(n.child)
+            return
+        if isinstance(n, (And, Or)):
+            for child in n.children:
+                _walk(child)
+
+    _walk(node)
+    return out
 
 
 def evaluate(
