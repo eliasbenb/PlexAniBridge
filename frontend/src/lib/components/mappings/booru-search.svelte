@@ -108,7 +108,7 @@
         const out: Suggestion[] = [];
 
         // If segment looks like key:value (possibly partial value)
-        const mKV = t.match(/^([-~]?)([a-zA-Z_][\w]*)?(:)?([^\s]*)$/);
+        const mKV = t.match(/^([-~]?)([a-zA-Z_][\w.]*)?(:)?([^\s]*)$/);
         if (mKV) {
             const prefix = mKV[1] || ""; // ~ or -
             const name = (mKV[2] || "").toLowerCase();

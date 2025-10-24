@@ -78,7 +78,7 @@ class OrMarker(Node):
 
 
 def _make_parser() -> pp.ParserElement:
-    identifier = pp.Word(pp.alphas, pp.alphanums + "_")
+    identifier = pp.Word(pp.alphas, pp.alphanums + "_.")
 
     # Normalize identifier to lowercase
     identifier = identifier.setParseAction(lambda _s, _loc, t: str(t[0]).lower())
