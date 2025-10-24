@@ -1,6 +1,7 @@
 nav:
   - index.md
   - configuration.md
+  - faq.md
   - Quick start:
       - quick-start/docker.md
       - quick-start/source.md
