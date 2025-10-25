@@ -54,6 +54,7 @@ dependencies = [
 
 [project.scripts]
 pab-build = "scripts.dev:build"
+pab-bump-version = "scripts.dev:bump_version"
 pab-clean = "scripts.dev:clean"
 pab-deps-install = "scripts.dev:deps_install"
 pab-deps-upgrade = "scripts.dev:deps_upgrade"
