@@ -81,7 +81,7 @@
 </script>
 
 <div
-    class="flex gap-3 overflow-hidden rounded-md border border-slate-800 bg-slate-900/60 p-4 shadow-sm backdrop-blur-sm transition-shadow hover:shadow-md">
+    class="group flex gap-3 overflow-hidden rounded-md border border-slate-800 bg-slate-900/60 p-4 shadow-sm backdrop-blur-sm transition-shadow hover:shadow-md">
     <div class={`w-1 rounded-md ${meta.color}`}></div>
     <div class="flex min-w-0 flex-1 gap-3">
         {#if coverImage(item)}
@@ -91,7 +91,8 @@
                     src={coverImage(item)!}
                     alt={displayTitle(item) || "Cover"}
                     loading="lazy"
-                    class="h-full w-full object-cover" />
+                    class="h-full w-full object-cover transition-[filter] duration-150 ease-out group-hover:blur-none"
+                    class:blur-sm={item.anilist?.isAdult} />
             </div>
         {:else}
             <div
@@ -170,6 +171,11 @@
                             {#if item.anilist?.episodes}
                                 <span class="rounded bg-slate-800/70 px-1 py-0.5"
                                     >EP {item.anilist.episodes}</span>
+                            {/if}
+                            {#if item.anilist?.isAdult}
+                                <span
+                                    class="rounded bg-rose-800 px-1 py-0.5"
+                                    title="ADULT content">ADULT</span>
                             {/if}
                         </div>
                     </div>

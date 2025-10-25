@@ -37,7 +37,8 @@ export interface MediaCoverImage {
 
 export interface MediaWithoutList {
     id: number;
-    type?: MediaType | null;
+    // id_mal?: number | null;
+    // type?: MediaType | null;
     format?: MediaFormat | null;
     status?: MediaStatus | null;
     season?: MediaSeason | null;
@@ -45,17 +46,16 @@ export interface MediaWithoutList {
     episodes?: number | null;
     duration?: number | null;
     coverImage?: MediaCoverImage | null;
+    // bannerImage?: string | null;
+    // synonyms?: string[] | null;
+    // isLocked?: boolean | null;
+    isAdult?: boolean | null;
     title?: MediaTitle | null;
+    // startDate?: FuzzyDate | null;
+    // endDate?: FuzzyDate | null;
+    // nextAiringEpisode?: AiringSchedule | null;
 }
 
-export type Media = Pick<
-    MediaWithoutList,
-    | "id"
-    | "format"
-    | "status"
-    | "season"
-    | "seasonYear"
-    | "episodes"
-    | "coverImage"
-    | "title"
->;
+export interface Media extends MediaWithoutList {
+    media_list_entry?: { id: number };
+}

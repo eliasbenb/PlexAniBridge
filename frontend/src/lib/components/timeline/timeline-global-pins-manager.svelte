@@ -69,8 +69,7 @@
 
     const anilistUrlFor = (m?: AniListMediaWithoutList | null): string | null => {
         if (!m?.id) return null;
-        const typePath = m?.type === "MANGA" ? "manga" : "anime";
-        return `https://anilist.co/${typePath}/${m.id}`;
+        return `https://anilist.co/anime/${m.id}`;
     };
 
     function setRow(aid: number, fields: string[], updateBaseline = false) {
@@ -264,7 +263,7 @@
     } = props}
     <div class="px-3 py-2">
         <div
-            class="flex gap-3 overflow-hidden rounded-md border border-slate-800 bg-slate-900/60 p-4 shadow-sm backdrop-blur-sm transition-shadow hover:shadow-md">
+            class="group flex gap-3 overflow-hidden rounded-md border border-slate-800 bg-slate-900/60 p-4 shadow-sm backdrop-blur-sm transition-shadow hover:shadow-md">
             <div class={`w-1 rounded-md ${accentClass}`}></div>
             <div class="flex min-w-0 flex-1 gap-3">
                 {#if coverOf(anilist)}
@@ -274,7 +273,8 @@
                             src={coverOf(anilist)!}
                             alt={titleOf(anilist) || "Cover"}
                             loading="lazy"
-                            class="h-full w-full object-cover" />
+                            class="h-full w-full object-cover transition-[filter] duration-150 ease-out group-hover:blur-none"
+                            class:blur-sm={anilist?.isAdult} />
                     </div>
                 {:else}
                     <div
@@ -330,6 +330,11 @@
                                         <span
                                             class="rounded bg-slate-800/70 px-1 py-0.5"
                                             >EP {anilist.episodes}</span>
+                                    {/if}\
+                                    {#if anilist?.isAdult}
+                                        <span
+                                            class="rounded bg-rose-800 px-1 py-0.5"
+                                            title="ADULT content">ADULT</span>
                                     {/if}
                                 </div>
                             </div>

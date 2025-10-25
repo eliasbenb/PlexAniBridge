@@ -536,7 +536,7 @@ class MediaWithoutList(AniListBaseModel):
 
     id: int
     # id_mal: int | None = None
-    type: MediaType | None = None
+    # type: MediaType | None = None
     format: MediaFormat | None = None
     status: MediaStatus | None = None
     season: MediaSeason | None = None
@@ -547,6 +547,7 @@ class MediaWithoutList(AniListBaseModel):
     # banner_image: str | None = None
     # synonyms: list[str] | None = None
     # is_locked: bool | None = None
+    is_adult: bool | None = None
     title: MediaTitle | None = None
     # start_date: FuzzyDate | None = None
     # end_date: FuzzyDate | None = None

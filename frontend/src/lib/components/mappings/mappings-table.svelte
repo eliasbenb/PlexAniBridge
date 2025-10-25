@@ -116,15 +116,20 @@
                                             href={`https://anilist.co/anime/${m.anilist_id}`}
                                             rel="noopener noreferrer"
                                             target="_blank"
-                                            class="w-12 shrink-0">
+                                            class="group block w-12 shrink-0">
                                             {#if coverImage}
-                                                <img
-                                                    alt={(preferredTitle(
-                                                        m.anilist?.title,
-                                                    ) || "Cover") + " cover"}
-                                                    loading="lazy"
-                                                    src={coverImage}
-                                                    class="h-16 w-12 rounded-md object-cover ring-1 ring-slate-700/60" />
+                                                <div
+                                                    class="relative h-16 w-full overflow-hidden rounded-md ring-1 ring-slate-700/60">
+                                                    <img
+                                                        alt={(preferredTitle(
+                                                            m.anilist?.title,
+                                                        ) || "Cover") + " cover"}
+                                                        loading="lazy"
+                                                        src={coverImage}
+                                                        class="h-full w-full object-cover transition-[filter] duration-150 ease-out group-hover:blur-none"
+                                                        class:blur-sm={m.anilist
+                                                            ?.isAdult} />
+                                                </div>
                                             {:else}
                                                 <div
                                                     class="flex h-16 w-12 shrink-0 items-center justify-center rounded-md border border-dashed border-slate-700 bg-slate-800/30 text-[9px] text-slate-500 select-none">
@@ -167,6 +172,12 @@
                                                             >EP {m.anilist
                                                                 .episodes}</span
                                                         >{/if}
+                                                    {#if m.anilist?.isAdult}
+                                                        <span
+                                                            class="rounded bg-rose-800 px-1 py-0.5"
+                                                            title="ADULT content"
+                                                            >ADULT</span>
+                                                    {/if}
                                                 </div>
                                             {/if}
                                         </div>
