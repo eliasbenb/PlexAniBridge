@@ -11,5 +11,4 @@ dependencies = [
     "mkdocs-git-tag-plugin>=0.1.0",
     "mkdocs-material>=9.6.10",
     "mkdocs-redoc-tag>=0.2.0",
-    "mkdocs-swagger-ui-tag>=0.7.2",
 ]

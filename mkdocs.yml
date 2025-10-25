@@ -8,9 +8,9 @@ extra:
   generator: false
 plugins:
   - git-tag
+  - git-revision-date-localized
   - search
   - awesome-nav
-  - swagger-ui-tag
   - redoc-tag
 theme:
   name: material
