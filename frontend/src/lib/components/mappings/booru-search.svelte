@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { onMount } from "svelte";
+    import { createEventDispatcher, onMount } from "svelte";
 
     import { ArrowRight, LoaderCircle, Search } from "@lucide/svelte";
     import { Popover } from "bits-ui";
@@ -14,6 +14,7 @@
         size?: "sm" | "md";
         onSubmit?: () => void;
         loading?: boolean;
+        onCancel?: () => void;
     }
 
     let {
@@ -24,6 +25,7 @@
         size = "sm",
         onSubmit,
         loading = false,
+        onCancel,
     }: Props = $props();
 
     type FieldCapability = {
@@ -51,6 +53,7 @@
     let pointerInPopover = $state(false);
     const listId = `booru-suggestions-${Math.random().toString(36).slice(2, 8)}`;
 
+    const dispatch = createEventDispatcher<{ cancel: void }>();
     const ANILIST_WARNING_STORAGE_KEY = "mappings.anilist-warning-dismissed.v1";
     let warningDismissed = $state(false);
     const showAniListWarning = $derived(
@@ -386,6 +389,16 @@
         } catch {}
     }
 
+    function handleActionClick() {
+        if (loading) {
+            onCancel?.();
+            dispatch("cancel");
+            return;
+        }
+        closePopover();
+        onSubmit?.();
+    }
+
     function closePopover() {
         open = false;
         activeIndex = -1;
@@ -464,13 +477,12 @@
                     hover:bg-slate-700
                     ${size === "sm" ? "h-6 w-6" : "h-7 w-7"}
                 `}
-                aria-label="Run search"
-                onclick={() => {
-                    closePopover();
-                    onSubmit?.();
-                }}
+                type="button"
+                aria-label={loading ? "Cancel search" : "Run search"}
+                title={loading ? "Cancel search" : "Run search"}
+                onclick={handleActionClick}
                 aria-busy={loading}
-                {disabled}>
+                disabled={disabled && !loading}>
                 {#if loading}
                     <LoaderCircle
                         class={`${size === "sm" ? "h-3 w-3" : "h-3.5 w-3.5"} animate-spin`} />

@@ -96,6 +96,13 @@
         }
     }
 
+    function cancelLoad() {
+        if (!currentAbort) return;
+        currentAbort.abort();
+        currentAbort = null;
+        loading = false;
+    }
+
     function openNew() {
         form = emptyForm();
         editMode = "form";
@@ -473,6 +480,7 @@
             bind:page
             {loading}
             onLoad={load}
+            onCancel={cancelLoad}
             onNew={openNew} />
     </div>
     <div

@@ -12,6 +12,7 @@
         loading?: boolean;
         onLoad: () => void;
         onNew: () => void;
+        onCancel: () => void;
     }
 
     let {
@@ -22,6 +23,7 @@
         loading = false,
         onLoad,
         onNew,
+        onCancel,
     }: Props = $props();
 
     function toggleCustom() {
@@ -38,6 +40,8 @@
             bind:value={query}
             size="md"
             {loading}
+            {onCancel}
+            on:cancel={onCancel}
             onSubmit={() => {
                 page = 1;
                 onLoad();
@@ -90,6 +94,8 @@
             bind:value={query}
             size="md"
             {loading}
+            {onCancel}
+            on:cancel={onCancel}
             onSubmit={() => {
                 page = 1;
                 onLoad();
