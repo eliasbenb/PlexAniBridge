@@ -18,7 +18,7 @@ _Note: the `viewCount` attribute **is not** equivalent to the number of items un
 While PlexAniBridge aims to cover as many titles as possible (and we are proud to say we have one of the most comprehensive mapping databases available), there are still some titles that may not be mapped. If you get a "not found" message for one of your titles, it could be due to several reasons:
 
 - The title is very new or obscure and has not yet been added to the mapping database.
-- The title is uncorrectable due to mismatches across databases (see [PlexAniBridge-Mapps#known-issues](https://github.com/eliasbenb/PlexAniBridge-Mappings#known-issues)).
+- The title is uncorrectable due to mismatches across databases (see [PlexAniBridge-Mappings#known-issues](https://github.com/eliasbenb/PlexAniBridge-Mappings#known-issues)).
 - We just missed it!
 
 If you find a title that is not mapped, please consider submitting a pull request to the [PlexAniBridge-Mappings](https://github.com/eliasbenb/PlexAniBridge-Mappings) repository with your corrections or additions.
