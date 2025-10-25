@@ -265,6 +265,10 @@ def collect_bare_terms(node: Node) -> list[str]:
         if isinstance(n, BareTerm):
             out.append(n.text)
             return
+        if isinstance(n, pp.ParseResults):
+            for child in n:
+                _walk(cast(Node, child))
+            return
         if isinstance(n, Not):
             _walk(n.child)
             return
@@ -300,6 +304,10 @@ def collect_key_terms(node: Node) -> list[KeyTerm]:
     def _walk(n: Node) -> None:
         if isinstance(n, KeyTerm):
             out.append(n)
+            return
+        if isinstance(n, pp.ParseResults):
+            for child in n:
+                _walk(cast(Node, child))
             return
         if isinstance(n, Not):
             _walk(n.child)

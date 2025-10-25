@@ -4,6 +4,7 @@ import asyncio
 import calendar
 import json
 import re
+from collections import deque
 from collections.abc import Awaitable, Callable, Iterable, Mapping
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -12,6 +13,7 @@ from pathlib import Path
 from typing import Any, ClassVar
 
 import yaml
+from pyparsing import ParseResults
 from sqlalchemy import and_, delete, func, or_, select
 from sqlalchemy.sql import exists
 
@@ -32,6 +34,11 @@ from src.models.db.animap import AniMap
 from src.models.db.provenance import AniMapProvenance
 from src.models.schemas.anilist import MediaWithoutList as AniListMetadata
 from src.utils.booru_query import (
+    And,
+    KeyTerm,
+    Node,
+    Not,
+    Or,
     collect_bare_terms,
     collect_key_terms,
     evaluate,
@@ -228,13 +235,12 @@ class MappingsService:
         """Convert datetime into AniList fuzzy integer representation."""
         return dt.year * 10000 + dt.month * 100 + dt.day
 
-    async def _resolve_anilist_term(
+    def _build_anilist_term_filters(
         self,
-        client: AniListClient,
         spec: QueryFieldSpec,
         raw_value: str,
-    ) -> set[int]:
-        """Resolve AniList-backed query terms into identifier sets."""
+    ) -> dict[str, Any]:
+        """Translate an AniList term into GraphQL filter arguments."""
         value = raw_value.strip()
 
         if not spec.anilist_field:
@@ -246,9 +252,9 @@ class MappingsService:
                 raise AniListFilterError(
                     f"AniList filter '{spec.key}' requires a non-empty value"
                 )
-            filters = {spec.anilist_field: text}
+            return {spec.anilist_field: text}
 
-        elif spec.kind == QueryFieldKind.ANILIST_ENUM:
+        if spec.kind == QueryFieldKind.ANILIST_ENUM:
             allowed = spec.values or ()
             if not allowed:
                 raise AniListFilterError(
@@ -272,9 +278,9 @@ class MappingsService:
                     f"'{candidate}' is not a valid value for AniList filter "
                     f"'{spec.key}'"
                 )
-            filters = {spec.anilist_field: resolved}
+            return {spec.anilist_field: resolved}
 
-        elif spec.kind == QueryFieldKind.ANILIST_NUMERIC:
+        if spec.kind == QueryFieldKind.ANILIST_NUMERIC:
             cmp_filter, range_filter, text_value = self._parse_numeric_filters(value)
             filters_dict = self._build_anilist_numeric_filters(
                 spec, cmp_filter, range_filter, text_value
@@ -283,10 +289,18 @@ class MappingsService:
                 raise AniListFilterError(
                     f"AniList filter '{spec.key}' has an invalid numeric value"
                 )
-            filters = filters_dict
+            return filters_dict
 
-        else:
-            raise AniListFilterError(f"AniList filter '{spec.key}' is not supported")
+        raise AniListFilterError(f"AniList filter '{spec.key}' is not supported")
+
+    async def _resolve_anilist_term(
+        self,
+        client: AniListClient,
+        spec: QueryFieldSpec,
+        raw_value: str,
+    ) -> set[int]:
+        """Resolve AniList-backed query terms into identifier sets."""
+        filters = self._build_anilist_term_filters(spec, raw_value)
 
         try:
             ids = await client.search_media_ids(
@@ -301,6 +315,51 @@ class MappingsService:
                 f"Failed to resolve AniList filter '{spec.key}'"
             ) from exc
         return set(ids)
+
+    def _collect_anilist_and_groups(self, node: Node) -> list[list[KeyTerm]]:
+        """Collect AniList key term groups that share a direct AND relationship."""
+        groups: list[list[KeyTerm]] = []
+        assigned: set[int] = set()
+
+        def visit(current: Any) -> None:
+            if isinstance(current, And):
+                direct_terms: list[KeyTerm] = []
+                for child in current.children:
+                    if isinstance(child, KeyTerm):
+                        spec = self._FIELD_MAP.get(child.key.lower())
+                        if (
+                            spec
+                            and spec.kind in self._ANILIST_KINDS
+                            and id(child) not in assigned
+                        ):
+                            direct_terms.append(child)
+                    else:
+                        visit(child)
+                if len(direct_terms) >= 2:
+                    groups.append(direct_terms)
+                    assigned.update(id(term) for term in direct_terms)
+                return
+
+            if isinstance(current, Or):
+                for child in current.children:
+                    visit(child)
+                return
+
+            if isinstance(current, Not):
+                visit(current.child)
+                return
+
+            if isinstance(current, ParseResults):
+                for child in current:
+                    visit(child)
+                return
+
+            if isinstance(current, list):
+                for child in current:
+                    visit(child)
+
+        visit(node)
+        return groups
 
     @staticmethod
     def _fuzzy_to_datetime(value: int, bias: str) -> datetime:
@@ -827,7 +886,8 @@ class MappingsService:
                 ),
             )
 
-            ani_cache: dict[tuple[str, str], set[int]] = {}
+            ani_term_nodes: dict[tuple[str, str], deque[KeyTerm]] = {}
+            term_results: dict[int, set[int]] = {}
 
             def resolve_db(key: str, value: str) -> set[int]:
                 """Resolves a query key/value pair to matching AniList identifiers.
@@ -880,7 +940,14 @@ class MappingsService:
 
                 if spec.kind in self._ANILIST_KINDS:
                     cache_key = (spec.key, value_key)
-                    return ani_cache.get(cache_key, set())
+                    queue = ani_term_nodes.get(cache_key)
+                    if queue:
+                        term_node = queue[0]
+                        result = term_results.get(id(term_node))
+                        if result is not None:
+                            queue.popleft()
+                            return set(result)
+                    return set()
 
                 return set()
 
@@ -899,8 +966,11 @@ class MappingsService:
                     await ensure_not_cancelled()
                     bare_cache[term] = await resolve_anilist(term)
 
-                ani_cache.clear()
                 key_terms = collect_key_terms(node)
+                term_filters: dict[int, dict[str, Any]] = {}
+                term_specs: dict[int, QueryFieldSpec] = {}
+                term_values: dict[int, str] = {}
+                individual_cache: dict[tuple[str, str], set[int]] = {}
                 client = None
                 if key_terms:
                     for term in key_terms:
@@ -908,27 +978,106 @@ class MappingsService:
                         spec = self._FIELD_MAP.get(term.key.lower())
                         if not spec or spec.kind not in self._ANILIST_KINDS:
                             continue
+                        term_id = id(term)
                         term_value = term.value.strip()
-                        cache_key = (spec.key, term_value)
-                        if cache_key in ani_cache:
-                            continue
-                        if client is None:
+                        ani_term_nodes.setdefault(
+                            (spec.key, term_value), deque()
+                        ).append(term)
+                        term_specs[term_id] = spec
+                        term_values[term_id] = term_value
+                        term_filters[term_id] = self._build_anilist_term_filters(
+                            spec, term_value
+                        )
+
+                    if term_filters:
+                        groups = self._collect_anilist_and_groups(node)
+                        for group in groups:
                             await ensure_not_cancelled()
-                            client = await get_app_state().ensure_public_anilist()
-                        try:
-                            ids = await self._resolve_anilist_term(
-                                client, spec, term_value
-                            )
-                        except (AniListFilterError, AniListSearchError):
-                            raise
-                        except Exception as exc:
-                            if isinstance(exc, asyncio.CancelledError):
+                            if not all(id(term) in term_filters for term in group):
+                                continue
+                            # Combine compatible AniList filters upstream.
+                            combined_filters: dict[str, Any] = {}
+                            conflict = False
+                            for term in group:
+                                for fk, fv in term_filters[id(term)].items():
+                                    existing = combined_filters.get(fk)
+                                    if existing is not None and existing != fv:
+                                        conflict = True
+                                        break
+                                    if existing is None:
+                                        combined_filters[fk] = fv
+                                if conflict:
+                                    break
+                            if conflict:
+                                # Conflicting constraints yield an empty intersection.
+                                for term in group:
+                                    term_results.setdefault(id(term), set())
+                                continue
+                            if client is None:
+                                await ensure_not_cancelled()
+                                client = await get_app_state().ensure_public_anilist()
+                            try:
+                                ids = await client.search_media_ids(
+                                    filters=combined_filters,
+                                    max_results=self._ANILIST_MAX_RESULTS,
+                                )
+                            except (AniListFilterError, AniListSearchError):
                                 raise
-                            raise AniListSearchError(
-                                f"Failed to resolve AniList filter "
-                                f"'{spec.key}:{term_value}'"
-                            ) from exc
-                        ani_cache[cache_key] = ids
+                            except Exception as exc:
+                                if isinstance(exc, asyncio.CancelledError):
+                                    raise
+                                terms_desc = ", ".join(
+                                    f"{t.key}:{t.value.strip()}" for t in group
+                                )
+                                raise AniListSearchError(
+                                    f"Failed to resolve AniList filter group "
+                                    f"'{terms_desc}'"
+                                ) from exc
+                            result_set = set(ids)
+                            for term in group:
+                                term_results[id(term)] = result_set
+
+                    for term in key_terms:
+                        await ensure_not_cancelled()
+                        spec = term_specs.get(id(term))
+                        if not spec:
+                            continue
+                        term_id = id(term)
+                        if term_id in term_results:
+                            continue
+                        term_value = term_values.get(term_id)
+                        if term_value is None:
+                            term_value = term.value.strip()
+                            term_values[term_id] = term_value
+                        filters_dict = term_filters.get(term_id)
+                        if filters_dict is None:
+                            filters_dict = self._build_anilist_term_filters(
+                                spec, term_value
+                            )
+                            term_filters[term_id] = filters_dict
+                        cache_key = (spec.key, term_value)
+                        cached = individual_cache.get(cache_key)
+                        if cached is None:
+                            if client is None:
+                                await ensure_not_cancelled()
+                                client = await get_app_state().ensure_public_anilist()
+                            try:
+                                ids = await client.search_media_ids(
+                                    filters=filters_dict,
+                                    max_results=self._ANILIST_MAX_RESULTS,
+                                )
+                            except (AniListFilterError, AniListSearchError):
+                                raise
+                            except Exception as exc:
+                                if isinstance(exc, asyncio.CancelledError):
+                                    raise
+                                raise AniListSearchError(
+                                    f"Failed to resolve AniList filter "
+                                    f"'{spec.key}:{term_value}'"
+                                ) from exc
+                            cached = set(ids)
+                            individual_cache[cache_key] = cached
+                        term_results[term_id] = cached
 
                 def db_resolver(k: str, v: str) -> set[int]:
                     return resolve_db(k, v)
