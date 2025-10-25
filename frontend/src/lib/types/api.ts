@@ -122,10 +122,32 @@ export interface AboutInfo {
     started_at?: string | null;
     uptime_seconds?: number | null;
     uptime?: string | null;
+    sqlite?: string | null;
+}
+
+export interface ProcessInfo {
+    pid: number;
+    cpu_count?: number | null;
+    memory_mb?: number | null;
+}
+
+export interface SchedulerSummary {
+    running: boolean;
+    configured_profiles: number;
+    total_profiles: number;
+    running_profiles: number;
+    syncing_profiles: number;
+    sync_mode_counts: Record<string, number>;
+    most_recent_sync?: string | null;
+    most_recent_sync_profile?: string | null;
+    next_database_sync_at?: string | null;
+    profiles: Record<string, ProfileStatus>;
 }
 
 export interface AboutResponse {
     info: AboutInfo;
+    process: ProcessInfo;
+    scheduler: SchedulerSummary;
     status: Record<string, ProfileStatus>;
 }
 

@@ -193,6 +193,18 @@ class SchedulerClient:
         if not self.stop_event.is_set():
             self.stop_event.set()
 
+    @property
+    def is_running(self) -> bool:
+        """Return whether the scheduler main loop is currently running."""
+        return self._running
+
+    def get_next_database_sync_at(self) -> datetime | None:
+        """Return the next scheduled database sync time in UTC."""
+        if not self._running:
+            return None
+        now = datetime.now(UTC)
+        return self._get_next_1am_utc(now)
+
     async def initialize(self) -> None:
         """Initialize the application scheduler and all components."""
         log.info("Initializing application scheduler")
