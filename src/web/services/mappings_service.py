@@ -836,30 +836,28 @@ class MappingsService:
         await ensure_not_cancelled()
         upstream_url = self.upstream_url
 
-        async def resolve_anilist(term: str) -> list[int]:
-            """Resolves a search term to AniList identifiers via the public client.
-
-            Args:
-                term (str): User supplied search term.
-
-            Returns:
-                list[int]: Matching AniList identifiers in discovery order.
-            """
+        async def resolve_bare_term(term: str) -> list[int]:
+            """Resolve a bare AniList search term using filter-based search."""
             await ensure_not_cancelled()
             client = await get_app_state().ensure_public_anilist()
-            search_limit = 50  # Max results AniList API allows
-            ids: list[int] = []
-            seen: set[int] = set()
-            async for m in client.search_anime(
-                term, is_movie=None, episodes=None, limit=search_limit
-            ):
-                await ensure_not_cancelled()
-                aid = int(m.id)
-                if aid not in seen:
-                    ids.append(aid)
-                    seen.add(aid)
+            text = self._normalize_text_query(term)
+            if not text:
+                return []
+            try:
+                ids = await client.search_media_ids(
+                    filters={"search": text},
+                    max_results=self._ANILIST_MAX_RESULTS,
+                )
+            except (AniListFilterError, AniListSearchError):
+                raise
+            except Exception as exc:
+                if isinstance(exc, asyncio.CancelledError):
+                    raise
+                raise AniListSearchError(
+                    f"Failed to resolve AniList search term '{term}'"
+                ) from exc
             await ensure_not_cancelled()
-            return ids
+            return list(dict.fromkeys(ids))
 
         items: list[dict[str, Any]] = []
         total: int = 0
@@ -964,7 +962,7 @@ class MappingsService:
                 bare_cache: dict[str, list[int]] = {}
                 for term in collect_bare_terms(node):
                     await ensure_not_cancelled()
-                    bare_cache[term] = await resolve_anilist(term)
+                    bare_cache[term] = await resolve_bare_term(term)
 
                 key_terms = collect_key_terms(node)
                 term_filters: dict[int, dict[str, Any]] = {}
