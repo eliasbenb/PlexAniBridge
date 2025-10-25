@@ -3,6 +3,7 @@
 import json
 from collections.abc import Iterator
 from hashlib import md5
+from itertools import batched
 from pathlib import Path
 from typing import Any
 
@@ -34,6 +35,8 @@ class AniMapClient:
     Mapping Source:
         https://github.com/eliasbenb/PlexAniBridge-Mappings
     """
+
+    _SQLITE_SAFE_VARIABLES = 900
 
     def __init__(self, data_path: Path, upstream_url: str | None) -> None:
         """Initializes the AniMapClient.
@@ -220,14 +223,12 @@ class AniMapClient:
                 )
 
             if to_delete:
-                ctx.session.execute(
-                    delete(AniMap).where(AniMap.anilist_id.in_(to_delete))
-                )
-                ctx.session.execute(
-                    delete(AniMapProvenance).where(
-                        AniMapProvenance.anilist_id.in_(to_delete)
+                for chunk in batched(
+                    to_delete, self._SQLITE_SAFE_VARIABLES, strict=False
+                ):
+                    ctx.session.execute(
+                        delete(AniMap).where(AniMap.anilist_id.in_(chunk))
                     )
-                )
 
             if to_insert:
                 new_entries = [
