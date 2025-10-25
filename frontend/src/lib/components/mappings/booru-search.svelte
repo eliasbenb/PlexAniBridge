@@ -133,7 +133,7 @@
                 if (!needle && prefix === "" && t.trim() === t) {
                     out.push({
                         label: '"search anilist"',
-                        detail: "AniList database search",
+                        detail: "AniList title search",
                         kind: "helper",
                         apply: ({ replace }) => {
                             replace(seg.start, seg.end, '""');

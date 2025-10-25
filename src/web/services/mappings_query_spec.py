@@ -196,7 +196,7 @@ _ANILIST_FIELDS: tuple[QueryFieldSpec, ...] = (
         kind=QueryFieldKind.ANILIST_STRING,
         type=QueryFieldType.STRING,
         operators=_STRING_EQ_OPS,
-        anilist_field="title",
+        anilist_field="search",
         anilist_value_type="string",
     ),
     QueryFieldSpec(
