@@ -1,9 +1,10 @@
 """Mappings service for CRUD operations, listing, and provenance updates."""
 
+import asyncio
 import calendar
 import json
 import re
-from collections.abc import Iterable, Mapping
+from collections.abc import Awaitable, Callable, Iterable, Mapping
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from functools import lru_cache
@@ -294,6 +295,8 @@ class MappingsService:
         except (AniListFilterError, AniListSearchError):
             raise
         except Exception as exc:
+            if isinstance(exc, asyncio.CancelledError):
+                raise
             raise AniListSearchError(
                 f"Failed to resolve AniList filter '{spec.key}'"
             ) from exc
@@ -746,6 +749,7 @@ class MappingsService:
         q: str | None,
         custom_only: bool,
         with_anilist: bool,
+        cancel_check: Callable[[], Awaitable[bool]] | None = None,
     ) -> tuple[list[dict[str, Any]], int]:
         """List mappings with optional booru-like query.
 
@@ -755,10 +759,22 @@ class MappingsService:
             q (str | None): Booru-like query string.
             custom_only (bool): Include only custom mappings.
             with_anilist (bool): Include AniList metadata.
+            cancel_check (Callable[[], Awaitable[bool]] | None): Async
+                callback returning True when the caller has cancelled the
+                request.
 
         Returns:
             tuple[list[dict[str, Any]], int]: The list of mappings and the total count.
         """
+
+        async def ensure_not_cancelled() -> None:
+            task = asyncio.current_task()
+            if task and task.cancelled():
+                raise asyncio.CancelledError
+            if cancel_check and await cancel_check():
+                raise asyncio.CancelledError
+
+        await ensure_not_cancelled()
         upstream_url = self.upstream_url
 
         async def resolve_anilist(term: str) -> list[int]:
@@ -770,6 +786,7 @@ class MappingsService:
             Returns:
                 list[int]: Matching AniList identifiers in discovery order.
             """
+            await ensure_not_cancelled()
             client = await get_app_state().ensure_public_anilist()
             search_limit = 50  # Max results AniList API allows
             ids: list[int] = []
@@ -777,10 +794,12 @@ class MappingsService:
             async for m in client.search_anime(
                 term, is_movie=None, episodes=None, limit=search_limit
             ):
+                await ensure_not_cancelled()
                 aid = int(m.id)
                 if aid not in seen:
                     ids.append(aid)
                     seen.add(aid)
+            await ensure_not_cancelled()
             return ids
 
         items: list[dict[str, Any]] = []
@@ -871,10 +890,13 @@ class MappingsService:
                 except BooruQuerySyntaxError:
                     raise
                 except Exception as exc:
+                    if isinstance(exc, asyncio.CancelledError):
+                        raise
                     raise BooruQuerySyntaxError("Invalid query syntax") from exc
 
                 bare_cache: dict[str, list[int]] = {}
                 for term in collect_bare_terms(node):
+                    await ensure_not_cancelled()
                     bare_cache[term] = await resolve_anilist(term)
 
                 ani_cache.clear()
@@ -882,6 +904,7 @@ class MappingsService:
                 client = None
                 if key_terms:
                     for term in key_terms:
+                        await ensure_not_cancelled()
                         spec = self._FIELD_MAP.get(term.key.lower())
                         if not spec or spec.kind not in self._ANILIST_KINDS:
                             continue
@@ -890,6 +913,7 @@ class MappingsService:
                         if cache_key in ani_cache:
                             continue
                         if client is None:
+                            await ensure_not_cancelled()
                             client = await get_app_state().ensure_public_anilist()
                         try:
                             ids = await self._resolve_anilist_term(
@@ -898,6 +922,8 @@ class MappingsService:
                         except (AniListFilterError, AniListSearchError):
                             raise
                         except Exception as exc:
+                            if isinstance(exc, asyncio.CancelledError):
+                                raise
                             raise AniListSearchError(
                                 f"Failed to resolve AniList filter "
                                 f"'{spec.key}:{term_value}'"
@@ -919,6 +945,8 @@ class MappingsService:
                         universe_ids=all_ids,
                     )
                 except Exception as exc:
+                    if isinstance(exc, asyncio.CancelledError):
+                        raise
                     raise BooruQueryEvaluationError(
                         "Failed to evaluate booru query"
                     ) from exc
@@ -931,6 +959,7 @@ class MappingsService:
                 else:
                     final_ids = sorted(list(eval_res.ids))
 
+                await ensure_not_cancelled()
                 sources_by_id = self._collect_provenance(ctx, final_ids)
                 if custom_only and final_ids:
                     final_ids = [
@@ -946,6 +975,7 @@ class MappingsService:
                 page_ids = final_ids[start:end]
 
                 if page_ids:
+                    await ensure_not_cancelled()
                     rows_map = self._load_animaps(ctx, page_ids)
                     items = [
                         self._build_item(
@@ -958,6 +988,7 @@ class MappingsService:
                 else:
                     items = []
             else:
+                await ensure_not_cancelled()
                 where_clauses: list[Any] = []
                 if custom_only:
                     if upstream_url:
@@ -982,6 +1013,7 @@ class MappingsService:
                     .limit(per_page)
                 )
                 animaps = list(ctx.session.execute(paged_stmt).scalars())
+                await ensure_not_cancelled()
                 anilist_ids = [animap.anilist_id for animap in animaps]
                 sources_by_id = self._collect_provenance(ctx, anilist_ids)
                 items = [
@@ -995,11 +1027,13 @@ class MappingsService:
 
         # Optionally fetch AniList metadata for page items only.
         if with_anilist and items:
+            await ensure_not_cancelled()
             anilist_client = await get_app_state().ensure_public_anilist()
             anilist_ids = [int(it["anilist_id"]) for it in items]
             medias = await anilist_client.batch_get_anime(anilist_ids)
             by_id = {m.id: m for m in medias}
             for it in items:
+                await ensure_not_cancelled()
                 m = by_id.get(int(it["anilist_id"]))
                 if m:
                     it["anilist"] = {
@@ -1010,6 +1044,7 @@ class MappingsService:
                 else:
                     it["anilist"] = None
 
+        await ensure_not_cancelled()
         return items, total
 
 

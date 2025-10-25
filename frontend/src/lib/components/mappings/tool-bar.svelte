@@ -9,6 +9,7 @@
         query?: string;
         customOnly?: boolean;
         page?: number;
+        loading?: boolean;
         onLoad: () => void;
         onNew: () => void;
     }
@@ -18,6 +19,7 @@
         query = $bindable(""),
         customOnly = $bindable(false),
         page = $bindable(1),
+        loading = false,
         onLoad,
         onNew,
     }: Props = $props();
@@ -35,6 +37,7 @@
         <BooruSearch
             bind:value={query}
             size="md"
+            {loading}
             onSubmit={() => {
                 page = 1;
                 onLoad();
@@ -86,6 +89,7 @@
         <BooruSearch
             bind:value={query}
             size="md"
+            {loading}
             onSubmit={() => {
                 page = 1;
                 onLoad();

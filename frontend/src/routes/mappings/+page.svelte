@@ -15,7 +15,7 @@
     import SearchBar from "$lib/components/mappings/tool-bar.svelte";
     import Pagination from "$lib/components/pagination.svelte";
     import type { Mapping } from "$lib/types/api";
-    import { apiFetch } from "$lib/utils/api";
+    import { apiFetch, isAbortError } from "$lib/utils/api";
     import { toast } from "$lib/utils/notify";
 
     let items: Mapping[] = $state([]);
@@ -26,10 +26,13 @@
     let query = $state("");
     let customOnly = $state(false);
     let modal = $state(false);
+    let loading = $state(false);
 
     let form: EditForm = $state(emptyForm());
     let editMode: "form" | "raw" = $state("form");
     let rawJSON = $state("");
+
+    let currentAbort: AbortController | null = null;
 
     function emptyForm(): EditForm {
         return {
@@ -55,6 +58,12 @@
     }
 
     async function load() {
+        const controller = new AbortController();
+        if (currentAbort) {
+            currentAbort.abort();
+        }
+        currentAbort = controller;
+        loading = true;
         try {
             const p = new SvelteURLSearchParams({
                 page: String(page),
@@ -66,7 +75,9 @@
                 (column) => column.id === "title" && column.visible,
             );
             if (titleVisible) p.set("with_anilist", "true");
-            const r = await apiFetch("/api/mappings?" + p.toString());
+            const r = await apiFetch("/api/mappings?" + p.toString(), {
+                signal: controller.signal,
+            });
             if (!r.ok) throw new Error("HTTP " + r.status);
             const d = await r.json();
             items = d.items || [];
@@ -74,8 +85,14 @@
             pages = d.pages || 1;
             page = d.page || page;
         } catch (e) {
+            if (isAbortError(e)) return;
             console.error("load mappings failed", e);
             toast("Failed to load mappings", "error");
+        } finally {
+            if (currentAbort === controller) {
+                currentAbort = null;
+                loading = false;
+            }
         }
     }
 
@@ -454,6 +471,7 @@
             bind:query
             bind:customOnly
             bind:page
+            {loading}
             onLoad={load}
             onNew={openNew} />
     </div>

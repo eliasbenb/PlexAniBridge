@@ -1,7 +1,9 @@
 """API endpoints for mappings."""
 
+import asyncio
 from typing import Any
 
+from fastapi import HTTPException, Request
 from fastapi.param_functions import Query
 from fastapi.routing import APIRouter
 from pydantic import BaseModel
@@ -96,6 +98,7 @@ async def get_query_capabilities() -> QueryCapabilitiesResponse:
 
 @router.get("", response_model=ListMappingsResponse)
 async def list_mappings(
+    request: Request,
     page: int = Query(1, ge=1),
     per_page: int = Query(25, ge=1, le=250),
     q: str | None = None,
@@ -105,6 +108,7 @@ async def list_mappings(
     """List mappings from AniMap database with optional search and pagination.
 
     Args:
+        request (Request): Active request context for cancellation handling.
         page (int): 1-based page number.
         per_page (int): Number of items per page.
         q (str | None): Booru-like query string.
@@ -115,13 +119,21 @@ async def list_mappings(
         ListMappingsResponse: The paginated list of mappings.
     """
     svc = get_mappings_service()
-    raw_items, total = await svc.list_mappings(
-        page=page,
-        per_page=per_page,
-        q=q,
-        custom_only=custom_only,
-        with_anilist=with_anilist,
-    )
+
+    async def cancel_check() -> bool:
+        return await request.is_disconnected()
+
+    try:
+        raw_items, total = await svc.list_mappings(
+            page=page,
+            per_page=per_page,
+            q=q,
+            custom_only=custom_only,
+            with_anilist=with_anilist,
+            cancel_check=cancel_check,
+        )
+    except asyncio.CancelledError as exc:
+        raise HTTPException(status_code=499, detail="Client Closed Request") from exc
 
     items = [MappingItemModel(**it) for it in raw_items]
     pages = (total + per_page - 1) // per_page if per_page else 1

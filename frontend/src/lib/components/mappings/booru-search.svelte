@@ -1,7 +1,7 @@
 <script lang="ts">
     import { onMount } from "svelte";
 
-    import { ArrowRight, Search } from "@lucide/svelte";
+    import { ArrowRight, LoaderCircle, Search } from "@lucide/svelte";
     import { Popover } from "bits-ui";
 
     import { apiJson } from "$lib/utils/api";
@@ -13,6 +13,7 @@
         placeholder?: string;
         size?: "sm" | "md";
         onSubmit?: () => void;
+        loading?: boolean;
     }
 
     let {
@@ -22,6 +23,7 @@
         placeholder = "Search...",
         size = "sm",
         onSubmit,
+        loading = false,
     }: Props = $props();
 
     type FieldCapability = {
@@ -381,7 +383,8 @@
 
 <div
     class="relative w-full"
-    data-component="booru-search">
+    data-component="booru-search"
+    aria-busy={loading}>
     <div
         bind:this={containerEl}
         class="relative flex items-center">
@@ -446,8 +449,14 @@
                     closePopover();
                     onSubmit?.();
                 }}
+                aria-busy={loading}
                 {disabled}>
-                <ArrowRight class={size === "sm" ? "h-3 w-3" : "h-3.5 w-3.5"} />
+                {#if loading}
+                    <LoaderCircle
+                        class={`${size === "sm" ? "h-3 w-3" : "h-3.5 w-3.5"} animate-spin`} />
+                {:else}
+                    <ArrowRight class={size === "sm" ? "h-3 w-3" : "h-3.5 w-3.5"} />
+                {/if}
             </button>
         </div>
     </div>
