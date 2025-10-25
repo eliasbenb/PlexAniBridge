@@ -6,7 +6,7 @@ from enum import StrEnum
 from typing import Any
 
 from src.models.db.animap import AniMap
-from src.models.schemas.anilist import MediaFormat
+from src.models.schemas.anilist import MediaFormat, MediaStatus
 
 __all__ = [
     "QueryFieldKind",
@@ -251,6 +251,22 @@ _ANILIST_FIELDS: tuple[QueryFieldSpec, ...] = (
             MediaFormat.MUSIC.value,
         ),
         anilist_field="format",
+        anilist_value_type="enum",
+    ),
+    QueryFieldSpec(
+        key="anilist.status",
+        desc="AniList status",
+        kind=QueryFieldKind.ANILIST_ENUM,
+        type=QueryFieldType.ENUM,
+        operators=(QueryFieldOperator.EQ,),
+        values=(
+            MediaStatus.FINISHED.value,
+            MediaStatus.RELEASING.value,
+            MediaStatus.NOT_YET_RELEASED.value,
+            MediaStatus.CANCELLED.value,
+            MediaStatus.HIATUS.value,
+        ),
+        anilist_field="status",
         anilist_value_type="enum",
     ),
     QueryFieldSpec(
