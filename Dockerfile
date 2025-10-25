@@ -24,7 +24,7 @@ ENV CI=1 \
     PNPM_STORE_DIR=/pnpm/store
 ENV PATH="$PNPM_HOME:$PATH"
 
-RUN corepack enable
+RUN npm install -g pnpm
 
 RUN --mount=type=bind,source=frontend/pnpm-lock.yaml,target=/app/pnpm-lock.yaml,ro \
     --mount=type=bind,source=frontend/package.json,target=/app/package.json,ro \
