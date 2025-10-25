@@ -534,7 +534,12 @@ class AniListClient:
         result: list[int] = []
         seen: set[int] = set()
         current_page = 1
-        pages_per_request = 20
+        pages_per_request = 100
+
+        log.debug(
+            f"Executing AniList media ID search with filters "
+            f"$${{filters: {filters}}}$$ to retrieve up to $$'{max_results}'$$ results"
+        )
 
         while len(result) < max_results:
             pages_remaining = (max_results - len(result) + per_page - 1) // per_page
@@ -545,6 +550,14 @@ class AniListClient:
             batch_var_defs = list(base_var_defs)
             request_vars = dict(base_variables)
             page_aliases: list[tuple[str, str, int]] = []
+
+            start_idx = (current_page - 1) * per_page + 1
+            end_idx = (current_page + batch_size - 1) * per_page
+            log.debug(
+                f"Requesting AniList pages "
+                f"$$'[{current_page}..{current_page + batch_size - 1}] "
+                f"({start_idx}..{end_idx})'$$"
+            )
 
             for idx in range(batch_size):
                 alias = f"batch{idx + 1}"
