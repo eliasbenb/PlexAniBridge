@@ -1,7 +1,7 @@
 <script lang="ts">
-    import { onMount } from "svelte";
+    import { createEventDispatcher, onMount } from "svelte";
 
-    import { ArrowRight, Search } from "@lucide/svelte";
+    import { ArrowRight, LoaderCircle, Search } from "@lucide/svelte";
     import { Popover } from "bits-ui";
 
     import { apiJson } from "$lib/utils/api";
@@ -13,6 +13,8 @@
         placeholder?: string;
         size?: "sm" | "md";
         onSubmit?: () => void;
+        loading?: boolean;
+        onCancel?: () => void;
     }
 
     let {
@@ -22,6 +24,8 @@
         placeholder = "Search...",
         size = "sm",
         onSubmit,
+        loading = false,
+        onCancel,
     }: Props = $props();
 
     type FieldCapability = {
@@ -48,6 +52,13 @@
     const isActive = $derived(focused || open || value.trim().length > 0);
     let pointerInPopover = $state(false);
     const listId = `booru-suggestions-${Math.random().toString(36).slice(2, 8)}`;
+
+    const dispatch = createEventDispatcher<{ cancel: void }>();
+    const ANILIST_WARNING_STORAGE_KEY = "mappings.anilist-warning-dismissed.v1";
+    let warningDismissed = $state(false);
+    const showAniListWarning = $derived(
+        /\banilist\./i.test(value) && !warningDismissed,
+    );
 
     type Suggestion = {
         label: string;
@@ -95,9 +106,8 @@
         if (!name) return undefined;
         const lname = name.toLowerCase();
         for (const k of KEYS) {
-            const aliases = k.aliases ?? [];
-            if (k.key === lname || (Array.isArray(aliases) && aliases.includes(lname)))
-                return k;
+            const aliases = (k.aliases ?? []).map((alias) => alias.toLowerCase());
+            if (k.key === lname || aliases.includes(lname)) return k;
         }
         return undefined;
     }
@@ -109,7 +119,7 @@
         const out: Suggestion[] = [];
 
         // If segment looks like key:value (possibly partial value)
-        const mKV = t.match(/^([-~]?)([a-zA-Z_][\w]*)?(:)?([^\s]*)$/);
+        const mKV = t.match(/^([-~]?)([a-zA-Z_][\w.]*)?(:)?([^\s]*)$/);
         if (mKV) {
             const prefix = mKV[1] || ""; // ~ or -
             const name = (mKV[2] || "").toLowerCase();
@@ -122,8 +132,8 @@
                 const needle = name;
                 if (!needle && prefix === "" && t.trim() === t) {
                     out.push({
-                        label: '"title"',
-                        detail: "AniList search by title",
+                        label: '"search anilist"',
+                        detail: "AniList title search",
                         kind: "helper",
                         apply: ({ replace }) => {
                             replace(seg.start, seg.end, '""');
@@ -144,13 +154,15 @@
                 }
             } else {
                 // Value suggestions depending on key type
-                if (kinfo?.key === "has") {
+                if (kinfo?.type === "enum") {
                     const opts = kinfo.values || [];
                     for (const opt of opts) {
-                        if (vpart && !opt.startsWith(vpart.toLowerCase())) continue;
+                        const optLower = opt.toLowerCase();
+                        if (vpart && !optLower.startsWith(vpart.toLowerCase()))
+                            continue;
                         out.push({
                             label: `${prefix}${kinfo.key}:${opt}`,
-                            detail: "Has field",
+                            detail: kinfo.key === "has" ? "Has field" : "Enum",
                             kind: "value",
                             apply: ({ replace }) => {
                                 replace(
@@ -221,15 +233,22 @@
             }
         }
 
-        if (out.length < 6 && val.trim() === "") {
-            for (const k of KEYS) {
-                if (out.length >= 6) break;
+        if (val.trim() === "") {
+            const added: Record<string, true> = {};
+            const addKeySuggestion = (cap: FieldCapability | undefined) => {
+                if (!cap) return;
+                if (added[cap.key]) return;
                 out.push({
-                    label: `${k.key}:`,
-                    detail: k.desc ?? undefined,
+                    label: `${cap.key}:`,
+                    detail: cap.desc ?? undefined,
                     kind: "key",
-                    apply: ({ insert }) => insert(`${k.key}:`),
+                    apply: ({ insert }) => insert(`${cap.key}:`),
                 });
+                added[cap.key] = true;
+            };
+
+            for (const k of KEYS) {
+                addKeySuggestion(k);
             }
         }
 
@@ -241,7 +260,7 @@
             seen[s.label] = true;
             uniq.push(s);
         }
-        return uniq.slice(0, 12);
+        return uniq;
     }
 
     function applySuggestion(idx: number) {
@@ -345,6 +364,13 @@
     }
 
     onMount(async () => {
+        try {
+            const stored = localStorage.getItem(ANILIST_WARNING_STORAGE_KEY);
+            if (stored === "1") {
+                warningDismissed = true;
+            }
+        } catch {}
+
         if (autoFocus) inputEl?.focus();
         try {
             const res = await apiJson<CapabilitiesResponse>(
@@ -355,6 +381,23 @@
             }
         } catch {}
     });
+
+    function dismissAniListWarning() {
+        warningDismissed = true;
+        try {
+            localStorage.setItem(ANILIST_WARNING_STORAGE_KEY, "1");
+        } catch {}
+    }
+
+    function handleActionClick() {
+        if (loading) {
+            onCancel?.();
+            dispatch("cancel");
+            return;
+        }
+        closePopover();
+        onSubmit?.();
+    }
 
     function closePopover() {
         open = false;
@@ -373,7 +416,8 @@
 
 <div
     class="relative w-full"
-    data-component="booru-search">
+    data-component="booru-search"
+    aria-busy={loading}>
     <div
         bind:this={containerEl}
         class="relative flex items-center">
@@ -433,13 +477,18 @@
                     hover:bg-slate-700
                     ${size === "sm" ? "h-6 w-6" : "h-7 w-7"}
                 `}
-                aria-label="Run search"
-                onclick={() => {
-                    closePopover();
-                    onSubmit?.();
-                }}
-                {disabled}>
-                <ArrowRight class={size === "sm" ? "h-3 w-3" : "h-3.5 w-3.5"} />
+                type="button"
+                aria-label={loading ? "Cancel search" : "Run search"}
+                title={loading ? "Cancel search" : "Run search"}
+                onclick={handleActionClick}
+                aria-busy={loading}
+                disabled={disabled && !loading}>
+                {#if loading}
+                    <LoaderCircle
+                        class={`${size === "sm" ? "h-3 w-3" : "h-3.5 w-3.5"} animate-spin`} />
+                {:else}
+                    <ArrowRight class={size === "sm" ? "h-3 w-3" : "h-3.5 w-3.5"} />
+                {/if}
             </button>
         </div>
     </div>
@@ -499,6 +548,25 @@
                     within a group, '-' to negate, '..' for ranges, '*' or '?' as
                     wildcards, and quotes for AniList title search.
                 </div>
+                {#if showAniListWarning}
+                    <div
+                        class="border-t border-slate-800/70 bg-yellow-900/90 px-2 py-1 text-[10px] text-yellow-100 ring-1 ring-yellow-700/70">
+                        <div class="flex items-start justify-between gap-2">
+                            <span class="leading-snug">
+                                Warning: querying AniList fields can cause long response
+                                times and excessive API usage if the query covers many
+                                entries. Consider narrowing your search criteria when
+                                possible to improve performance.
+                            </span>
+                            <button
+                                type="button"
+                                class="ml-auto flex shrink-0 items-center rounded bg-amber-500/20 px-2 py-0.5 text-[10px] font-medium text-amber-50 transition hover:bg-amber-500/30"
+                                onclick={dismissAniListWarning}>
+                                Dismiss
+                            </button>
+                        </div>
+                    </div>
+                {/if}
             </Popover.Content>
         </Popover.Portal>
     </Popover.Root>

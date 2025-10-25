@@ -1,5 +1,11 @@
 import { toast, type ToastType } from "$lib/utils/notify";
 
+export function isAbortError(error: unknown): boolean {
+    if (!error) return false;
+    if (error instanceof DOMException && error.name === "AbortError") return true;
+    return (error as { name?: string }).name === "AbortError";
+}
+
 export interface ApiErrorData {
     message?: string;
     error?: string;
@@ -33,6 +39,7 @@ export async function apiFetch(
     try {
         res = await fetch(input, init);
     } catch (e) {
+        if (isAbortError(e)) throw e;
         if (!opts.silent) toast(`Network error: ${(e as Error).message || e}`, "error");
         throw e;
     }

@@ -40,23 +40,25 @@ The querying language supports a wide range of operators to build flexible and c
 
 - `has:foo` → Search for mappings that have the field `foo`
 
-### Wildcards on text fields
+### Wildcards
 
-- Use `*` for any sequence of characters and `?` for a single character.
-- Matching is case-insensitive.
-- Works on text-based fields: `imdb` and `tvdb_mappings` (both keys like `s1` and values like `e1-e12`).
+Use `*` for any sequence of characters and `?` for a single character. Matching is case-insensitive.
 
-Examples:
+- `foo:bar*` → Search for mappings where field `foo` starts with `bar`
+- `foo:*bar` → Search for mappings where field `foo` ends with `bar`
+- `foo:b?r` → Search for mappings where field `foo` matches `b?r` (e.g., `bar`, `ber`, `bir`, etc.)
 
-```bash
-tvdb_mappings:s1? # season key like s1X (s10..s19)
-tvdb_mappings:e12* # any episode range starting with e12-
-tvdb_mappings:*e24 # any episode range ending with e24
-```
+### Querying JSON fields
 
-## Supported Fields
+For fields that store JSON dictionaries, you can use the following syntax:
 
-- `""` → Title (AniList API search for bare term)
+- `foo:bar` → Search for mappings where the JSON field `foo` contains the key `bar` or the value `bar`
+- `foo:bar*` → Search for mappings where the JSON field `foo` contains a key starting with `bar` or a value starting with `bar`. All other wildcard patterns are also supported.
+
+## Supported Database Fields
+
+The following fields are queried against the local mappings database:
+
 - `anilist` → AniList ID
 - `anidb` → AniDB ID
 - `imdb` → IMDb ID
@@ -64,8 +66,25 @@ tvdb_mappings:*e24 # any episode range ending with e24
 - `tmdb_movie` → TMDb Movie ID
 - `tmdb_show` → TMDb Show ID
 - `tvdb` → TVDB Show ID
-- `tmdb_mappings` → Searches keys/values in TMDB mappings dictionary
+- `tmdb_mappings` → Searches keys/values in TMDb mappings dictionary
 - `tvdb_mappings` → Searches keys/values in TVDB mappings dictionary
+
+## Supported AniList Fields
+
+The following fields are queried against the AniList API:
+
+- `"foo"` → Searches AniList for the bare term `foo`.
+- `anilist.title"` → Alias for `"foo"`, searches AniList for the bare term `foo`.
+- `anilist.duration` → Duration in minutes
+- `anilist.episodes` → Number of episodes
+- `anilist.start_date` → Start date (YYYYMMDD)
+- `anilist.end_date` → End date (YYYYMMDD)
+- `anilist.format` → Format (e.g., TV, MOVIE, OVA, etc.)
+- `anilist.status` → Status (e.g., FINISHED, RELEASING, NOT_YET_RELEASED, etc.)
+- `anilist.genre` → Genre (e.g., Action, Comedy, Drama, etc.)
+- `anilist.tag` → Tag (e.g., Mecha, School, Shounen, etc.)
+- `anilist.average_score` → Average score (0-100)
+- `anilist.popularity` → Popularity (number of AniList users with the entry in their list)
 
 ## Example Queries
 
@@ -76,8 +95,8 @@ tvdb_mappings:*e24 # any episode range ending with e24
 anilist:101347 
 # AniList ID lookup
 
-"Dororo" (tvdb:328592 | tmdb_show:21298) 
-# Title search for "Dororo" with either TVDB or TMDb Show ID
+tvdb:328592 | tmdb_show:21298
+# TVDB ID 328592 OR TMDb Show ID 21298
 
 anilist:>100000
 # AniList IDs greater than 100000
@@ -85,6 +104,21 @@ anilist:>100000
 -(anilist:100..200)
 # Exclude AniList IDs 100 to 200 (inclusive)
 
--has:tvdb_mappings 
+-has:tvdb_mappings
 # Exclude results that have TVDB mappings
+
+imdb:tt0*
+# IMDb IDs starting with "tt0"
+
+tvdb_mappings:s0
+# TVDB mappings with season 0
+
+tmdb_mappings:e12*
+# TMDb mappings starting with episode 12
+
+anilist.status:RELEASING anilist.genre:Action
+# Currently releasing anime in the Action genre
+
+anilist.format:TV anilist.average_score:>80 anilist.popularity:>5000
+# TV format anime with average score over 80 and popularity over 5000
 ```

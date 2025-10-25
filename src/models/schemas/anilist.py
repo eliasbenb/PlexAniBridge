@@ -504,7 +504,7 @@ class MediaListGroup[EntryType: MediaList](AniListBaseModel):
     status: MediaListStatus | None = None
 
 
-class MediaListCollection[GroupType: "MediaListGroup"](AniListBaseModel):
+class MediaListCollection[GroupType: MediaListGroup](AniListBaseModel):
     """Model representing a collection of media list groups for a user."""
 
     user: User | None = None

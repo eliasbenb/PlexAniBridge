@@ -26,7 +26,7 @@
     import { apiFetch } from "$lib/utils/api";
 
     let { children } = $props();
-    let version = $state("v?");
+    let version = $state("?");
     let gitHash = $state("");
     let sidebarOpen = $state(false);
     let ws: WebSocket | null = null;

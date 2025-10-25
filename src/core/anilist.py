@@ -15,7 +15,11 @@ from async_lru import alru_cache
 from limiter import Limiter
 
 from src import __version__, log
-from src.exceptions import AniListTokenRequiredError
+from src.exceptions import (
+    AniListFilterError,
+    AniListSearchError,
+    AniListTokenRequiredError,
+)
 from src.models.schemas.anilist import (
     Media,
     MediaFormat,
@@ -27,6 +31,7 @@ from src.models.schemas.anilist import (
     MediaStatus,
     User,
 )
+from src.utils.cache import gattl_cache, generic_hash
 
 __all__ = ["AniListClient"]
 
@@ -288,9 +293,9 @@ class AniListClient:
 
             nl = "\n"
             query = f"""
-                mutation BatchUpdateEntries({", ".join(variable_declarations)}) {{
-                    {nl.join(mutation_fields)}
-                }}
+            mutation BatchUpdateEntries({", ".join(variable_declarations)}) {{
+                {nl.join(mutation_fields)}
+            }}
             """
 
             if self.dry_run:
@@ -406,13 +411,13 @@ class AniListClient:
     ) -> list[Media]:
         """Cached helper function for anime searches."""
         query = f"""
-            query ($search: String, $formats: [MediaFormat], $limit: Int) {{
-                Page(perPage: $limit) {{
-                    media(search: $search, type: ANIME, format_in: $formats) {{
-                        {Media.model_dump_graphql()}
-                    }}
+        query ($search: String, $formats: [MediaFormat], $limit: Int) {{
+            Page(perPage: $limit) {{
+                media(search: $search, type: ANIME, format_in: $formats) {{
+                    {Media.model_dump_graphql()}
                 }}
             }}
+        }}
         """
 
         formats = (
@@ -443,6 +448,183 @@ class AniListClient:
 
         response = await self._make_request(query, variables)
         return [Media(**m) for m in response["data"]["Page"]["media"]]
+
+    @gattl_cache(
+        ttl=3600,
+        key=lambda self, *, filters, max_results=1000, per_page=50: generic_hash(
+            filters, max_results, per_page
+        ),
+    )
+    async def search_media_ids(
+        self,
+        *,
+        filters: dict[str, Any],
+        max_results: int = 1000,
+        per_page: int = 50,
+    ) -> list[int]:
+        """Execute a filtered media search returning AniList identifiers only.
+
+        Args:
+            filters (dict[str, Any]): GraphQL-compatible media arguments. Keys must
+                match AniList's ``Media`` query arguments (e.g. ``search`` or
+                ``duration_greater``).
+            max_results (int): Maximum number of identifiers to return.
+            per_page (int): AniList page size to request per API call.
+
+        Returns:
+            list[int]: Ordered AniList identifiers matching the filter.
+        """
+        if not filters:
+            raise AniListFilterError("AniList search requires at least one filter")
+
+        per_page = max(1, min(int(per_page), 50))
+        max_results = max(1, int(max_results))
+
+        variable_types = {
+            "search": "String",
+            "format": "MediaFormat",
+            "format_in": "[MediaFormat]",
+            "status": "MediaStatus",
+            "status_in": "[MediaStatus]",
+            "status_not_in": "[MediaStatus]",
+            "duration": "Int",
+            "duration_greater": "Int",
+            "duration_lesser": "Int",
+            "episodes": "Int",
+            "episodes_greater": "Int",
+            "episodes_lesser": "Int",
+            "genre": "String",
+            "genre_in": "[String]",
+            "genre_not_in": "[String]",
+            "tag": "String",
+            "tag_in": "[String]",
+            "tag_not_in": "[String]",
+            "averageScore": "Int",
+            "averageScore_greater": "Int",
+            "averageScore_lesser": "Int",
+            "popularity": "Int",
+            "popularity_greater": "Int",
+            "popularity_lesser": "Int",
+            "startDate": "FuzzyDateInt",
+            "startDate_greater": "FuzzyDateInt",
+            "startDate_lesser": "FuzzyDateInt",
+            "endDate": "FuzzyDateInt",
+            "endDate_greater": "FuzzyDateInt",
+            "endDate_lesser": "FuzzyDateInt",
+            "sort": "[MediaSort]",
+        }
+
+        base_variables: dict[str, Any] = {"perPage": per_page}
+        arg_parts = ["type: ANIME"]
+        base_var_defs = ["$perPage: Int!"]
+
+        for key, value in filters.items():
+            if value is None:
+                continue
+            var_type = variable_types.get(key)
+            if not var_type:
+                raise AniListFilterError(f"Unsupported AniList filter argument '{key}'")
+            base_var_defs.append(f"${key}: {var_type}")
+            arg_parts.append(f"{key}: ${key}")
+            base_variables[key] = value
+
+        if len(arg_parts) == 1:
+            raise AniListFilterError(
+                "AniList search requires at least one supported filter"
+            )
+
+        arg_str = ", ".join(arg_parts)
+        result: list[int] = []
+        seen: set[int] = set()
+        current_page = 1
+        pages_per_request = 100
+
+        log.debug(
+            f"Executing AniList media ID search with filters "
+            f"$${{filters: {filters}}}$$ to retrieve up to $$'{max_results}'$$ results"
+        )
+
+        while len(result) < max_results:
+            pages_remaining = (max_results - len(result) + per_page - 1) // per_page
+            if pages_remaining <= 0:
+                break
+
+            batch_size = min(pages_per_request, pages_remaining)
+            batch_var_defs = list(base_var_defs)
+            request_vars = dict(base_variables)
+            page_aliases: list[tuple[str, str, int]] = []
+
+            start_idx = (current_page - 1) * per_page + 1
+            end_idx = (current_page + batch_size - 1) * per_page
+            log.debug(
+                f"Requesting AniList pages "
+                f"$$'[{current_page}..{current_page + batch_size - 1}] "
+                f"({start_idx}..{end_idx})'$$"
+            )
+
+            for idx in range(batch_size):
+                alias = f"batch{idx + 1}"
+                page_var = f"page_{idx + 1}"
+                page_number = current_page + idx
+                batch_var_defs.append(f"${page_var}: Int!")
+                request_vars[page_var] = page_number
+                page_aliases.append((alias, page_var, page_number))
+
+            query_sections = [
+                f"""
+                {alias}: Page(page: ${page_var}, perPage: $perPage) {{
+                    pageInfo {{ hasNextPage }}
+                    media({arg_str}) {{ id }}
+                }}
+                """
+                for alias, page_var, _page_number in page_aliases
+            ]
+
+            query = f"""
+            query ({", ".join(batch_var_defs)}) {{
+                {", ".join(query_sections)}
+            }}
+            """
+
+            try:
+                response = await self._make_request(query, request_vars)
+            except Exception as exc:
+                raise AniListSearchError("AniList search request failed") from exc
+            data = response.get("data", {}) or {}
+
+            stop = False
+            for alias, _page_var, _page_number in page_aliases:
+                page_data = data.get(alias) or {}
+                media = page_data.get("media") or []
+
+                if not media:
+                    stop = True
+                    break
+
+                for item in media:
+                    try:
+                        aid = int(item["id"])
+                    except (KeyError, TypeError, ValueError):
+                        continue
+                    if aid not in seen:
+                        result.append(aid)
+                        seen.add(aid)
+                    if len(result) >= max_results:
+                        break
+
+                if len(result) >= max_results:
+                    break
+
+                page_info = page_data.get("pageInfo") or {}
+                if not page_info.get("hasNextPage"):
+                    stop = True
+                    break
+
+            current_page += batch_size
+            if len(result) >= max_results or stop:
+                break
+
+        return result[:max_results]
 
     async def get_anime(self, anilist_id: int) -> Media:
         """Retrieves detailed information about a specific anime.
@@ -530,11 +712,11 @@ class AniListClient:
 
             query = f"""
             query BatchGetAnime($ids: [Int]) {{
-            Page(perPage: {len(batch_ids)}) {{
-                media(id_in: $ids, type: ANIME) {{
-                    {Media.model_dump_graphql()}
+                Page(perPage: {len(batch_ids)}) {{
+                    media(id_in: $ids, type: ANIME) {{
+                        {Media.model_dump_graphql()}
+                    }}
                 }}
-            }}
             }}
             """
 

@@ -9,8 +9,10 @@
         query?: string;
         customOnly?: boolean;
         page?: number;
+        loading?: boolean;
         onLoad: () => void;
         onNew: () => void;
+        onCancel: () => void;
     }
 
     let {
@@ -18,8 +20,10 @@
         query = $bindable(""),
         customOnly = $bindable(false),
         page = $bindable(1),
+        loading = false,
         onLoad,
         onNew,
+        onCancel,
     }: Props = $props();
 
     function toggleCustom() {
@@ -35,6 +39,9 @@
         <BooruSearch
             bind:value={query}
             size="md"
+            {loading}
+            {onCancel}
+            on:cancel={onCancel}
             onSubmit={() => {
                 page = 1;
                 onLoad();
@@ -86,6 +93,9 @@
         <BooruSearch
             bind:value={query}
             size="md"
+            {loading}
+            {onCancel}
+            on:cancel={onCancel}
             onSubmit={() => {
                 page = 1;
                 onLoad();

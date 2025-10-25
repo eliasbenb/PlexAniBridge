@@ -23,6 +23,8 @@ from typing import Any, cast
 
 import pyparsing as pp
 
+from src.exceptions import BooruQuerySyntaxError
+
 pp.ParserElement.enablePackrat()  # Supposed to speed up parsing
 
 DbResolver = Callable[[str, str], set[int]]
@@ -78,11 +80,7 @@ class OrMarker(Node):
 
 
 def _make_parser() -> pp.ParserElement:
-    identifier = pp.oneOf(
-        "anilist id anidb imdb mal tmdb_movie tmdb_show tvdb tmdb_mappings "
-        "tvdb_mappings has",
-        caseless=True,
-    )
+    identifier = pp.Word(pp.alphas, pp.alphanums + "_.")
 
     # Normalize identifier to lowercase
     identifier = identifier.setParseAction(lambda _s, _loc, t: str(t[0]).lower())
@@ -216,7 +214,10 @@ def parse_query(q: str) -> Node:
     if not q:
         return And([])
 
-    res = PARSER.parseString(q, parseAll=True)
+    try:
+        res = PARSER.parseString(q, parseAll=True)
+    except pp.ParseBaseException as exc:
+        raise BooruQuerySyntaxError(str(exc)) from exc
     node_any = res[0]
 
     # Normalize single grouped result
@@ -236,7 +237,7 @@ def parse_query(q: str) -> Node:
         if isinstance(first, Node):
             return first
 
-    raise ValueError("Invalid parsed AST for query")
+    raise BooruQuerySyntaxError("Invalid parsed AST for query")
 
 
 @dataclass
@@ -264,6 +265,10 @@ def collect_bare_terms(node: Node) -> list[str]:
         if isinstance(n, BareTerm):
             out.append(n.text)
             return
+        if isinstance(n, pp.ParseResults):
+            for child in n:
+                _walk(cast(Node, child))
+            return
         if isinstance(n, Not):
             _walk(n.child)
             return
@@ -283,6 +288,36 @@ def collect_bare_terms(node: Node) -> list[str]:
             seen.add(t)
 
     return unique
+
+
+def collect_key_terms(node: Node) -> list[KeyTerm]:
+    """Collect key:value terms from the AST for pre-resolution.
+
+    Args:
+        node (Node): The root AST node.
+
+    Returns:
+        list[KeyTerm]: Ordered list of encountered KeyTerm nodes.
+    """
+    out: list[KeyTerm] = []
+
+    def _walk(n: Node) -> None:
+        if isinstance(n, KeyTerm):
+            out.append(n)
+            return
+        if isinstance(n, pp.ParseResults):
+            for child in n:
+                _walk(cast(Node, child))
+            return
+        if isinstance(n, Not):
+            _walk(n.child)
+            return
+        if isinstance(n, (And, Or)):
+            for child in n.children:
+                _walk(child)
+
+    _walk(node)
+    return out
 
 
 def evaluate(
