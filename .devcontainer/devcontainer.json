@@ -2,11 +2,6 @@
     "name": "PlexAniBridge",
     "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
     "features": {
-        "ghcr.io/devcontainers/features/python:1": {
-            "toolsToInstall": "virtualenv",
-            "optimize": true,
-            "version": "3.13"
-        },
         "ghcr.io/devcontainers/features/node:1": {
             "version": "25"
         },
@@ -15,7 +10,8 @@
             "packages": "sqlite3"
         },
         "ghcr.io/va-h/devcontainers-features/uv:1": {
-            "shellautocompletion": true
+            "shellautocompletion": true,
+            "version": "0"
         }
     },
     "customizations": {
