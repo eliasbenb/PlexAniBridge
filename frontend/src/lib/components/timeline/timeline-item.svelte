@@ -77,6 +77,8 @@
         onPinsBusy,
     }: Props = $props();
 
+    const coverHref = anilistUrl(item);
+
     const ui = () => ensureDiffUi(item.id);
 </script>
 
@@ -84,7 +86,32 @@
     class="group flex gap-3 overflow-hidden rounded-md border border-slate-800 bg-slate-900/60 p-4 shadow-sm backdrop-blur-sm transition-shadow hover:shadow-md">
     <div class={`w-1 rounded-md ${meta.color}`}></div>
     <div class="flex min-w-0 flex-1 gap-3">
-        {#if coverImage(item)}
+        {#if coverHref}
+            <!-- eslint-disable svelte/no-navigation-without-resolve -->
+            <a
+                href={coverHref}
+                target="_blank"
+                rel="noopener"
+                class="block h-20 w-14 shrink-0">
+                {#if coverImage(item)}
+                    <div
+                        class="relative h-full w-full overflow-hidden rounded-md border border-slate-800 bg-slate-800/40">
+                        <img
+                            src={coverImage(item)!}
+                            alt={displayTitle(item) || "Cover"}
+                            loading="lazy"
+                            class="h-full w-full object-cover transition-[filter] duration-150 ease-out group-hover:blur-none"
+                            class:blur-sm={item.anilist?.isAdult} />
+                    </div>
+                {:else}
+                    <div
+                        class="flex h-full w-full items-center justify-center rounded-md border border-dashed border-slate-700 bg-slate-800/30 text-[9px] text-slate-500 select-none">
+                        No Art
+                    </div>
+                {/if}
+            </a>
+            <!-- eslint-enable svelte/no-navigation-without-resolve -->
+        {:else if coverImage(item)}
             <div
                 class="relative h-20 w-14 shrink-0 overflow-hidden rounded-md border border-slate-800 bg-slate-800/40">
                 <img
@@ -96,7 +123,7 @@
             </div>
         {:else}
             <div
-                class="flex h-20 w-14 shrink-0 items-center justify-center rounded-md border border-dashed border-slate-700 bg-slate-800/30 text-[9px] text-slate-500">
+                class="flex h-20 w-14 shrink-0 items-center justify-center rounded-md border border-dashed border-slate-700 bg-slate-800/30 text-[9px] text-slate-500 select-none">
                 No Art
             </div>
         {/if}

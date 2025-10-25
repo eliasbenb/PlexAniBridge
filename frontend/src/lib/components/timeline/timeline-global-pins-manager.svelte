@@ -261,12 +261,38 @@
         onChange,
         onRefresh,
     } = props}
+    {@const coverHref = anilistUrlFor(anilist)}
     <div class="px-3 py-2">
         <div
             class="group flex gap-3 overflow-hidden rounded-md border border-slate-800 bg-slate-900/60 p-4 shadow-sm backdrop-blur-sm transition-shadow hover:shadow-md">
             <div class={`w-1 rounded-md ${accentClass}`}></div>
             <div class="flex min-w-0 flex-1 gap-3">
-                {#if coverOf(anilist)}
+                {#if coverHref}
+                    <!-- eslint-disable svelte/no-navigation-without-resolve -->
+                    <a
+                        href={coverHref}
+                        target="_blank"
+                        rel="noopener"
+                        class="block h-20 w-14 shrink-0">
+                        {#if coverOf(anilist)}
+                            <div
+                                class="relative h-full w-full overflow-hidden rounded-md border border-slate-800 bg-slate-800/40">
+                                <img
+                                    src={coverOf(anilist)!}
+                                    alt={titleOf(anilist) || "Cover"}
+                                    loading="lazy"
+                                    class="h-full w-full object-cover transition-[filter] duration-150 ease-out group-hover:blur-none"
+                                    class:blur-sm={anilist?.isAdult} />
+                            </div>
+                        {:else}
+                            <div
+                                class="flex h-full w-full items-center justify-center rounded-md border border-dashed border-slate-700 bg-slate-800/30 text-[9px] text-slate-500 select-none">
+                                No Art
+                            </div>
+                        {/if}
+                    </a>
+                    <!-- eslint-enable svelte/no-navigation-without-resolve -->
+                {:else if coverOf(anilist)}
                     <div
                         class="relative h-20 w-14 shrink-0 overflow-hidden rounded-md border border-slate-800 bg-slate-800/40">
                         <img
@@ -278,7 +304,7 @@
                     </div>
                 {:else}
                     <div
-                        class="flex h-20 w-14 shrink-0 items-center justify-center rounded-md border border-dashed border-slate-700 bg-slate-800/30 text-[9px] text-slate-500">
+                        class="flex h-20 w-14 shrink-0 items-center justify-center rounded-md border border-dashed border-slate-700 bg-slate-800/30 text-[9px] text-slate-500 select-none">
                         No Art
                     </div>
                 {/if}
@@ -324,13 +350,14 @@
                                         <span
                                             class="rounded bg-slate-800/70 px-1 py-0.5 tracking-wide uppercase"
                                             title={`${anilist.season} ${anilist.seasonYear}`}
-                                            >{anilist.season}{anilist.seasonYear}</span>
+                                            >{anilist.season}
+                                            {anilist.seasonYear}</span>
                                     {/if}
                                     {#if anilist?.episodes}
                                         <span
                                             class="rounded bg-slate-800/70 px-1 py-0.5"
                                             >EP {anilist.episodes}</span>
-                                    {/if}\
+                                    {/if}
                                     {#if anilist?.isAdult}
                                         <span
                                             class="rounded bg-rose-800 px-1 py-0.5"
