@@ -5,7 +5,7 @@ icon: material/wrench
 
 ## Requirements
 
-- [Python 3.10+](https://www.python.org/downloads/)
+- [Python 3.13+](https://www.python.org/downloads/)
 - [SQLite3](https://www.sqlite.org/download.html)
 - [Git](https://git-scm.com/downloads)
 

@@ -33,22 +33,22 @@ classifiers = [
 ]
 dependencies = [
     "aiocache>=0.12.3",
-    "aiohttp>=3.12.15",
-    "alembic>=1.16.5",
+    "aiohttp>=3.13.1",
+    "alembic>=1.17.0",
     "async-lru>=2.0.5",
-    "cachetools>=6.2.0",
+    "cachetools>=6.2.1",
     "colorama>=0.4.6",
-    "fastapi[all]>=0.118.0",
+    "fastapi[all]>=0.120.0",
     "limiter>=0.5.0",
     "plexapi>=4.17.1",
-    "pydantic>=2.11.10",
+    "pydantic>=2.12.3",
     "pydantic-settings>=2.11.0",
     "pyparsing>=3.2.5",
     "pyyaml>=6.0.3",
     "rapidfuzz>=3.14.1",
     "requests>=2.32.5",
-    "ruamel-yaml>=0.18.15",
-    "sqlalchemy>=2.0.43",
+    "ruamel-yaml>=0.18.16",
+    "sqlalchemy>=2.0.44",
     "tzlocal>=5.3.1",
 ]
 
@@ -81,7 +81,6 @@ include = ["main.py", "src"]
 include = ["pyproject.toml", "src/**/*.py", "scripts/**/*.py"]
 indent-width = 4
 line-length = 88
-extend-select = ["I"]
 
 [tool.ruff.format]
 docstring-code-format = true
@@ -115,4 +114,4 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [dependency-groups]
-dev = ["py-spy>=0.4.0", "ruff>=0.12.0"]
+dev = ["py-spy>=0.4.1", "ruff>=0.14.2"]

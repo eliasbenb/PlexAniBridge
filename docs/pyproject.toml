@@ -7,8 +7,8 @@ requires-python = ">=3.10"
 
 dependencies = [
     "mkdocs-awesome-nav>=3.2.0",
-    "mkdocs-git-revision-date-localized-plugin>=1.4.5",
+    "mkdocs-git-revision-date-localized-plugin>=1.4.7",
     "mkdocs-git-tag-plugin>=0.1.0",
-    "mkdocs-material>=9.6.10",
+    "mkdocs-material>=9.6.22",
     "mkdocs-redoc-tag>=0.2.0",
 ]
