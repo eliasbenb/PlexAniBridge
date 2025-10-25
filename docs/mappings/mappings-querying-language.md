@@ -63,10 +63,10 @@ The following fields are queried against the local mappings database:
 - `anidb` → AniDB ID
 - `imdb` → IMDb ID
 - `mal` → MyAnimeList ID
-- `tmdb_movie` → TMDb Movie ID
-- `tmdb_show` → TMDb Show ID
+- `tmdb_movie` → TMDB Movie ID
+- `tmdb_show` → TMDB Show ID
 - `tvdb` → TVDB Show ID
-- `tmdb_mappings` → Searches keys/values in TMDb mappings dictionary
+- `tmdb_mappings` → Searches keys/values in TMDB mappings dictionary
 - `tvdb_mappings` → Searches keys/values in TVDB mappings dictionary
 
 ## Supported AniList Fields
@@ -96,7 +96,7 @@ anilist:101347
 # AniList ID lookup
 
 tvdb:328592 | tmdb_show:21298
-# TVDB ID 328592 OR TMDb Show ID 21298
+# TVDB ID 328592 OR TMDB Show ID 21298
 
 anilist:>100000
 # AniList IDs greater than 100000
@@ -114,7 +114,7 @@ tvdb_mappings:s0
 # TVDB mappings with season 0
 
 tmdb_mappings:e12*
-# TMDb mappings starting with episode 12
+# TMDB mappings starting with episode 12
 
 anilist.status:RELEASING anilist.genre:Action
 # Currently releasing anime in the Action genre

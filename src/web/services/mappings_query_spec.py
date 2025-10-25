@@ -139,7 +139,7 @@ _DB_FIELDS: tuple[QueryFieldSpec, ...] = (
     ),
     QueryFieldSpec(
         key="tmdb_movie",
-        desc="TMDb Movie ID",
+        desc="TMDB Movie ID",
         kind=QueryFieldKind.DB_JSON_ARRAY,
         type=QueryFieldType.INT,
         operators=_INT_OPS,
@@ -148,7 +148,7 @@ _DB_FIELDS: tuple[QueryFieldSpec, ...] = (
     ),
     QueryFieldSpec(
         key="tmdb_show",
-        desc="TMDb TV Show ID",
+        desc="TMDB TV Show ID",
         kind=QueryFieldKind.DB_SCALAR,
         type=QueryFieldType.INT,
         operators=_INT_OPS,

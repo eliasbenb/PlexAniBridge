@@ -25,7 +25,7 @@ If you find a title that is not mapped, please consider submitting a pull reques
 
 ## Why doesn't X sync when it's in the mappings?
 
-If Plex is not correctly identifying or updating the metadata for an item, it may not sync properly. Ensure that item is correctly matched to the TVDB/TMDb/IMDb ID in your mappings and try refreshing the metadata in Plex.
+If Plex is not correctly identifying or updating the metadata for an item, it may not sync properly. Ensure that item is correctly matched to the TVDB/TMDB/IMDb ID in your mappings and try refreshing the metadata in Plex.
 
 ## Is the HAMA agent supported?
 
