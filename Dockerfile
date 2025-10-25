@@ -15,7 +15,7 @@ RUN --mount=type=bind,source=uv.lock,target=/tmp/uv.lock,ro \
     --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev --no-install-project
 
-FROM node:24-alpine AS node-builder
+FROM node:25-alpine AS node-builder
 
 WORKDIR /app
 
