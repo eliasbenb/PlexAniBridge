@@ -51,6 +51,12 @@
     let pointerInPopover = $state(false);
     const listId = `booru-suggestions-${Math.random().toString(36).slice(2, 8)}`;
 
+    const ANILIST_WARNING_STORAGE_KEY = "mappings.anilist-warning-dismissed.v1";
+    let warningDismissed = $state(false);
+    const showAniListWarning = $derived(
+        /\banilist\./i.test(value) && !warningDismissed,
+    );
+
     type Suggestion = {
         label: string;
         detail?: string;
@@ -355,6 +361,13 @@
     }
 
     onMount(async () => {
+        try {
+            const stored = localStorage.getItem(ANILIST_WARNING_STORAGE_KEY);
+            if (stored === "1") {
+                warningDismissed = true;
+            }
+        } catch {}
+
         if (autoFocus) inputEl?.focus();
         try {
             const res = await apiJson<CapabilitiesResponse>(
@@ -365,6 +378,13 @@
             }
         } catch {}
     });
+
+    function dismissAniListWarning() {
+        warningDismissed = true;
+        try {
+            localStorage.setItem(ANILIST_WARNING_STORAGE_KEY, "1");
+        } catch {}
+    }
 
     function closePopover() {
         open = false;
@@ -516,6 +536,25 @@
                     within a group, '-' to negate, '..' for ranges, '*' or '?' as
                     wildcards, and quotes for AniList title search.
                 </div>
+                {#if showAniListWarning}
+                    <div
+                        class="border-t border-slate-800/70 bg-yellow-900/90 px-2 py-1 text-[10px] text-yellow-100 ring-1 ring-yellow-700/70">
+                        <div class="flex items-start justify-between gap-2">
+                            <span class="leading-snug">
+                                Warning: querying AniList fields can cause long response
+                                times and excessive API usage if the query covers many
+                                entries. Consider narrowing your search criteria when
+                                possible to improve performance.
+                            </span>
+                            <button
+                                type="button"
+                                class="ml-auto flex shrink-0 items-center rounded bg-amber-500/20 px-2 py-0.5 text-[10px] font-medium text-amber-50 transition hover:bg-amber-500/30"
+                                onclick={dismissAniListWarning}>
+                                Dismiss
+                            </button>
+                        </div>
+                    </div>
+                {/if}
             </Popover.Content>
         </Popover.Portal>
     </Popover.Root>
