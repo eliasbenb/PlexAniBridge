@@ -21,6 +21,7 @@ from src.exceptions import (
     AniListSearchError,
     BooruQueryEvaluationError,
     BooruQuerySyntaxError,
+    MappingNotFoundError,
 )
 from src.models.db.animap import AniMap
 from src.models.db.provenance import AniMapProvenance
@@ -547,6 +548,48 @@ class MappingsService:
                 "tvdb_mappings": animap.tvdb_mappings,
             }
         )
+        return item
+
+    async def get_mapping(
+        self,
+        anilist_id: int,
+        *,
+        with_anilist: bool = False,
+    ) -> dict[str, Any]:
+        """Fetch a single mapping entry by AniList identifier.
+
+        Args:
+            anilist_id (int): AniList identifier to retrieve.
+            with_anilist (bool): Include AniList metadata in the response.
+
+        Returns:
+            dict[str, Any]: Mapping payload suitable for API responses.
+
+        Raises:
+            MappingNotFoundError: If no mapping exists for the identifier.
+        """
+        with db() as ctx:
+            animap = ctx.session.get(AniMap, int(anilist_id))
+            if animap is None:
+                raise MappingNotFoundError("Mapping not found")
+
+            sources = self._collect_provenance(ctx, [anilist_id]).get(anilist_id, [])
+            item = self._build_item(anilist_id, animap, sources)
+
+        if with_anilist:
+            anilist_client = await get_app_state().ensure_public_anilist()
+            medias = await anilist_client.batch_get_anime([int(anilist_id)])
+            media_map = {m.id: m for m in medias}
+            media = media_map.get(int(anilist_id))
+            if media:
+                item["anilist"] = {
+                    field: getattr(media, field)
+                    for field in AniListMetadata.model_fields
+                    if hasattr(media, field)
+                }
+            else:
+                item["anilist"] = None
+
         return item
 
     @staticmethod
