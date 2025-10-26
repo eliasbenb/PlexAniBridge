@@ -154,14 +154,19 @@
         fieldState = { ...fieldState, [fieldId]: { ...fieldState[fieldId], value } };
     }
 
-    function addSeasonRow(fieldId: FieldId) {
+    function mutateSeasonRows(
+        fieldId: FieldId,
+        mutator: (rows: SeasonRow[]) => SeasonRow[],
+    ) {
         const state = fieldState[fieldId];
         if (!state) return;
-        const rows = Array.isArray(state.value)
-            ? [...(state.value as SeasonRow[])]
-            : [];
-        rows.push({ season: "", value: "" });
-        fieldState = { ...fieldState, [fieldId]: { ...state, value: rows } };
+        const rows = Array.isArray(state.value) ? (state.value as SeasonRow[]) : [];
+        const nextRows = mutator([...rows]);
+        fieldState = { ...fieldState, [fieldId]: { ...state, value: nextRows } };
+    }
+
+    function addSeasonRow(fieldId: FieldId) {
+        mutateSeasonRows(fieldId, (rows) => [...rows, { season: "", value: "" }]);
     }
 
     function updateSeasonRow(
@@ -170,19 +175,18 @@
         key: keyof SeasonRow,
         value: string,
     ) {
-        const state = fieldState[fieldId];
-        if (!state || !Array.isArray(state.value)) return;
-        const rows = [...state.value];
-        rows[index] = { ...rows[index], [key]: value };
-        fieldState = { ...fieldState, [fieldId]: { ...state, value: rows } };
+        mutateSeasonRows(fieldId, (rows) => {
+            if (!rows[index]) return rows;
+            rows[index] = { ...rows[index], [key]: value };
+            return rows;
+        });
     }
 
     function removeSeasonRow(fieldId: FieldId, index: number) {
-        const state = fieldState[fieldId];
-        if (!state || !Array.isArray(state.value)) return;
-        const rows = [...state.value];
-        rows.splice(index, 1);
-        fieldState = { ...fieldState, [fieldId]: { ...state, value: rows } };
+        mutateSeasonRows(fieldId, (rows) => {
+            rows.splice(index, 1);
+            return rows;
+        });
     }
 
     function formatEffective(def: OverrideFieldDefinition): string {
@@ -228,11 +232,15 @@
             : [];
     }
 
-    function parseNumberList(input: string): number[] {
-        const tokens = input
+    function parseTokens(input: string): string[] {
+        return input
             .split(/[\s,]+/)
             .map((token) => token.trim())
             .filter(Boolean);
+    }
+
+    function parseNumberList(input: string): number[] {
+        const tokens = parseTokens(input);
         const result: number[] = [];
         for (const token of tokens) {
             const parsed = Number(token);
@@ -245,10 +253,7 @@
     }
 
     function parseStringList(input: string): string[] {
-        return input
-            .split(/[\s,]+/)
-            .map((token) => token.trim())
-            .filter(Boolean);
+        return parseTokens(input);
     }
 
     function buildSeasonMapping(rows: SeasonRow[]): Record<string, string> {
@@ -265,47 +270,39 @@
         return mapping;
     }
 
+    function resolveFieldValue(
+        def: OverrideFieldDefinition,
+        state: { value: FieldStateValue },
+    ): unknown {
+        if (def.type === "season") {
+            return buildSeasonMapping((state.value as SeasonRow[]) || []);
+        }
+        const text = String(state.value ?? "").trim();
+        if (def.type === "number") {
+            if (!text) {
+                throw new Error(`${def.label}: value is required`);
+            }
+            const parsed = Number(text);
+            if (!Number.isInteger(parsed)) {
+                throw new Error(`${def.label}: value must be an integer`);
+            }
+            return parsed;
+        }
+        if (def.type === "number_list") {
+            return text ? parseNumberList(text) : [];
+        }
+        return text ? parseStringList(text) : [];
+    }
+
     function buildFieldsPayload(): Record<string, MappingOverrideFieldInput> {
         const payload: Record<string, MappingOverrideFieldInput> = {};
         for (const def of FIELD_DEFS) {
             const state = fieldState[def.id];
             if (!state || state.mode === "omit") continue;
-            if (state.mode === "null") {
-                payload[def.id] = { mode: "null" };
-                continue;
-            }
-            if (def.type === "season") {
-                payload[def.id] = {
-                    mode: "value",
-                    value: buildSeasonMapping((state.value as SeasonRow[]) || []),
-                };
-                continue;
-            }
-            const valueText = String(state.value || "").trim();
-            if (def.type === "number") {
-                if (!valueText) {
-                    throw new Error(`${def.label}: value is required`);
-                }
-                const parsed = Number(valueText);
-                if (!Number.isInteger(parsed)) {
-                    throw new Error(`${def.label}: value must be an integer`);
-                }
-                payload[def.id] = { mode: "value", value: parsed };
-                continue;
-            }
-            if (def.type === "number_list") {
-                payload[def.id] = {
-                    mode: "value",
-                    value: valueText ? parseNumberList(valueText) : [],
-                };
-                continue;
-            }
-            if (def.type === "string_list") {
-                payload[def.id] = {
-                    mode: "value",
-                    value: valueText ? parseStringList(valueText) : [],
-                };
-            }
+            payload[def.id] =
+                state.mode === "null"
+                    ? { mode: "null" }
+                    : { mode: "value", value: resolveFieldValue(def, state) };
         }
         return payload;
     }
@@ -314,6 +311,30 @@
         override: Record<string, unknown> | null | undefined,
     ): Record<string, unknown> {
         return override ? { ...override } : {};
+    }
+
+    function toJsonString(
+        anilistId: number | null,
+        override: Record<string, unknown> = {},
+    ): string {
+        const payload =
+            anilistId != null
+                ? composeOverrideWithAnilistId(anilistId, override)
+                : override;
+        return JSON.stringify(payload, null, 4);
+    }
+
+    function applyDetailState(
+        anilistId: number | null,
+        nextDetail: MappingDetail | null,
+    ): void {
+        detail = nextDetail;
+        loadedDetailId = nextDetail?.anilist_id ?? null;
+        updateFieldStateFromOverride(nextDetail?.override ?? null);
+        rawJson = toJsonString(
+            nextDetail?.anilist_id ?? anilistId,
+            normaliseOverride(nextDetail?.override),
+        );
     }
 
     function parseAnilistIdValue(value: unknown): number | null {
@@ -371,14 +392,7 @@
                 { silent: true },
             );
             if (!res.ok) {
-                detail = null;
-                loadedDetailId = null;
-                updateFieldStateFromOverride(null);
-                rawJson = JSON.stringify(
-                    composeOverrideWithAnilistId(anilistId, {}),
-                    null,
-                    4,
-                );
+                applyDetailState(anilistId, null);
                 if (!silent) {
                     if (res.status === 404) {
                         toast("No existing mapping found for this AniList ID", "info");
@@ -389,30 +403,13 @@
                 return;
             }
             const data = (await res.json()) as MappingDetail;
-            detail = data;
-            loadedDetailId = anilistId;
-            updateFieldStateFromOverride(data.override ?? null);
-            rawJson = JSON.stringify(
-                composeOverrideWithAnilistId(
-                    anilistId,
-                    normaliseOverride(data.override),
-                ),
-                null,
-                4,
-            );
+            applyDetailState(anilistId, data);
             if (mode !== "edit") {
                 anilistIdInput = String(anilistId);
             }
         } catch (error) {
             if (isAbortError(error)) return;
-            detail = null;
-            loadedDetailId = null;
-            updateFieldStateFromOverride(null);
-            rawJson = JSON.stringify(
-                composeOverrideWithAnilistId(anilistId, {}),
-                null,
-                4,
-            );
+            applyDetailState(anilistId, null);
             if (!silent) {
                 toast("Failed to load mapping details", "error");
             }
@@ -427,7 +424,7 @@
     function resetEditorState() {
         fieldState = createEmptyFieldState();
         detail = null;
-        rawJson = "{}";
+        rawJson = toJsonString(null);
         formError = null;
         jsonError = null;
         loadingDetail = false;
@@ -447,7 +444,7 @@
                 fetchDetail(mapping.anilist_id);
             } else {
                 anilistIdInput = "";
-                rawJson = "{}";
+                rawJson = toJsonString(null);
                 updateFieldStateFromOverride(null);
             }
             initialised = true;
@@ -467,11 +464,10 @@
     $effect(() => {
         if (!open || activeTab !== "form") return;
         try {
-            const snapshot = composeOverrideWithAnilistId(
+            rawJson = toJsonString(
                 resolveAnilistIdFromForm(),
                 buildOverrideFromState(),
             );
-            rawJson = JSON.stringify(snapshot, null, 4);
         } catch {
             // ignore invalid form state while the user is editing
         }
@@ -493,11 +489,10 @@
         if (next === activeTab) return;
         if (next === "json") {
             try {
-                const snapshot = composeOverrideWithAnilistId(
+                rawJson = toJsonString(
                     resolveAnilistIdFromForm(),
                     buildOverrideFromState(),
                 );
-                rawJson = JSON.stringify(snapshot, null, 4);
                 formError = null;
                 jsonError = null;
                 activeTab = next;
@@ -531,21 +526,8 @@
         for (const def of FIELD_DEFS) {
             const state = fieldState[def.id];
             if (!state || state.mode === "omit") continue;
-            if (state.mode === "null") {
-                entry[def.id] = null;
-                continue;
-            }
-            if (def.type === "season") {
-                entry[def.id] = buildSeasonMapping((state.value as SeasonRow[]) || []);
-                continue;
-            }
-            const text = String(state.value || "");
             entry[def.id] =
-                def.type === "number"
-                    ? Number(text.trim())
-                    : def.type === "number_list"
-                      ? parseNumberList(text)
-                      : parseStringList(text);
+                state.mode === "null" ? null : resolveFieldValue(def, state);
         }
         return entry;
     }
@@ -601,7 +583,7 @@
                 const fieldsPayload = buildFieldsPayload();
                 payload = {
                     anilist_id: targetAnilistId,
-                    fields: Object.keys(fieldsPayload).length ? fieldsPayload : {},
+                    fields: fieldsPayload,
                     raw: null,
                 };
             } catch (error) {
@@ -631,17 +613,7 @@
             );
             if (!res.ok) return;
             const data = (await res.json()) as MappingDetail;
-            detail = data;
-            loadedDetailId = data.anilist_id;
-            updateFieldStateFromOverride(data.override ?? null);
-            rawJson = JSON.stringify(
-                composeOverrideWithAnilistId(
-                    data.anilist_id,
-                    normaliseOverride(data.override),
-                ),
-                null,
-                4,
-            );
+            applyDetailState(data.anilist_id, data);
             if (mode !== "edit") {
                 anilistIdInput = String(data.anilist_id);
             }
