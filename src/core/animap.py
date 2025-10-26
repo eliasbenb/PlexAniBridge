@@ -98,17 +98,38 @@ class AniMapClient:
         if not target_ids:
             return
 
+        existing: dict[int, list[str]] = {}
         for chunk in batched(target_ids, self._SQLITE_SAFE_VARIABLES, strict=False):
+            rows = (
+                session.execute(
+                    select(AniMapProvenance)
+                    .where(AniMapProvenance.anilist_id.in_(chunk))
+                    .order_by(AniMapProvenance.anilist_id, AniMapProvenance.n)
+                )
+                .scalars()
+                .all()
+            )
+            for row in rows:
+                existing.setdefault(row.anilist_id, []).append(row.source)
+
+        ids_to_refresh: list[int] = []
+        rows_to_insert: list[AniMapProvenance] = []
+
+        for anilist_id in target_ids:
+            desired = provenance_map.get(anilist_id, [])
+            if desired != existing.get(anilist_id, []):
+                ids_to_refresh.append(anilist_id)
+                rows_to_insert.extend(
+                    AniMapProvenance(anilist_id=anilist_id, n=i, source=source)
+                    for i, source in enumerate(desired)
+                )
+
+        if not ids_to_refresh:
+            return
+
+        for chunk in batched(ids_to_refresh, self._SQLITE_SAFE_VARIABLES, strict=False):
             session.execute(
                 delete(AniMapProvenance).where(AniMapProvenance.anilist_id.in_(chunk))
-            )
-
-        rows_to_insert: list[AniMapProvenance] = []
-        for anilist_id in target_ids:
-            sources = provenance_map.get(anilist_id, [])
-            rows_to_insert.extend(
-                AniMapProvenance(anilist_id=anilist_id, n=i, source=source)
-                for i, source in enumerate(sources)
             )
 
         if rows_to_insert:
@@ -203,7 +224,18 @@ class AniMapClient:
             ).hexdigest()
 
             if last_mappings_hash and last_mappings_hash.value == curr_mappings_hash:
-                log.debug("Cache is still valid, skipping sync")
+                log.debug(
+                    "Cache is still valid, refreshing provenance and skipping sync"
+                )
+                existing_ids = set(
+                    ctx.session.execute(select(AniMap.anilist_id)).scalars().all()
+                )
+                provenance_scope = existing_ids & set(provenance_map.keys())
+                self._sync_provenance_rows(
+                    ctx.session, provenance_map, provenance_scope
+                )
+                if provenance_scope:
+                    ctx.session.commit()
                 return
 
             log.debug(
