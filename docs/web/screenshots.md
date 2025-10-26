@@ -18,3 +18,7 @@ icon: material/monitor-shimmer
 ## Logs
 
 ![Logs Screenshot](../img/screenshots/logs.png)
+
+# Backups
+
+![Backups Screenshot](../img/screenshots/backups.png)
