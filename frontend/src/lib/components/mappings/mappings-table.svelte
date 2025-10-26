@@ -9,16 +9,9 @@
     export interface Props {
         items: Mapping[];
         columns?: ColumnConfig[];
-        onEdit: (m: Mapping) => void;
-        onDelete: (m: Mapping) => void;
     }
 
-    let {
-        items = $bindable([]),
-        columns = $bindable([]),
-        onEdit,
-        onDelete,
-    }: Props = $props();
+    let { items = $bindable([]), columns = $bindable([]) }: Props = $props();
 
     if (!columns.length) {
         columns = [...defaultColumns];
@@ -411,11 +404,9 @@
                                     <div
                                         class="flex justify-end gap-1 whitespace-nowrap">
                                         <button
-                                            onclick={() => onEdit(m)}
                                             class="inline-flex h-6 items-center rounded-md bg-slate-800 px-2 text-[11px] text-slate-200 hover:bg-slate-700"
                                             >Edit</button>
                                         <button
-                                            onclick={() => onDelete(m)}
                                             title="Delete mapping"
                                             class="inline-flex h-6 items-center rounded-md bg-rose-700/70 px-2 text-[11px] text-rose-200 hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-35"
                                             >Del</button>
