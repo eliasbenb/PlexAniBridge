@@ -105,7 +105,11 @@ def _prepare_override_kwargs(
     """Prepare keyword arguments for mapping override service methods."""
     fields_data: dict[str, Any] | None = None
     if payload.fields:
-        fields_data = {key: field.model_dump() for key, field in payload.fields.items()}
+        fields_data = {}
+        for key, field in payload.fields.items():
+            data = field.model_dump(mode="json")
+            data["mode"] = field.mode.value
+            fields_data[key] = data
     return {
         "anilist_id": payload.anilist_id,
         "fields": fields_data,
