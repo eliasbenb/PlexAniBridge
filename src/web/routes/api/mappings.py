@@ -1,15 +1,20 @@
 """API endpoints for mappings."""
 
 import asyncio
+from enum import Enum
 from typing import Any
 
 from fastapi import Request
 from fastapi.exceptions import HTTPException
 from fastapi.param_functions import Query
 from fastapi.routing import APIRouter
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
+from src.exceptions import MappingIdMismatchError
 from src.models.schemas.anilist import MediaWithoutList
+from src.web.services.mapping_overrides_service import (
+    get_mapping_overrides_service,
+)
 from src.web.services.mappings_query_spec import (
     QueryFieldOperator,
     QueryFieldSpec,
@@ -49,6 +54,63 @@ class ListMappingsResponse(BaseModel):
 
 class DeleteMappingResponse(BaseModel):
     ok: bool
+
+
+class MappingOverrideMode(str, Enum):
+    """Supported modes for mapping override fields."""
+
+    OMIT = "omit"
+    NULL = "null"
+    VALUE = "value"
+
+
+class MappingOverrideFieldInput(BaseModel):
+    """Input model for a single mapping override field."""
+
+    mode: MappingOverrideMode = MappingOverrideMode.VALUE
+    value: Any | None = None
+
+
+class MappingOverridePayload(BaseModel):
+    """Payload for creating or updating a mapping override."""
+
+    anilist_id: int
+    fields: dict[str, MappingOverrideFieldInput] | None = None
+    raw: dict[str, Any] | None = None
+
+    @model_validator(mode="after")
+    def _ensure_payload(self) -> "MappingOverridePayload":
+        """Ensure at least one of fields or raw is provided."""
+        if self.fields is None and self.raw is None:
+            raise ValueError("Either 'fields' or 'raw' must be provided")
+        return self
+
+
+class MappingDetailModel(MappingItemModel):
+    """Mapping model including override data."""
+
+    override: dict[str, Any] | None = None
+
+
+class OverrideDeleteKind(str, Enum):
+    """Supported deletion behaviours for mapping overrides."""
+
+    CUSTOM = "custom"
+    FULL = "full"
+
+
+def _prepare_override_kwargs(
+    payload: MappingOverridePayload,
+) -> dict[str, Any]:
+    """Prepare keyword arguments for mapping override service methods."""
+    fields_data: dict[str, Any] | None = None
+    if payload.fields:
+        fields_data = {key: field.model_dump() for key, field in payload.fields.items()}
+    return {
+        "anilist_id": payload.anilist_id,
+        "fields": fields_data,
+        "raw": payload.raw,
+    }
 
 
 class FieldCapability(BaseModel):
@@ -142,71 +204,91 @@ async def list_mappings(
     )
 
 
-@router.post("", response_model=MappingItemModel)
-async def create_mapping(mapping: dict[str, Any]) -> MappingItemModel:
+@router.post("", response_model=MappingDetailModel)
+async def create_mapping(mapping: MappingOverridePayload) -> MappingDetailModel:
     """Create a new custom mapping.
 
     Args:
-        mapping (dict[str, Any]): The mapping data to create.
+        mapping (MappingOverridePayload): The mapping data to create.
 
     Returns:
-        dict[str, Any]: The created mapping.
+        MappingDetailModel: The created mapping detail including overrides.
 
     Raises:
         MissingAnilistIdError: If anilist_id is not provided.
         UnsupportedMappingFileExtensionError: If the custom file extension is
             unsupported.
     """
-    pass
+    svc = get_mapping_overrides_service()
+    payload = _prepare_override_kwargs(mapping)
+    data = await svc.save_override(**payload)
+    return MappingDetailModel(**data)
 
 
-@router.put("/{mapping_id}", response_model=MappingItemModel)
-async def update_mapping(mapping_id: int, mapping: dict[str, Any]) -> MappingItemModel:
+@router.put("/{mapping_id}", response_model=MappingDetailModel)
+async def update_mapping(
+    mapping_id: int, mapping: MappingOverridePayload
+) -> MappingDetailModel:
     """Update an existing custom mapping.
 
     Args:
         mapping_id (int): The ID of the mapping to update.
-        mapping (dict[str, Any]): The updated mapping data.
+        mapping (MappingOverridePayload): The updated mapping data.
 
     Returns:
-        dict[str, Any]: The updated mapping.
+        MappingDetailModel: The updated mapping detail.
 
     Raises:
         MappingIdMismatchError: If anilist_id in the body does not match the URL.
         UnsupportedMappingFileExtensionError: If the custom file extension is
             unsupported.
     """
-    pass
+    if mapping.anilist_id != mapping_id:
+        raise MappingIdMismatchError(
+            "anilist_id in body must match the mapping_id path parameter"
+        )
+
+    svc = get_mapping_overrides_service()
+    data = await svc.save_override(**_prepare_override_kwargs(mapping))
+    return MappingDetailModel(**data)
 
 
-@router.get("/{mapping_id}", response_model=MappingItemModel)
-async def get_mapping(mapping_id: int) -> MappingItemModel:
+@router.get("/{mapping_id}", response_model=MappingDetailModel)
+async def get_mapping(mapping_id: int) -> MappingDetailModel:
     """Retrieve a single mapping by ID.
 
     Args:
         mapping_id (int): The ID of the mapping to retrieve.
 
     Returns:
-        dict[str, Any]: The mapping data.
+        MappingDetailModel: The mapping data with override details.
 
     Raises:
         MappingNotFoundError: If the mapping does not exist.
     """
-    pass
+    svc = get_mapping_overrides_service()
+    data = await svc.get_mapping_detail(mapping_id)
+    return MappingDetailModel(**data)
 
 
 @router.delete("/{mapping_id}", response_model=DeleteMappingResponse)
-async def delete_mapping(mapping_id: int) -> DeleteMappingResponse:
+async def delete_mapping(
+    mapping_id: int,
+    kind: OverrideDeleteKind = OverrideDeleteKind.CUSTOM,
+) -> DeleteMappingResponse:
     """Delete a mapping.
 
     Args:
         mapping_id (int): The ID of the mapping to delete.
+        kind (OverrideDeleteKind): Deletion strategy to apply.
 
     Returns:
-        dict[str, Any]: A confirmation message.
+        DeleteMappingResponse: A confirmation message.
 
     Raises:
         UnsupportedMappingFileExtensionError: If the custom file extension is
             unsupported.
     """
-    pass
+    svc = get_mapping_overrides_service()
+    await svc.delete_override(mapping_id, mode=kind.value)
+    return DeleteMappingResponse(ok=True)
