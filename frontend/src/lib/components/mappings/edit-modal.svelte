@@ -1,9 +1,17 @@
 <script lang="ts">
-    import { Globe, Loader2, Plus, Trash2 } from "@lucide/svelte";
     import { Tabs } from "bits-ui";
-    import type * as Monaco from "monaco-editor/esm/vs/editor/editor.api";
 
     import CodeEditor from "$lib/components/code-editor.svelte";
+    import {
+        FIELD_DEFS,
+        mappingSchema,
+        type FieldId,
+        type FieldStateMap,
+        type FieldStateValue,
+        type OverrideFieldDefinition,
+        type OverrideFieldType,
+        type SeasonRow,
+    } from "$lib/components/mappings/columns";
     import type {
         Mapping,
         MappingDetail,
@@ -12,24 +20,10 @@
         MappingOverridePayload,
     } from "$lib/types/api";
     import Modal from "$lib/ui/modal.svelte";
-    import { preferredTitle } from "$lib/utils/anilist";
     import { apiFetch, isAbortError } from "$lib/utils/api";
     import { toast } from "$lib/utils/notify";
-
-    interface SeasonRow {
-        season: string;
-        value: string;
-    }
-
-    type OverrideFieldType = "number" | "number_list" | "string_list" | "season";
-
-    interface OverrideFieldDefinition {
-        id: string;
-        label: string;
-        type: OverrideFieldType;
-        placeholder?: string;
-        hint?: string;
-    }
+    import MappingDetailPreview from "./mapping-detail-preview.svelte";
+    import MappingFieldCard from "./mapping-field-card.svelte";
 
     interface Props {
         open: boolean;
@@ -44,136 +38,6 @@
         mapping = null,
         onSaved,
     }: Props = $props();
-
-    const FIELD_DEFS: OverrideFieldDefinition[] = [
-        {
-            id: "anidb_id",
-            label: "AniDB ID",
-            type: "number",
-            placeholder: "e.g. 12345",
-        },
-        {
-            id: "imdb_id",
-            label: "IMDb IDs",
-            type: "string_list",
-            placeholder: "tt12345, tt67890",
-        },
-        {
-            id: "mal_id",
-            label: "MyAnimeList IDs",
-            type: "number_list",
-            placeholder: "12345, 67890",
-        },
-        {
-            id: "tmdb_movie_id",
-            label: "TMDB Movie IDs",
-            type: "number_list",
-            placeholder: "12345, 67890",
-        },
-        {
-            id: "tmdb_show_id",
-            label: "TMDB Show ID",
-            type: "number",
-            placeholder: "12345",
-        },
-        { id: "tvdb_id", label: "TVDB ID", type: "number", placeholder: "12345" },
-        {
-            id: "tmdb_mappings",
-            label: "TMDB Season Mappings",
-            type: "season",
-            hint: "Season key (e.g. s1) mapped to episode pattern",
-        },
-        {
-            id: "tvdb_mappings",
-            label: "TVDB Season Mappings",
-            type: "season",
-            hint: "Season key (e.g. s1) mapped to episode pattern",
-        },
-    ];
-
-    type FieldId = (typeof FIELD_DEFS)[number]["id"];
-    type FieldStateValue = string | SeasonRow[];
-
-    interface FieldState {
-        mode: MappingOverrideMode;
-        value: FieldStateValue;
-    }
-
-    type FieldStateMap = Record<FieldId, FieldState>;
-
-    const jsonSchema: Monaco.languages.json.JSONSchema = {
-        title: "PlexAniBridge Mapping Override",
-        type: "object",
-        required: ["anilist_id"],
-        additionalProperties: false,
-        properties: {
-            anilist_id: { type: ["integer", "null"], description: "The AniList ID" },
-            anidb_id: { type: ["integer", "null"], description: "The AniDB ID" },
-            imdb_id: {
-                anyOf: [
-                    {
-                        type: "array",
-                        items: { type: "string", pattern: "^tt[0-9]{7,}$" },
-                    },
-                    { type: "null" },
-                ],
-                description: "Array of IMDB IDs in the format tt1234567 (or null)",
-            },
-            mal_id: {
-                anyOf: [
-                    { type: "array", items: { type: "integer" } },
-                    { type: "null" },
-                ],
-                description: "Array of MyAnimeList IDs (or null)",
-            },
-            tmdb_movie_id: {
-                anyOf: [
-                    { type: "array", items: { type: "integer" } },
-                    { type: "null" },
-                ],
-                description: "Array of TMDB movie IDs (or null)",
-            },
-            tmdb_show_id: {
-                type: ["integer", "null"],
-                description: "The TMDB Show ID",
-            },
-            tvdb_id: { type: ["integer", "null"], description: "The TVDB ID" },
-            tmdb_mappings: {
-                anyOf: [
-                    {
-                        type: "object",
-                        patternProperties: {
-                            "^s[0-9]+$": {
-                                type: "string",
-                                description: "TMDB episode mappings pattern",
-                                examples: ["e1-e12"],
-                            },
-                        },
-                        additionalProperties: false,
-                        description: "Season to episode mapping patterns",
-                    },
-                    { type: "null" },
-                ],
-            },
-            tvdb_mappings: {
-                anyOf: [
-                    {
-                        type: "object",
-                        patternProperties: {
-                            "^s[0-9]+$": {
-                                type: "string",
-                                description: "TVDB episode mappings pattern",
-                                examples: ["e1-e12"],
-                            },
-                        },
-                        additionalProperties: false,
-                        description: "Season to episode mapping patterns",
-                    },
-                    { type: "null" },
-                ],
-            },
-        },
-    };
 
     const MODE_OPTIONS: MappingOverrideMode[] = ["omit", "null", "value"];
 
@@ -192,6 +56,7 @@
     let fieldState = $state<FieldStateMap>(createEmptyFieldState());
     let detail = $state<MappingDetail | null>(null);
     let anilistIdInput = $state<string>("");
+    const pendingPrefillId = $derived(parseAnilistIdValue(anilistIdInput));
     let activeTab = $state<"form" | "json">("form");
     let rawJson = $state<string>("{}");
     let formError = $state<string | null>(null);
@@ -856,170 +721,13 @@
                             downstream provider mappings.
                         </p>
                     </div>
-                    <div
-                        class="h-full rounded-lg border border-slate-800/60 bg-linear-to-br from-slate-950/95 via-slate-950/80 to-slate-900/70 p-4 shadow-inner">
-                        {#if loadingDetail}
-                            <div class="flex min-w-0 animate-pulse items-start gap-3">
-                                <div class="block w-12 shrink-0">
-                                    <div class="h-16 w-full rounded-md bg-slate-800/40">
-                                    </div>
-                                </div>
-                                <div class="min-w-0 flex-1 space-y-3">
-                                    <div class="h-4 w-3/4 rounded bg-slate-800/40">
-                                    </div>
-                                    <div class="h-3 w-1/2 rounded bg-slate-800/40">
-                                    </div>
-                                    <div class="flex flex-wrap gap-1 pt-1">
-                                        <div class="h-3 w-16 rounded bg-slate-800/40">
-                                        </div>
-                                        <div class="h-3 w-14 rounded bg-slate-800/40">
-                                        </div>
-                                        <div class="h-3 w-12 rounded bg-slate-800/40">
-                                        </div>
-                                        <div class="h-3 w-10 rounded bg-slate-800/40">
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        {:else if detail?.anilist}
-                            {@const pendingPrefillId =
-                                parseAnilistIdValue(anilistIdInput)}
-                            {@const coverImage =
-                                detail.anilist?.coverImage?.medium ??
-                                detail.anilist?.coverImage?.large ??
-                                detail.anilist?.coverImage?.extraLarge ??
-                                null}
-                            <div class="flex min-w-0 items-start gap-3">
-                                <a
-                                    href={`https://anilist.co/anime/${detail.anilist_id}`}
-                                    rel="noopener noreferrer"
-                                    target="_blank"
-                                    class="group block w-12 shrink-0">
-                                    {#if coverImage}
-                                        <div
-                                            class="relative h-16 w-full overflow-hidden rounded-md ring-1 ring-slate-700/60">
-                                            {#if mode === "create" && pendingPrefillId && pendingPrefillId !== loadedDetailId}
-                                                <div
-                                                    class="mt-4 rounded-lg border border-emerald-900/40 bg-emerald-950/20 p-3 text-[10px] text-emerald-200">
-                                                    <div
-                                                        class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                                                        <div
-                                                            class="text-left font-medium">
-                                                            AniList ID changed. Load
-                                                            details for {pendingPrefillId}?
-                                                        </div>
-                                                        <button
-                                                            class="inline-flex h-8 items-center gap-1 rounded-lg border border-emerald-800/60 bg-emerald-900/40 px-3 text-[10px] font-semibold text-emerald-100 transition hover:border-emerald-600/70 hover:bg-emerald-900/60 disabled:opacity-60"
-                                                            type="button"
-                                                            disabled={loadingDetail}
-                                                            onclick={loadEffectiveForCreate}>
-                                                            {#if loadingDetail}
-                                                                <Loader2
-                                                                    class="h-3 w-3 animate-spin" />
-                                                            {:else}
-                                                                <Globe
-                                                                    class="h-3 w-3" />
-                                                            {/if}
-                                                            Prefill new ID
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            {/if}
-                                            <img
-                                                alt={(preferredTitle(
-                                                    detail.anilist.title,
-                                                ) || "Cover") + " cover"}
-                                                loading="lazy"
-                                                src={coverImage}
-                                                class="h-full w-full object-cover transition-[filter] duration-150 ease-out group-hover:blur-none"
-                                                class:blur-sm={detail.anilist
-                                                    ?.isAdult} />
-                                        </div>
-                                    {:else}
-                                        <div
-                                            class="flex h-20 w-14 items-center justify-center rounded-md border border-dashed border-slate-700 bg-slate-800/30 text-[9px] text-slate-500 select-none">
-                                            No Art
-                                        </div>
-                                    {/if}
-                                </a>
-                                <div class="min-w-0 flex-1 space-y-1">
-                                    <div class="flex items-start justify-between gap-2">
-                                        <div class="min-w-0 space-y-2">
-                                            <div
-                                                class="truncate font-medium"
-                                                title={preferredTitle(
-                                                    detail.anilist.title,
-                                                ) || `AniList ${detail.anilist_id}`}>
-                                                {#if detail?.anilist?.title}
-                                                    {preferredTitle(
-                                                        detail.anilist.title,
-                                                    )}
-                                                {:else}
-                                                    AniList {detail.anilist_id}
-                                                {/if}
-                                            </div>
-                                            <div
-                                                class="mt-1 flex flex-wrap gap-1 text-[9px] text-slate-400">
-                                                {#if detail.anilist.format}<span
-                                                        class="truncate rounded bg-slate-800/70 px-1.5 py-0.5 tracking-wide uppercase"
-                                                        title={detail.anilist.format}
-                                                        >{detail.anilist.format}</span>
-                                                {/if}
-                                                {#if detail.anilist.status}<span
-                                                        class="truncate rounded bg-slate-800/70 px-1.5 py-0.5 tracking-wide uppercase"
-                                                        title={detail.anilist.status}
-                                                        >{detail.anilist.status}</span>
-                                                {/if}
-                                                {#if detail.anilist.season && detail.anilist.seasonYear}<span
-                                                        class="truncate rounded bg-slate-800/70 px-1.5 py-0.5 tracking-wide uppercase"
-                                                        title={`${detail.anilist.season} ${detail.anilist.seasonYear}`}
-                                                        >{detail.anilist.season}
-                                                        {detail.anilist
-                                                            .seasonYear}</span>
-                                                {/if}
-                                                {#if detail.anilist.episodes}<span
-                                                        class="truncate rounded bg-slate-800/70 px-1.5 py-0.5"
-                                                        title={`${detail.anilist.episodes} episodes`}
-                                                        >EP {detail.anilist
-                                                            .episodes}</span>
-                                                {/if}
-                                                {#if detail.anilist?.isAdult}
-                                                    <span
-                                                        class="rounded bg-rose-800 px-1.5 py-0.5 text-rose-100"
-                                                        title="ADULT content"
-                                                        >ADULT</span>
-                                                {/if}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        {:else if mode === "create"}
-                            <div
-                                class="flex h-full flex-col items-center justify-center gap-3 text-center text-[11px] text-slate-300">
-                                <button
-                                    class="inline-flex h-9 items-center gap-1 rounded-lg border border-slate-700/70 bg-slate-900/60 px-3 text-[11px] font-semibold text-slate-200 transition hover:border-emerald-500/70 hover:bg-slate-900/80"
-                                    type="button"
-                                    onclick={loadEffectiveForCreate}>
-                                    {#if loadingDetail}
-                                        <Loader2 class="h-3.5 w-3.5 animate-spin" />
-                                    {:else}
-                                        <Globe class="h-3.5 w-3.5" />
-                                    {/if}
-                                    Prefill from AniList
-                                </button>
-                                <p class="text-[10px] text-slate-500">
-                                    Fetch the current mapping details before creating
-                                    overrides.
-                                </p>
-                            </div>
-                        {:else}
-                            <div
-                                class="flex h-full items-center justify-center text-[11px] text-slate-500">
-                                No AniList details available.
-                            </div>
-                        {/if}
-                    </div>
+                    <MappingDetailPreview
+                        {detail}
+                        {mode}
+                        {loadingDetail}
+                        {pendingPrefillId}
+                        {loadedDetailId}
+                        on:prefill={loadEffectiveForCreate} />
                 </div>
             </div>
             {#if loadingDetail}
@@ -1049,206 +757,28 @@
                         <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                             {#each FIELD_DEFS as field (field.id)}
                                 {@const state = fieldState[field.id]}
-                                <div
-                                    class={`rounded-xl border border-slate-800/60 bg-linear-to-br from-slate-950/90 via-slate-950/70 to-slate-900/70 p-4 shadow-[inset_0_1px_0_rgba(148,163,184,0.05)] ${field.type === "season" ? "md:col-span-2 xl:col-span-3" : ""}`}>
-                                    <div
-                                        class="flex flex-wrap items-start justify-between gap-3">
-                                        <div class="space-y-1">
-                                            <div
-                                                class="flex flex-wrap items-center gap-2">
-                                                <span
-                                                    class="text-[12px] font-semibold text-slate-100">
-                                                    {field.label}
-                                                </span>
-                                            </div>
-                                            {#if field.hint}
-                                                <p class="text-[10px] text-slate-500">
-                                                    {field.hint}
-                                                </p>
-                                            {/if}
-                                        </div>
-                                        <select
-                                            class="h-8 rounded-lg border border-slate-800/60 bg-slate-950/70 px-3 text-[10px] font-medium text-slate-100 transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/40 focus:outline-none"
-                                            value={state.mode}
-                                            onchange={(e) =>
-                                                setFieldMode(
-                                                    field.id,
-                                                    (e.currentTarget
-                                                        .value as MappingOverrideMode) ??
-                                                        "omit",
-                                                )}>
-                                            {#each MODE_OPTIONS as option (option)}
-                                                <option value={option}>
-                                                    {option === "omit"
-                                                        ? "Use Upstream"
-                                                        : option === "null"
-                                                          ? "Force Null"
-                                                          : "Custom Value"}
-                                                </option>
-                                            {/each}
-                                        </select>
-                                    </div>
-                                    {#if state.mode === "value"}
-                                        {#if field.type === "season"}
-                                            {@const rows = Array.isArray(state.value)
-                                                ? (state.value as SeasonRow[])
-                                                : []}
-                                            <div class="mt-3 space-y-2">
-                                                {#each rows as row, index (index)}
-                                                    <div
-                                                        class="flex flex-col gap-2 rounded-lg border border-slate-800/60 bg-slate-950/70 p-3 shadow-inner sm:flex-row sm:items-center">
-                                                        <div
-                                                            class="flex items-center gap-2 sm:w-28">
-                                                            <label
-                                                                class="text-[10px] font-medium tracking-wide text-slate-500 uppercase"
-                                                                for={`season-${field.id}-${index}`}>
-                                                                Season
-                                                            </label>
-                                                            <input
-                                                                id={`season-${field.id}-${index}`}
-                                                                class="h-8 w-full rounded-lg border border-slate-800/60 bg-slate-950/80 px-3 text-[11px] text-slate-100 shadow-inner transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 focus:outline-none"
-                                                                placeholder="s1"
-                                                                bind:value={row.season}
-                                                                oninput={(e) =>
-                                                                    updateSeasonRow(
-                                                                        field.id,
-                                                                        index,
-                                                                        "season",
-                                                                        (
-                                                                            e.currentTarget as HTMLInputElement
-                                                                        ).value,
-                                                                    )} />
-                                                        </div>
-                                                        <div class="flex-1">
-                                                            <label
-                                                                class="sr-only"
-                                                                for={`pattern-${field.id}-${index}`}>
-                                                                Episode pattern
-                                                            </label>
-                                                            <input
-                                                                id={`pattern-${field.id}-${index}`}
-                                                                class="h-8 w-full rounded-lg border border-slate-800/60 bg-slate-950/80 px-3 text-[11px] text-slate-100 shadow-inner transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 focus:outline-none"
-                                                                placeholder="e1-e12"
-                                                                bind:value={row.value}
-                                                                oninput={(e) =>
-                                                                    updateSeasonRow(
-                                                                        field.id,
-                                                                        index,
-                                                                        "value",
-                                                                        (
-                                                                            e.currentTarget as HTMLInputElement
-                                                                        ).value,
-                                                                    )} />
-                                                        </div>
-                                                        <button
-                                                            class="inline-flex h-8 items-center gap-1 rounded-lg border border-rose-800/50 bg-rose-950/30 px-3 text-[10px] font-medium text-rose-200 transition hover:bg-rose-900/40"
-                                                            type="button"
-                                                            onclick={() =>
-                                                                removeSeasonRow(
-                                                                    field.id,
-                                                                    index,
-                                                                )}>
-                                                            <Trash2
-                                                                class="h-3.5 w-3.5" />
-                                                            Remove
-                                                        </button>
-                                                    </div>
-                                                {/each}
-                                                <button
-                                                    class="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-700/60 bg-slate-900/60 px-3 text-[10px] font-semibold text-slate-100 transition hover:border-emerald-500/70 hover:bg-slate-900/80"
-                                                    type="button"
-                                                    onclick={() =>
-                                                        handleAddSeason(field.id)}>
-                                                    <Plus class="h-3.5 w-3.5" />
-                                                    Add season mapping
-                                                </button>
-                                            </div>
-                                        {:else}
-                                            <input
-                                                class="mt-3 h-9 w-full rounded-lg border border-slate-800/60 bg-slate-950/80 px-3 text-[11px] text-slate-100 shadow-inner transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 focus:outline-none"
-                                                placeholder={field.placeholder}
-                                                bind:value={state.value as string}
-                                                oninput={(e) =>
-                                                    setFieldStringValue(
-                                                        field.id,
-                                                        (
-                                                            e.currentTarget as HTMLInputElement
-                                                        ).value,
-                                                    )} />
-                                        {/if}
-                                    {:else if state.mode === "null"}
-                                        <p
-                                            class="mt-3 rounded-lg border border-rose-800/40 bg-rose-950/30 p-3 text-[11px] text-rose-100">
-                                            Field will be returned as <strong
-                                                class="font-semibold text-rose-200"
-                                                >null</strong>
-                                            for this mapping.
-                                        </p>
-                                    {:else if field.type === "season"}
-                                        {@const effectiveRows =
-                                            getEffectiveSeasonRows(field)}
-                                        {#if effectiveRows.length}
-                                            <div class="mt-3 space-y-2">
-                                                {#each effectiveRows as row, index (index)}
-                                                    <div
-                                                        class="flex flex-col gap-2 rounded-lg border border-slate-800/60 bg-slate-950/60 p-3 text-slate-400 opacity-80 sm:flex-row sm:items-center">
-                                                        <div
-                                                            class="flex items-center gap-2 sm:w-28">
-                                                            <label
-                                                                class="text-[10px] font-medium tracking-wide text-slate-500 uppercase"
-                                                                for={`effective-${field.id}-season-${index}`}>
-                                                                Season
-                                                            </label>
-                                                            <input
-                                                                id={`effective-${field.id}-season-${index}`}
-                                                                class="h-8 w-full rounded-lg border border-slate-800/60 bg-slate-950/60 px-3 text-[11px] text-slate-400 shadow-inner"
-                                                                value={row.season}
-                                                                disabled
-                                                                readonly />
-                                                        </div>
-                                                        <div class="flex-1">
-                                                            <label
-                                                                class="sr-only"
-                                                                for={`effective-${field.id}-pattern-${index}`}>
-                                                                Episode pattern
-                                                            </label>
-                                                            <input
-                                                                id={`effective-${field.id}-pattern-${index}`}
-                                                                class="h-8 w-full rounded-lg border border-slate-800/60 bg-slate-950/60 px-3 text-[11px] text-slate-400 shadow-inner"
-                                                                value={row.value}
-                                                                disabled
-                                                                readonly />
-                                                        </div>
-                                                    </div>
-                                                {/each}
-                                            </div>
-                                        {:else}
-                                            <p
-                                                class="mt-3 rounded-lg border border-slate-800/50 bg-slate-950/50 p-3 text-[11px] text-slate-400">
-                                                {formatEffective(field)}
-                                            </p>
-                                        {/if}
-                                    {:else}
-                                        {@const effectiveText = formatEffective(field)}
-                                        <div class="mt-3 space-y-2">
-                                            <input
-                                                class="h-9 w-full rounded-lg border border-slate-800/60 bg-slate-950/60 px-3 text-[11px] text-slate-400 opacity-70"
-                                                value={effectiveText}
-                                                disabled
-                                                readonly />
-                                            <p class="text-[10px] text-slate-500">
-                                                Upstream value in effect.
-                                            </p>
-                                        </div>
-                                    {/if}
-                                </div>
+                                <MappingFieldCard
+                                    {field}
+                                    {state}
+                                    modeOptions={MODE_OPTIONS}
+                                    effectiveText={formatEffective(field)}
+                                    effectiveSeasonRows={getEffectiveSeasonRows(field)}
+                                    onModeChange={(modeValue) =>
+                                        setFieldMode(field.id, modeValue)}
+                                    onStringChange={(value) =>
+                                        setFieldStringValue(field.id, value)}
+                                    onAddSeason={() => handleAddSeason(field.id)}
+                                    onUpdateSeason={(index, key, value) =>
+                                        updateSeasonRow(field.id, index, key, value)}
+                                    onRemoveSeason={(index) =>
+                                        removeSeasonRow(field.id, index)} />
                             {/each}
                         </div>
                     </Tabs.Content>
                     <Tabs.Content value="json">
                         <CodeEditor
                             bind:value={rawJson}
-                            {jsonSchema}
+                            jsonSchema={mappingSchema}
                             performanceMode={true} />
                         {#if jsonError}
                             <p class="mt-2 text-xs text-rose-400">{jsonError}</p>
