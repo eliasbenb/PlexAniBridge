@@ -565,7 +565,7 @@
         <div class="fixed right-6 bottom-6 z-40">
             <button
                 onclick={jumpToLatest}
-                class="pointer-events-auto flex items-center gap-2 rounded-md border border-sky-500/60 bg-gradient-to-r from-sky-600 to-sky-500 py-2 pr-3 pl-3 text-sm font-medium text-white shadow-md shadow-slate-950/40 backdrop-blur-md hover:from-sky-500 hover:to-sky-400">
+                class="pointer-events-auto flex items-center gap-2 rounded-md border border-sky-500/60 bg-linear-to-r from-sky-600 to-sky-500 py-2 pr-3 pl-3 text-sm font-medium text-white shadow-md shadow-slate-950/40 backdrop-blur-md hover:from-sky-500 hover:to-sky-400">
                 <ArrowUp class="inline h-4 w-4" />
                 <span class="hidden sm:inline">Latest</span>
                 {#if newItemsCount > 0}

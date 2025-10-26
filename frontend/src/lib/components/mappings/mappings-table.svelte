@@ -72,7 +72,7 @@
             class="w-full align-middle text-xs"
             style="table-layout: fixed;">
             <thead
-                class="sticky top-0 z-10 bg-gradient-to-b from-slate-900/70 to-slate-900/40 text-slate-300">
+                class="sticky top-0 z-10 bg-linear-to-b from-slate-900/70 to-slate-900/40 text-slate-300">
                 <tr class="divide-x divide-slate-800/70 whitespace-nowrap">
                     {#each visibleColumns as column, i (column.id)}
                         <th
@@ -289,7 +289,7 @@
                                                 <Tooltip.Root>
                                                     <Tooltip.Trigger>
                                                         <span
-                                                            class={`inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded px-1.5 text-[10px] ring-1 ${totalSeasons > 1 ? "bg-amber-600/30 text-amber-100 ring-amber-700/40" : "bg-slate-800/60 text-slate-300 ring-slate-700/50"}`}
+                                                            class={`inline-flex h-5 min-w-5 items-center justify-center rounded px-1.5 text-[10px] ring-1 ${totalSeasons > 1 ? "bg-amber-600/30 text-amber-100 ring-amber-700/40" : "bg-slate-800/60 text-slate-300 ring-slate-700/50"}`}
                                                             >{totalSeasons}</span>
                                                     </Tooltip.Trigger>
                                                     <Tooltip.Portal>
@@ -301,7 +301,7 @@
                                                             <ol class="space-y-1">
                                                                 {#each entries as e (e[0])}
                                                                     <li
-                                                                        class="flex items-start gap-1 break-words">
+                                                                        class="flex items-start gap-1 wrap-break-word">
                                                                         <span
                                                                             class="text-slate-500"
                                                                             >{e[0]}</span>
@@ -333,7 +333,7 @@
                                                 <Tooltip.Root>
                                                     <Tooltip.Trigger>
                                                         <span
-                                                            class={`inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded px-1.5 text-[10px] ring-1 ${totalSeasons > 1 ? "bg-amber-600/30 text-amber-100 ring-amber-700/40" : "bg-slate-800/60 text-slate-300 ring-slate-700/50"}`}
+                                                            class={`inline-flex h-5 min-w-5 items-center justify-center rounded px-1.5 text-[10px] ring-1 ${totalSeasons > 1 ? "bg-amber-600/30 text-amber-100 ring-amber-700/40" : "bg-slate-800/60 text-slate-300 ring-slate-700/50"}`}
                                                             >{totalSeasons}</span>
                                                     </Tooltip.Trigger>
                                                     <Tooltip.Portal>
@@ -345,7 +345,7 @@
                                                             <ol class="space-y-1">
                                                                 {#each entries as e (e[0])}
                                                                     <li
-                                                                        class="flex items-start gap-1 break-words">
+                                                                        class="flex items-start gap-1 wrap-break-word">
                                                                         <span
                                                                             class="text-slate-500"
                                                                             >{e[0]}</span>
@@ -374,7 +374,7 @@
                                                 <Tooltip.Root>
                                                     <Tooltip.Trigger>
                                                         <span
-                                                            class={`inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded px-1.5 text-[10px] ring-1 ${total > 1 ? "bg-amber-600/30 text-amber-100 ring-amber-700/40" : "bg-slate-800/60 text-slate-300 ring-slate-700/50"}`}
+                                                            class={`inline-flex h-5 min-w-5 items-center justify-center rounded px-1.5 text-[10px] ring-1 ${total > 1 ? "bg-amber-600/30 text-amber-100 ring-amber-700/40" : "bg-slate-800/60 text-slate-300 ring-slate-700/50"}`}
                                                             >{total}</span>
                                                     </Tooltip.Trigger>
                                                     <Tooltip.Portal>
@@ -386,7 +386,7 @@
                                                             <ol class="space-y-1">
                                                                 {#each m.sources ?? [] as s, i (i)}
                                                                     <li
-                                                                        class="flex items-start gap-1 break-words">
+                                                                        class="flex items-start gap-1 wrap-break-word">
                                                                         <span
                                                                             class="text-slate-500"
                                                                             >{i +

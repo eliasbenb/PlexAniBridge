@@ -31,7 +31,7 @@
         <button
             type="button"
             onclick={() => toggle(k)}
-            class={`group relative cursor-pointer overflow-hidden rounded-md p-3 text-left transition select-none ${active === k ? "border-sky-500 bg-sky-950/40 ring-1 ring-sky-400/60" : "border border-slate-800 bg-gradient-to-br from-slate-900/70 to-slate-800/30 hover:border-slate-700"}`}
+            class={`group relative cursor-pointer overflow-hidden rounded-md p-3 text-left transition select-none ${active === k ? "border-sky-500 bg-sky-950/40 ring-1 ring-sky-400/60" : "border border-slate-800 bg-linear-to-br from-slate-900/70 to-slate-800/30 hover:border-slate-700"}`}
             title={active === k
                 ? "Click to remove filter"
                 : "Filter by " + value.label}>

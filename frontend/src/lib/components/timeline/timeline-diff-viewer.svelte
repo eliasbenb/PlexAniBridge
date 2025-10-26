@@ -52,7 +52,7 @@
             </button>
         </div>
         {#if ui.tab === "changes"}
-            <div class="flex min-w-[12rem] grow items-center gap-2 text-[11px]">
+            <div class="flex min-w-48 grow items-center gap-2 text-[11px]">
                 <div class="relative flex-1">
                     <Search
                         class="absolute top-1/2 left-1.5 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
@@ -101,8 +101,7 @@
                                     class="max-w-full rounded bg-slate-800/80 px-1.5 py-0.5 font-mono text-[10px] break-all text-slate-300 group-hover:bg-slate-700/80">
                                     {diff.path}
                                 </span>
-                                <div
-                                    class="flex min-w-[10rem] flex-1 items-start gap-1.5">
+                                <div class="flex min-w-40 flex-1 items-start gap-1.5">
                                     <span
                                         class={`min-w-0 break-all ${diff.status === "removed" ? "text-red-400" : diff.status === "changed" ? "text-red-300" : "text-slate-500"}`}
                                         >{truncateValue(diff.before)}</span>

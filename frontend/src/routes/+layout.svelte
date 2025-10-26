@@ -77,7 +77,7 @@
 
 <Tooltip.Provider>
     <div
-        class="min-h-dvh overflow-x-hidden bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-950 via-slate-950 to-slate-900 text-slate-100 antialiased selection:bg-blue-600/40 selection:text-white">
+        class="min-h-dvh overflow-x-hidden bg-[radial-gradient(ellipse_at_top,var(--tw-gradient-stops))] from-slate-950 via-slate-950 to-slate-900 text-slate-100 antialiased selection:bg-blue-600/40 selection:text-white">
         <!-- Toasts -->
         <ToastHost />
         <a
@@ -175,7 +175,7 @@
         <div class="flex min-h-dvh w-full flex-col lg:pl-64">
             <!-- Top bar -->
             <header
-                class="sticky top-0 z-20 flex h-14 w-full items-center gap-3 border-b border-slate-800/80 bg-slate-950/80 px-4 pb-[env(safe-area-inset-top)] backdrop-blur supports-[backdrop-filter]:bg-slate-950/65">
+                class="sticky top-0 z-20 flex h-14 w-full items-center gap-3 border-b border-slate-800/80 bg-slate-950/80 px-4 pb-[env(safe-area-inset-top)] backdrop-blur supports-backdrop-filter:bg-slate-950/65">
                 <button
                     type="button"
                     class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-700/70 bg-slate-800/70 text-slate-300 hover:bg-slate-700/70 hover:text-white focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none lg:hidden"

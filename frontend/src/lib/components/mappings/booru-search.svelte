@@ -510,7 +510,7 @@
                 trapFocus={false}
                 onOpenAutoFocus={(e) => e.preventDefault()}
                 updatePositionStrategy="always"
-                class="focus-override data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 z-50 mt-1 w-[var(--bits-popover-anchor-width)] max-w-[90vw] overflow-hidden rounded-md border border-slate-800/70 bg-slate-900/95 shadow-xl outline-hidden backdrop-blur supports-[backdrop-filter]:bg-slate-900/75"
+                class="focus-override data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 z-50 mt-1 w-(--bits-popover-anchor-width) max-w-[90vw] overflow-hidden rounded-md border border-slate-800/70 bg-slate-900/95 shadow-xl outline-hidden backdrop-blur supports-backdrop-filter:bg-slate-900/75"
                 onmouseenter={() => (pointerInPopover = true)}
                 onmouseleave={() => {
                     pointerInPopover = false;
