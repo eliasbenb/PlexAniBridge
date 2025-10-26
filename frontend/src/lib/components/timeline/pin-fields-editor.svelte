@@ -1,6 +1,4 @@
 <script lang="ts">
-    import { createEventDispatcher } from "svelte";
-
     import { LoaderCircle, Pin, PinOff, RefreshCcw } from "@lucide/svelte";
     import { SvelteSet } from "svelte/reactivity";
 
@@ -18,6 +16,9 @@
         missingMessage?: string | null;
         title?: string;
         subtitle?: string;
+        onChange?: (value: string[]) => void;
+        onSave?: (value: string[]) => void;
+        onRefresh?: (force: boolean) => void;
     }
 
     let {
@@ -32,13 +33,10 @@
         missingMessage = null,
         title = "Pin fields",
         subtitle = "Choose the fields to keep unchanged when syncing.",
+        onChange,
+        onSave,
+        onRefresh,
     }: Props = $props();
-
-    const dispatch = createEventDispatcher<{
-        change: { value: string[] };
-        save: { value: string[] };
-        refresh: { force: boolean };
-    }>();
 
     let selected = $state([...(Array.isArray(value) ? value : [])]);
     let internalBaseline = $state([...(Array.isArray(baseline) ? baseline : [])]);
@@ -64,7 +62,7 @@
         const next = [...fields];
         selected = next;
         value = [...next];
-        dispatch("change", { value: [...next] });
+        onChange?.([...next]);
     }
 
     function toggleField(value: string) {
@@ -95,11 +93,11 @@
 
     function saveSelection() {
         if (saving || !hasChanges || disabled) return;
-        dispatch("save", { value: [...selected] });
+        onSave?.([...selected]);
     }
 
     function refreshOptions(force: boolean) {
-        dispatch("refresh", { force });
+        onRefresh?.(force);
     }
 
     $effect(() => {
@@ -118,7 +116,7 @@
         <div
             class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 px-3 py-2">
             <div class="flex items-start gap-2 text-[10px]">
-                <Pin class="mt-[2px] h-3.5 w-3.5" />
+                <Pin class="mt-0.5 h-3.5 w-3.5" />
                 <div class="flex items-center gap-2">
                     <span class="font-semibold tracking-wide text-slate-100 uppercase">
                         {title}

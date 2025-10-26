@@ -41,7 +41,6 @@
             size="md"
             {loading}
             {onCancel}
-            on:cancel={onCancel}
             onSubmit={() => {
                 page = 1;
                 onLoad();
@@ -95,7 +94,6 @@
             size="md"
             {loading}
             {onCancel}
-            on:cancel={onCancel}
             onSubmit={() => {
                 page = 1;
                 onLoad();

@@ -348,21 +348,9 @@
     <TimelineManagePins
         {profile}
         {item}
-        on:draft={(event) =>
-            onPinsDraft?.(
-                item,
-                (event as CustomEvent<{ fields: string[] }>).detail.fields,
-            )}
-        on:saved={(event) =>
-            onPinsSaved?.(
-                item,
-                (event as CustomEvent<{ fields: string[] }>).detail.fields,
-            )}
-        on:busy={(event) =>
-            onPinsBusy?.(
-                item,
-                (event as CustomEvent<{ value: boolean }>).detail.value,
-            )} />
+        onDraft={(fields) => onPinsDraft?.(item, fields)}
+        onSaved={(fields) => onPinsSaved?.(item, fields)}
+        onBusy={(value) => onPinsBusy?.(item, value)} />
 {/if}
 
 <style>

@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { createEventDispatcher, onDestroy, onMount } from "svelte";
+    import { onDestroy, onMount } from "svelte";
 
     import PinFieldsEditor from "$lib/components/timeline/pin-fields-editor.svelte";
     import type { HistoryItem, PinFieldOption, PinResponse } from "$lib/types/api";
@@ -10,15 +10,12 @@
     interface Props {
         profile: string;
         item: HistoryItem;
+        onDraft?: (fields: string[]) => void;
+        onSaved?: (fields: string[]) => void;
+        onBusy?: (value: boolean) => void;
     }
 
-    let { profile, item }: Props = $props();
-
-    const dispatch = createEventDispatcher<{
-        draft: { fields: string[] };
-        saved: { fields: string[] };
-        busy: { value: boolean };
-    }>();
+    let { profile, item, onDraft, onSaved, onBusy }: Props = $props();
 
     let options: PinFieldOption[] = $state([]);
     let optionsLoading = $state(false);
@@ -38,13 +35,13 @@
     }
 
     function emitBusy(value: boolean) {
-        dispatch("busy", { value });
+        onBusy?.(value);
     }
 
     function setSelection(fields: string[], updateBaseline = false) {
         selected = [...fields];
         if (updateBaseline) baseline = [...fields];
-        dispatch("draft", { fields: [...fields] });
+        onDraft?.([...fields]);
     }
 
     async function loadOptions(force = false) {
@@ -94,7 +91,7 @@
                 );
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 setSelection([], true);
-                dispatch("saved", { fields: [] });
+                onSaved?.([]);
                 return;
             }
             const res = await apiFetch(
@@ -110,7 +107,7 @@
             const data = (await res.json()) as PinResponse;
             const next = data.fields ?? [];
             setSelection(next, true);
-            dispatch("saved", { fields: [...next] });
+            onSaved?.([...next]);
         } catch (e) {
             console.error("Failed to save pins", e);
             error = (e as Error)?.message || "Failed to save pins";
@@ -163,6 +160,6 @@
     title="Pin fields"
     subtitle="Choose the fields to keep unchanged for this entry when syncing."
     disabled={!hasAniListId}
-    on:save={(event) => void saveSelection(event.detail.value)}
-    on:refresh={(event) => void refreshAll(event.detail.force)}
-    on:change={(event) => dispatch("draft", { fields: [...event.detail.value] })} />
+    onSave={(value) => void saveSelection(value)}
+    onRefresh={(force) => void refreshAll(force)}
+    onChange={(value) => setSelection(value)} />

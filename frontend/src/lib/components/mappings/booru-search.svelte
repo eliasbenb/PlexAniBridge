@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { createEventDispatcher, onMount } from "svelte";
+    import { onMount } from "svelte";
 
     import { ArrowRight, LoaderCircle, Search } from "@lucide/svelte";
     import { Popover } from "bits-ui";
@@ -53,7 +53,6 @@
     let pointerInPopover = $state(false);
     const listId = `booru-suggestions-${Math.random().toString(36).slice(2, 8)}`;
 
-    const dispatch = createEventDispatcher<{ cancel: void }>();
     const ANILIST_WARNING_STORAGE_KEY = "mappings.anilist-warning-dismissed.v1";
     let warningDismissed = $state(false);
     const showAniListWarning = $derived(
@@ -392,7 +391,6 @@
     function handleActionClick() {
         if (loading) {
             onCancel?.();
-            dispatch("cancel");
             return;
         }
         closePopover();

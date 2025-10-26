@@ -241,7 +241,7 @@
         disabled: boolean;
         onSave: (value: string[]) => void;
         onChange: (value: string[]) => void;
-        onRefresh: () => void;
+        onRefresh: (force: boolean) => void;
     }
 </script>
 
@@ -405,9 +405,9 @@
                 {disabled}
                 title="Pin fields"
                 subtitle="Keep these fields unchanged for this entry when syncing."
-                on:save={(e) => onSave(e.detail.value as string[])}
-                on:change={(e) => onChange(e.detail.value as string[])}
-                on:refresh={onRefresh} />
+                {onSave}
+                {onChange}
+                onRefresh={(force) => onRefresh(force)} />
         {/if}
     </div>
 {/snippet}
@@ -538,7 +538,7 @@
                             onSave: (value: string[]) => save(aid, value),
                             onChange: (value: string[]) =>
                                 (selections[aid] = [...value]),
-                            onRefresh: () => ensureOptions(true),
+                            onRefresh: (force: boolean) => ensureOptions(force),
                         })}
                     {/each}
                 </div>
@@ -589,7 +589,7 @@
                             onSave: (value: string[]) => save(aid, value),
                             onChange: (value: string[]) =>
                                 (selections[aid] = [...value]),
-                            onRefresh: () => ensureOptions(true),
+                            onRefresh: (force: boolean) => ensureOptions(force),
                         })}
                     {/each}
                 </div>

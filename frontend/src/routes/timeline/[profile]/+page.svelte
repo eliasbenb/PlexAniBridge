@@ -504,8 +504,8 @@
         meta={OUTCOME_META}
         {stats}
         active={outcomeFilter}
-        on:toggle={(event) => toggleOutcomeFilter(event.detail)}
-        on:clear={() => ((outcomeFilter = null), loadFirst())} />
+        onToggle={toggleOutcomeFilter}
+        onClear={() => ((outcomeFilter = null), loadFirst())} />
 
     <div
         class="flex items-center gap-2 text-[11px] text-slate-500"

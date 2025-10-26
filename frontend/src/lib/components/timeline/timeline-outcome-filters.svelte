@@ -1,6 +1,4 @@
 <script lang="ts">
-    import { createEventDispatcher } from "svelte";
-
     import { Funnel, X } from "@lucide/svelte";
 
     import type { OutcomeMeta } from "$lib/components/timeline/types";
@@ -9,18 +7,18 @@
         meta: Record<string, OutcomeMeta>;
         stats: Record<string, number>;
         active?: string | null;
+        onToggle?: (key: string) => void;
+        onClear?: () => void;
     }
 
-    let { meta, stats, active = null }: Props = $props();
-
-    const dispatch = createEventDispatcher<{ toggle: string; clear: void }>();
+    let { meta, stats, active = null, onToggle, onClear }: Props = $props();
 
     function toggle(key: string) {
-        dispatch("toggle", key);
+        onToggle?.(key);
     }
 
     function clear() {
-        dispatch("clear");
+        onClear?.();
     }
 
     const activeMeta = () => (active ? (meta[active] ?? null) : null);
