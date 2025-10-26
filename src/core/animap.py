@@ -1,13 +1,14 @@
 """AniMap Client."""
 
 import json
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from hashlib import md5
 from itertools import batched
 from pathlib import Path
 from typing import Any
 
 from pydantic import ValidationError
+from sqlalchemy.orm import Session
 from sqlalchemy.sql import and_, delete, or_, select
 from sqlalchemy.sql.elements import ColumnElement
 
@@ -82,6 +83,36 @@ class AniMapClient:
             exc_tb: Traceback object if an exception occurred.
         """
         await self.close()
+
+    def _sync_provenance_rows(
+        self,
+        session: Session,
+        provenance_map: dict[int, list[str]],
+        anilist_ids: Iterable[int],
+    ) -> None:
+        """Ensure provenance rows match the sources observed during load."""
+        target_ids = [
+            anilist_id for anilist_id in anilist_ids if anilist_id in provenance_map
+        ]
+
+        if not target_ids:
+            return
+
+        for chunk in batched(target_ids, self._SQLITE_SAFE_VARIABLES, strict=False):
+            session.execute(
+                delete(AniMapProvenance).where(AniMapProvenance.anilist_id.in_(chunk))
+            )
+
+        rows_to_insert: list[AniMapProvenance] = []
+        for anilist_id in target_ids:
+            sources = provenance_map.get(anilist_id, [])
+            rows_to_insert.extend(
+                AniMapProvenance(anilist_id=anilist_id, n=i, source=source)
+                for i, source in enumerate(sources)
+            )
+
+        if rows_to_insert:
+            session.add_all(rows_to_insert)
 
     def _entries_are_equal(self, existing_entry: AniMap, new_entry: AniMap) -> bool:
         """Compare two AniMap entries for equality.
@@ -251,35 +282,12 @@ class AniMapClient:
                 ]
                 ctx.session.add_all(new_entries)
 
-                # Insert provenance rows (one per source with order 'n')
-                prov_rows = []
-                for anilist_id in to_insert:
-                    sources = provenance_map.get(anilist_id, [])
-                    for i, src in enumerate(sources):
-                        prov_rows.append(
-                            AniMapProvenance(anilist_id=anilist_id, n=i, source=src)
-                        )
-
-                if prov_rows:
-                    ctx.session.add_all(prov_rows)
-
             if to_update:
                 for entry in to_update:
                     ctx.session.merge(entry)
-                    anilist_id = entry.anilist_id
-                    sources = provenance_map.get(anilist_id, [])
-                    ctx.session.execute(
-                        delete(AniMapProvenance).where(
-                            AniMapProvenance.anilist_id == anilist_id
-                        )
-                    )
-                    if sources:
-                        ctx.session.add_all(
-                            [
-                                AniMapProvenance(anilist_id=anilist_id, n=i, source=src)
-                                for i, src in enumerate(sources)
-                            ]
-                        )
+
+            provenance_scope = new_ids & set(provenance_map.keys())
+            self._sync_provenance_rows(ctx.session, provenance_map, provenance_scope)
 
             ctx.session.merge(
                 Housekeeping(key="animap_mappings_hash", value=curr_mappings_hash)
