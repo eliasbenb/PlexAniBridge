@@ -170,7 +170,7 @@ class MappingOverridesService:
         sanitized: dict[str, Any] = {}
         for key, value in entry.items():
             key_str = str(key)
-            if key_str.startswith("$"):
+            if key_str.startswith("$") or key_str == "anilist_id":
                 continue
             spec = self._FIELD_SPECS.get(key_str)
             if not spec:
