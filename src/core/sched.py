@@ -466,7 +466,7 @@ class SchedulerClient:
 
                 log.info("Starting daily database sync")
                 try:
-                    await self.shared_animap_client._sync_db()
+                    await self.shared_animap_client.sync_db()
                     log.success("Daily database sync completed")
 
                     log.info("Reinitializing all AniList clients")

@@ -60,7 +60,7 @@ class AniMapClient:
             Exception: If database synchronization fails during initialization.
         """
         try:
-            await self._sync_db()
+            await self.sync_db()
         except Exception as e:
             log.error(f"Failed to sync database: {e}", exc_info=True)
             raise
@@ -101,7 +101,7 @@ class AniMapClient:
                 return False
         return True
 
-    async def _sync_db(self) -> None:
+    async def sync_db(self) -> None:
         """Synchronizes the local database with the mapping source."""
 
         def single_val_to_list(value: Any) -> list[Any] | None:
