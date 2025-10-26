@@ -198,7 +198,7 @@
     let jsonError = $state<string | null>(null);
     let loadingDetail = $state(false);
     let saving = $state(false);
-    let loadedDetailId: number | null = null;
+    let loadedDetailId: number | null = $state(null);
     let initialised = $state(false);
     let currentAbort: AbortController | null = null;
 
@@ -612,6 +612,14 @@
         }
     });
 
+    $effect(() => {
+        if (!open || mode !== "create") return;
+        const parsedInput = parseAnilistIdValue(anilistIdInput);
+        if (detail && (!parsedInput || parsedInput !== loadedDetailId)) {
+            detail = null;
+        }
+    });
+
     function handleAddSeason(fieldId: FieldId) {
         addSeasonRow(fieldId);
     }
@@ -827,8 +835,7 @@
             class="space-y-5 rounded-xl border border-slate-800/70 bg-slate-950/80 p-5 text-[11px] shadow-[0_24px_64px_-32px_rgba(2,6,23,0.9)] ring-1 ring-slate-900/60 backdrop-blur">
             <div
                 class="rounded-lg border border-slate-800/60 bg-linear-to-br from-slate-950/95 via-slate-950/80 to-slate-900/70 p-5 shadow-inner">
-                <div
-                    class={`grid gap-4 ${detail?.anilist ? "md:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]" : ""}`}>
+                <div class="grid gap-4 md:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
                     <div class="space-y-2">
                         <label
                             for="anilist-id"
@@ -843,33 +850,45 @@
                                 placeholder="e.g. 12345"
                                 bind:value={anilistIdInput}
                                 disabled={mode === "edit"} />
-                            {#if mode === "create"}
-                                <button
-                                    class="inline-flex h-9 items-center gap-1 rounded-lg border border-slate-700/70 bg-slate-900/60 px-3 text-[11px] font-semibold text-slate-200 transition hover:border-emerald-500/70 hover:bg-slate-900/80"
-                                    type="button"
-                                    onclick={loadEffectiveForCreate}>
-                                    {#if loadingDetail}
-                                        <Loader2 class="h-3.5 w-3.5 animate-spin" />
-                                    {:else}
-                                        <Globe class="h-3.5 w-3.5" />
-                                    {/if}
-                                    Prefill
-                                </button>
-                            {/if}
                         </div>
                         <p class="text-[10px] text-slate-500">
                             Provide an AniList anime identifier to inspect and override
                             downstream provider mappings.
                         </p>
                     </div>
-                    {#if detail?.anilist}
-                        {@const coverImage =
-                            detail.anilist?.coverImage?.medium ??
-                            detail.anilist?.coverImage?.large ??
-                            detail.anilist?.coverImage?.extraLarge ??
-                            null}
-                        <div
-                            class="h-full rounded-lg border border-slate-800/60 bg-linear-to-br from-slate-950/95 via-slate-950/80 to-slate-900/70 p-4 shadow-inner">
+                    <div
+                        class="h-full rounded-lg border border-slate-800/60 bg-linear-to-br from-slate-950/95 via-slate-950/80 to-slate-900/70 p-4 shadow-inner">
+                        {#if loadingDetail}
+                            <div class="flex min-w-0 animate-pulse items-start gap-3">
+                                <div class="block w-12 shrink-0">
+                                    <div class="h-16 w-full rounded-md bg-slate-800/40">
+                                    </div>
+                                </div>
+                                <div class="min-w-0 flex-1 space-y-3">
+                                    <div class="h-4 w-3/4 rounded bg-slate-800/40">
+                                    </div>
+                                    <div class="h-3 w-1/2 rounded bg-slate-800/40">
+                                    </div>
+                                    <div class="flex flex-wrap gap-1 pt-1">
+                                        <div class="h-3 w-16 rounded bg-slate-800/40">
+                                        </div>
+                                        <div class="h-3 w-14 rounded bg-slate-800/40">
+                                        </div>
+                                        <div class="h-3 w-12 rounded bg-slate-800/40">
+                                        </div>
+                                        <div class="h-3 w-10 rounded bg-slate-800/40">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        {:else if detail?.anilist}
+                            {@const pendingPrefillId =
+                                parseAnilistIdValue(anilistIdInput)}
+                            {@const coverImage =
+                                detail.anilist?.coverImage?.medium ??
+                                detail.anilist?.coverImage?.large ??
+                                detail.anilist?.coverImage?.extraLarge ??
+                                null}
                             <div class="flex min-w-0 items-start gap-3">
                                 <a
                                     href={`https://anilist.co/anime/${detail.anilist_id}`}
@@ -879,6 +898,33 @@
                                     {#if coverImage}
                                         <div
                                             class="relative h-16 w-full overflow-hidden rounded-md ring-1 ring-slate-700/60">
+                                            {#if mode === "create" && pendingPrefillId && pendingPrefillId !== loadedDetailId}
+                                                <div
+                                                    class="mt-4 rounded-lg border border-emerald-900/40 bg-emerald-950/20 p-3 text-[10px] text-emerald-200">
+                                                    <div
+                                                        class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                                        <div
+                                                            class="text-left font-medium">
+                                                            AniList ID changed. Load
+                                                            details for {pendingPrefillId}?
+                                                        </div>
+                                                        <button
+                                                            class="inline-flex h-8 items-center gap-1 rounded-lg border border-emerald-800/60 bg-emerald-900/40 px-3 text-[10px] font-semibold text-emerald-100 transition hover:border-emerald-600/70 hover:bg-emerald-900/60 disabled:opacity-60"
+                                                            type="button"
+                                                            disabled={loadingDetail}
+                                                            onclick={loadEffectiveForCreate}>
+                                                            {#if loadingDetail}
+                                                                <Loader2
+                                                                    class="h-3 w-3 animate-spin" />
+                                                            {:else}
+                                                                <Globe
+                                                                    class="h-3 w-3" />
+                                                            {/if}
+                                                            Prefill new ID
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            {/if}
                                             <img
                                                 alt={(preferredTitle(
                                                     detail.anilist.title,
@@ -948,8 +994,32 @@
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                    {/if}
+                        {:else if mode === "create"}
+                            <div
+                                class="flex h-full flex-col items-center justify-center gap-3 text-center text-[11px] text-slate-300">
+                                <button
+                                    class="inline-flex h-9 items-center gap-1 rounded-lg border border-slate-700/70 bg-slate-900/60 px-3 text-[11px] font-semibold text-slate-200 transition hover:border-emerald-500/70 hover:bg-slate-900/80"
+                                    type="button"
+                                    onclick={loadEffectiveForCreate}>
+                                    {#if loadingDetail}
+                                        <Loader2 class="h-3.5 w-3.5 animate-spin" />
+                                    {:else}
+                                        <Globe class="h-3.5 w-3.5" />
+                                    {/if}
+                                    Prefill from AniList
+                                </button>
+                                <p class="text-[10px] text-slate-500">
+                                    Fetch the current mapping details before creating
+                                    overrides.
+                                </p>
+                            </div>
+                        {:else}
+                            <div
+                                class="flex h-full items-center justify-center text-[11px] text-slate-500">
+                                No AniList details available.
+                            </div>
+                        {/if}
+                    </div>
                 </div>
             </div>
             {#if loadingDetail}
