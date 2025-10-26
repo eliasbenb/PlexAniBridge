@@ -9,6 +9,7 @@
         defaultColumns,
         type ColumnConfig,
     } from "$lib/components/mappings/columns";
+    import EditModal from "$lib/components/mappings/edit-modal.svelte";
     import MappingsTable from "$lib/components/mappings/mappings-table.svelte";
     import SearchBar from "$lib/components/mappings/tool-bar.svelte";
     import Pagination from "$lib/components/pagination.svelte";
@@ -26,6 +27,10 @@
     let loading = $state(false);
 
     let currentAbort: AbortController | null = null;
+
+    let editorOpen = $state(false);
+    let editorMode = $state<"create" | "edit">("create");
+    let editorTarget = $state<Mapping | null>(null);
 
     async function load() {
         const controller = new AbortController();
@@ -71,6 +76,52 @@
         currentAbort.abort();
         currentAbort = null;
         loading = false;
+    }
+
+    function openCreateEditor() {
+        editorMode = "create";
+        editorTarget = null;
+        editorOpen = true;
+    }
+
+    function handleEdit({ mapping }: { mapping: Mapping }) {
+        editorMode = "edit";
+        editorTarget = mapping;
+        editorOpen = true;
+    }
+
+    async function handleDelete({
+        mapping,
+        kind,
+    }: {
+        mapping: Mapping;
+        kind: "custom" | "full";
+    }) {
+        const message =
+            kind === "full"
+                ? "Are you sure you want to force all fields to null for this mapping?"
+                : "Reset custom override for this mapping and fall back to upstream?";
+        if (!confirm(message)) return;
+
+        const res = await apiFetch(
+            `/api/mappings/${mapping.anilist_id}?kind=${kind}`,
+            { method: "DELETE" },
+            {
+                successMessage:
+                    kind === "full"
+                        ? "Mapping explicitly set to null"
+                        : "Override removed",
+            },
+        );
+
+        if (res.ok) {
+            await load();
+        }
+    }
+
+    async function handleSaved() {
+        editorOpen = false;
+        await load();
     }
 
     let columns = $state<ColumnConfig[]>(restoreColumns());
@@ -145,7 +196,8 @@
             bind:page
             {loading}
             onLoad={load}
-            onCancel={cancelLoad} />
+            onCancel={cancelLoad}
+            onCreate={openCreateEditor} />
     </div>
     <div
         class="relative flex h-[70vh] flex-col overflow-hidden rounded-md border border-slate-800/70 bg-slate-900/40 backdrop-blur-sm">
@@ -230,7 +282,9 @@
         </div>
         <MappingsTable
             {items}
-            bind:columns />
+            bind:columns
+            onEdit={handleEdit}
+            onDelete={handleDelete} />
     </div>
     <Pagination
         class="mt-3"
@@ -239,3 +293,9 @@
         bind:pages
         onChange={load} />
 </div>
+
+<EditModal
+    bind:open={editorOpen}
+    mode={editorMode}
+    mapping={editorTarget}
+    onSaved={handleSaved} />

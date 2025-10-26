@@ -12,6 +12,7 @@
         loading?: boolean;
         onLoad: () => void;
         onCancel: () => void;
+        onCreate?: () => void;
     }
 
     let {
@@ -22,6 +23,7 @@
         loading = false,
         onLoad,
         onCancel,
+        onCreate,
     }: Props = $props();
 
     function toggleCustom() {
@@ -73,6 +75,7 @@
         <button
             title="New Override"
             aria-label="New Override"
+            onclick={() => onCreate?.()}
             class="inline-flex h-8 items-center gap-1 rounded-md bg-emerald-600/90 px-3 text-[11px] font-medium text-emerald-50 hover:bg-emerald-500">
             <Plus class="inline h-3.5 w-3.5 text-[14px]" />
         </button>
@@ -125,6 +128,7 @@
         <button
             title="New Override"
             aria-label="New Override"
+            onclick={() => onCreate?.()}
             class="inline-flex h-8 items-center gap-1 rounded-md bg-emerald-600/90 px-3 text-[11px] font-medium text-emerald-50 hover:bg-emerald-500">
             <Plus class="inline h-3.5 w-3.5 text-[14px]" />
         </button>

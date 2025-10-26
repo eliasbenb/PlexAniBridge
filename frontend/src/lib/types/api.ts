@@ -26,6 +26,23 @@ export interface Mapping {
     sources?: string[];
 }
 
+export type MappingOverrideMode = "omit" | "null" | "value";
+
+export interface MappingOverrideFieldInput {
+    mode: MappingOverrideMode;
+    value?: unknown;
+}
+
+export interface MappingOverridePayload {
+    anilist_id: number;
+    fields?: Record<string, MappingOverrideFieldInput> | null;
+    raw?: Record<string, unknown> | null;
+}
+
+export interface MappingDetail extends Mapping {
+    override?: Record<string, unknown> | null;
+}
+
 export interface ListMappingsResponse {
     items: Mapping[];
     total: number;
