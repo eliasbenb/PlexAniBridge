@@ -11,8 +11,8 @@
         page?: number;
         loading?: boolean;
         onLoad: () => void;
-        onNew: () => void;
         onCancel: () => void;
+        onCreate?: () => void;
     }
 
     let {
@@ -22,8 +22,8 @@
         page = $bindable(1),
         loading = false,
         onLoad,
-        onNew,
         onCancel,
+        onCreate,
     }: Props = $props();
 
     function toggleCustom() {
@@ -75,8 +75,8 @@
         <button
             title="New Override"
             aria-label="New Override"
-            class="inline-flex h-8 items-center gap-1 rounded-md bg-emerald-600/90 px-3 text-[11px] font-medium text-emerald-50 hover:bg-emerald-500"
-            onclick={onNew}>
+            onclick={() => onCreate?.()}
+            class="inline-flex h-8 items-center gap-1 rounded-md bg-emerald-600/90 px-3 text-[11px] font-medium text-emerald-50 hover:bg-emerald-500">
             <Plus class="inline h-3.5 w-3.5 text-[14px]" />
         </button>
     </div>
@@ -128,8 +128,8 @@
         <button
             title="New Override"
             aria-label="New Override"
-            class="inline-flex h-8 items-center gap-1 rounded-md bg-emerald-600/90 px-3 text-[11px] font-medium text-emerald-50 hover:bg-emerald-500"
-            onclick={onNew}>
+            onclick={() => onCreate?.()}
+            class="inline-flex h-8 items-center gap-1 rounded-md bg-emerald-600/90 px-3 text-[11px] font-medium text-emerald-50 hover:bg-emerald-500">
             <Plus class="inline h-3.5 w-3.5 text-[14px]" />
         </button>
     </div>

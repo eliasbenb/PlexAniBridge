@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { Tooltip } from "bits-ui";
+    import { Popover, Tooltip } from "bits-ui";
 
     import type { Mapping } from "$lib/types/api";
     import { preferredTitle } from "$lib/utils/anilist";
@@ -9,8 +9,8 @@
     export interface Props {
         items: Mapping[];
         columns?: ColumnConfig[];
-        onEdit: (m: Mapping) => void;
-        onDelete: (m: Mapping) => void;
+        onEdit?: (payload: { mapping: Mapping }) => void;
+        onDelete?: (payload: { mapping: Mapping; kind: "custom" | "full" }) => void;
     }
 
     let {
@@ -411,14 +411,41 @@
                                     <div
                                         class="flex justify-end gap-1 whitespace-nowrap">
                                         <button
-                                            onclick={() => onEdit(m)}
                                             class="inline-flex h-6 items-center rounded-md bg-slate-800 px-2 text-[11px] text-slate-200 hover:bg-slate-700"
+                                            onclick={() => onEdit?.({ mapping: m })}
                                             >Edit</button>
-                                        <button
-                                            onclick={() => onDelete(m)}
-                                            title="Delete mapping"
-                                            class="inline-flex h-6 items-center rounded-md bg-rose-700/70 px-2 text-[11px] text-rose-200 hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-35"
-                                            >Del</button>
+                                        <Popover.Root>
+                                            <Popover.Trigger
+                                                class="inline-flex h-6 items-center rounded-md bg-rose-700/70 px-2 text-[11px] text-rose-200 hover:bg-rose-600"
+                                                aria-label="Delete mapping options"
+                                                title="Delete mapping options">
+                                                Del
+                                            </Popover.Trigger>
+                                            <Popover.Content
+                                                align="end"
+                                                side="top"
+                                                sideOffset={6}
+                                                class="z-50 w-44 rounded-md border border-rose-800/60 bg-slate-950/95 p-2 text-left text-[11px] shadow-lg">
+                                                <div class="space-y-1">
+                                                    <Popover.Close
+                                                        class="flex w-full items-center justify-start rounded px-2 py-1 text-left text-[11px] text-slate-100 hover:bg-rose-900/60"
+                                                        onclick={() =>
+                                                            onDelete?.({
+                                                                mapping: m,
+                                                                kind: "custom",
+                                                            })}
+                                                        >Reset to upstream</Popover.Close>
+                                                    <Popover.Close
+                                                        class="flex w-full items-center justify-start rounded px-2 py-1 text-left text-[11px] text-rose-100 hover:bg-rose-900/60"
+                                                        onclick={() =>
+                                                            onDelete?.({
+                                                                mapping: m,
+                                                                kind: "full",
+                                                            })}
+                                                        >Remove mapping</Popover.Close>
+                                                </div>
+                                            </Popover.Content>
+                                        </Popover.Root>
                                     </div>
                                 {/if}
                             </td>

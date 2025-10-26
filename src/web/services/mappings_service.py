@@ -2,33 +2,26 @@
 
 import asyncio
 import calendar
-import json
 import re
 from collections import deque
 from collections.abc import Awaitable, Callable, Iterable, Mapping
-from dataclasses import dataclass
 from datetime import datetime, timedelta
 from functools import lru_cache
-from pathlib import Path
 from typing import Any, ClassVar
 
-import yaml
 from pyparsing import ParseResults
-from sqlalchemy import and_, delete, func, or_, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.sql import exists
 
-from src import log
 from src.config.database import db
 from src.config.settings import get_config
 from src.core.anilist import AniListClient
-from src.core.mappings import MappingsClient
 from src.exceptions import (
     AniListFilterError,
     AniListSearchError,
     BooruQueryEvaluationError,
     BooruQuerySyntaxError,
-    MissingAnilistIdError,
-    UnsupportedMappingFileExtensionError,
+    MappingNotFoundError,
 )
 from src.models.db.animap import AniMap
 from src.models.db.provenance import AniMapProvenance
@@ -65,16 +58,9 @@ from src.web.state import get_app_state
 __all__ = ["MappingsService", "get_mappings_service"]
 
 
-@dataclass
-class _ActiveFile:
-    path: Path
-    ext: str
-
-
 class MappingsService:
     """Service to manage custom mappings and DB provenance."""
 
-    _LIST_FIELDS: ClassVar[tuple[str, ...]] = ("imdb_id", "mal_id", "tmdb_movie_id")
     _FIELD_MAP: ClassVar[Mapping[str, QueryFieldSpec]] = get_query_field_map()
     _ANILIST_KINDS: ClassVar[frozenset[QueryFieldKind]] = frozenset(
         {
@@ -92,87 +78,7 @@ class MappingsService:
 
     def __init__(self) -> None:
         """Initialize service with config and paths."""
-        _config = get_config()
-        self.data_path: Path = _config.data_path
-        self.upstream_url: str | None = _config.mappings_url
-
-    def _active_custom_file(self) -> _ActiveFile:
-        """Determine the active custom mappings file (json/yaml/yml)."""
-        for fname in MappingsClient.MAPPING_FILES:
-            p = (self.data_path / fname).resolve()
-            if p.exists():
-                return _ActiveFile(path=p, ext=p.suffix.lstrip("."))
-        p = (self.data_path / "mappings.custom.yaml").resolve()
-        return _ActiveFile(path=p, ext="yaml")
-
-    def _load_custom(self) -> tuple[_ActiveFile, dict[str, Any]]:
-        """Load and parse the active custom mappings file."""
-        af = self._active_custom_file()
-        if not af.path.exists():
-            return af, {}
-
-        try:
-            if af.ext == "json":
-                return af, json.loads(af.path.read_text(encoding="utf-8"))
-            elif af.ext in ("yaml", "yml"):
-                return af, yaml.safe_load(af.path.read_text(encoding="utf-8")) or {}
-            raise UnsupportedMappingFileExtensionError(
-                f"Unsupported file extension: {af.ext}"
-            )
-        except Exception:
-            return af, {}
-
-    def _dump_custom(self, af: _ActiveFile, content: dict[str, Any]) -> None:
-        """Dump content to the active custom mappings file."""
-        af.path.parent.mkdir(parents=True, exist_ok=True)
-        if af.ext == "json":
-            af.path.write_text(
-                json.dumps(content, indent=2, ensure_ascii=False, sort_keys=True),
-                encoding="utf-8",
-            )
-        elif af.ext in ("yaml", "yml"):
-            af.path.write_text(
-                yaml.safe_dump(content, sort_keys=True, allow_unicode=True),
-                encoding="utf-8",
-            )
-        else:
-            raise UnsupportedMappingFileExtensionError(
-                f"Unsupported file extension: {af.ext}"
-            )
-
-    def _update_custom_file(
-        self,
-        anilist_id: int,
-        entry: Any,
-        *,
-        update_provenance: bool = True,
-        active_file: _ActiveFile | None = None,
-        content: dict[str, Any] | None = None,
-    ) -> None:
-        """Persists a mapping entry and optionally updates provenance ordering."""
-        if active_file and content is not None:
-            af, data = active_file, content
-        else:
-            af, data = self._load_custom()
-        data[str(anilist_id)] = entry
-        self._dump_custom(af, data)
-        if update_provenance:
-            self._set_provenance_custom_last(anilist_id, str(af.path))
-
-    @staticmethod
-    def _normalize_list_value(value: Any) -> list[Any] | None:
-        """Normalizes scalar or iterable inputs into list form."""
-        if value is None:
-            return None
-        return value if isinstance(value, list) else [value]
-
-    def _normalize_list_fields(
-        self, payload: dict[str, Any], fields: Iterable[str] | None = None
-    ) -> None:
-        """Applies list normalization across the provided payload fields."""
-        for field in fields or self._LIST_FIELDS:
-            if field in payload:
-                payload[field] = self._normalize_list_value(payload[field])
+        self.upstream_url: str | None = get_config().mappings_url
 
     @staticmethod
     def _fetch_ids(ctx, stmt) -> set[int]:
@@ -644,6 +550,48 @@ class MappingsService:
         )
         return item
 
+    async def get_mapping(
+        self,
+        anilist_id: int,
+        *,
+        with_anilist: bool = False,
+    ) -> dict[str, Any]:
+        """Fetch a single mapping entry by AniList identifier.
+
+        Args:
+            anilist_id (int): AniList identifier to retrieve.
+            with_anilist (bool): Include AniList metadata in the response.
+
+        Returns:
+            dict[str, Any]: Mapping payload suitable for API responses.
+
+        Raises:
+            MappingNotFoundError: If no mapping exists for the identifier.
+        """
+        with db() as ctx:
+            animap = ctx.session.get(AniMap, int(anilist_id))
+            if animap is None:
+                raise MappingNotFoundError("Mapping not found")
+
+            sources = self._collect_provenance(ctx, [anilist_id]).get(anilist_id, [])
+            item = self._build_item(anilist_id, animap, sources)
+
+        if with_anilist:
+            anilist_client = await get_app_state().ensure_public_anilist()
+            medias = await anilist_client.batch_get_anime([int(anilist_id)])
+            media_map = {m.id: m for m in medias}
+            media = media_map.get(int(anilist_id))
+            if media:
+                item["anilist"] = {
+                    field: getattr(media, field)
+                    for field in AniListMetadata.model_fields
+                    if hasattr(media, field)
+                }
+            else:
+                item["anilist"] = None
+
+        return item
+
     @staticmethod
     def _load_animaps(ctx, anilist_ids: Iterable[int]) -> dict[int, AniMap]:
         """Loads mapping models keyed by AniList identifier."""
@@ -656,149 +604,6 @@ class MappingsService:
         ).scalars():
             result[animap.anilist_id] = animap
         return result
-
-    def _set_provenance_custom_last(self, anilist_id: int, custom_src: str) -> None:
-        """Replace provenance entries so that custom is the last source."""
-        with db() as ctx:
-            if ctx.session.get(AniMap, anilist_id) is None:
-                return
-
-            ctx.session.execute(
-                delete(AniMapProvenance).where(
-                    AniMapProvenance.anilist_id == anilist_id
-                )
-            )
-
-            n = 0
-            rows: list[AniMapProvenance] = []
-            if self.upstream_url:
-                rows.append(
-                    AniMapProvenance(
-                        anilist_id=anilist_id, n=n, source=self.upstream_url
-                    )
-                )
-                n += 1
-
-            rows.append(
-                AniMapProvenance(anilist_id=anilist_id, n=n, source=str(custom_src))
-            )
-            ctx.session.add_all(rows)
-            ctx.session.commit()
-
-    def replace_mapping(self, mapping: dict[str, Any]) -> AniMap:
-        """Replace DB row with provided mapping and persist full mapping in custom file.
-
-        Args:
-            mapping (dict[str, Any]): Full mapping dict including anilist_id.
-
-        Returns:
-            AniMap: The up-to-date DB model.
-
-        Raises:
-            MissingAnilistIdError: If anilist_id is missing.
-            UnsupportedMappingFileExtensionError: If the custom file extension is
-                unsupported.
-        """
-        if "anilist_id" not in mapping:
-            raise MissingAnilistIdError("anilist_id is required")
-        anilist_id = int(mapping["anilist_id"])
-        log.info(f"Replacing mapping for anilist_id={anilist_id}")
-
-        defaults = {c.name: None for c in AniMap.__table__.columns}
-        payload: dict[str, Any] = {**defaults, **mapping, "anilist_id": anilist_id}
-
-        self._normalize_list_fields(payload)
-
-        with db() as ctx:
-            ctx.session.execute(delete(AniMap).where(AniMap.anilist_id == anilist_id))
-            obj = AniMap(**payload)
-            ctx.session.add(obj)
-            ctx.session.commit()
-
-        entry = {k: payload[k] for k in payload if k != "anilist_id"}
-        self._update_custom_file(anilist_id, entry)
-        log.success(f"Replaced mapping for anilist_id={anilist_id}")
-
-        return obj
-
-    def upsert_mapping(self, anilist_id: int, partial: dict[str, Any]) -> AniMap:
-        """Upsert DB row applying only provided fields and save partial overlay.
-
-        Args:
-            anilist_id (int): The AniList ID of the entry to upsert.
-            partial (dict[str, Any]): Partial mapping dict with fields to update.
-
-        Returns:
-            AniMap: The up-to-date DB model.
-
-        Raises:
-            UnsupportedMappingFileExtensionError: If the custom file extension is
-                unsupported.
-        """
-        log.info(f"Upserting mapping for anilist_id={anilist_id}")
-        updates: dict[str, Any] = {}
-        with db() as ctx:
-            obj = ctx.session.get(AniMap, anilist_id)
-            if not obj:
-                defaults = {c.name: None for c in AniMap.__table__.columns}
-                obj = AniMap(**{**defaults, "anilist_id": anilist_id})
-                ctx.session.add(obj)
-
-            for k, v in partial.items():
-                if k == "anilist_id":
-                    continue
-                if k not in AniMap.__table__.columns:
-                    continue
-                if k in self._LIST_FIELDS:
-                    normalized = self._normalize_list_value(v)
-                    setattr(obj, k, normalized)
-                    updates[k] = normalized
-                else:
-                    setattr(obj, k, v)
-                    updates[k] = v
-
-            ctx.session.commit()
-
-        af, content = self._load_custom()
-        existing = content.get(str(anilist_id))
-        entry: dict[str, Any] = existing.copy() if isinstance(existing, dict) else {}
-        entry.update(updates)
-        self._update_custom_file(
-            anilist_id,
-            entry,
-            active_file=af,
-            content=content,
-        )
-        log.success(f"Upserted mapping for anilist_id={anilist_id}")
-
-        return obj
-
-    def delete_mapping(self, anilist_id: int) -> None:
-        """Delete mapping from DB and shadow upstream by setting null in custom file.
-
-        Args:
-            anilist_id (int): The AniList ID of the entry to delete.
-
-        Raises:
-            UnsupportedMappingFileExtensionError: If the custom file extension is
-                unsupported.
-        """
-        log.info(f"Deleting mapping for anilist_id={anilist_id}")
-        with db() as ctx:
-            ctx.session.execute(
-                delete(AniMapProvenance).where(
-                    AniMapProvenance.anilist_id == anilist_id
-                )
-            )
-            ctx.session.execute(delete(AniMap).where(AniMap.anilist_id == anilist_id))
-            ctx.session.commit()
-
-        self._update_custom_file(
-            anilist_id,
-            None,
-            update_provenance=False,
-        )
-        log.success(f"Deleted mapping for anilist_id={anilist_id}")
 
     async def list_mappings(
         self,

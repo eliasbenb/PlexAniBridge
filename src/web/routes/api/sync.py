@@ -50,7 +50,7 @@ async def sync_database() -> OkResponse:
     scheduler = get_app_state().scheduler
     if not scheduler:
         raise SchedulerNotInitializedError("Scheduler not available")
-    await scheduler.shared_animap_client._sync_db()
+    await scheduler.shared_animap_client.sync_db()
     return OkResponse(ok=True)
 
 

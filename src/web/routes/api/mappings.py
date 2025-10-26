@@ -1,19 +1,20 @@
 """API endpoints for mappings."""
 
 import asyncio
+from enum import Enum
 from typing import Any
 
-from fastapi import HTTPException, Request
+from fastapi import Request
+from fastapi.exceptions import HTTPException
 from fastapi.param_functions import Query
 from fastapi.routing import APIRouter
-from pydantic import BaseModel
-from sqlalchemy import and_, func, select
+from pydantic import BaseModel, model_validator
 
-from src.config.database import db
-from src.exceptions import MappingIdMismatchError, MappingNotFoundError
-from src.models.db.animap import AniMap
-from src.models.db.provenance import AniMapProvenance
-from src.models.schemas.anilist import MediaWithoutList as AniListMetadata
+from src.exceptions import MappingIdMismatchError
+from src.models.schemas.anilist import MediaWithoutList
+from src.web.services.mapping_overrides_service import (
+    get_mapping_overrides_service,
+)
 from src.web.services.mappings_query_spec import (
     QueryFieldOperator,
     QueryFieldSpec,
@@ -21,7 +22,6 @@ from src.web.services.mappings_query_spec import (
     get_query_field_specs,
 )
 from src.web.services.mappings_service import get_mappings_service
-from src.web.state import get_app_state
 
 __all__ = ["router"]
 
@@ -38,7 +38,7 @@ class MappingItemModel(BaseModel):
     tvdb_id: int | None = None
     tmdb_mappings: dict[str, str] | None = None
     tvdb_mappings: dict[str, str] | None = None
-    anilist: AniListMetadata | None = None
+    anilist: MediaWithoutList | None = None
     custom: bool = False
     sources: list[str] = []
 
@@ -54,6 +54,67 @@ class ListMappingsResponse(BaseModel):
 
 class DeleteMappingResponse(BaseModel):
     ok: bool
+
+
+class MappingOverrideMode(str, Enum):
+    """Supported modes for mapping override fields."""
+
+    OMIT = "omit"
+    NULL = "null"
+    VALUE = "value"
+
+
+class MappingOverrideFieldInput(BaseModel):
+    """Input model for a single mapping override field."""
+
+    mode: MappingOverrideMode = MappingOverrideMode.VALUE
+    value: Any | None = None
+
+
+class MappingOverridePayload(BaseModel):
+    """Payload for creating or updating a mapping override."""
+
+    anilist_id: int
+    fields: dict[str, MappingOverrideFieldInput] | None = None
+    raw: dict[str, Any] | None = None
+
+    @model_validator(mode="after")
+    def _ensure_payload(self) -> "MappingOverridePayload":
+        """Ensure at least one of fields or raw is provided."""
+        if self.fields is None and self.raw is None:
+            raise ValueError("Either 'fields' or 'raw' must be provided")
+        return self
+
+
+class MappingDetailModel(MappingItemModel):
+    """Mapping model including override data."""
+
+    override: dict[str, Any] | None = None
+
+
+class OverrideDeleteKind(str, Enum):
+    """Supported deletion behaviours for mapping overrides."""
+
+    CUSTOM = "custom"
+    FULL = "full"
+
+
+def _prepare_override_kwargs(
+    payload: MappingOverridePayload,
+) -> dict[str, Any]:
+    """Prepare keyword arguments for mapping override service methods."""
+    fields_data: dict[str, Any] | None = None
+    if payload.fields:
+        fields_data = {}
+        for key, field in payload.fields.items():
+            data = field.model_dump(mode="json")
+            data["mode"] = field.mode.value
+            fields_data[key] = data
+    return {
+        "anilist_id": payload.anilist_id,
+        "fields": fields_data,
+        "raw": payload.raw,
+    }
 
 
 class FieldCapability(BaseModel):
@@ -147,222 +208,91 @@ async def list_mappings(
     )
 
 
-@router.post("", response_model=MappingItemModel)
-async def create_mapping(mapping: dict[str, Any]) -> MappingItemModel:
+@router.post("", response_model=MappingDetailModel)
+async def create_mapping(mapping: MappingOverridePayload) -> MappingDetailModel:
     """Create a new custom mapping.
 
     Args:
-        mapping (dict[str, Any]): The mapping data to create.
+        mapping (MappingOverridePayload): The mapping data to create.
 
     Returns:
-        dict[str, Any]: The created mapping.
+        MappingDetailModel: The created mapping detail including overrides.
 
     Raises:
         MissingAnilistIdError: If anilist_id is not provided.
         UnsupportedMappingFileExtensionError: If the custom file extension is
             unsupported.
     """
-    svc = get_mappings_service()
-    obj = svc.replace_mapping(mapping)
-
-    # Compute provenance to set flags
-    scheduler = get_app_state().scheduler
-    upstream_url = scheduler.global_config.mappings_url if scheduler else None
-    # Get last source via provenance
-    with db() as ctx:
-        sub = (
-            select(
-                AniMapProvenance.anilist_id, func.max(AniMapProvenance.n).label("maxn")
-            )
-            .where(AniMapProvenance.anilist_id == obj.anilist_id)
-            .group_by(AniMapProvenance.anilist_id)
-            .subquery()
-        )
-
-        src = ctx.session.execute(
-            select(AniMapProvenance.source).join(
-                sub,
-                and_(
-                    AniMapProvenance.anilist_id == sub.c.anilist_id,
-                    AniMapProvenance.n == sub.c.maxn,
-                ),
-            )
-        ).scalar_one_or_none()
-
-        # Fetch full ordered sources for this mapping
-        prov_list = (
-            ctx.session.execute(
-                select(AniMapProvenance.source)
-                .where(AniMapProvenance.anilist_id == obj.anilist_id)
-                .order_by(AniMapProvenance.n.asc())
-            )
-            .scalars()
-            .all()
-        )
-
-    return MappingItemModel(
-        anilist_id=obj.anilist_id,
-        anidb_id=obj.anidb_id,
-        imdb_id=obj.imdb_id,
-        mal_id=obj.mal_id,
-        tmdb_movie_id=obj.tmdb_movie_id,
-        tmdb_show_id=obj.tmdb_show_id,
-        tvdb_id=obj.tvdb_id,
-        tmdb_mappings=obj.tmdb_mappings,
-        tvdb_mappings=obj.tvdb_mappings,
-        custom=(src is not None and (not upstream_url or src != upstream_url)),
-        sources=list(prov_list),
-    )
+    svc = get_mapping_overrides_service()
+    payload = _prepare_override_kwargs(mapping)
+    data = await svc.save_override(**payload)
+    return MappingDetailModel(**data)
 
 
-@router.put("/{mapping_id}", response_model=MappingItemModel)
-async def update_mapping(mapping_id: int, mapping: dict[str, Any]) -> MappingItemModel:
+@router.put("/{mapping_id}", response_model=MappingDetailModel)
+async def update_mapping(
+    mapping_id: int, mapping: MappingOverridePayload
+) -> MappingDetailModel:
     """Update an existing custom mapping.
 
     Args:
         mapping_id (int): The ID of the mapping to update.
-        mapping (dict[str, Any]): The updated mapping data.
+        mapping (MappingOverridePayload): The updated mapping data.
 
     Returns:
-        dict[str, Any]: The updated mapping.
+        MappingDetailModel: The updated mapping detail.
 
     Raises:
         MappingIdMismatchError: If anilist_id in the body does not match the URL.
         UnsupportedMappingFileExtensionError: If the custom file extension is
             unsupported.
     """
-    if mapping.get("anilist_id") and int(mapping["anilist_id"]) != mapping_id:
-        raise MappingIdMismatchError("anilist_id in body does not match URL")
-
-    svc = get_mappings_service()
-    obj = svc.upsert_mapping(mapping_id, mapping)
-
-    scheduler = get_app_state().scheduler
-    upstream_url = scheduler.global_config.mappings_url if scheduler else None
-    with db() as ctx:
-        sub = (
-            select(
-                AniMapProvenance.anilist_id, func.max(AniMapProvenance.n).label("maxn")
-            )
-            .where(AniMapProvenance.anilist_id == obj.anilist_id)
-            .group_by(AniMapProvenance.anilist_id)
-            .subquery()
+    if mapping.anilist_id != mapping_id:
+        raise MappingIdMismatchError(
+            "anilist_id in body must match the mapping_id path parameter"
         )
 
-        src = ctx.session.execute(
-            select(AniMapProvenance.source).join(
-                sub,
-                and_(
-                    AniMapProvenance.anilist_id == sub.c.anilist_id,
-                    AniMapProvenance.n == sub.c.maxn,
-                ),
-            )
-        ).scalar_one_or_none()
-
-        prov_list = (
-            ctx.session.execute(
-                select(AniMapProvenance.source)
-                .where(AniMapProvenance.anilist_id == obj.anilist_id)
-                .order_by(AniMapProvenance.n.asc())
-            )
-            .scalars()
-            .all()
-        )
-
-    return MappingItemModel(
-        anilist_id=obj.anilist_id,
-        anidb_id=obj.anidb_id,
-        imdb_id=obj.imdb_id,
-        mal_id=obj.mal_id,
-        tmdb_movie_id=obj.tmdb_movie_id,
-        tmdb_show_id=obj.tmdb_show_id,
-        tvdb_id=obj.tvdb_id,
-        tmdb_mappings=obj.tmdb_mappings,
-        tvdb_mappings=obj.tvdb_mappings,
-        custom=(src is not None and (not upstream_url or src != upstream_url)),
-        sources=list(prov_list),
-    )
+    svc = get_mapping_overrides_service()
+    data = await svc.save_override(**_prepare_override_kwargs(mapping))
+    return MappingDetailModel(**data)
 
 
-@router.get("/{mapping_id}", response_model=MappingItemModel)
-async def get_mapping(mapping_id: int) -> MappingItemModel:
+@router.get("/{mapping_id}", response_model=MappingDetailModel)
+async def get_mapping(mapping_id: int) -> MappingDetailModel:
     """Retrieve a single mapping by ID.
 
     Args:
         mapping_id (int): The ID of the mapping to retrieve.
 
     Returns:
-        dict[str, Any]: The mapping data.
+        MappingDetailModel: The mapping data with override details.
 
     Raises:
         MappingNotFoundError: If the mapping does not exist.
     """
-    with db() as ctx:
-        obj = ctx.session.get(AniMap, mapping_id)
-        if not obj:
-            raise MappingNotFoundError("Mapping not found")
-
-        sub = (
-            select(
-                AniMapProvenance.anilist_id, func.max(AniMapProvenance.n).label("maxn")
-            )
-            .where(AniMapProvenance.anilist_id == obj.anilist_id)
-            .group_by(AniMapProvenance.anilist_id)
-            .subquery()
-        )
-
-        src = ctx.session.execute(
-            select(AniMapProvenance.source).join(
-                sub,
-                and_(
-                    AniMapProvenance.anilist_id == sub.c.anilist_id,
-                    AniMapProvenance.n == sub.c.maxn,
-                ),
-            )
-        ).scalar_one_or_none()
-
-    # Gather full provenance list for this mapping
-    scheduler = get_app_state().scheduler
-    upstream_url = scheduler.global_config.mappings_url if scheduler else None
-    with db() as ctx2:
-        prov_list = (
-            ctx2.session.execute(
-                select(AniMapProvenance.source)
-                .where(AniMapProvenance.anilist_id == obj.anilist_id)
-                .order_by(AniMapProvenance.n.asc())
-            )
-            .scalars()
-            .all()
-        )
-    return MappingItemModel(
-        anilist_id=obj.anilist_id,
-        anidb_id=obj.anidb_id,
-        imdb_id=obj.imdb_id,
-        mal_id=obj.mal_id,
-        tmdb_movie_id=obj.tmdb_movie_id,
-        tmdb_show_id=obj.tmdb_show_id,
-        tvdb_id=obj.tvdb_id,
-        tmdb_mappings=obj.tmdb_mappings,
-        tvdb_mappings=obj.tvdb_mappings,
-        custom=(src is not None and (not upstream_url or src != upstream_url)),
-        sources=list(prov_list),
-    )
+    svc = get_mapping_overrides_service()
+    data = await svc.get_mapping_detail(mapping_id)
+    return MappingDetailModel(**data)
 
 
 @router.delete("/{mapping_id}", response_model=DeleteMappingResponse)
-async def delete_mapping(mapping_id: int) -> DeleteMappingResponse:
+async def delete_mapping(
+    mapping_id: int,
+    kind: OverrideDeleteKind = OverrideDeleteKind.CUSTOM,
+) -> DeleteMappingResponse:
     """Delete a mapping.
 
     Args:
         mapping_id (int): The ID of the mapping to delete.
+        kind (OverrideDeleteKind): Deletion strategy to apply.
 
     Returns:
-        dict[str, Any]: A confirmation message.
+        DeleteMappingResponse: A confirmation message.
 
     Raises:
         UnsupportedMappingFileExtensionError: If the custom file extension is
             unsupported.
     """
-    svc = get_mappings_service()
-    svc.delete_mapping(mapping_id)
+    svc = get_mapping_overrides_service()
+    await svc.delete_override(mapping_id, mode=kind.value)
     return DeleteMappingResponse(ok=True)
