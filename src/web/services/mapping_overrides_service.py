@@ -205,9 +205,6 @@ class MappingOverridesService:
             entry[name] = spec.coerce(payload.get("value"))
         return entry
 
-    def _null_entry(self) -> dict[str, Any]:
-        return {name: None for name in self._FIELD_SPECS}
-
     async def _sync_database(self) -> None:
         scheduler = self._ensure_scheduler()
         await scheduler.shared_animap_client.sync_db()
@@ -289,14 +286,13 @@ class MappingOverridesService:
         *,
         mode: Literal["custom", "full"] = "custom",
     ) -> None:
-        """Remove an override or replace it with a full-null override entry.
+        """Remove an override or replace it with a null override marker.
 
         Args:
             anilist_id (int): The AniList ID of the mapping to modify.
             mode (Literal["custom", "full"]): The deletion mode. If "custom",
                 the override entry is removed entirely. If "full", the override
-                entry is replaced with a full-null entry to omit the mapping from
-                AniMap.
+                entry is replaced with a null value to omit the mapping from AniMap.
 
         Raises:
             MappingNotFoundError: If the mapping does not exist.
@@ -308,7 +304,7 @@ class MappingOverridesService:
             if mode == "custom":
                 raw.pop(key, None)
             else:
-                raw[key] = self._null_entry()
+                raw[key] = None
 
             self._write_raw(raw, path, fmt)
 

@@ -20,14 +20,6 @@
         onDelete,
     }: Props = $props();
 
-    function emitEdit(mapping: Mapping) {
-        onEdit?.({ mapping });
-    }
-
-    function emitDelete(mapping: Mapping, kind: "custom" | "full") {
-        onDelete?.({ mapping, kind });
-    }
-
     if (!columns.length) {
         columns = [...defaultColumns];
     }
@@ -420,7 +412,8 @@
                                         class="flex justify-end gap-1 whitespace-nowrap">
                                         <button
                                             class="inline-flex h-6 items-center rounded-md bg-slate-800 px-2 text-[11px] text-slate-200 hover:bg-slate-700"
-                                            onclick={() => emitEdit(m)}>Edit</button>
+                                            onclick={() => onEdit?.({ mapping: m })}
+                                            >Edit</button>
                                         <Popover.Root>
                                             <Popover.Trigger
                                                 class="inline-flex h-6 items-center rounded-md bg-rose-700/70 px-2 text-[11px] text-rose-200 hover:bg-rose-600"
@@ -437,13 +430,19 @@
                                                     <Popover.Close
                                                         class="flex w-full items-center justify-start rounded px-2 py-1 text-left text-[11px] text-slate-100 hover:bg-rose-900/60"
                                                         onclick={() =>
-                                                            emitDelete(m, "custom")}
+                                                            onDelete?.({
+                                                                mapping: m,
+                                                                kind: "custom",
+                                                            })}
                                                         >Reset to upstream</Popover.Close>
                                                     <Popover.Close
                                                         class="flex w-full items-center justify-start rounded px-2 py-1 text-left text-[11px] text-rose-100 hover:bg-rose-900/60"
                                                         onclick={() =>
-                                                            emitDelete(m, "full")}
-                                                        >Force explicit null</Popover.Close>
+                                                            onDelete?.({
+                                                                mapping: m,
+                                                                kind: "full",
+                                                            })}
+                                                        >Remove mapping</Popover.Close>
                                                 </div>
                                             </Popover.Content>
                                         </Popover.Root>

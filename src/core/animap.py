@@ -135,6 +135,21 @@ class AniMapClient:
                     invalid_count += 1
                     continue
 
+                if entry is None:
+                    # Null override entries clear all fields for the given AniList ID
+                    mappings[key] = {}
+                    valid_count += 1
+                    continue
+
+                if not isinstance(entry, dict):
+                    log.warning(
+                        "Found an invalid mapping entry "
+                        f"$${{anilist_id: {anilist_id}}}$$: expected an object"
+                    )
+                    mappings.pop(key)
+                    invalid_count += 1
+                    continue
+
                 try:
                     AniMap(
                         **{
