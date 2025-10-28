@@ -12,6 +12,33 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from src.models.db.base import Base
 
+MAPPING_PATTERN = re.compile(
+    r"""
+            (?:^|,)
+            (?:
+                (?P<is_ep_range>                # Episode range (e.g. e1-e4)
+                    e(?P<range_start>\d+)
+                    -
+                    e(?P<range_end>\d+)
+                )
+                |
+                (?P<is_open_ep_range_after>     # Open range after (e.g. e1-)
+                    e(?P<after_start>\d+)-(?=\||$|,)
+                )
+                |
+                (?P<is_single_ep>               # Single episode (e.g. e2)
+                    e(?P<single_ep>\d+)(?!-)
+                )
+                |
+                (?P<is_open_ep_range_before>    # Open range before (e.g. -e5)
+                    -e(?P<before_end>\d+)
+                )
+            )
+            (?:\|(?P<ratio>-?\d+))?            # Optional ratio for each range
+            """,
+    re.VERBOSE,
+)
+
 
 class EpisodeMapping(BaseModel):
     """Model for parsing and validating episode mapping patterns.
@@ -55,39 +82,12 @@ class EpisodeMapping(BaseModel):
             EpisodeMapping | None: New EpisodeMapping instance if pattern is valid, None
                                 otherwise
         """
-        PATTERN = re.compile(
-            r"""
-            (?:^|,)
-            (?:
-                (?P<is_ep_range>                # Episode range (e.g. e1-e4)
-                    e(?P<range_start>\d+)
-                    -
-                    e(?P<range_end>\d+)
-                )
-                |
-                (?P<is_open_ep_range_after>     # Open range after (e.g. e1-)
-                    e(?P<after_start>\d+)-(?=\||$|,)
-                )
-                |
-                (?P<is_single_ep>               # Single episode (e.g. e2)
-                    e(?P<single_ep>\d+)(?!-)
-                )
-                |
-                (?P<is_open_ep_range_before>    # Open range before (e.g. -e5)
-                    -e(?P<before_end>\d+)
-                )
-            )
-            (?:\|(?P<ratio>-?\d+))?            # Optional ratio for each range
-            """,
-            re.VERBOSE,
-        )
-
         service = service or ""
 
         if not s:
             return [cls(season=season, service=service)]
 
-        range_matches = list(PATTERN.finditer(s))
+        range_matches = list(MAPPING_PATTERN.finditer(s))
 
         episode_ranges = []
         for match in range_matches:
