@@ -39,7 +39,7 @@ services:
         volumes:
             - /path/to/plexanibridge/data:/config
         ports:
-         - 4848:4848
+            - 4848:4848
         restart: unless-stopped
 ```
 
