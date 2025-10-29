@@ -106,6 +106,10 @@ extend-immutable-calls = [
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
 [tool.uv.workspace]
 members = ["docs"]
 
@@ -114,4 +118,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [dependency-groups]
-dev = ["py-spy>=0.4.1", "ruff>=0.14.2"]
+dev = [
+    "py-spy>=0.4.1",
+    "pytest>=8.3.3",
+    "pytest-asyncio>=1.2.0",
+    "ruff>=0.14.2",
+]
