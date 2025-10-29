@@ -75,7 +75,7 @@ Source = "https://github.com/eliasbenb/PlexAniBridge"
 packages = ["scripts"]
 
 [tool.pyright]
-extraPaths = ["./src/stubs"]
+stubPath = "typings"
 include = ["main.py", "src"]
 
 [tool.ruff]
