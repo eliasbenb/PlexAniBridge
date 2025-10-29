@@ -34,7 +34,7 @@ jobs:
           echo "IMAGE_NAME_LC=$(echo ${{ github.event.repository.name }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
       
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ github.event.inputs.ref || github.ref }}
 
