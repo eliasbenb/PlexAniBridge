@@ -25,8 +25,8 @@ from src.exceptions import (
     PlexClientNotInitializedError,
     PlexUserNotFoundError,
 )
-from src.plexapi.community import PlexCommunityClient
-from src.plexapi.metadata import PlexMetadataServer
+from src.plex.community import PlexCommunityClient
+from src.plex.metadata import PlexMetadataServer
 from src.utils.requests import SelectiveVerifySession
 
 __all__ = ["Media", "MediaHistory", "PlexClient", "Section"]

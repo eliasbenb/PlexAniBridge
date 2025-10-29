@@ -39,6 +39,7 @@ The project has a set of developer scripts at `scripts/dev.py` to help with comm
 - Follow the coding standard. We use [ruff](https://docs.astral.sh/ruff/) for Python linting and [ESLint](https://eslint.org/) for JavaScript/TypeScript linting.
   - Run `python scripts/dev.py lint` to ensure your Python and Svelte code passes the linting rules.
   - Run `python scripts/dev.py format` to auto-format your Python and Svelte code.
+  - Run `python scripts/dev.py test` to run the test suite and ensure all tests pass.
 - Update or add documentation in the `docs/` directory if it affects usage.
 - Make sure any complex or non-obvious code is explained with comments. This helps maintain readability and ease of review.
 

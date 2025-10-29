@@ -62,6 +62,7 @@ pab-dev = "scripts.dev:dev"
 pab-format = "scripts.dev:format"
 pab-lint = "scripts.dev:lint"
 pab-start = "scripts.dev:start"
+pab-test = "scripts.dev:test"
 pab-openapi = "scripts.openapi:main"
 
 [project.urls]
@@ -74,7 +75,7 @@ Source = "https://github.com/eliasbenb/PlexAniBridge"
 packages = ["scripts"]
 
 [tool.pyright]
-extraPaths = ["./src/stubs"]
+stubPath = "typings"
 include = ["main.py", "src"]
 
 [tool.ruff]
@@ -106,6 +107,10 @@ extend-immutable-calls = [
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
 [tool.uv.workspace]
 members = ["docs"]
 
@@ -114,4 +119,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [dependency-groups]
-dev = ["py-spy>=0.4.1", "ruff>=0.14.2"]
+dev = [
+    "py-spy>=0.4.1",
+    "pytest>=8.3.3",
+    "pytest-asyncio>=1.2.0",
+    "ruff>=0.14.2",
+]
