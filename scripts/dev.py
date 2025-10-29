@@ -371,6 +371,27 @@ def lint() -> None:
         sys.exit(1)
 
 
+def test() -> None:
+    """Run the backend test suite."""
+    target = parse_target_args()
+
+    if target == "frontend":
+        print_error("Frontend does not have a pytest suite to run.")
+        sys.exit(1)
+
+    print_task("Running backend tests with pytest...")
+
+    try:
+        subprocess.run(["uv", "run", "pytest"], cwd=ROOT_DIR, check=True)
+        print_success("Pytest suite completed successfully!")
+    except subprocess.CalledProcessError:
+        print_error("Tests failed! Please fix the issues above.")
+        sys.exit(1)
+    except FileNotFoundError as e:
+        print_error(f"Tool not found: {e}")
+        sys.exit(1)
+
+
 def start() -> None:
     """Start the PlexAniBridge application."""
     target = parse_target_args()
@@ -413,6 +434,7 @@ def main() -> None:
             "dev",
             "format",
             "lint",
+            "test",
             "start",
         ],
         help="Command to execute",
@@ -443,6 +465,8 @@ def main() -> None:
             format()
         case "lint":
             lint()
+        case "test":
+            test()
         case "start":
             start()
         case _:

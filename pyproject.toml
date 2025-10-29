@@ -62,6 +62,7 @@ pab-dev = "scripts.dev:dev"
 pab-format = "scripts.dev:format"
 pab-lint = "scripts.dev:lint"
 pab-start = "scripts.dev:start"
+pab-test = "scripts.dev:test"
 pab-openapi = "scripts.openapi:main"
 
 [project.urls]
