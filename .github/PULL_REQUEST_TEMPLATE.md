@@ -21,6 +21,8 @@ YES - ###
 ### Checklist
 
 - [ ] I have performed a self-review of my own code
+- [ ] My code passes the test suite (`pytest`)
 - [ ] My code passes the code style checks of this project (`ruff check && (cd frontend && pnpm lint)`)
+- [ ] I have added tests that prove my fix is effective or that my feature works
 - [ ] I have commented my code, particularly in hard-to-understand areas
 - [ ] I have made changes to the documentation in `docs/` if applicable
