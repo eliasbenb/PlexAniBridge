@@ -45,9 +45,10 @@ class KeyTerm(Node):
 
 @dataclass
 class BareTerm(Node):
-    """A non-keyed term (word or quoted phrase) that searches AniList."""
+    """A non-keyed term (word or phrase) that searches AniList."""
 
     text: str
+    quoted: bool = False
 
 
 @dataclass
@@ -86,10 +87,10 @@ def _make_parser() -> pp.ParserElement:
     identifier = identifier.setParseAction(lambda _s, _loc, t: str(t[0]).lower())
 
     integer = pp.Word(pp.nums)
-    word = pp.Word(pp.alphanums + "_-.:/@*?\\")
-    qstring = pp.QuotedString('"', escChar="\\", unquoteResults=True) | pp.QuotedString(
-        "'", escChar="\\", unquoteResults=True
-    )
+    word_token = pp.Word(pp.alphanums + "_-.:/@*?\\")
+    qstring_token = pp.QuotedString(
+        '"', escChar="\\", unquoteResults=True
+    ) | pp.QuotedString("'", escChar="\\", unquoteResults=True)
 
     # Tokens for comparisons and ranges
     cmp_op = pp.oneOf("> >= < <=", caseless=False)
@@ -97,7 +98,9 @@ def _make_parser() -> pp.ParserElement:
     range_val = pp.Combine(pp.Word(pp.nums) + pp.Literal("..") + pp.Word(pp.nums))
 
     # Normalize value to string
-    value = (qstring | range_val | cmp_val | word | integer).setParseAction(
+    value_word = word_token.copy()
+    value_qstring = qstring_token.copy()
+    value = (value_qstring | range_val | cmp_val | value_word | integer).setParseAction(
         lambda _s, _loc, toks: str(toks[0])
     )
 
@@ -109,9 +112,13 @@ def _make_parser() -> pp.ParserElement:
     )
 
     # Normalize bare term to string
-    bare = (qstring | word).setParseAction(
-        lambda _s, _loc, toks: BareTerm(text=str(toks[0]))
+    bare_word = word_token.copy().setParseAction(
+        lambda _s, _loc, toks: BareTerm(text=str(toks[0]), quoted=False)
     )
+    bare_qstring = qstring_token.copy().setParseAction(
+        lambda _s, _loc, toks: BareTerm(text=str(toks[0]), quoted=True)
+    )
+    bare = bare_qstring | bare_word
 
     # Define syntax grammar
     LPAR, RPAR = map(pp.Suppress, "()")
@@ -198,6 +205,56 @@ def _make_parser() -> pp.ParserElement:
 PARSER = _make_parser()
 
 
+def _merge_unquoted_bare_terms(node: Node) -> Node:
+    """Group consecutive unquoted bare terms into single phrase terms."""
+    if isinstance(node, BareTerm):
+        return node
+
+    if isinstance(node, Not):
+        merged_child = _merge_unquoted_bare_terms(node.child)
+        return Not(child=cast(Node, merged_child), _ids=node._ids)
+
+    if isinstance(node, Or):
+        merged_children = [
+            cast(Node, _merge_unquoted_bare_terms(child)) for child in node.children
+        ]
+        return Or(merged_children)
+
+    if isinstance(node, And):
+        merged_children: list[Node] = []
+        buffer: list[BareTerm] = []
+
+        def _flush_buffer() -> None:
+            """Flush buffered unquoted bare terms into a phrase term."""
+            if not buffer:
+                return
+            if len(buffer) == 1:
+                merged_children.append(buffer[0])
+            else:
+                phrase = " ".join(term.text for term in buffer)
+                merged_children.append(BareTerm(text=phrase, quoted=False))
+            buffer.clear()
+
+        for child in node.children:
+            merged_child = _merge_unquoted_bare_terms(child)
+            if isinstance(merged_child, BareTerm) and not merged_child.quoted:
+                buffer.append(merged_child)
+                continue
+
+            _flush_buffer()
+            merged_children.append(cast(Node, merged_child))
+
+        _flush_buffer()
+
+        if not merged_children:
+            return And([])
+        if len(merged_children) == 1:
+            return merged_children[0]
+        return And(merged_children)
+
+    return node
+
+
 def parse_query(q: str) -> Node:
     """Parse the booru-like query string into an AST Node.
 
@@ -220,24 +277,23 @@ def parse_query(q: str) -> Node:
         raise BooruQuerySyntaxError(str(exc)) from exc
     node_any = res[0]
 
+    node: Node
+
     # Normalize single grouped result
     if (
         isinstance(node_any, list)
         and len(node_any) == 1
         and isinstance(node_any[0], Node)
     ):
-        return cast(Node, node_any[0])
+        node = cast(Node, node_any[0])
+    elif isinstance(node_any, Node):
+        node = node_any
+    elif isinstance(node_any, list) and node_any and isinstance(node_any[0], Node):
+        node = cast(Node, node_any[0])
+    else:
+        raise BooruQuerySyntaxError("Invalid parsed AST for query")
 
-    if isinstance(node_any, Node):
-        return node_any
-
-    # Fallback: try to unwrap one level
-    if isinstance(node_any, list) and node_any:
-        first = node_any[0]
-        if isinstance(first, Node):
-            return first
-
-    raise BooruQuerySyntaxError("Invalid parsed AST for query")
+    return _merge_unquoted_bare_terms(node)
 
 
 @dataclass
