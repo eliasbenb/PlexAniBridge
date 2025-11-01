@@ -36,6 +36,36 @@ def test_collect_helpers_preserve_order_and_deduplicate():
     ]
 
 
+def test_parse_query_auto_groups_unquoted_terms_into_phrase():
+    """Unquoted multi-word AniList searches should auto-merge into one term."""
+    node = bq.parse_query("Full Metal Panic")
+
+    assert isinstance(node, bq.BareTerm)
+    assert node.text == "Full Metal Panic"
+    assert node.quoted is False
+
+
+def test_parse_query_merges_phrase_alongside_filters():
+    """Ensure filters with trailing phrase auto-merge remaining bare terms."""
+    node = bq.parse_query("anilist.status:FINISHED Full Metal Panic")
+
+    assert isinstance(node, bq.And)
+    assert len(node.children) == 2
+    assert isinstance(node.children[0], bq.KeyTerm)
+    assert isinstance(node.children[1], bq.BareTerm)
+    assert node.children[1].text == "Full Metal Panic"
+
+
+def test_parse_query_keeps_or_terms_separate():
+    """OR-separated AniList terms should remain distinct."""
+    node = bq.parse_query("Naruto | Shippuden")
+
+    assert isinstance(node, bq.Or)
+    assert all(isinstance(term, bq.BareTerm) for term in node.children)
+    texts = [term.text for term in node.children if isinstance(term, bq.BareTerm)]
+    assert texts == ["Naruto", "Shippuden"]
+
+
 def test_evaluate_combines_or_group_with_and_filters():
     """Test that evaluate combines OR groups with AND filters."""
     node = bq.parse_query('~"Naruto" ~"Bleach" anilist.genre:action')
