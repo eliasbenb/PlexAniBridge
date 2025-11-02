@@ -66,6 +66,40 @@ def test_parse_query_keeps_or_terms_separate():
     assert texts == ["Naruto", "Shippuden"]
 
 
+def test_parse_query_bare_phrase_with_non_alphanumeric():
+    """Phrases containing non-alphanumeric characters should be parsed correctly."""
+    node = bq.parse_query("Full Metal Panic!")
+
+    assert isinstance(node, bq.BareTerm)
+    assert node.text == "Full Metal Panic!"
+
+
+def test_parse_query_bare_phrase_with_restricted_characters():
+    """Phrases containing restricted characters should be parsed correctly."""
+    node = bq.parse_query("Hello (World)")
+    assert isinstance(node, bq.BareTerm)
+    # Parentheses are parsed as a group, which gets simplified down to just the text
+    assert node.text == "Hello World"
+
+    node = bq.parse_query("Test-Case")
+    assert isinstance(node, bq.BareTerm)
+    assert node.text == "Test-Case"
+
+    node = bq.parse_query("Hello-World")
+    assert isinstance(node, bq.BareTerm)
+    assert node.text == "Hello-World"
+
+    node = bq.parse_query("Hello (World) | Test-Case | Hello-World")
+    assert isinstance(node, bq.Or)
+    assert all(isinstance(term, bq.BareTerm) for term in node.children)
+    texts = [term.text for term in node.children if isinstance(term, bq.BareTerm)]
+    assert texts == ["Hello World", "Test-Case", "Hello-World"]
+
+    node = bq.parse_query("Hello (There World)")
+    assert isinstance(node, bq.BareTerm)
+    assert node.text == "Hello There World"
+
+
 def test_evaluate_combines_or_group_with_and_filters():
     """Test that evaluate combines OR groups with AND filters."""
     node = bq.parse_query('~"Naruto" ~"Bleach" anilist.genre:action')
