@@ -87,7 +87,9 @@ def _make_parser() -> pp.ParserElement:
     identifier = identifier.setParseAction(lambda _s, _loc, t: str(t[0]).lower())
 
     integer = pp.Word(pp.nums)
-    word_token = pp.Word(pp.alphanums + "_-.:/@*?\\")
+    restricted_chars = {"(", ")", "|", "~", '"', "'"}
+    word_chars = "".join(ch for ch in pp.printables if ch not in restricted_chars)
+    word_token = pp.Word(word_chars)
     qstring_token = pp.QuotedString(
         '"', escChar="\\", unquoteResults=True
     ) | pp.QuotedString("'", escChar="\\", unquoteResults=True)

@@ -20,7 +20,7 @@ def test_parse_query_invalid_raises_custom_error():
     with pytest.raises(BooruQuerySyntaxError):
         bq.parse_query('unclosed "quote')
     with pytest.raises(BooruQuerySyntaxError):
-        bq.parse_query("invalid ! operator")
+        bq.parse_query("foo | | bar")
 
 
 def test_collect_helpers_preserve_order_and_deduplicate():
