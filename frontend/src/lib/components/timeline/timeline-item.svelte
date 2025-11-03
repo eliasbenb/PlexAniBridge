@@ -110,7 +110,7 @@
                 href={coverHref}
                 target="_blank"
                 rel="noopener"
-                class="timeline-cover block h-20 w-14 shrink-0">
+                class="timeline-cover block shrink-0">
                 {#if coverImage(item)}
                     <div
                         class="timeline-cover-frame relative h-full w-full overflow-hidden rounded-md border border-slate-800 bg-slate-800/40">
@@ -130,7 +130,7 @@
             </a>
             <!-- eslint-enable svelte/no-navigation-without-resolve -->
         {:else if coverImage(item)}
-            <div class="timeline-cover h-20 w-14 shrink-0">
+            <div class="timeline-cover shrink-0">
                 <div
                     class="timeline-cover-frame relative h-full w-full overflow-hidden rounded-md border border-slate-800 bg-slate-800/40">
                     <img
@@ -143,11 +143,11 @@
             </div>
         {:else}
             <div
-                class="timeline-cover timeline-cover-fallback flex h-20 w-14 shrink-0 items-center justify-center rounded-md border border-dashed border-slate-700 bg-slate-800/30 text-[9px] text-slate-500 select-none">
+                class="timeline-cover timeline-cover-fallback flex shrink-0 items-center justify-center rounded-md border border-dashed border-slate-700 bg-slate-800/30 text-[9px] text-slate-500 select-none">
                 No Art
             </div>
         {/if}
-        <div class="flex max-h-20 min-w-0 flex-1 flex-col overflow-hidden">
+        <div class="flex max-h-[78px] min-w-0 flex-1 flex-col overflow-hidden">
             <header class="flex items-start gap-2">
                 <div class="min-w-0 flex-1 space-y-1.5">
                     <div class="flex items-center gap-x-2 gap-y-1 whitespace-nowrap">
@@ -395,18 +395,23 @@
 {/if}
 
 <style>
-    :global(.chip-scroll) {
+    .timeline-cover {
+        aspect-ratio: 3 / 4;
+        height: 78px;
+        width: 54px;
+    }
+    .chip-scroll {
         -webkit-overflow-scrolling: touch;
         scrollbar-width: none;
     }
-    :global(.chip-scroll::-webkit-scrollbar) {
+    .chip-scroll::-webkit-scrollbar {
         display: none;
     }
-    :global(.diff-toggle) {
+    .diff-toggle {
         position: relative;
         transition: color 0.25s ease;
     }
-    :global(.diff-toggle.open) {
+    .diff-toggle.open {
         animation: diffPulse 900ms ease;
     }
     @keyframes diffPulse {
@@ -420,27 +425,12 @@
             text-shadow: 0 0 0 rgba(56, 189, 248, 0);
         }
     }
-    :global(.diff-toggle .diff-icon) {
-        transition: transform 220ms ease;
-    }
-    :global(.diff-toggle.open .diff-icon) {
-        transform: rotate(90deg) scale(1.05);
-    }
-    :global(.diff-toggle:not(.open):hover .diff-icon) {
-        transform: rotate(6deg);
-    }
-    :global(.diff-toggle:disabled) {
+    .diff-toggle:disabled {
         cursor: not-allowed;
         opacity: 0.6;
     }
     @media (prefers-reduced-motion: reduce) {
-        :global(.diff-toggle .diff-icon),
-        :global(.diff-toggle.open .diff-icon),
-        :global(.diff-toggle:not(.open):hover .diff-icon) {
-            transition: none;
-            transform: none;
-        }
-        :global(.diff-toggle.open) {
+        .diff-toggle.open {
             animation: none;
         }
     }
