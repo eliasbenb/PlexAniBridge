@@ -19,6 +19,7 @@ services:
             # PAB_DESTRUCTIVE_SYNC: False
             # PAB_EXCLUDED_SYNC_FIELDS: '["notes", "score"]'
             # PAB_DRY_RUN: False
+            # PAB_BACKUP_RETENTION_DAYS: 30
             # PAB_BATCH_REQUESTS: False
             # PAB_SEARCH_FALLBACK_THRESHOLD=-1
             # PAB_PROFILES__example__$FIELD=$VALUE

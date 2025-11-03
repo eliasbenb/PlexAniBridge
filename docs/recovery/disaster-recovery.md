@@ -24,7 +24,7 @@ You can work with these backups in two ways:
 
 !!! warning
 
-    Backups are automatically deleted after 7 days (rolling retention). If you need to keep a snapshot longer, save it in a safe location.
+    Backups are kept for 30 days by default. Adjust [BACKUP_RETENTION_DAYS](../configuration.md#backup_retention_days) if you need a longer retention window.
 
 ### Viewing & Restoring Backups in the Web UI
 

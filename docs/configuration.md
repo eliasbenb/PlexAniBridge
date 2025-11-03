@@ -238,6 +238,14 @@ When enabled:
 
 ---
 
+### `BACKUP_RETENTION_DAYS`
+
+`int` (Optional, default: `30`)
+
+Controls how many days PlexAniBridge keeps AniList backup snapshots before pruning older files. Set to `0` to disable automatic cleanup and retain all backups indefinitely.
+
+---
+
 ### `BATCH_REQUESTS`
 
 `bool` (Optional, default: `False`)

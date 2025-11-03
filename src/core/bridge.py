@@ -59,6 +59,7 @@ class BridgeClient:
             backup_dir=profile_config.data_path / "backups",
             dry_run=profile_config.dry_run,
             profile_name=profile_name,
+            backup_retention_days=profile_config.backup_retention_days,
         )
 
         self.plex_client = PlexClient(

@@ -12,6 +12,7 @@ plex_url: ...
 # destructive_sync: false
 # excluded_sync_fields: ["notes", "score"]
 # dry_run: false
+# backup_retention_days: 30
 # batch_requests: false
 # search_fallback_threshold: -1
 

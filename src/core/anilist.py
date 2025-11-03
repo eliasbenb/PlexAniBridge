@@ -49,7 +49,7 @@ class AniListClient:
     """
 
     API_URL = "https://graphql.anilist.co"
-    BACKUP_RETENTION_DAYS = 7
+    BACKUP_RETENTION_DAYS = 30
 
     def __init__(
         self,
@@ -57,6 +57,7 @@ class AniListClient:
         backup_dir: Path | None,
         dry_run: bool,
         profile_name: str | None,
+        backup_retention_days: int | None = None,
     ) -> None:
         """Initialize the AniList client.
 
@@ -66,12 +67,19 @@ class AniListClient:
             backup_dir (Path | None): Directory path where backup files will be stored
             dry_run (bool): If True, simulates API calls without making actual changes
             profile_name (str | None): Owning profile name; optional in public mode
+            backup_retention_days (int | None): Days to retain backups before cleanup;
+                defaults to BACKUP_RETENTION_DAYS when None.
         """
         self.anilist_token = anilist_token
         self.backup_dir = backup_dir
         self.dry_run = dry_run
         self.profile_name = profile_name or "public"
         self._session: aiohttp.ClientSession | None = None
+        self.backup_retention_days = (
+            self.BACKUP_RETENTION_DAYS
+            if backup_retention_days is None
+            else backup_retention_days
+        )
 
         self.offline_anilist_entries: dict[int, Media] = {}
 
@@ -738,9 +746,9 @@ class AniListClient:
     async def backup_anilist(self) -> None:
         """Creates a JSON backup of the user's AniList data.
 
-        Fetches all anime entries from the user's lists and saves them to a JSON file.
-        Implements a rotating backup system that maintains backups for
-        BACKUP_RETENTION_DAYS.
+        Fetches all anime entries from the user's lists and saves them to a JSON
+        file. Implements a rotating backup system that maintains backups for the
+        configured retention period.
 
         The backup includes:
             - User information
@@ -826,7 +834,10 @@ class AniListClient:
         backup_file.write_text(data_without_media.model_dump_json())
         log.info(f"Exported AniList data to $$'{backup_file}'$$")
 
-        cutoff_date = datetime.now() - timedelta(days=self.BACKUP_RETENTION_DAYS)
+        if self.backup_retention_days <= 0:
+            return
+
+        cutoff_date = datetime.now() - timedelta(days=self.backup_retention_days)
 
         retention_pattern = f"plexanibridge-{self.profile_name}.*.json"
         for file in self.backup_dir.glob(retention_pattern):

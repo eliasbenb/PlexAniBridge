@@ -244,6 +244,13 @@ class PlexAnibridgeProfileConfig(BaseModel):
     search_fallback_threshold: int = Field(
         default=-1, ge=-1, le=100, description="Fuzzy search threshold"
     )
+    backup_retention_days: int = Field(
+        default=30,
+        ge=0,
+        description=(
+            "Days to retain AniList backups before cleanup (0 disables cleanup)"
+        ),
+    )
 
     _parent: PlexAnibridgeConfig | None = None
 
@@ -406,6 +413,13 @@ class PlexAnibridgeConfig(BaseSettings):
         ge=-1,
         le=100,
         description="Global default search fallback threshold",
+    )
+    backup_retention_days: int | None = Field(
+        default=None,
+        ge=0,
+        description=(
+            "Global default backup retention period in days (0 disables cleanup)"
+        ),
     )
 
     @staticmethod
