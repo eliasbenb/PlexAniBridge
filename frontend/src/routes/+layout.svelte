@@ -8,7 +8,6 @@
         LayoutDashboard,
         List,
         Menu,
-        RotateCw,
         Settings,
         Terminal,
         X,
@@ -187,29 +186,19 @@
                         <Menu class="inline h-4 w-4" />
                     {/if}
                 </button>
-                <div class="flex flex-1 items-center gap-3">
-                    <div
-                        class="hidden items-center gap-2 rounded-md border border-slate-700/60 bg-slate-900/60 px-3 py-1.5 text-xs text-slate-400 sm:flex"
-                        aria-live="polite">
-                        <span class="relative flex h-2 w-2">
-                            <span
-                                class={`absolute inline-flex h-full w-full rounded-md ${isWsOpen ? "animate-ping bg-blue-500/60" : "bg-amber-500/40"}`}
-                            ></span>
-                            <span
-                                class={`relative inline-flex h-2 w-2 rounded-md ${isWsOpen ? "bg-blue-500" : "bg-amber-500"}`}
-                            ></span>
-                        </span>
-                        <span class="font-medium">{isWsOpen ? "Live" : "Offline"}</span>
-                    </div>
-                </div>
-                <div class="flex items-center gap-2">
-                    <button
-                        type="button"
-                        class="btn-base border border-slate-700/70 bg-slate-800/70 text-slate-300 hover:bg-slate-700/70 hover:text-white focus-visible:ring-blue-500"
-                        onclick={() => location.reload()}>
-                        <RotateCw class="inline h-4 w-4" />
-                        <span class="hidden sm:inline">Refresh</span>
-                    </button>
+                <div
+                    class="ml-auto hidden items-center gap-2 rounded-md border border-slate-700/60 bg-slate-900/60 px-3 py-1.5 text-xs text-slate-400 sm:flex"
+                    aria-live="polite"
+                    title={isWsOpen ? "Live connection established" : "Offline"}>
+                    <span class="relative flex h-2 w-2">
+                        <span
+                            class={`absolute inline-flex h-full w-full rounded-md ${isWsOpen ? "animate-ping bg-blue-500/60" : "bg-amber-500/40"}`}
+                        ></span>
+                        <span
+                            class={`relative inline-flex h-2 w-2 rounded-md ${isWsOpen ? "bg-blue-500" : "bg-amber-500"}`}
+                        ></span>
+                    </span>
+                    <span class="font-medium">{isWsOpen ? "Live" : "Offline"}</span>
                 </div>
             </header>
             <!-- Page content area -->
