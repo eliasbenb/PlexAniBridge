@@ -28,6 +28,7 @@ def build_openapi_json() -> str:
         spec,
         ensure_ascii=True,
         sort_keys=True,
+        indent=4,
     )
 
 
