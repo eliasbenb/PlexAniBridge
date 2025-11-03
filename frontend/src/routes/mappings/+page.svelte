@@ -5,6 +5,9 @@
     import { Checkbox, Popover } from "bits-ui";
     import { SvelteURLSearchParams } from "svelte/reactivity";
 
+    import { browser } from "$app/environment";
+    import { goto } from "$app/navigation";
+    import { resolve } from "$app/paths";
     import {
         defaultColumns,
         type ColumnConfig,
@@ -32,13 +35,42 @@
     let editorMode = $state<"create" | "edit">("create");
     let editorTarget = $state<Mapping | null>(null);
 
-    async function load() {
+    let pendingReplaceState: boolean | null = null;
+
+    function queuePushState() {
+        pendingReplaceState = false;
+    }
+
+    function syncQueryParam(replaceState: boolean) {
+        if (!browser) return;
+        const params = new SvelteURLSearchParams();
+        const trimmed = query.trim();
+        if (trimmed) params.set("q", query);
+        const search = params.toString();
+        let target = resolve("/mappings");
+        if (search) target += `?${search}`;
+        const current = window.location.pathname + window.location.search;
+        if (current === target) return;
+        goto(target, { replaceState, keepFocus: true, noScroll: true });
+    }
+
+    async function load(trigger?: Event | { type: string }) {
+        if (
+            trigger &&
+            "preventDefault" in trigger &&
+            typeof trigger.preventDefault === "function"
+        ) {
+            trigger.preventDefault();
+        }
         const controller = new AbortController();
         if (currentAbort) {
             currentAbort.abort();
         }
         currentAbort = controller;
         loading = true;
+        const replaceState = pendingReplaceState ?? true;
+        pendingReplaceState = null;
+        syncQueryParam(replaceState);
         try {
             const p = new SvelteURLSearchParams({
                 page: String(page),
@@ -70,6 +102,15 @@
             }
         }
     }
+    async function navigateToQuery(nextQuery: string) {
+        const value = nextQuery.trim();
+        if (!value) return;
+        query = value;
+        page = 1;
+        queuePushState();
+        await load();
+    }
+
 
     function cancelLoad() {
         if (!currentAbort) return;
@@ -176,7 +217,19 @@
         }
     });
 
-    onMount(load);
+    onMount(() => {
+        if (!browser) return;
+        try {
+            const params = new SvelteURLSearchParams(window.location.search);
+            const initial = params.get("q");
+            if (initial !== null) {
+                query = initial;
+            }
+        } catch (error) {
+            console.error("Failed to parse initial mappings query", error);
+        }
+        load();
+    });
 </script>
 
 <div class="space-y-6">
