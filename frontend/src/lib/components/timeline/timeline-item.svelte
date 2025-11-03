@@ -209,31 +209,31 @@
                             {/if}
 
                             <span
-                                class="inline-flex items-center rounded bg-slate-800/70 px-1.5 py-0.5 tracking-wide text-slate-200 uppercase">
+                                class="inline-flex items-center rounded bg-slate-800/70 px-1.5 py-0.5 tracking-wide text-slate-400 uppercase">
                                 {new Date(item.timestamp + "Z").toLocaleString()}
                             </span>
                             {#if item.anilist?.format}
                                 <span
-                                    class="inline-flex items-center rounded bg-slate-800/70 px-1.5 py-0.5 tracking-wide text-slate-200 uppercase">
+                                    class="inline-flex items-center rounded bg-slate-800/70 px-1.5 py-0.5 tracking-wide text-slate-400 uppercase">
                                     {item.anilist.format}
                                 </span>
                             {/if}
                             {#if item.anilist?.status}
                                 <span
-                                    class="inline-flex items-center rounded bg-slate-800/70 px-1.5 py-0.5 tracking-wide text-slate-200 uppercase">
+                                    class="inline-flex items-center rounded bg-slate-800/70 px-1.5 py-0.5 tracking-wide text-slate-400 uppercase">
                                     {item.anilist.status}
                                 </span>
                             {/if}
                             {#if item.anilist?.season && item.anilist?.seasonYear}
                                 <span
-                                    class="inline-flex items-center rounded bg-slate-800/70 px-1.5 py-0.5 tracking-wide text-slate-200 uppercase">
+                                    class="inline-flex items-center rounded bg-slate-800/70 px-1.5 py-0.5 tracking-wide text-slate-400 uppercase">
                                     {item.anilist.season}
                                     {item.anilist.seasonYear}
                                 </span>
                             {/if}
                             {#if item.anilist?.episodes}
                                 <span
-                                    class="inline-flex items-center rounded bg-slate-800/70 px-1.5 py-0.5 text-slate-200">
+                                    class="inline-flex items-center rounded bg-slate-800/70 px-1.5 py-0.5 text-slate-400">
                                     EP {item.anilist.episodes}
                                 </span>
                             {/if}
@@ -274,7 +274,7 @@
                                         >{openDiff ? "Hide diff" : "Show diff"}</span>
                                     {#if diffCount !== undefined}
                                         <span
-                                            class="rounded bg-slate-900/80 px-1 text-[10px] font-semibold text-slate-200">
+                                            class="rounded bg-slate-800/70 px-1 text-[10px] font-semibold text-slate-200">
                                             {diffCount}
                                         </span>
                                     {/if}
@@ -324,7 +324,7 @@
                                         >{openPins ? "Hide pins" : "Show pins"}</span>
                                     {#if pinCount !== undefined}
                                         <span
-                                            class="rounded bg-slate-900/80 px-1 text-[10px] font-semibold text-slate-200">
+                                            class="rounded bg-slate-800/70 px-1 text-[10px] font-semibold text-slate-200">
                                             {pinCount}
                                         </span>
                                     {/if}
