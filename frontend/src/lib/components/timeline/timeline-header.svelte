@@ -37,11 +37,13 @@
     const percent = () => progressPercent(currentSync) ?? 0;
 </script>
 
-<div class="flex flex-wrap items-center gap-2">
-    <History class="inline h-4 w-4 text-slate-300" />
-    <h2 class="text-lg font-semibold">Sync Timeline</h2>
-    <span class="text-xs text-slate-500">profile: <i>{profile}</i></span>
-    <div class="ml-auto flex items-center gap-2 text-[11px]">
+<div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <div class="flex items-center gap-2">
+        <History class="inline h-4 w-4 text-slate-300" />
+        <h2 class="text-lg font-semibold">Sync Timeline</h2>
+        <span class="text-xs text-slate-500">profile: <i>{profile}</i></span>
+    </div>
+    <div class="flex items-center gap-2 text-[11px]">
         <button
             onclick={onFullSync}
             type="button"

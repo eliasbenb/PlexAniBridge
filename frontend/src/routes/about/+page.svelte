@@ -429,7 +429,7 @@
                 rel="noreferrer noopener"
                 class="group flex h-full items-stretch gap-3 rounded-md border border-slate-800/70 bg-slate-900/50 p-4 transition-colors hover:bg-slate-900/70">
                 <div
-                    class="flex aspect-square h-full items-center justify-center rounded-md bg-slate-800/50 text-slate-300 transition-colors group-hover:bg-slate-800/70">
+                    class="flex h-full w-16 items-center justify-center rounded-md bg-slate-800/50 text-slate-300 transition-colors group-hover:bg-slate-800/70">
                     <Github class="h-6 w-6" />
                 </div>
                 <div class="flex flex-1 flex-col justify-center text-left">
@@ -450,7 +450,7 @@
                 rel="noreferrer noopener"
                 class="group flex h-full items-stretch gap-3 rounded-md border border-slate-800/70 bg-slate-900/50 p-4 transition-colors hover:bg-slate-900/70">
                 <div
-                    class="flex aspect-square h-full items-center justify-center rounded-md bg-slate-800/50 text-slate-300 transition-colors group-hover:bg-slate-800/70">
+                    class="flex h-full w-16 items-center justify-center rounded-md bg-slate-800/50 text-slate-300 transition-colors group-hover:bg-slate-800/70">
                     <Box class="h-6 w-6" />
                 </div>
                 <div class="flex flex-1 flex-col justify-center text-left">
@@ -469,12 +469,12 @@
                 rel="noreferrer noopener"
                 class="group flex h-full items-stretch gap-3 rounded-md border border-slate-800/70 bg-slate-900/50 p-4 transition-colors hover:bg-slate-900/70">
                 <div
-                    class="flex aspect-square h-full items-center justify-center rounded-md bg-slate-800/50 text-slate-300 transition-colors group-hover:bg-slate-800/70">
+                    class="flex h-full w-16 items-center justify-center rounded-md bg-slate-800/50 text-slate-300 transition-colors group-hover:bg-slate-800/70">
                     <FileText class="h-6 w-6" />
                 </div>
                 <div class="flex flex-1 flex-col justify-center text-left">
                     <div class="text-sm font-semibold text-slate-100">
-                        Documentation Portal
+                        Documentation
                     </div>
                     <p class="mt-1 text-xs text-slate-400">
                         Installation guides, configuration examples, and FAQs.
@@ -490,7 +490,7 @@
                 rel="noreferrer noopener"
                 class="group flex h-full items-stretch gap-3 rounded-md border border-slate-800/70 bg-slate-900/50 p-4 transition-colors hover:bg-slate-900/70">
                 <div
-                    class="flex aspect-square h-full items-center justify-center rounded-md bg-slate-800/50 text-slate-300 transition-colors group-hover:bg-slate-800/70">
+                    class="flex h-full w-16 items-center justify-center rounded-md bg-slate-800/50 text-slate-300 transition-colors group-hover:bg-slate-800/70">
                     <MessageCircle class="h-6 w-6" />
                 </div>
                 <div class="flex flex-1 flex-col justify-center text-left">
