@@ -219,3 +219,10 @@
         </Modal>
     {/if}
 </div>
+
+<style>
+    td,
+    th {
+        white-space: nowrap;
+    }
+</style>
