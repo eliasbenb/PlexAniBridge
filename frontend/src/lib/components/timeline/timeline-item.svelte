@@ -1,4 +1,6 @@
 <script lang="ts">
+    import type { Snippet } from "svelte";
+
     import {
         ExternalLink,
         Hash,
@@ -18,35 +20,49 @@
     import type { ItemDiffUi, OutcomeMeta } from "$lib/components/timeline/types";
     import type { HistoryItem } from "$lib/types/api";
 
+    export interface PinsPanelContext {
+        item: HistoryItem;
+        profile: string;
+        openPins: boolean;
+        pinCount?: number;
+        pinButtonLoading: boolean;
+        pinButtonDisabled: boolean;
+        togglePins?: (item: HistoryItem) => void;
+        data?: unknown;
+    }
+
     interface Props {
         item: HistoryItem;
         meta: OutcomeMeta;
         displayTitle: (item: HistoryItem) => string | null;
         coverImage: (item: HistoryItem) => string | null;
-        anilistUrl: (item: HistoryItem) => string | null;
-        plexUrl: (item: HistoryItem) => string | null;
-        canRetry: (item: HistoryItem) => boolean;
-        retryHistory: (item: HistoryItem) => void;
+        anilistUrl?: (item: HistoryItem) => string | null;
+        plexUrl?: (item: HistoryItem) => string | null;
+        canRetry?: (item: HistoryItem) => boolean;
+        retryHistory?: (item: HistoryItem) => void;
         retryLoading?: boolean;
         isProfileRunning?: boolean;
-        canUndo: (item: HistoryItem) => boolean;
-        undoHistory: (item: HistoryItem) => void;
+        canUndo?: (item: HistoryItem) => boolean;
+        undoHistory?: (item: HistoryItem) => void;
         undoLoading?: boolean;
-        deleteHistory: (item: HistoryItem) => void;
-        canShowDiff: (item: HistoryItem) => boolean;
-        toggleDiff: (id: number) => void;
+        deleteHistory?: (item: HistoryItem) => void;
+        canShowDiff?: (item: HistoryItem) => boolean;
+        toggleDiff?: (id: number) => void;
         openDiff?: boolean;
-        ensureDiffUi: (id: number) => ItemDiffUi;
+        ensureDiffUi?: (id: number) => ItemDiffUi;
         diffCount?: number;
         hasPins?: boolean;
         togglePins?: (item: HistoryItem) => void;
         openPins?: boolean;
         pinButtonLoading?: boolean;
+        pinButtonDisabled?: boolean;
         pinCount?: number;
         profile: string;
         onPinsDraft?: (item: HistoryItem, fields: string[]) => void;
         onPinsSaved?: (item: HistoryItem, fields: string[]) => void;
         onPinsBusy?: (item: HistoryItem, value: boolean) => void;
+        pinsPanel?: Snippet<[PinsPanelContext]>;
+        pinsPanelData?: unknown;
     }
 
     let {
@@ -54,18 +70,18 @@
         meta,
         displayTitle,
         coverImage,
-        anilistUrl,
-        plexUrl,
-        canRetry,
-        retryHistory,
+        anilistUrl = () => null,
+        plexUrl = () => null,
+        canRetry = () => false,
+        retryHistory = () => undefined,
         retryLoading = false,
         isProfileRunning = false,
-        canUndo,
-        undoHistory,
+        canUndo = () => false,
+        undoHistory = () => undefined,
         undoLoading = false,
         deleteHistory,
-        canShowDiff,
-        toggleDiff,
+        canShowDiff = () => false,
+        toggleDiff = () => undefined,
         openDiff = false,
         ensureDiffUi,
         diffCount,
@@ -73,11 +89,14 @@
         togglePins,
         openPins = false,
         pinButtonLoading = false,
+        pinButtonDisabled = false,
         pinCount,
         profile,
         onPinsDraft,
         onPinsSaved,
         onPinsBusy,
+        pinsPanel,
+        pinsPanelData,
     }: Props = $props();
 
     function mappingUrl(item: HistoryItem): string | null {
@@ -94,8 +113,33 @@
     }
     const coverHref = anilistUrl(item);
 
-    const ui = () => ensureDiffUi(item.id);
+    const fallbackDiffUi: ItemDiffUi = {
+        tab: "changes",
+        filter: "",
+        showUnchanged: false,
+    };
+
+    const ui = () => ensureDiffUi?.(item.id) ?? fallbackDiffUi;
+
+    function formatTimestamp(raw?: string): string | null {
+        if (!raw) return null;
+        const normalized = raw.endsWith("Z") || raw.endsWith("z") ? raw : `${raw}Z`;
+        const value = new Date(normalized);
+        if (Number.isNaN(value.getTime())) return null;
+        return value.toLocaleString();
+    }
+
+    const timestampLabel = $derived(formatTimestamp(item.timestamp));
 </script>
+
+{#snippet DefaultPins(props: PinsPanelContext)}
+    <TimelineManagePins
+        profile={props.profile}
+        item={props.item}
+        onDraft={(fields) => onPinsDraft?.(props.item, fields)}
+        onSaved={(fields) => onPinsSaved?.(props.item, fields)}
+        onBusy={(value) => onPinsBusy?.(props.item, value)} />
+{/snippet}
 
 <div
     class="group relative flex items-stretch gap-3 overflow-hidden rounded-md border border-slate-800 bg-slate-900/60 p-3 shadow-sm backdrop-blur-sm transition-shadow hover:shadow-md sm:p-4">
@@ -208,10 +252,12 @@
                                 <!-- eslint-enable svelte/no-navigation-without-resolve -->
                             {/if}
 
-                            <span
-                                class="inline-flex items-center rounded bg-slate-800/70 px-1.5 py-0.5 tracking-wide text-slate-400 uppercase">
-                                {new Date(item.timestamp + "Z").toLocaleString()}
-                            </span>
+                            {#if timestampLabel}
+                                <span
+                                    class="inline-flex items-center rounded bg-slate-800/70 px-1.5 py-0.5 tracking-wide text-slate-200 uppercase">
+                                    {timestampLabel}
+                                </span>
+                            {/if}
                             {#if item.anilist?.format}
                                 <span
                                     class="inline-flex items-center rounded bg-slate-800/70 px-1.5 py-0.5 tracking-wide text-slate-400 uppercase">
@@ -243,7 +289,7 @@
                                     title="ADULT content">ADULT</span>
                             {/if}
                         </div>
-                        <div class="flex items-center gap-2">
+                        <div class="mt-2 flex items-center gap-2">
                             {#if canShowDiff(item)}
                                 <button
                                     type="button"
@@ -290,7 +336,7 @@
                                     aria-expanded={openPins}
                                     aria-pressed={openPins}
                                     aria-busy={pinButtonLoading}
-                                    disabled={pinButtonLoading}>
+                                    disabled={pinButtonLoading || pinButtonDisabled}>
                                     <span
                                         class="relative inline-flex h-4 w-4 items-center justify-center overflow-hidden">
                                         {#if openPins}
@@ -368,13 +414,15 @@
                             {/if}
                         </button>
                     {/if}
-                    <button
-                        type="button"
-                        onclick={() => deleteHistory(item)}
-                        class="inline-flex h-8 w-8 items-center justify-center gap-1 rounded-md border border-red-600/80 bg-red-700/70 px-2 text-[10px] font-medium text-red-100 hover:bg-red-600/70"
-                        title="Delete history entry">
-                        <Trash2 class="inline h-4 w-4" />
-                    </button>
+                    {#if deleteHistory}
+                        <button
+                            type="button"
+                            onclick={() => deleteHistory?.(item)}
+                            class="inline-flex h-8 w-8 items-center justify-center gap-1 rounded-md border border-red-600/80 bg-red-700/70 px-2 text-[10px] font-medium text-red-100 hover:bg-red-600/70"
+                            title="Delete history entry">
+                            <Trash2 class="inline h-4 w-4" />
+                        </button>
+                    {/if}
                 </div>
             </header>
         </div>
@@ -386,12 +434,16 @@
         ui={ui()} />
 {/if}
 {#if openPins && hasPins}
-    <TimelineManagePins
-        {profile}
-        {item}
-        onDraft={(fields) => onPinsDraft?.(item, fields)}
-        onSaved={(fields) => onPinsSaved?.(item, fields)}
-        onBusy={(value) => onPinsBusy?.(item, value)} />
+    {@render (pinsPanel ?? DefaultPins)({
+        item,
+        profile,
+        openPins,
+        pinCount,
+        pinButtonLoading,
+        pinButtonDisabled,
+        togglePins,
+        data: pinsPanelData,
+    })}
 {/if}
 
 <style>

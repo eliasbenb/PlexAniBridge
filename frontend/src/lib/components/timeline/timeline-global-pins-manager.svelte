@@ -1,20 +1,16 @@
 <script lang="ts">
     import { onMount } from "svelte";
 
-    import {
-        ExternalLink,
-        LoaderCircle,
-        Pin,
-        RefreshCcw,
-        Search,
-        SquareMinus,
-        SquarePlus,
-        X,
-    } from "@lucide/svelte";
+    import { LoaderCircle, Pin, RefreshCcw, Search, X } from "@lucide/svelte";
 
     import PinFieldsEditor from "$lib/components/timeline/pin-fields-editor.svelte";
+    import TimelineItem, {
+        type PinsPanelContext,
+    } from "$lib/components/timeline/timeline-item.svelte";
+    import type { OutcomeMeta } from "$lib/components/timeline/types";
     import type { MediaWithoutList as AniListMediaWithoutList } from "$lib/types/anilist";
     import type {
+        HistoryItem,
         PinFieldOption,
         PinListResponse,
         PinResponse,
@@ -58,19 +54,74 @@
     let selections: Record<RowKey, string[]> = $state({});
     let baselines: Record<RowKey, string[]> = $state({});
 
-    const titleOf = (m?: AniListMediaWithoutList | null) =>
-        preferredTitle(m?.title) || (m?.id ? `AniList ${m.id}` : "Unknown");
+    const PINNED_META: OutcomeMeta = {
+        label: "Pinned",
+        color: "bg-fuchsia-700/60",
+        icon: Pin,
+        order: 0,
+    };
 
-    const coverOf = (m?: AniListMediaWithoutList | null): string | null =>
-        m?.coverImage?.large ||
-        m?.coverImage?.medium ||
-        m?.coverImage?.extraLarge ||
+    const SEARCH_META: OutcomeMeta = {
+        label: "Search",
+        color: "bg-sky-700/60",
+        icon: Search,
+        order: 1,
+    };
+
+    interface PinsPanelData {
+        value: string[];
+        baseline: string[];
+        options: PinFieldOption[];
+        optionsLoading: boolean;
+        saving: boolean;
+        error: string | null;
+        optionsError: string | null;
+        disabled: boolean;
+        onSave: (value: string[]) => void;
+        onChange: (value: string[]) => void;
+        onRefresh: (force: boolean) => void;
+    }
+
+    const timelineDisplayTitle = (item: HistoryItem): string | null =>
+        preferredTitle(item.anilist?.title) ||
+        (item.anilist_id ? `AniList ${item.anilist_id}` : null) ||
+        "Unknown";
+
+    const timelineCoverImage = (item: HistoryItem): string | null =>
+        item.anilist?.coverImage?.large ||
+        item.anilist?.coverImage?.medium ||
+        item.anilist?.coverImage?.extraLarge ||
         null;
 
-    const anilistUrlFor = (m?: AniListMediaWithoutList | null): string | null => {
-        if (!m?.id) return null;
-        return `https://anilist.co/anime/${m.id}`;
+    const timelineAnilistUrl = (item: HistoryItem): string | null => {
+        const id = item.anilist?.id || item.anilist_id;
+        if (!id) return null;
+        return `https://anilist.co/anime/${id}`;
     };
+
+    const timelinePlexUrl = () => null;
+
+    function toHistoryItem(
+        aid: number,
+        pin: PinResponse | null | undefined,
+        anilist: AniListMediaWithoutList | null,
+        outcome: string,
+    ): HistoryItem {
+        const timestamp = pin?.updated_at || pin?.created_at || "";
+        return {
+            id: aid,
+            profile_name: profile,
+            anilist_id: aid,
+            outcome,
+            before_state: null,
+            after_state: null,
+            error_message: null,
+            timestamp,
+            anilist: anilist ?? null,
+            plex: null,
+            pinned_fields: pin?.fields ?? [],
+        } satisfies HistoryItem;
+    }
 
     function setRow(aid: number, fields: string[], updateBaseline = false) {
         selections[aid] = [...fields];
@@ -228,188 +279,41 @@
         void ensureOptions(false);
     });
 
-    interface RowEntryProps {
-        aid: number;
-        anilist?: AniListMediaWithoutList | null;
-        sel: string[];
-        base: string[];
-        accentClass: string;
-        options: PinFieldOption[];
-        optionsLoading: boolean;
-        savingFlag: boolean;
-        rowErr: string | null;
-        disabled: boolean;
-        onSave: (value: string[]) => void;
-        onChange: (value: string[]) => void;
-        onRefresh: (force: boolean) => void;
+    function panelDataFor(aid: number, base: string[], sel: string[]): PinsPanelData {
+        return {
+            value: sel,
+            baseline: baselines[aid] ?? base,
+            options,
+            optionsLoading,
+            saving: saving[aid] || false,
+            error: rowError[aid] || null,
+            optionsError,
+            disabled: !!optionsError,
+            onSave: (value: string[]) => save(aid, value),
+            onChange: (value: string[]) => (selections[aid] = [...value]),
+            onRefresh: (force: boolean) => ensureOptions(force),
+        };
     }
 </script>
 
-{#snippet RowEntry(props: RowEntryProps)}
-    {@const {
-        aid,
-        anilist,
-        sel,
-        base,
-        accentClass,
-        options,
-        optionsLoading,
-        savingFlag,
-        rowErr,
-        disabled,
-        onSave,
-        onChange,
-        onRefresh,
-    } = props}
-    {@const coverHref = anilistUrlFor(anilist)}
-    <div class="px-3 py-2">
-        <div
-            class="group flex gap-3 overflow-hidden rounded-md border border-slate-800 bg-slate-900/60 p-4 shadow-sm backdrop-blur-sm transition-shadow hover:shadow-md">
-            <div class={`w-1 rounded-md ${accentClass}`}></div>
-            <div class="flex min-w-0 flex-1 gap-3">
-                {#if coverHref}
-                    <!-- eslint-disable svelte/no-navigation-without-resolve -->
-                    <a
-                        href={coverHref}
-                        target="_blank"
-                        rel="noopener"
-                        class="block h-20 w-14 shrink-0">
-                        {#if coverOf(anilist)}
-                            <div
-                                class="relative h-full w-full overflow-hidden rounded-md border border-slate-800 bg-slate-800/40">
-                                <img
-                                    src={coverOf(anilist)!}
-                                    alt={titleOf(anilist) || "Cover"}
-                                    loading="lazy"
-                                    class="h-full w-full object-cover transition-[filter] duration-150 ease-out group-hover:blur-none"
-                                    class:blur-sm={anilist?.isAdult} />
-                            </div>
-                        {:else}
-                            <div
-                                class="flex h-full w-full items-center justify-center rounded-md border border-dashed border-slate-700 bg-slate-800/30 text-[9px] text-slate-500 select-none">
-                                No Art
-                            </div>
-                        {/if}
-                    </a>
-                    <!-- eslint-enable svelte/no-navigation-without-resolve -->
-                {:else if coverOf(anilist)}
-                    <div
-                        class="relative h-20 w-14 shrink-0 overflow-hidden rounded-md border border-slate-800 bg-slate-800/40">
-                        <img
-                            src={coverOf(anilist)!}
-                            alt={titleOf(anilist) || "Cover"}
-                            loading="lazy"
-                            class="h-full w-full object-cover transition-[filter] duration-150 ease-out group-hover:blur-none"
-                            class:blur-sm={anilist?.isAdult} />
-                    </div>
-                {:else}
-                    <div
-                        class="flex h-20 w-14 shrink-0 items-center justify-center rounded-md border border-dashed border-slate-700 bg-slate-800/30 text-[9px] text-slate-500 select-none">
-                        No Art
-                    </div>
-                {/if}
-                <div class="min-w-0 flex-1 space-y-1">
-                    <div class="flex items-start justify-between gap-3">
-                        <div class="min-w-0">
-                            <div class="flex items-center gap-2">
-                                <span
-                                    class="truncate text-base font-medium"
-                                    title={titleOf(anilist)}>{titleOf(anilist)}</span>
-                            </div>
-                            <div
-                                class="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-400">
-                                {#if anilist?.id}
-                                    <!-- eslint-disable svelte/no-navigation-without-resolve -->
-                                    <a
-                                        href={anilistUrlFor(anilist)!}
-                                        target="_blank"
-                                        rel="noopener"
-                                        class="inline-flex items-center gap-1 rounded-md border border-sky-600/60 bg-sky-700/50 px-1 py-0.5 text-[9px] font-semibold text-sky-100 hover:bg-sky-600/60"
-                                        title="Open in AniList">
-                                        <ExternalLink
-                                            class="inline h-3.5 w-3.5 text-[11px]" />
-                                        AniList
-                                    </a>
-                                    <!-- eslint-enable svelte/no-navigation-without-resolve -->
-                                {/if}
-                                <div
-                                    class="hidden flex-wrap gap-1 text-[9px] text-slate-400 sm:flex">
-                                    {#if anilist?.format}
-                                        <span
-                                            class="rounded bg-slate-800/70 px-1 py-0.5 tracking-wide uppercase"
-                                            title={anilist.format}
-                                            >{anilist.format}</span>
-                                    {/if}
-                                    {#if anilist?.status}
-                                        <span
-                                            class="rounded bg-slate-800/70 px-1 py-0.5 tracking-wide uppercase"
-                                            title={anilist.status}
-                                            >{anilist.status}</span>
-                                    {/if}
-                                    {#if anilist?.season && anilist?.seasonYear}
-                                        <span
-                                            class="rounded bg-slate-800/70 px-1 py-0.5 tracking-wide uppercase"
-                                            title={`${anilist.season} ${anilist.seasonYear}`}
-                                            >{anilist.season}
-                                            {anilist.seasonYear}</span>
-                                    {/if}
-                                    {#if anilist?.episodes}
-                                        <span
-                                            class="rounded bg-slate-800/70 px-1 py-0.5"
-                                            >EP {anilist.episodes}</span>
-                                    {/if}
-                                    {#if anilist?.isAdult}
-                                        <span
-                                            class="rounded bg-rose-800 px-1 py-0.5"
-                                            title="ADULT content">ADULT</span>
-                                    {/if}
-                                </div>
-                            </div>
-                        </div>
-                        <div class="flex shrink-0 items-center gap-2"></div>
-                    </div>
-                    <div class="flex gap-3 pt-1">
-                        <button
-                            type="button"
-                            class={`diff-toggle inline-flex items-center gap-1 text-xs text-sky-400 hover:text-sky-300 ${expanded[aid] ? "open" : ""}`}
-                            onclick={() => toggleRow(aid)}
-                            aria-expanded={expanded[aid] || false}>
-                            <span
-                                class="relative inline-flex h-4 w-4 items-center justify-center overflow-hidden">
-                                {#if expanded[aid]}
-                                    <SquareMinus
-                                        class="diff-icon inline h-4 w-4 text-[14px]" />
-                                {:else}
-                                    <SquarePlus
-                                        class="diff-icon inline h-4 w-4 text-[14px]" />
-                                {/if}
-                            </span>
-                            <span class="diff-label relative"
-                                >{expanded[aid] ? "Hide pins" : "Show pins"}</span>
-                            <span
-                                class="rounded bg-slate-800/70 px-1 text-[10px] font-semibold text-slate-300"
-                                >{sel.length}</span>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-        {#if expanded[aid]}
-            <PinFieldsEditor
-                value={sel}
-                baseline={base}
-                {options}
-                loading={optionsLoading}
-                saving={savingFlag}
-                error={rowErr}
-                {disabled}
-                title="Pin fields"
-                subtitle="Keep these fields unchanged for this entry when syncing."
-                {onSave}
-                {onChange}
-                onRefresh={(force) => onRefresh(force)} />
-        {/if}
-    </div>
+{#snippet PinEditorPanel(props: PinsPanelContext)}
+    {@const data = props.data as PinsPanelData | undefined}
+    {#if props.openPins && data}
+        <PinFieldsEditor
+            value={data.value}
+            baseline={data.baseline}
+            options={data.options}
+            loading={data.optionsLoading}
+            saving={data.saving}
+            error={data.error}
+            optionsError={data.optionsError}
+            disabled={data.disabled}
+            title="Pin fields"
+            subtitle="Keep these fields unchanged for this entry when syncing."
+            onSave={data.onSave}
+            onChange={data.onChange}
+            onRefresh={data.onRefresh} />
+    {/if}
 {/snippet}
 
 <div class="relative inline-flex items-center gap-2">
@@ -524,22 +428,31 @@
                         {@const aid = p.anilist_id}
                         {@const base = p.fields || []}
                         {@const sel = selections[aid] ?? base}
-                        {@render RowEntry({
+                        {@const historyItem = toHistoryItem(
                             aid,
-                            anilist: p.anilist,
-                            sel,
-                            base: baselines[aid] ?? base,
-                            accentClass: "bg-fuchsia-700/60",
-                            options,
-                            optionsLoading,
-                            savingFlag: saving[aid] || false,
-                            rowErr: rowError[aid] || null,
-                            disabled: !!optionsError,
-                            onSave: (value: string[]) => save(aid, value),
-                            onChange: (value: string[]) =>
-                                (selections[aid] = [...value]),
-                            onRefresh: (force: boolean) => ensureOptions(force),
-                        })}
+                            p,
+                            p.anilist ?? null,
+                            "pinned",
+                        )}
+                        {@const panelData = panelDataFor(aid, base, sel)}
+                        <div class="px-3 py-2">
+                            <TimelineItem
+                                {profile}
+                                item={historyItem}
+                                meta={PINNED_META}
+                                displayTitle={timelineDisplayTitle}
+                                coverImage={timelineCoverImage}
+                                anilistUrl={timelineAnilistUrl}
+                                plexUrl={timelinePlexUrl}
+                                hasPins={true}
+                                togglePins={(item) => toggleRow(item.id)}
+                                openPins={expanded[aid] || false}
+                                pinButtonLoading={saving[aid] || false}
+                                pinButtonDisabled={!!optionsError}
+                                pinCount={sel.length}
+                                pinsPanel={PinEditorPanel}
+                                pinsPanelData={panelData} />
+                        </div>
                     {/each}
                 </div>
             </div>
@@ -575,22 +488,32 @@
                         {@const aid = Number(r.anilist.id)}
                         {@const base = r.pin?.fields || []}
                         {@const sel = selections[aid] ?? base}
-                        {@render RowEntry({
+                        {@const meta = r.pin ? PINNED_META : SEARCH_META}
+                        {@const historyItem = toHistoryItem(
                             aid,
-                            anilist: r.anilist,
-                            sel,
-                            base: baselines[aid] ?? base,
-                            accentClass: "bg-sky-700/60",
-                            options,
-                            optionsLoading,
-                            savingFlag: saving[aid] || false,
-                            rowErr: rowError[aid] || null,
-                            disabled: !!optionsError,
-                            onSave: (value: string[]) => save(aid, value),
-                            onChange: (value: string[]) =>
-                                (selections[aid] = [...value]),
-                            onRefresh: (force: boolean) => ensureOptions(force),
-                        })}
+                            r.pin ?? null,
+                            r.anilist ?? null,
+                            r.pin ? "pinned" : "search",
+                        )}
+                        {@const panelData = panelDataFor(aid, base, sel)}
+                        <div class="px-3 py-2">
+                            <TimelineItem
+                                {profile}
+                                item={historyItem}
+                                {meta}
+                                displayTitle={timelineDisplayTitle}
+                                coverImage={timelineCoverImage}
+                                anilistUrl={timelineAnilistUrl}
+                                plexUrl={timelinePlexUrl}
+                                hasPins={true}
+                                togglePins={(item) => toggleRow(item.id)}
+                                openPins={expanded[aid] || false}
+                                pinButtonLoading={saving[aid] || false}
+                                pinButtonDisabled={!!optionsError}
+                                pinCount={sel.length}
+                                pinsPanel={PinEditorPanel}
+                                pinsPanelData={panelData} />
+                        </div>
                     {/each}
                 </div>
             </div>
@@ -621,48 +544,3 @@
         </div>
     </section>
 {/if}
-
-<style>
-    :global(.diff-toggle) {
-        position: relative;
-        transition: color 0.25s ease;
-    }
-    :global(.diff-toggle.open) {
-        animation: diffPulse 900ms ease;
-    }
-    @keyframes diffPulse {
-        0% {
-            text-shadow: 0 0 0 rgba(56, 189, 248, 0);
-        }
-        35% {
-            text-shadow: 0 0 6px rgba(56, 189, 248, 0.7);
-        }
-        100% {
-            text-shadow: 0 0 0 rgba(56, 189, 248, 0);
-        }
-    }
-    :global(.diff-toggle .diff-icon) {
-        transition: transform 220ms ease;
-    }
-    :global(.diff-toggle.open .diff-icon) {
-        transform: rotate(90deg) scale(1.05);
-    }
-    :global(.diff-toggle:not(.open):hover .diff-icon) {
-        transform: rotate(6deg);
-    }
-    :global(.diff-toggle:disabled) {
-        cursor: not-allowed;
-        opacity: 0.6;
-    }
-    @media (prefers-reduced-motion: reduce) {
-        :global(.diff-toggle .diff-icon),
-        :global(.diff-toggle.open .diff-icon),
-        :global(.diff-toggle:not(.open):hover .diff-icon) {
-            transition: none;
-            transform: none;
-        }
-        :global(.diff-toggle.open) {
-            animation: none;
-        }
-    }
-</style>
