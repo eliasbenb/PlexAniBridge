@@ -452,7 +452,7 @@ class AniListClient:
     @gattl_cache(
         ttl=3600,
         key=lambda self, *, filters, max_results=1000, per_page=50: generic_hash(
-            filters, max_results, per_page
+            id(self), filters, max_results, per_page
         ),
     )
     async def search_media_ids(

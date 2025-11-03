@@ -16,7 +16,7 @@ from src.core.sync.base import BaseSyncClient, ParsedGuids
 from src.core.sync.stats import ItemIdentifier, SyncOutcome
 from src.models.db.animap import AniMap, EpisodeMapping
 from src.models.schemas.anilist import FuzzyDate, Media, MediaListStatus
-from src.utils.cache import gattl_cache, glru_cache
+from src.utils.cache import gattl_cache, generic_hash, glru_cache
 
 
 class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
@@ -314,7 +314,10 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
 
         return ItemIdentifier.from_items(episodes)
 
-    @glru_cache(maxsize=1, key=lambda self, item: item.ratingKey)
+    @glru_cache(
+        maxsize=1,
+        key=lambda self, item: generic_hash(id(self), item.ratingKey),
+    )
     def __get_wanted_seasons(self, item: Show) -> dict[int, Season]:
         """Get seasons that are wanted for syncing.
 
@@ -336,7 +339,10 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             )
         }
 
-    @glru_cache(maxsize=1, key=lambda self, item: item.ratingKey)
+    @glru_cache(
+        maxsize=1,
+        key=lambda self, item: generic_hash(id(self), item.ratingKey),
+    )
     def __get_wanted_episodes(self, item: Show) -> list[Episode]:
         """Get episodes that are wanted for syncing.
 
@@ -688,7 +694,11 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             f"{f', anilist_id: {anilist_id}' if anilist_id else ''}}}$$"
         )
 
-    @gattl_cache()
+    @gattl_cache(
+        key=lambda self, item, grandchild_items: generic_hash(
+            id(self), item.ratingKey, grandchild_items
+        )
+    )
     async def _filter_history_by_episodes(
         self, item: Show, grandchild_items: list[Episode]
     ) -> list[EpisodeHistory | MovieHistory]:
@@ -728,7 +738,10 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
 
         return list(filtered_history.values())
 
-    @glru_cache(maxsize=1)
+    @glru_cache(
+        maxsize=1,
+        key=lambda self, episodes: generic_hash(id(self), episodes),
+    )
     def _filter_watched_episodes(self, episodes: list[Episode]) -> list[Episode]:
         """Filters watched episodes based on AniList entry.
 
