@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { ExternalLink } from "@lucide/svelte";
     import { Popover, Tooltip } from "bits-ui";
 
     import type { Mapping } from "$lib/types/api";
@@ -11,6 +12,7 @@
         columns?: ColumnConfig[];
         onEdit?: (payload: { mapping: Mapping }) => void;
         onDelete?: (payload: { mapping: Mapping; kind: "custom" | "full" }) => void;
+        onNavigateToQuery?: (payload: { query: string }) => void;
     }
 
     let {
@@ -18,6 +20,7 @@
         columns = $bindable([]),
         onEdit,
         onDelete,
+        onNavigateToQuery,
     }: Props = $props();
 
     if (!columns.length) {
@@ -60,6 +63,13 @@
     }
 
     const visibleColumns = $derived(columns.filter((c) => c.visible));
+
+    function navigate(prefix: string, value: string | number | null | undefined) {
+        if (value === null || value === undefined) return;
+        const text = String(value).trim();
+        if (!text) return;
+        onNavigateToQuery?.({ query: `${prefix}:${text}` });
+    }
 </script>
 
 <svelte:window
@@ -183,98 +193,204 @@
                                         </div>
                                     </div>
                                 {:else if column.id === "anilist"}
-                                    <div class="truncate font-mono">
-                                        {#if m.anilist_id}<a
-                                                rel="noopener"
-                                                target="_blank"
-                                                class="block truncate text-emerald-400 hover:underline"
-                                                title={m.anilist_id.toString()}
-                                                href={"https://anilist.co/anime/" +
-                                                    m.anilist_id}>{m.anilist_id}</a
-                                            >{:else}-{/if}
-                                    </div>
-                                {:else if column.id === "anidb"}
-                                    <div class="truncate font-mono">
-                                        {#if m.anidb_id}<a
-                                                rel="noopener"
-                                                target="_blank"
-                                                class="block truncate text-emerald-400 hover:underline"
-                                                title={m.anidb_id.toString()}
-                                                href={"https://anidb.net/anime/" +
-                                                    m.anidb_id}>{m.anidb_id}</a
-                                            >{:else}-{/if}
-                                    </div>
-                                {:else if column.id === "imdb"}
-                                    <div class="truncate font-mono">
-                                        {#if m.imdb_id && m.imdb_id.length}
-                                            <div
-                                                class="truncate"
-                                                title={m.imdb_id.join(", ")}>
-                                                {#each m.imdb_id as imdb, i (imdb)}<a
+                                    <div class="font-mono">
+                                        {#if m.anilist_id}
+                                            <div class="scroll-wrapper">
+                                                <div class="scroll-row">
+                                                    <button
+                                                        type="button"
+                                                        class="cursor-pointer rounded px-0.5 text-left text-emerald-400 select-text hover:underline focus:ring-1 focus:ring-emerald-500/40 focus:outline-none"
+                                                        title={`Filter by AniList ${m.anilist_id}`}
+                                                        onclick={() =>
+                                                            navigate(
+                                                                "anilist",
+                                                                m.anilist_id,
+                                                            )}>{m.anilist_id}</button>
+                                                    <a
                                                         rel="noopener"
                                                         target="_blank"
-                                                        class="text-emerald-400 hover:underline"
-                                                        href={"https://www.imdb.com/title/" +
-                                                            imdb +
-                                                            "/"}>{imdb}</a
-                                                    >{#if m.imdb_id && i < m.imdb_id.length - 1},
-                                                    {/if}{/each}
+                                                        class="text-slate-500 transition-colors hover:text-emerald-300"
+                                                        aria-label={`Open AniList ${m.anilist_id}`}
+                                                        href={`https://anilist.co/anime/${m.anilist_id}`}>
+                                                        <ExternalLink class="h-3 w-3" />
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        {:else}-{/if}
+                                    </div>
+                                {:else if column.id === "anidb"}
+                                    <div class="font-mono">
+                                        {#if m.anidb_id}
+                                            <div class="scroll-wrapper">
+                                                <div class="scroll-row">
+                                                    <button
+                                                        type="button"
+                                                        class="cursor-pointer rounded px-0.5 text-left text-emerald-400 select-text hover:underline focus:ring-1 focus:ring-emerald-500/40 focus:outline-none"
+                                                        title={`Filter by AniDB ${m.anidb_id}`}
+                                                        onclick={() =>
+                                                            navigate(
+                                                                "anidb",
+                                                                m.anidb_id,
+                                                            )}>{m.anidb_id}</button>
+                                                    <a
+                                                        rel="noopener"
+                                                        target="_blank"
+                                                        class="text-slate-500 transition-colors hover:text-emerald-300"
+                                                        aria-label={`Open AniDB ${m.anidb_id}`}
+                                                        href={`https://anidb.net/anime/${m.anidb_id}`}>
+                                                        <ExternalLink class="h-3 w-3" />
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        {:else}-{/if}
+                                    </div>
+                                {:else if column.id === "imdb"}
+                                    <div class="font-mono">
+                                        {#if m.imdb_id && m.imdb_id.length}
+                                            <div class="scroll-wrapper">
+                                                <div
+                                                    class="scroll-row"
+                                                    title={m.imdb_id.join(", ")}>
+                                                    {#each m.imdb_id as imdb (imdb)}
+                                                        <div
+                                                            class="flex shrink-0 items-center gap-1">
+                                                            <button
+                                                                type="button"
+                                                                class="cursor-pointer rounded px-0.5 text-left text-emerald-400 select-text hover:underline focus:ring-1 focus:ring-emerald-500/40 focus:outline-none"
+                                                                title={`Filter by IMDb ${imdb}`}
+                                                                onclick={() =>
+                                                                    navigate(
+                                                                        "imdb",
+                                                                        imdb,
+                                                                    )}>{imdb}</button>
+                                                            <a
+                                                                rel="noopener"
+                                                                target="_blank"
+                                                                class="text-slate-500 transition-colors hover:text-emerald-300"
+                                                                aria-label={`Open IMDb ${imdb}`}
+                                                                href={`https://www.imdb.com/title/${imdb}/`}>
+                                                                <ExternalLink
+                                                                    class="h-3 w-3" />
+                                                            </a>
+                                                        </div>
+                                                    {/each}
+                                                </div>
                                             </div>
                                         {:else}-{/if}
                                     </div>
                                 {:else if column.id === "tmdb_movie"}
-                                    <div class="truncate font-mono">
+                                    <div class="font-mono">
                                         {#if m.tmdb_movie_id && m.tmdb_movie_id.length}
-                                            <div
-                                                class="truncate"
-                                                title={m.tmdb_movie_id.join(", ")}>
-                                                {#each m.tmdb_movie_id as id, i (id)}<a
-                                                        rel="noopener"
-                                                        target="_blank"
-                                                        class="text-emerald-400 hover:underline"
-                                                        href={"https://www.themoviedb.org/movie/" +
-                                                            id}>{id}</a
-                                                    >{#if m.tmdb_movie_id && i < m.tmdb_movie_id.length - 1},
-                                                    {/if}{/each}
+                                            <div class="scroll-wrapper">
+                                                <div
+                                                    class="scroll-row"
+                                                    title={m.tmdb_movie_id.join(", ")}>
+                                                    {#each m.tmdb_movie_id as id (id)}
+                                                        <div
+                                                            class="flex shrink-0 items-center gap-1">
+                                                            <button
+                                                                type="button"
+                                                                class="cursor-pointer rounded px-0.5 text-left text-emerald-400 select-text hover:underline focus:ring-1 focus:ring-emerald-500/40 focus:outline-none"
+                                                                title={`Filter by TMDB Movie ${id}`}
+                                                                onclick={() =>
+                                                                    navigate(
+                                                                        "tmdb_movie",
+                                                                        id,
+                                                                    )}>{id}</button>
+                                                            <a
+                                                                rel="noopener"
+                                                                target="_blank"
+                                                                class="text-slate-500 transition-colors hover:text-emerald-300"
+                                                                aria-label={`Open TMDB Movie ${id}`}
+                                                                href={`https://www.themoviedb.org/movie/${id}`}>
+                                                                <ExternalLink
+                                                                    class="h-3 w-3" />
+                                                            </a>
+                                                        </div>
+                                                    {/each}
+                                                </div>
                                             </div>
                                         {:else}-{/if}
                                     </div>
                                 {:else if column.id === "tmdb_show"}
-                                    <div class="truncate font-mono">
-                                        {#if m.tmdb_show_id}<a
-                                                rel="noopener"
-                                                target="_blank"
-                                                class="block truncate text-emerald-400 hover:underline"
-                                                title={m.tmdb_show_id.toString()}
-                                                href={"https://www.themoviedb.org/tv/" +
-                                                    m.tmdb_show_id}>{m.tmdb_show_id}</a
-                                            >{:else}-{/if}
-                                    </div>
-                                {:else if column.id === "tvdb"}
-                                    <div class="truncate font-mono">
-                                        {#if m.tvdb_id}<a
-                                                rel="noopener"
-                                                target="_blank"
-                                                class="block truncate text-emerald-400 hover:underline"
-                                                title={m.tvdb_id.toString()}
-                                                href={"https://thetvdb.com/?tab=series&id=" +
-                                                    m.tvdb_id}>{m.tvdb_id}</a
-                                            >{:else}-{/if}
-                                    </div>
-                                {:else if column.id === "mal"}
-                                    <div class="truncate font-mono">
-                                        {#if m.mal_id && m.mal_id.length}
-                                            <div
-                                                class="truncate"
-                                                title={m.mal_id.join(", ")}>
-                                                {#each m.mal_id as id, i (id)}<a
+                                    <div class="font-mono">
+                                        {#if m.tmdb_show_id}
+                                            <div class="scroll-wrapper">
+                                                <div class="scroll-row">
+                                                    <button
+                                                        type="button"
+                                                        class="cursor-pointer rounded px-0.5 text-left text-emerald-400 select-text hover:underline focus:ring-1 focus:ring-emerald-500/40 focus:outline-none"
+                                                        title={`Filter by TMDB Show ${m.tmdb_show_id}`}
+                                                        onclick={() =>
+                                                            navigate(
+                                                                "tmdb_show",
+                                                                m.tmdb_show_id,
+                                                            )}>{m.tmdb_show_id}</button>
+                                                    <a
                                                         rel="noopener"
                                                         target="_blank"
-                                                        class="text-emerald-400 hover:underline"
-                                                        href={"https://myanimelist.net/anime/" +
-                                                            id}>{id}</a
-                                                    >{#if m.mal_id && i < m.mal_id.length - 1},
-                                                    {/if}{/each}
+                                                        class="text-slate-500 transition-colors hover:text-emerald-300"
+                                                        aria-label={`Open TMDB Show ${m.tmdb_show_id}`}
+                                                        href={`https://www.themoviedb.org/tv/${m.tmdb_show_id}`}>
+                                                        <ExternalLink class="h-3 w-3" />
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        {:else}-{/if}
+                                    </div>
+                                {:else if column.id === "tvdb"}
+                                    <div class="font-mono">
+                                        {#if m.tvdb_id}
+                                            <div class="scroll-wrapper">
+                                                <div class="scroll-row">
+                                                    <button
+                                                        type="button"
+                                                        class="cursor-pointer rounded px-0.5 text-left text-emerald-400 select-text hover:underline focus:ring-1 focus:ring-emerald-500/40 focus:outline-none"
+                                                        title={`Filter by TVDB ${m.tvdb_id}`}
+                                                        onclick={() =>
+                                                            navigate("tvdb", m.tvdb_id)}
+                                                        >{m.tvdb_id}</button>
+                                                    <a
+                                                        rel="noopener"
+                                                        target="_blank"
+                                                        class="text-slate-500 transition-colors hover:text-emerald-300"
+                                                        aria-label={`Open TVDB ${m.tvdb_id}`}
+                                                        href={`https://thetvdb.com/?tab=series&id=${m.tvdb_id}`}>
+                                                        <ExternalLink class="h-3 w-3" />
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        {:else}-{/if}
+                                    </div>
+                                {:else if column.id === "mal"}
+                                    <div class="font-mono">
+                                        {#if m.mal_id && m.mal_id.length}
+                                            <div class="scroll-wrapper">
+                                                <div
+                                                    class="scroll-row"
+                                                    title={m.mal_id.join(", ")}>
+                                                    {#each m.mal_id as id (id)}
+                                                        <div
+                                                            class="flex shrink-0 items-center gap-1">
+                                                            <button
+                                                                type="button"
+                                                                class="cursor-pointer rounded px-0.5 text-left text-emerald-400 select-text hover:underline focus:ring-1 focus:ring-emerald-500/40 focus:outline-none"
+                                                                title={`Filter by MAL ${id}`}
+                                                                onclick={() =>
+                                                                    navigate("mal", id)}
+                                                                >{id}</button>
+                                                            <a
+                                                                rel="noopener"
+                                                                target="_blank"
+                                                                class="text-slate-500 transition-colors hover:text-emerald-300"
+                                                                aria-label={`Open MAL ${id}`}
+                                                                href={`https://myanimelist.net/anime/${id}`}>
+                                                                <ExternalLink
+                                                                    class="h-3 w-3" />
+                                                            </a>
+                                                        </div>
+                                                    {/each}
+                                                </div>
                                             </div>
                                         {:else}-{/if}
                                     </div>
@@ -464,3 +580,44 @@
         </table>
     </div>
 </div>
+
+<style>
+    .scroll-wrapper {
+        position: relative;
+    }
+
+    .scroll-wrapper:hover::after,
+    .scroll-wrapper:focus-within::after {
+        opacity: 0.85;
+    }
+
+    .scroll-row {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+        overflow-x: auto;
+        white-space: nowrap;
+        padding-bottom: 0.35rem;
+        padding-right: 0.75rem;
+        scrollbar-width: thin;
+        scrollbar-gutter: stable both-edges;
+    }
+
+    .scroll-row::-webkit-scrollbar {
+        height: 6px;
+    }
+
+    .scroll-row::-webkit-scrollbar-track {
+        background: rgba(71, 85, 105, 0.35);
+        border-radius: 9999px;
+    }
+
+    .scroll-row::-webkit-scrollbar-thumb {
+        background: rgba(16, 185, 129, 0.45);
+        border-radius: 9999px;
+    }
+
+    .scroll-row:hover::-webkit-scrollbar-thumb {
+        background: rgba(16, 185, 129, 0.8);
+    }
+</style>

@@ -342,7 +342,8 @@
             {items}
             bind:columns
             onEdit={handleEdit}
-            onDelete={handleDelete} />
+            onDelete={handleDelete}
+            onNavigateToQuery={({ query: next }) => navigateToQuery(next)} />
     </div>
     <Pagination
         class="mt-3"
