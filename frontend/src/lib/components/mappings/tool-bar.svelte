@@ -12,6 +12,7 @@
         loading?: boolean;
         onLoad: () => void;
         onCancel: () => void;
+        onSubmit?: () => void;
         onCreate?: () => void;
     }
 
@@ -24,6 +25,7 @@
         onLoad,
         onCancel,
         onCreate,
+        onSubmit,
     }: Props = $props();
 
     function toggleCustom() {
@@ -43,6 +45,7 @@
             {onCancel}
             onSubmit={() => {
                 page = 1;
+                onSubmit?.();
                 onLoad();
             }} />
     </div>
@@ -96,6 +99,7 @@
             {onCancel}
             onSubmit={() => {
                 page = 1;
+                onSubmit?.();
                 onLoad();
             }} />
     </div>

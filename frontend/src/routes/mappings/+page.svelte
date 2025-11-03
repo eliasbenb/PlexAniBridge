@@ -102,6 +102,7 @@
             }
         }
     }
+
     async function navigateToQuery(nextQuery: string) {
         const value = nextQuery.trim();
         if (!value) return;
@@ -111,6 +112,9 @@
         await load();
     }
 
+    function handleSearchSubmit() {
+        queuePushState();
+    }
 
     function cancelLoad() {
         if (!currentAbort) return;
@@ -250,7 +254,8 @@
             {loading}
             onLoad={load}
             onCancel={cancelLoad}
-            onCreate={openCreateEditor} />
+            onCreate={openCreateEditor}
+            onSubmit={handleSearchSubmit} />
     </div>
     <div
         class="relative flex h-[70vh] flex-col overflow-hidden rounded-md border border-slate-800/70 bg-slate-900/40 backdrop-blur-sm">
