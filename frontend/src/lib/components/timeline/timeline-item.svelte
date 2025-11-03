@@ -1,6 +1,7 @@
 <script lang="ts">
     import {
         ExternalLink,
+        Hash,
         LoaderCircle,
         RefreshCcw,
         RotateCw,
@@ -8,8 +9,10 @@
         SquarePlus,
         Trash2,
     } from "@lucide/svelte";
+    import { SvelteURLSearchParams } from "svelte/reactivity";
     import { fade } from "svelte/transition";
 
+    import { resolve } from "$app/paths";
     import TimelineDiffViewer from "$lib/components/timeline/timeline-diff-viewer.svelte";
     import TimelineManagePins from "$lib/components/timeline/timeline-manage-pins.svelte";
     import type { ItemDiffUi, OutcomeMeta } from "$lib/components/timeline/types";
@@ -76,6 +79,19 @@
         onPinsSaved,
         onPinsBusy,
     }: Props = $props();
+
+    function mappingUrl(item: HistoryItem): string | null {
+        if (item.anilist?.id) {
+            return (
+                resolve("/mappings") +
+                "?" +
+                new SvelteURLSearchParams({
+                    q: `anilist:${item.anilist.id.toString()}`,
+                }).toString()
+            );
+        }
+        return null;
+    }
 
     const coverHref = anilistUrl(item);
 
@@ -144,7 +160,7 @@
                     </div>
                     <div
                         class="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-400">
-                        {#if item.anilist?.id}
+                        {#if anilistUrl(item)}
                             <!-- eslint-disable svelte/no-navigation-without-resolve -->
                             <a
                                 href={anilistUrl(item)!}
@@ -158,7 +174,7 @@
                             <!-- eslint-enable svelte/no-navigation-without-resolve -->
                         {/if}
 
-                        {#if item.plex_guid}
+                        {#if plexUrl(item)}
                             <!-- eslint-disable svelte/no-navigation-without-resolve -->
                             <a
                                 href={plexUrl(item)!}
@@ -171,6 +187,19 @@
                             </a>
                             <!-- eslint-enable svelte/no-navigation-without-resolve -->
                         {/if}
+
+                        {#if mappingUrl(item)}
+                            <!-- eslint-disable svelte/no-navigation-without-resolve -->
+                            <a
+                                href={mappingUrl(item)!}
+                                class="inline-flex items-center gap-1 rounded-md border border-slate-600/60 bg-slate-700/50 px-1 py-0.5 text-[9px] font-semibold text-slate-100 hover:bg-slate-600/60"
+                                title="View mapping">
+                                <Hash class="inline h-3.5 w-3.5 text-[11px]" />
+                                Mapping
+                            </a>
+                            <!-- eslint-enable svelte/no-navigation-without-resolve -->
+                        {/if}
+
                         <span class="text-xs text-slate-400">
                             {new Date(item.timestamp + "Z").toLocaleString()}
                         </span>
