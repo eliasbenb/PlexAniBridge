@@ -559,7 +559,7 @@
                             ><Download class="inline h-4 w-4" /></button>
                     </div>
                 </div>
-                <div class="flex flex-1 overflow-hidden">
+                <div class="flex min-w-0 flex-1 overflow-hidden">
                     <div
                         class={`flex w-64 flex-col border-r border-slate-800/60 transition-transform duration-300 ease-out md:translate-x-0 ${isMobile ? "absolute inset-y-0 left-0 z-30 bg-slate-950/95 backdrop-blur-sm" : ""}`}
                         class:-translate-x-full={!showFiles}>
@@ -617,10 +617,10 @@
                             aria-hidden="true">
                         </div>
                     {/if}
-                    <div class="flex flex-1 flex-col">
+                    <div class="flex min-w-0 flex-1 flex-col">
                         <div
                             bind:this={historyScroller}
-                            class="scrollbar-thin flex-1 overflow-y-auto p-1 font-mono text-[11px] leading-normal"
+                            class="scrollbar-thin min-w-0 flex-1 overflow-y-auto p-1 font-mono text-[11px] leading-normal"
                             class:overflow-x-auto={!wrap}
                             class:overflow-x-hidden={wrap}
                             style="touch-action: auto;">
