@@ -367,11 +367,32 @@ HTTP Basic Authentication password for the web UI. Basic Auth is enabled only wh
 
 `str` (Optional, default: `None`)
 
-Path to an [Apache `htpasswd`](https://httpd.apache.org/docs/current/programs/htpasswd.html) file containing user credentials for HTTP Basic Authentication. When set, the web UI will validate requests against the specified file. Only **bcrypt** (recommended) and **SHA1** hashed passwords are supported.
+Path to an [Apache `htpasswd`](https://httpd.apache.org/docs/current/programs/htpasswd.html) file containing user credentials for HTTP Basic Authentication. When set, the web UI validates requests against this file. Only **bcrypt** (recommended) and **SHA1** hashed passwords are supported.
 
 Providing an `htpasswd` file allows you to manage multiple users and rotate passwords without exposing plaintext credentials in the configuration. You may still set `PAB_WEB_BASIC_AUTH_USERNAME` and `PAB_WEB_BASIC_AUTH_PASSWORD`; both authentication methods will be accepted.
 
+!!! tip "Generate htpasswd entries"
 
+    <div class="htpasswd-generator" data-htpasswd-generator>
+        <form class="htpasswd-generator__grid" autocomplete="off" novalidate>
+            <label>Username
+                <input data-htpasswd-username="" type="text" name="username" required  />
+            </label>
+            <label>Password
+                <input data-htpasswd-password="" type="password" name="password" required />
+            </label>
+            <div class="htpasswd-generator__actions">
+                <button type="submit">Generate htpasswd entry</button>
+            </div>
+        </form>
+        <div class="htpasswd-generator__output">
+            <textarea data-htpasswd-output="" autocomplete="off" readonly></textarea>
+            <div class="htpasswd-generator__actions">
+                <button type="button" data-htpasswd-copy="">Copy to clipboard</button>
+            </div>
+            <div class="htpasswd-generator__feedback" data-htpasswd-feedback=""></div>
+        </div>
+    </div>
 
 ---
 
