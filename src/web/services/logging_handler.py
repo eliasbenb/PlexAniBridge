@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import threading
+from datetime import UTC, datetime
 from functools import lru_cache
 from typing import Any
 
@@ -79,7 +80,7 @@ class WebsocketLogHandler(logging.Handler):
         if in_loop and current_loop is not None:
             for ws in conns:
                 task = current_loop.create_task(
-                    self._safe_send(ws, msg, record.levelname)
+                    self._safe_send(ws, msg, record.levelname, record.created)
                 )
                 self._tasks.add(task)
                 task.add_done_callback(self._tasks.discard)
@@ -89,22 +90,33 @@ class WebsocketLogHandler(logging.Handler):
             for ws in conns:
                 try:
                     asyncio.run_coroutine_threadsafe(
-                        self._safe_send(ws, msg, record.levelname), self._loop
+                        self._safe_send(ws, msg, record.levelname, record.created),
+                        self._loop,
                     )
                 except Exception:
                     continue
             return
 
-    async def _safe_send(self, ws: WebSocket, msg: str, level: str) -> None:
+    async def _safe_send(
+        self, ws: WebSocket, msg: str, level: str, created: float | None
+    ) -> None:
         """Send a message to a websocket connection.
 
         Args:
             ws (WebSocket): The websocket connection to send the message to.
             msg (str): The message to send.
             level (str): The log level of the message.
+            created (float | None): Epoch seconds when the record was created.
         """
         try:
-            await ws.send_json({"level": level, "message": msg})
+            timestamp = None
+            if created is not None:
+                try:
+                    timestamp = datetime.fromtimestamp(created, tz=UTC).isoformat()
+                except Exception:
+                    timestamp = None
+
+            await ws.send_json({"level": level, "message": msg, "timestamp": timestamp})
         except Exception:
             await self.remove(ws)
 
