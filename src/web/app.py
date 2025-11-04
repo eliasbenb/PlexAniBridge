@@ -89,11 +89,16 @@ def create_app(scheduler: SchedulerClient | None = None) -> FastAPI:
         log.debug("Web: Request logging enabled (debug mode)")
 
     # Add basic auth middleware if configured
-    if config.web_basic_auth_username and config.web_basic_auth_password:
+    if (
+        config.web_basic_auth_username and config.web_basic_auth_password
+    ) or config.web_basic_auth_htpasswd_path:
         app.add_middleware(
             BasicAuthMiddleware,
             username=config.web_basic_auth_username,
-            password=config.web_basic_auth_password.get_secret_value(),
+            password=config.web_basic_auth_password.get_secret_value()
+            if config.web_basic_auth_password
+            else None,
+            htpasswd_path=config.web_basic_auth_htpasswd_path,
             realm=config.web_basic_auth_realm,
         )
         log.info("Web: HTTP Basic Authentication enabled for web UI")

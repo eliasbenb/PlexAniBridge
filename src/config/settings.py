@@ -369,6 +369,10 @@ class PlexAnibridgeConfig(BaseSettings):
     web_basic_auth_realm: str = Field(
         default="PlexAniBridge", description="Realm for HTTP Basic Auth on the web UI"
     )
+    web_basic_auth_htpasswd_path: Path | None = Field(
+        default=None,
+        description="Path to an htpasswd file for HTTP Basic Auth on the web UI",
+    )
 
     anilist_token: SecretStr | None = Field(
         default=None, description="Global default AniList API token"
@@ -533,7 +537,18 @@ class PlexAnibridgeConfig(BaseSettings):
         if (not self.web_basic_auth_username) != (not self.web_basic_auth_password):
             _log.warning(
                 "Both web_basic_auth_username and web_basic_auth_password must be set "
-                "to enable HTTP Basic Authentication; disabling auth"
+                "to enable static HTTP Basic Authentication credentials; ignoring "
+                "partial values"
+            )
+            self.web_basic_auth_username = None
+            self.web_basic_auth_password = None
+
+        if (
+            self.web_basic_auth_htpasswd_path
+            and not self.web_basic_auth_htpasswd_path.is_file()
+        ):
+            raise ValueError(
+                "web_basic_auth_htpasswd_path must point to an existing file"
             )
 
         return self

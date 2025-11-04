@@ -2,6 +2,7 @@
 
 import secrets
 from collections.abc import Callable
+from pathlib import Path
 
 from fastapi.security import HTTPBasic
 from starlette.exceptions import HTTPException
@@ -10,6 +11,7 @@ from starlette.requests import Request
 from starlette.responses import Response
 
 from src import log
+from src.utils.htpasswd import HtpasswdFile
 
 __all__ = ["BasicAuthMiddleware"]
 
@@ -17,13 +19,66 @@ __all__ = ["BasicAuthMiddleware"]
 class BasicAuthMiddleware(BaseHTTPMiddleware):
     """Middleware to enforce HTTP Basic Authentication."""
 
-    def __init__(self, app, username: str, password: str, realm: str) -> None:
+    def __init__(
+        self,
+        app,
+        username: str | None = None,
+        password: str | None = None,
+        htpasswd_path: Path | None = None,
+        realm: str = "PlexAniBridge",
+    ) -> None:
         """Initialize the BasicAuthMiddleware."""
         super().__init__(app)
         self.username = username
         self.password = password
+        self.htpasswd_path = htpasswd_path
         self.realm = realm
         self.security = HTTPBasic()
+
+    def _validate_plain(self, username: str, password: str) -> bool:
+        """Validate plain username and password credentials.
+
+        Args:
+            username (str): The provided username.
+            password (str): The provided password.
+
+        Returns:
+            bool: True if credentials are valid, False otherwise.
+        """
+        username_match = (
+            secrets.compare_digest(username, self.username)
+            if self.username is not None
+            else False
+        )
+        password_match = (
+            secrets.compare_digest(password, self.password)
+            if self.password is not None
+            else False
+        )
+        return username_match and password_match
+
+    def _validate_htpasswd(self, username: str, password: str) -> bool:
+        """Validate credentials against an htpasswd file.
+
+        Args:
+            username (str): The provided username.
+            password (str): The provided password.
+
+        Returns:
+            bool: True if credentials are valid, False otherwise.
+        """
+        if not self.htpasswd_path:
+            return False
+        if not self.htpasswd_path.exists():
+            log.error(f"HTPasswd file not found at {self.htpasswd_path}")
+            return False
+
+        try:
+            htpasswd = HtpasswdFile.from_file(self.htpasswd_path)
+            return htpasswd.check_password(username, password) or False
+        except Exception as e:
+            log.error(f"Error reading HTPasswd file: {e}")
+            return False
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         """Process the incoming request and enforce basic authentication.
@@ -43,14 +98,15 @@ class BasicAuthMiddleware(BaseHTTPMiddleware):
         if not credentials:
             return self._challenge_response()
 
-        username_match = secrets.compare_digest(credentials.username, self.username)
-        password_match = secrets.compare_digest(credentials.password, self.password)
+        if self._validate_plain(credentials.username, credentials.password):
+            response = await call_next(request)
+            return response
 
-        if not (username_match and password_match):
-            return self._challenge_response()
+        if self._validate_htpasswd(credentials.username, credentials.password):
+            response = await call_next(request)
+            return response
 
-        response = await call_next(request)
-        return response
+        return self._challenge_response()
 
     def _challenge_response(self) -> Response:
         """Return a 401 response with the proper WWW-Authenticate header."""
