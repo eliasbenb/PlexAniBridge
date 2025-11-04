@@ -29,6 +29,9 @@ services:
             # PAB_WEB_ENABLED: True
             # PAB_WEB_HOST: 0.0.0.0
             # PAB_WEB_PORT: 4848
+            # PAB_WEB_BASIC_AUTH_USERNAME: null
+            # PAB_WEB_BASIC_AUTH_PASSWORD: null
+            # PAB_WEB_BASIC_AUTH_REALM: "PlexAniBridge"
         volumes:
             - /path/to/plexanibridge/data:/config
         ports:

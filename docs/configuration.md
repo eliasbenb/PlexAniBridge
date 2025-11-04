@@ -345,6 +345,30 @@ The host address for the web interface.
 
 The port for the web interface.
 
+---
+
+### `PAB_WEB_BASIC_AUTH_USERNAME`
+
+`str` (Optional, default: `None`)
+
+HTTP Basic Authentication username for the web UI. Basic Auth is enabled only when both the username and password are provided. Leave unset to disable authentication.
+
+---
+
+### `PAB_WEB_BASIC_AUTH_PASSWORD`
+
+`str` (Optional, default: `None`)
+
+HTTP Basic Authentication password for the web UI. Basic Auth is enabled only when both the username and password are provided. Leave unset to disable authentication.
+
+---
+
+### `PAB_WEB_BASIC_AUTH_REALM`
+
+`str` (Optional, default: `PlexAniBridge`)
+
+Realm label presented in the browser Basic Auth prompt and `WWW-Authenticate` response header.
+
 ## Advanced Examples
 
 ### Multiple Users
