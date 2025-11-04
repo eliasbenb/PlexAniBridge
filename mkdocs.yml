@@ -4,6 +4,12 @@ repo_url: https://github.com/eliasbenb/PlexAniBridge
 repo_name: eliasbenb/PlexAniBridge
 edit_uri: edit/main/docs/
 
+extra_javascript:
+  - https://cdn.jsdelivr.net/npm/bcryptjs@3/umd/index.min.js
+  - js/htpasswd-generator.js
+extra_css:
+  - css/htpasswd-generator.css
+
 extra:
   generator: false
 plugins:

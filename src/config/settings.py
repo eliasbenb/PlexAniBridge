@@ -360,6 +360,19 @@ class PlexAnibridgeConfig(BaseSettings):
     )
     web_host: str = Field(default="0.0.0.0", description="Web server listen host")
     web_port: int = Field(default=4848, description="Web server listen port")
+    web_basic_auth_username: str | None = Field(
+        default=None, description="Username for HTTP Basic Auth on the web UI"
+    )
+    web_basic_auth_password: SecretStr | None = Field(
+        default=None, description="Password for HTTP Basic Auth on the web UI"
+    )
+    web_basic_auth_realm: str = Field(
+        default="PlexAniBridge", description="Realm for HTTP Basic Auth on the web UI"
+    )
+    web_basic_auth_htpasswd_path: Path | None = Field(
+        default=None,
+        description="Path to an htpasswd file for HTTP Basic Auth on the web UI",
+    )
 
     anilist_token: SecretStr | None = Field(
         default=None, description="Global default AniList API token"
@@ -521,6 +534,23 @@ class PlexAnibridgeConfig(BaseSettings):
                     "PAB_PLEX_URL."
                 )
 
+        if (not self.web_basic_auth_username) != (not self.web_basic_auth_password):
+            _log.warning(
+                "Both web_basic_auth_username and web_basic_auth_password must be set "
+                "to enable static HTTP Basic Authentication credentials; ignoring "
+                "partial values"
+            )
+            self.web_basic_auth_username = None
+            self.web_basic_auth_password = None
+
+        if (
+            self.web_basic_auth_htpasswd_path
+            and not self.web_basic_auth_htpasswd_path.is_file()
+        ):
+            raise ValueError(
+                "web_basic_auth_htpasswd_path must point to an existing file"
+            )
+
         return self
 
     def get_profile(self, name: str) -> PlexAnibridgeProfileConfig:
@@ -574,13 +604,17 @@ class PlexAnibridgeConfig(BaseSettings):
         """
         return (
             EnvSettingsSource(
-                settings_cls, env_prefix="PAB_", env_nested_delimiter="__"
+                settings_cls,
+                env_prefix="PAB_",
+                env_nested_delimiter="__",
+                env_parse_none_str="null",
             ),
             DotEnvSettingsSource(
                 settings_cls,
                 env_file=".env",
                 env_prefix="PAB_",
                 env_nested_delimiter="__",
+                env_parse_none_str="null",
             ),
             YamlConfigSettingsSource(settings_cls, yaml_file=find_yaml_config_file()),
         )

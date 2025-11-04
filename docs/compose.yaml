@@ -5,30 +5,34 @@ services:
             PUID: 1000
             PGID: 1000
             UMASK: 022
-            TZ: Etc/UTC
+            TZ: "Etc/UTC"
             PAB_ANILIST_TOKEN: ...
             PAB_PLEX_TOKEN: ...
             PAB_PLEX_USER: ...
             PAB_PLEX_URL: ...
             # PAB_PLEX_SECTIONS: '[]'
             # PAB_PLEX_GENRES: '[]'
-            # PAB_PLEX_METADATA_SOURCE: local
+            # PAB_PLEX_METADATA_SOURCE: "local"
             # PAB_SYNC_INTERVAL: 86400
             # PAB_SYNC_MODES: '["periodic", "poll", "webhook"]'
-            # PAB_FULL_SCAN: False
-            # PAB_DESTRUCTIVE_SYNC: False
+            # PAB_FULL_SCAN: false
+            # PAB_DESTRUCTIVE_SYNC: false
             # PAB_EXCLUDED_SYNC_FIELDS: '["notes", "score"]'
-            # PAB_DRY_RUN: False
+            # PAB_DRY_RUN: false
             # PAB_BACKUP_RETENTION_DAYS: 30
-            # PAB_BATCH_REQUESTS: False
+            # PAB_BATCH_REQUESTS: false
             # PAB_SEARCH_FALLBACK_THRESHOLD=-1
             # PAB_PROFILES__example__$FIELD=$VALUE
-            # PAB_DATA_PATH: /config
-            # PAB_LOG_LEVEL: INFO
-            # PAB_MAPPINGS_URL=https://raw.githubusercontent.com/eliasbenb/PlexAniBridge-Mappings/v2/mappings.json
-            # PAB_WEB_ENABLED: True
-            # PAB_WEB_HOST: 0.0.0.0
+            # PAB_DATA_PATH: "/config"
+            # PAB_LOG_LEVEL: "INFO"
+            # PAB_MAPPINGS_URL: "https://raw.githubusercontent.com/eliasbenb/PlexAniBridge-Mappings/v2/mappings.json"
+            # PAB_WEB_ENABLED: true
+            # PAB_WEB_HOST: "0.0.0.0"
             # PAB_WEB_PORT: 4848
+            # PAB_WEB_BASIC_AUTH_USERNAME: null
+            # PAB_WEB_BASIC_AUTH_PASSWORD: null
+            # PAB_WEB_BASIC_AUTH_HTPASSWD_PATH: null
+            # PAB_WEB_BASIC_AUTH_REALM: "PlexAniBridge"
         volumes:
             - /path/to/plexanibridge/data:/config
         ports:

@@ -28,3 +28,7 @@ plex_url: ...
 # web_enabled: true
 # web_host: "0.0.0.0"
 # web_port: 4848
+# web_basic_auth_username: null
+# web_basic_auth_password: null
+# web_basic_auth_htpasswd_path: null
+# web_basic_auth_realm: "PlexAniBridge"
