@@ -589,13 +589,17 @@ class PlexAnibridgeConfig(BaseSettings):
         """
         return (
             EnvSettingsSource(
-                settings_cls, env_prefix="PAB_", env_nested_delimiter="__"
+                settings_cls,
+                env_prefix="PAB_",
+                env_nested_delimiter="__",
+                env_parse_none_str="null",
             ),
             DotEnvSettingsSource(
                 settings_cls,
                 env_file=".env",
                 env_prefix="PAB_",
                 env_nested_delimiter="__",
+                env_parse_none_str="null",
             ),
             YamlConfigSettingsSource(settings_cls, yaml_file=find_yaml_config_file()),
         )
