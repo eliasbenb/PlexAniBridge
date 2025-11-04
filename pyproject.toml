@@ -76,10 +76,9 @@ packages = ["scripts"]
 
 [tool.pyright]
 stubPath = "typings"
-include = ["main.py", "src"]
 
 [tool.ruff]
-include = ["pyproject.toml", "src/**/*.py", "scripts/**/*.py"]
+exclude = ["alembic"]
 indent-width = 4
 line-length = 88
 
