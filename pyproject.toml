@@ -50,6 +50,7 @@ dependencies = [
     "ruamel-yaml>=0.18.16",
     "sqlalchemy>=2.0.44",
     "tzlocal>=5.3.1",
+    "bcrypt>=5.0.0",
 ]
 
 [project.scripts]
