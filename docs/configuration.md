@@ -363,6 +363,18 @@ HTTP Basic Authentication password for the web UI. Basic Auth is enabled only wh
 
 ---
 
+### `PAB_WEB_BASIC_AUTH_HTPASSWD_PATH`
+
+`str` (Optional, default: `None`)
+
+Path to an [Apache `htpasswd`](https://httpd.apache.org/docs/current/programs/htpasswd.html) file containing user credentials for HTTP Basic Authentication. When set, the web UI will validate requests against the specified file. Only **bcrypt** (recommended) and **SHA1** hashed passwords are supported.
+
+Providing an `htpasswd` file allows you to manage multiple users and rotate passwords without exposing plaintext credentials in the configuration. You may still set `PAB_WEB_BASIC_AUTH_USERNAME` and `PAB_WEB_BASIC_AUTH_PASSWORD`; both authentication methods will be accepted.
+
+
+
+---
+
 ### `PAB_WEB_BASIC_AUTH_REALM`
 
 `str` (Optional, default: `PlexAniBridge`)
