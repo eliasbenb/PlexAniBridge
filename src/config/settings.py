@@ -360,6 +360,15 @@ class PlexAnibridgeConfig(BaseSettings):
     )
     web_host: str = Field(default="0.0.0.0", description="Web server listen host")
     web_port: int = Field(default=4848, description="Web server listen port")
+    web_basic_auth_username: str | None = Field(
+        default=None, description="Username for HTTP Basic Auth on the web UI"
+    )
+    web_basic_auth_password: SecretStr | None = Field(
+        default=None, description="Password for HTTP Basic Auth on the web UI"
+    )
+    web_basic_auth_realm: str = Field(
+        default="PlexAniBridge", description="Realm for HTTP Basic Auth on the web UI"
+    )
 
     anilist_token: SecretStr | None = Field(
         default=None, description="Global default AniList API token"
@@ -520,6 +529,12 @@ class PlexAnibridgeConfig(BaseSettings):
                     "set global PAB_ANILIST_TOKEN, PAB_PLEX_TOKEN, PAB_PLEX_USER, and "
                     "PAB_PLEX_URL."
                 )
+
+        if (not self.web_basic_auth_username) != (not self.web_basic_auth_password):
+            _log.warning(
+                "Both web_basic_auth_username and web_basic_auth_password must be set "
+                "to enable HTTP Basic Authentication; disabling auth"
+            )
 
         return self
 

@@ -11,16 +11,17 @@ from fastapi.exception_handlers import http_exception_handler
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
-from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 
-from src import __version__, log
+from src import __version__, config, log
 from src.core.sched import SchedulerClient
 from src.exceptions import PlexAniBridgeError
+from src.web.middlewares.basic_auth import BasicAuthMiddleware
 from src.web.middlewares.request_logging import RequestLoggingMiddleware
 from src.web.routes import router
 from src.web.services.logging_handler import get_log_ws_handler
 from src.web.state import get_app_state
+
 __all__ = ["create_app"]
 
 FRONTEND_BUILD_DIR = Path(__file__).parent.parent.parent / "frontend" / "build"
@@ -86,6 +87,16 @@ def create_app(scheduler: SchedulerClient | None = None) -> FastAPI:
     if log.level <= DEBUG:
         app.add_middleware(RequestLoggingMiddleware)
         log.debug("Web: Request logging enabled (debug mode)")
+
+    # Add basic auth middleware if configured
+    if config.web_basic_auth_username and config.web_basic_auth_password:
+        app.add_middleware(
+            BasicAuthMiddleware,
+            username=config.web_basic_auth_username,
+            password=config.web_basic_auth_password.get_secret_value(),
+            realm=config.web_basic_auth_realm,
+        )
+        log.info("Web: HTTP Basic Authentication enabled for web UI")
 
     app.include_router(router)
 
