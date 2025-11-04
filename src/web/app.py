@@ -1,10 +1,8 @@
 """FastAPI application factory and setup."""
 
 import asyncio
-import time
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from io import BytesIO
 from logging import DEBUG
 from pathlib import Path
 
@@ -19,67 +17,13 @@ from starlette.requests import Request
 from src import __version__, log
 from src.core.sched import SchedulerClient
 from src.exceptions import PlexAniBridgeError
+from src.web.middlewares.request_logging import RequestLoggingMiddleware
 from src.web.routes import router
 from src.web.services.logging_handler import get_log_ws_handler
 from src.web.state import get_app_state
+__all__ = ["create_app"]
 
 FRONTEND_BUILD_DIR = Path(__file__).parent.parent.parent / "frontend" / "build"
-
-
-class RequestLoggingMiddleware(BaseHTTPMiddleware):
-    """Middleware to log all incoming requests and responses."""
-
-    async def dispatch(self, request: Request, call_next):
-        start_time = time.time()
-
-        request_info = (
-            f"{request.method} {request.url.path}"
-            f"{f'?{request.url.query}' if request.url.query else ''} "
-            f"from {request.client.host if request.client else 'unknown'}"
-        )
-
-        # Capture request body without consuming the stream
-        body_info = ""
-        if request.method in ("POST", "PUT", "PATCH"):
-            try:
-                body = await request.body()
-
-                request._body = body
-                request.scope["body"] = BytesIO(body)
-
-                if body:
-                    content_type = request.headers.get("content-type", "").lower()
-                    if "application/json" in content_type or "text/" in content_type:
-                        try:
-                            body_str = body.decode("utf-8")
-                            if len(body_str) > 1000:
-                                body_str = body_str[:1000] + "..."
-                            body_info = f" Body: {body_str}"
-                        except UnicodeDecodeError:
-                            body_info = f" Body: <binary data, {len(body)} bytes>"
-                    else:
-                        body_info = (
-                            f" Body: <{content_type or 'unknown'}, {len(body)} bytes>"
-                        )
-            except Exception as e:
-                body_info = f" Body: <error reading: {e}>"
-
-        full_request_info = request_info + body_info
-
-        try:
-            response = await call_next(request)
-            process_time = time.time() - start_time
-
-            log.debug(
-                f"Request: {full_request_info} -> "
-                f"Response: {response.status_code} ({process_time:.3f}s)"
-            )
-
-            return response
-        except Exception:
-            process_time = time.time() - start_time
-            log.debug(f"Request: {full_request_info} -> Failed ({process_time:.3f}s)")
-            raise
 
 
 @asynccontextmanager
@@ -202,6 +146,3 @@ def create_app(scheduler: SchedulerClient | None = None) -> FastAPI:
         return JSONResponse(status_code=cls.status_code, content=payload)
 
     return app
-
-
-__all__ = ["create_app"]
