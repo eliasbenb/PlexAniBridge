@@ -638,9 +638,9 @@
 
 <Modal
     bind:open
-    contentClass="fixed left-1/2 top-1/2 z-50 w-full max-w-5xl -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-2xl border border-slate-800/70 bg-slate-950/95 shadow-[0_32px_120px_-48px_rgba(15,23,42,0.85)] ring-1 ring-emerald-500/10"
-    headerWrapperClass="px-6 pt-6 pb-4 border-b border-slate-800/60 bg-slate-950/85"
-    footerClass="border-t border-slate-800/60 bg-slate-950/85 px-6 py-4"
+    contentClass="fixed left-1/2 top-1/2 z-50 w-full max-w-5xl -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-2xl border border-slate-500/40 bg-slate-900/80 shadow-[0_48px_120px_-48px_rgba(15,23,42,0.45)] ring-1 ring-emerald-400/20"
+    headerWrapperClass="px-6 pt-6 pb-4 border-b border-slate-500/30 bg-slate-900/65"
+    footerClass="border-t border-slate-500/30 bg-slate-900/65 px-6 py-4"
     titleClass="flex items-center gap-3 text-base font-semibold tracking-wide text-slate-100">
     {#snippet titleChildren()}
         <span class="flex items-center gap-2">
@@ -649,16 +649,16 @@
     {/snippet}
     {#snippet footerChildren()}
         <div class="flex w-full flex-wrap items-center justify-between gap-3">
-            <div class="text-xs text-rose-300">{formError}</div>
+            <div class="text-xs text-rose-200">{formError}</div>
             <div class="flex items-center gap-2">
                 <button
-                    class="inline-flex h-9 items-center rounded-lg border border-slate-700/70 bg-slate-900/60 px-3 text-[11px] font-semibold text-slate-200 transition hover:border-slate-500/70 hover:bg-slate-900/80"
+                    class="inline-flex h-9 items-center rounded-lg border border-slate-500/50 bg-slate-800/60 px-3 text-[11px] font-semibold text-slate-100 transition hover:border-slate-400/50 hover:bg-slate-800/70"
                     onclick={() => (open = false)}
                     type="button">
                     Cancel
                 </button>
                 <button
-                    class="inline-flex h-9 items-center rounded-lg bg-emerald-600/90 px-4 text-[11px] font-semibold text-emerald-50 transition hover:bg-emerald-500 disabled:opacity-60"
+                    class="inline-flex h-9 items-center rounded-lg bg-emerald-500 px-4 text-[11px] font-semibold text-emerald-50 transition hover:bg-emerald-400 disabled:opacity-60"
                     disabled={saving}
                     onclick={save}
                     type="button">
@@ -669,26 +669,26 @@
     {/snippet}
     <div class="max-h-[70vh] overflow-y-auto px-6 py-5">
         <div
-            class="space-y-5 rounded-xl border border-slate-800/70 bg-slate-950/80 p-5 text-[11px] shadow-[0_24px_64px_-32px_rgba(2,6,23,0.9)] ring-1 ring-slate-900/60 backdrop-blur">
+            class="space-y-5 rounded-xl border border-slate-600/40 bg-slate-900/70 p-5 text-[11px] shadow-[0_36px_80px_-44px_rgba(15,23,42,0.55)] ring-1 ring-slate-800/35 backdrop-blur">
             <div
-                class="rounded-lg border border-slate-800/60 bg-linear-to-br from-slate-950/95 via-slate-950/80 to-slate-900/70 p-5 shadow-inner">
-                <div class="grid gap-4 md:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+                class="rounded-lg border border-slate-600/30 bg-slate-900/60 p-5 shadow-inner">
+                <div class="grid gap-5 md:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
                     <div class="space-y-2">
                         <label
                             for="anilist-id"
-                            class="block text-[12px] font-semibold tracking-[0.08em] text-slate-300 uppercase">
+                            class="block text-[12px] font-semibold tracking-[0.08em] text-slate-100 uppercase">
                             AniList Identifier
                         </label>
                         <div class="mt-1 flex flex-wrap items-center gap-2">
                             <input
                                 id="anilist-id"
-                                class="h-9 w-full rounded-lg border border-slate-800/60 bg-slate-950/80 px-3 text-[12px] text-slate-100 shadow-inner transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/40 focus:outline-none"
+                                class="h-9 w-full rounded-lg border border-slate-500/35 bg-slate-900/50 px-3 text-[12px] text-slate-100 shadow-inner transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/30 focus:outline-none"
                                 type="number"
                                 placeholder="e.g. 12345"
                                 bind:value={anilistIdInput}
                                 disabled={mode === "edit"} />
                         </div>
-                        <p class="text-[10px] text-slate-500">
+                        <p class="text-[10px] text-slate-300">
                             Provide an AniList anime identifier to inspect and override
                             downstream provider mappings.
                         </p>
@@ -704,7 +704,7 @@
             </div>
             {#if loadingDetail}
                 <div
-                    class="rounded-md border border-slate-800/60 bg-slate-950/70 p-4 text-center text-[11px] text-slate-300">
+                    class="rounded-md border border-slate-600/40 bg-slate-900/55 p-4 text-center text-[11px] text-slate-100">
                     Loading mapping details…
                 </div>
             {:else}
@@ -713,15 +713,15 @@
                     onValueChange={(v) => switchTab(v as typeof activeTab)}
                     class="space-y-4">
                     <Tabs.List
-                        class="flex items-center gap-1 rounded-lg border border-slate-800/60 bg-slate-950/60 p-1 text-[11px]">
+                        class="flex items-center gap-1 rounded-lg border border-slate-600/40 bg-slate-900/55 p-1 text-[11px] text-slate-200">
                         <Tabs.Trigger
                             value="form"
-                            class="inline-flex h-8 items-center gap-1 rounded-md px-3 font-medium text-slate-400 transition data-[state=active]:bg-emerald-900/40 data-[state=active]:text-emerald-100">
+                            class="inline-flex h-8 items-center gap-1 rounded-md px-3 font-medium text-slate-200 transition hover:text-slate-50 data-[state=active]:bg-emerald-500/20 data-[state=active]:text-emerald-100">
                             Form
                         </Tabs.Trigger>
                         <Tabs.Trigger
                             value="json"
-                            class="inline-flex h-8 items-center gap-1 rounded-md px-3 font-medium text-slate-400 transition data-[state=active]:bg-emerald-900/40 data-[state=active]:text-emerald-100">
+                            class="inline-flex h-8 items-center gap-1 rounded-md px-3 font-medium text-slate-200 transition hover:text-slate-50 data-[state=active]:bg-emerald-500/20 data-[state=active]:text-emerald-100">
                             JSON
                         </Tabs.Trigger>
                     </Tabs.List>
@@ -753,7 +753,7 @@
                             jsonSchema={mappingSchema}
                             performanceMode={true} />
                         {#if jsonError}
-                            <p class="mt-2 text-xs text-rose-400">{jsonError}</p>
+                            <p class="mt-2 text-xs text-rose-300">{jsonError}</p>
                         {/if}
                     </Tabs.Content>
                 </Tabs.Root>

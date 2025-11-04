@@ -34,7 +34,7 @@
 </script>
 
 <div
-    class="h-full rounded-lg border border-slate-800/60 bg-linear-to-br from-slate-950/95 via-slate-950/80 to-slate-900/70 p-4 shadow-inner">
+    class="h-full rounded-lg border border-slate-600/40 bg-slate-900/55 p-4 shadow-inner">
     {#if loadingDetail}
         <div class="flex min-w-0 animate-pulse items-start gap-3">
             <div class="block w-12 shrink-0">
@@ -61,7 +61,7 @@
                 class="group block w-12 shrink-0">
                 {#if coverImage}
                     <div
-                        class="relative h-16 w-full overflow-hidden rounded-md ring-1 ring-slate-700/60">
+                        class="relative h-16 w-full overflow-hidden rounded-md ring-1 ring-slate-500/40">
                         {#if mode === "create" && pendingPrefillId && pendingPrefillId !== loadedDetailId}
                             <div
                                 class="mt-4 rounded-lg border border-emerald-900/40 bg-emerald-950/20 p-3 text-[10px] text-emerald-200">
@@ -90,12 +90,12 @@
                                 " cover"}
                             loading="lazy"
                             src={coverImage}
-                            class="h-full w-full object-cover transition-[filter] duration-150 ease-out group-hover:blur-none"
+                            class="h-full w-full object-cover transition-[filter,transform] duration-150 ease-out group-hover:scale-105"
                             class:blur-sm={detail.anilist?.isAdult} />
                     </div>
                 {:else}
                     <div
-                        class="flex h-20 w-14 items-center justify-center rounded-md border border-dashed border-slate-700 bg-slate-800/30 text-[9px] text-slate-500 select-none">
+                        class="flex h-20 w-14 items-center justify-center rounded-md border border-dashed border-slate-600 bg-slate-800/30 text-[9px] text-slate-500 select-none">
                         No Art
                     </div>
                 {/if}
@@ -104,7 +104,7 @@
                 <div class="flex items-start justify-between gap-2">
                     <div class="min-w-0 space-y-2">
                         <div
-                            class="truncate font-medium"
+                            class="truncate font-semibold text-slate-100"
                             title={preferredTitle(detail.anilist.title) ||
                                 `AniList ${detail.anilist_id}`}>
                             {#if detail?.anilist?.title}
@@ -114,24 +114,24 @@
                             {/if}
                         </div>
                         <div
-                            class="mt-1 flex flex-wrap gap-1 text-[9px] text-slate-400">
+                            class="mt-1 flex flex-wrap gap-1 text-[9px] text-slate-300">
                             {#if detail.anilist.format}
                                 <span
-                                    class="truncate rounded bg-slate-800/70 px-1.5 py-0.5 tracking-wide uppercase"
+                                    class="truncate rounded bg-slate-800/60 px-1.5 py-0.5 tracking-wide uppercase"
                                     title={detail.anilist.format}>
                                     {detail.anilist.format}
                                 </span>
                             {/if}
                             {#if detail.anilist.status}
                                 <span
-                                    class="truncate rounded bg-slate-800/70 px-1.5 py-0.5 tracking-wide uppercase"
+                                    class="truncate rounded bg-slate-800/60 px-1.5 py-0.5 tracking-wide uppercase"
                                     title={detail.anilist.status}>
                                     {detail.anilist.status}
                                 </span>
                             {/if}
                             {#if detail.anilist.season && detail.anilist.seasonYear}
                                 <span
-                                    class="truncate rounded bg-slate-800/70 px-1.5 py-0.5 tracking-wide uppercase"
+                                    class="truncate rounded bg-slate-800/60 px-1.5 py-0.5 tracking-wide uppercase"
                                     title={`${detail.anilist.season} ${detail.anilist.seasonYear}`}>
                                     {detail.anilist.season}
                                     {detail.anilist.seasonYear}
@@ -139,7 +139,7 @@
                             {/if}
                             {#if detail.anilist.episodes}
                                 <span
-                                    class="truncate rounded bg-slate-800/70 px-1.5 py-0.5"
+                                    class="truncate rounded bg-slate-800/60 px-1.5 py-0.5"
                                     title={`${detail.anilist.episodes} episodes`}>
                                     EP {detail.anilist.episodes}
                                 </span>
@@ -158,9 +158,9 @@
         </div>
     {:else if mode === "create"}
         <div
-            class="flex h-full flex-col items-center justify-center gap-3 text-center text-[11px] text-slate-300">
+            class="flex h-full flex-col items-center justify-center gap-3 text-center text-[11px] text-slate-200">
             <button
-                class="inline-flex h-9 items-center gap-1 rounded-lg border border-slate-700/70 bg-slate-900/60 px-3 text-[11px] font-semibold text-slate-200 transition hover:border-emerald-500/70 hover:bg-slate-900/80"
+                class="inline-flex h-9 items-center gap-1 rounded-lg border border-slate-500/40 bg-slate-900/55 px-3 text-[11px] font-semibold text-slate-100 transition hover:border-emerald-400/60 hover:bg-slate-900/70"
                 type="button"
                 onclick={handlePrefillClick}>
                 {#if loadingDetail}
