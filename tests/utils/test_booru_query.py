@@ -46,6 +46,16 @@ def test_parse_query_key_term_in_values():
     assert node.quoted is False
 
 
+def test_parse_query_quoted_reserved_characters():
+    """Quoted values containing reserved characters should remain literal."""
+    node = bq.parse_query('anilist.title:"Full (Metal) Panic!"')
+
+    assert isinstance(node, bq.KeyTerm)
+    assert node.value == "Full (Metal) Panic!"
+    assert node.values is None
+    assert node.quoted is True
+
+
 def test_parse_query_quoted_value_with_comma_preserves_literal():
     """Quoted values containing commas should remain a single value."""
     node = bq.parse_query('tvdb:"1,2"')
@@ -54,6 +64,16 @@ def test_parse_query_quoted_value_with_comma_preserves_literal():
     assert node.value == "1,2"
     assert node.values is None
     assert node.quoted is True
+
+
+def test_parse_query_supports_mixed_list_with_escaped_values():
+    """Lists may include escaped commas without splitting the value."""
+    node = bq.parse_query('anilist.genre:"Action,Adventure",Drama,"Comedy"')
+
+    assert isinstance(node, bq.KeyTerm)
+    assert node.value == "Action,Adventure,Drama,Comedy"
+    assert node.values == ("Action,Adventure", "Drama", "Comedy")
+    assert node.quoted is False
 
 
 def test_parse_query_auto_groups_unquoted_terms_into_phrase():
