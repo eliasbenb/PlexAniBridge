@@ -113,6 +113,7 @@ This is useful for scanning for only Anime content in a mixed library.
     - [TheMovieDB Genres](https://www.themoviedb.org/talk/644a4b69f794ad04fe3cf1b9)
 
 ---
+
 ### `PLEX_METADATA_SOURCE`
 
 `Enum("local", "online")` (Optional, default: `"local"`)

@@ -32,4 +32,3 @@ If Plex is not correctly identifying or updating the metadata for an item, it ma
 No, PlexAniBridge does not support the HAMA agent. It is recommended to use the default Plex TV and Movie agents for best compatibility (we recommend the "TheTVDB" episode ordering for TV shows).
 
 Support is not planned for HAMA since it is [slated for deprecation](https://forums.plex.tv/t/important-information-for-users-running-plex-media-server-on-nvidia-shield-devices/883484) in the near future.
-

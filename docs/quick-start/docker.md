@@ -49,7 +49,7 @@ docker compose -f compose.yaml up -d
 !!! tip "Image Tags"
 
     You can pin the image to a specific version or branch by changing `latest` to a specific tag. Some available tags are:
-    
+
     - `latest`: The latest stable release
     - `beta`: The latest beta release (may be unstable)
     - `alpha`: The latest alpha release (may be unstable)
@@ -58,7 +58,6 @@ docker compose -f compose.yaml up -d
     - `main`: The latest commit on the `main` branch, which is usually tied to the latest release
     - `develop`: The latest commit on the `develop` branch (may be unstable)
     - `experimental`: The latest commit on the `experimental` branch (may be unstable)
-
 
 ### Docker CLI
 

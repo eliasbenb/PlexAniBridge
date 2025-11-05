@@ -24,9 +24,9 @@ The querying language supports a wide range of operators to build flexible and c
 
 ### Boolean Operators
 
-- **AND:** `foo bar` → Search for results matching both `foo` *and* `bar`
-- **OR (prefix):** `~foo ~bar baz` → Search for `(foo OR bar) AND baz` *(tilde marks OR terms within an AND group)*
-- **OR (infix):** `foo | bar baz` → Search for `foo OR (bar AND baz)` *(pipe creates OR between AND expressions)*
+- **AND:** `foo bar` → Search for results matching both `foo` _and_ `bar`
+- **OR (prefix):** `~foo ~bar baz` → Search for `(foo OR bar) AND baz` _(tilde marks OR terms within an AND group)_
+- **OR (infix):** `foo | bar baz` → Search for `foo OR (bar AND baz)` _(pipe creates OR between AND expressions)_
 - **NOT:** `-foo` → Exclude results matching `foo`
 
 ### Grouping
@@ -103,10 +103,10 @@ The following fields are queried against the AniList API:
 ## Example Queries
 
 ```bash
-"Dororo" 
+"Dororo"
 # Title search for "Dororo"
 
-anilist:101347 
+anilist:101347
 # AniList ID lookup
 
 tvdb:328592 | tmdb_show:21298

@@ -25,7 +25,6 @@ Below is an example mappings file. You can use [the JSON schema](https://github.
     --8<-- "data/mappings.example.json"
     ```
 
-
 !!! tip "Including External Mappings"
 
     ```yaml title="mappings.custom.yaml"

@@ -36,7 +36,7 @@ You can work with these backups in two ways:
 
 !!! warning
 
-    Initiating a restore will **overwrite all current AniList entries** for that profile. 
+    Initiating a restore will **overwrite all current AniList entries** for that profile.
 
 ## Restoring from Backups (CLI Script)
 
