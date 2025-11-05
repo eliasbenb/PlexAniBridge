@@ -6,6 +6,7 @@ icon: material/wrench
 ## Requirements
 
 - [Python 3.13+](https://www.python.org/downloads/)
+- [uv](https://docs.astral.sh/uv/getting-started/installation/)
 - [SQLite3](https://www.sqlite.org/download.html)
 - [Git](https://git-scm.com/downloads)
 
@@ -19,9 +20,13 @@ icon: material/wrench
 git clone https://github.com/eliasbenb/PlexAniBridge.git
 cd PlexAniBridge
 
-pip install -r requirements.txt
-
 cp .env.example .env # Edit the .env file
 
-python main.py
+# Setup environment
+uv sync
+uv run pab-deps-install
+uv run pab-build
+
+# Run PlexAniBridge
+uv run pab-start
 ```

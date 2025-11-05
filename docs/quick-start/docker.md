@@ -24,7 +24,7 @@ Below is a PlexAniBridge Docker compose file with example values. Optional envir
 
 !!! tip "Docker Variables"
 
-    While configuring the Docker variables are not required, they are highly recommended to ensure proper functionality.
+    While configuring the Docker variables are not required, they are highly recommended to improve file permission handling and debugging.
 
     Setting the `PUID` and `PGID` variables allows PlexAniBridge to run with the same permissions as the user running the container, which is important if you want to access files on the host system. You can find your user ID and group ID by running `id -u` and `id -g` in the terminal.
 
@@ -37,7 +37,7 @@ Below is a PlexAniBridge Docker compose file with example values. Optional envir
         PUID: 1000
         PGID: 1000
         UMASK: 022
-        TZ: Etc/UTC
+        TZ: "Etc/UTC"
     ```
 
 To start the container, run:
@@ -50,14 +50,15 @@ docker compose -f compose.yaml up -d
 
     You can pin the image to a specific version or branch by changing `latest` to a specific tag. Some available tags are:
 
-    - `latest`: The latest stable release
+    - `vX.Y.Z`, `X.Y.Z`: A specific version from the [releases page](https://github.com/eliasbenb/PlexAniBridge/releases) (e.g. `v1.0.0`)
+    - `vX.Y`, `X.Y`: The latest release in a specific minor version series (e.g. `v1.0` for the latest `1.0.x` release)
+    - `vX`, `X`: The latest release in a specific major version series (e.g. `v1` for the latest `1.x.x` release)
     - `beta`: The latest beta release (may be unstable)
     - `alpha`: The latest alpha release (may be unstable)
-    - `vX.Y.Z`: A specific version from the [releases page](https://github.com/eliasbenb/PlexAniBridge/releases) (e.g. `v1.0.0`)
-    - `X.Y.Z`: Alias of `vX.Y.Z` (e.g. `1.0.0`)
     - `main`: The latest commit on the `main` branch, which is usually tied to the latest release
     - `develop`: The latest commit on the `develop` branch (may be unstable)
     - `experimental`: The latest commit on the `experimental` branch (may be unstable)
+    - `latest`: The latest stable release
 
 ### Docker CLI
 
@@ -68,12 +69,12 @@ docker run \
     --name plexanibridge \
     -e PUID=1000 \
     -e PGID=1000 \
-    -e UMASK=022 \\
+    -e UMASK=022 \
     -e TZ=Etc/UTC \
-    -e PAB_ANILIST_TOKEN=eyJ... \
-    -e PAB_PLEX_TOKEN=2Sb... \
-    -e PAB_PLEX_USER=username \
-    -e PAB_PLEX_URL=http://plex:32400 \
+    -e PAB_ANILIST_TOKEN=... \
+    -e PAB_PLEX_TOKEN=... \
+    -e PAB_PLEX_USER=... \
+    -e PAB_PLEX_URL=... \
     -p 4848:4848 \
     -v /path/to/plexanibridge/data:/config \
     ghcr.io/eliasbenb/plexanibridge:v1
