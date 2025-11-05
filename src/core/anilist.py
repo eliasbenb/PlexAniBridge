@@ -177,12 +177,14 @@ class AniListClient:
             timezone: The timezone of the authenticated user
         """
         try:
-            if self.user.options and self.user.options.timezone:
-                hours, minutes = map(int, self.user.options.timezone.split(":"))
-            else:
+            tz = self.user.options.timezone if self.user.options else None
+            if not tz:
                 return UTC
-            return timezone(timedelta(hours=hours, minutes=minutes))
-        except (AttributeError, ValueError):
+            sign = -1 if tz.startswith("-") else 1
+            tz = tz.lstrip("+-")
+            h, m = map(int, tz.split(":"))
+            return timezone(sign * timedelta(hours=h, minutes=m))
+        except Exception:
             return UTC
 
     async def update_anime_entry(self, media_list_entry: MediaList) -> None:
