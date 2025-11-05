@@ -245,7 +245,9 @@ _ANILIST_FIELDS: tuple[QueryFieldSpec, ...] = (
         kind=QueryFieldKind.ANILIST_ENUM,
         type=QueryFieldType.ENUM,
         operators=_ENUM_OPS,
-        values=tuple({m.value for m in MediaFormat} - {"MANGA", "NOVEL", "ONE_SHOT"}),
+        values=tuple(
+            m.value for m in MediaFormat if m not in {"MANGA", "NOVEL", "ONE_SHOT"}
+        ),
         anilist_field="format",
         anilist_value_type="enum",
         anilist_multi_field="format_in",
@@ -256,7 +258,7 @@ _ANILIST_FIELDS: tuple[QueryFieldSpec, ...] = (
         kind=QueryFieldKind.ANILIST_ENUM,
         type=QueryFieldType.ENUM,
         operators=_ENUM_OPS,
-        values=tuple(s.value for s in MediaStatus),
+        values=tuple(s.value for s in MediaStatus if s not in {MediaStatus.HIATUS}),
         anilist_field="status",
         anilist_value_type="enum",
         anilist_multi_field="status_in",
