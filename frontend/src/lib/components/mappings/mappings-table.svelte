@@ -160,6 +160,12 @@
                                             {#if m.anilist && (m.anilist.format || m.anilist.status || m.anilist.episodes)}
                                                 <div
                                                     class="flex flex-wrap gap-1 overflow-hidden text-[9px] text-slate-400">
+                                                    {#if m.custom}
+                                                        <span
+                                                            class="truncate rounded bg-amber-600/30 px-1 py-0.5 tracking-wide text-amber-100 uppercase"
+                                                            title="Custom Mapping"
+                                                            >Custom</span>
+                                                    {/if}
                                                     {#if m.anilist.format}<span
                                                             class="truncate rounded bg-slate-800/70 px-1 py-0.5 tracking-wide uppercase"
                                                             title={m.anilist.format}
