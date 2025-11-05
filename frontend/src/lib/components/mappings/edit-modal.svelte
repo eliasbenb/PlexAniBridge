@@ -667,97 +667,95 @@
             </div>
         </div>
     {/snippet}
-    <div class="max-h-[70vh] overflow-y-auto px-6 py-5">
+    <div
+        class="max-h-[70vh] space-y-5 overflow-y-auto border-slate-600/40 bg-slate-900/70 p-5 text-[11px] shadow-[0_36px_80px_-44px_rgba(15,23,42,0.55)] ring-1 ring-slate-800/35 backdrop-blur">
         <div
-            class="space-y-5 rounded-xl border border-slate-600/40 bg-slate-900/70 p-5 text-[11px] shadow-[0_36px_80px_-44px_rgba(15,23,42,0.55)] ring-1 ring-slate-800/35 backdrop-blur">
-            <div
-                class="rounded-lg border border-slate-600/30 bg-slate-900/60 p-5 shadow-inner">
-                <div class="grid gap-5 md:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
-                    <div class="space-y-2">
-                        <label
-                            for="anilist-id"
-                            class="block text-[12px] font-semibold tracking-[0.08em] text-slate-100 uppercase">
-                            AniList Identifier
-                        </label>
-                        <div class="mt-1 flex flex-wrap items-center gap-2">
-                            <input
-                                id="anilist-id"
-                                class="h-9 w-full rounded-lg border border-slate-500/35 bg-slate-900/50 px-3 text-[12px] text-slate-100 shadow-inner transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/30 focus:outline-none"
-                                type="number"
-                                placeholder="e.g. 12345"
-                                bind:value={anilistIdInput}
-                                disabled={mode === "edit"} />
-                        </div>
-                        <p class="text-[10px] text-slate-300">
-                            Provide an AniList anime identifier to inspect and override
-                            downstream provider mappings.
-                        </p>
+            class="rounded-lg border border-slate-600/30 bg-slate-900/60 p-5 shadow-inner">
+            <div class="grid gap-5 md:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+                <div class="space-y-2">
+                    <label
+                        for="anilist-id"
+                        class="block text-[12px] font-semibold tracking-[0.08em] text-slate-100 uppercase">
+                        AniList Identifier
+                    </label>
+                    <div class="mt-1 flex flex-wrap items-center gap-2">
+                        <input
+                            id="anilist-id"
+                            class="h-9 w-full rounded-lg border border-slate-500/35 bg-slate-900/50 px-3 text-[12px] text-slate-100 shadow-inner transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/30 focus:outline-none"
+                            type="number"
+                            placeholder="e.g. 12345"
+                            bind:value={anilistIdInput}
+                            disabled={mode === "edit"} />
                     </div>
-                    <MappingDetailPreview
-                        {detail}
-                        {mode}
-                        {loadingDetail}
-                        {pendingPrefillId}
-                        {loadedDetailId}
-                        on:prefill={loadEffectiveForCreate} />
+                    <p class="text-[10px] text-slate-300">
+                        Provide an AniList anime identifier to inspect and override
+                        downstream provider mappings.
+                    </p>
                 </div>
+                <MappingDetailPreview
+                    {detail}
+                    {mode}
+                    {loadingDetail}
+                    {pendingPrefillId}
+                    {loadedDetailId}
+                    on:prefill={loadEffectiveForCreate} />
             </div>
-            {#if loadingDetail}
-                <div
-                    class="rounded-md border border-slate-600/40 bg-slate-900/55 p-4 text-center text-[11px] text-slate-100">
-                    Loading mapping details…
-                </div>
-            {:else}
-                <Tabs.Root
-                    value={activeTab}
-                    onValueChange={(v) => switchTab(v as typeof activeTab)}
-                    class="space-y-4">
-                    <Tabs.List
-                        class="flex items-center gap-1 rounded-lg border border-slate-600/40 bg-slate-900/55 p-1 text-[11px] text-slate-200">
-                        <Tabs.Trigger
-                            value="form"
-                            class="inline-flex h-8 items-center gap-1 rounded-md px-3 font-medium text-slate-200 transition hover:text-slate-50 data-[state=active]:bg-emerald-500/20 data-[state=active]:text-emerald-100">
-                            Form
-                        </Tabs.Trigger>
-                        <Tabs.Trigger
-                            value="json"
-                            class="inline-flex h-8 items-center gap-1 rounded-md px-3 font-medium text-slate-200 transition hover:text-slate-50 data-[state=active]:bg-emerald-500/20 data-[state=active]:text-emerald-100">
-                            JSON
-                        </Tabs.Trigger>
-                    </Tabs.List>
-                    <Tabs.Content value="form">
-                        <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                            {#each FIELD_DEFS as field (field.id)}
-                                {@const state = fieldState[field.id]}
-                                <MappingFieldCard
-                                    {field}
-                                    {state}
-                                    modeOptions={MODE_OPTIONS}
-                                    effectiveText={formatEffective(field)}
-                                    effectiveSeasonRows={getEffectiveSeasonRows(field)}
-                                    onModeChange={(modeValue) =>
-                                        setFieldMode(field.id, modeValue)}
-                                    onStringChange={(value) =>
-                                        setFieldStringValue(field.id, value)}
-                                    onAddSeason={() => handleAddSeason(field.id)}
-                                    onUpdateSeason={(index, key, value) =>
-                                        updateSeasonRow(field.id, index, key, value)}
-                                    onRemoveSeason={(index) =>
-                                        removeSeasonRow(field.id, index)} />
-                            {/each}
-                        </div>
-                    </Tabs.Content>
-                    <Tabs.Content value="json">
-                        <CodeEditor
-                            bind:value={rawJson}
-                            jsonSchema={mappingSchema}
-                            performanceMode={true} />
-                        {#if jsonError}
-                            <p class="mt-2 text-xs text-rose-300">{jsonError}</p>
-                        {/if}
-                    </Tabs.Content>
-                </Tabs.Root>
-            {/if}
         </div>
+        {#if loadingDetail}
+            <div
+                class="rounded-md border border-slate-600/40 bg-slate-900/55 p-4 text-center text-[11px] text-slate-100">
+                Loading mapping details…
+            </div>
+        {:else}
+            <Tabs.Root
+                value={activeTab}
+                onValueChange={(v) => switchTab(v as typeof activeTab)}
+                class="space-y-4">
+                <Tabs.List
+                    class="flex items-center gap-1 rounded-lg border border-slate-600/40 bg-slate-900/55 p-1 text-[11px] text-slate-200">
+                    <Tabs.Trigger
+                        value="form"
+                        class="inline-flex h-8 items-center gap-1 rounded-md px-3 font-medium text-slate-200 transition hover:text-slate-50 data-[state=active]:bg-emerald-500/20 data-[state=active]:text-emerald-100">
+                        Form
+                    </Tabs.Trigger>
+                    <Tabs.Trigger
+                        value="json"
+                        class="inline-flex h-8 items-center gap-1 rounded-md px-3 font-medium text-slate-200 transition hover:text-slate-50 data-[state=active]:bg-emerald-500/20 data-[state=active]:text-emerald-100">
+                        JSON
+                    </Tabs.Trigger>
+                </Tabs.List>
+                <Tabs.Content value="form">
+                    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                        {#each FIELD_DEFS as field (field.id)}
+                            {@const state = fieldState[field.id]}
+                            <MappingFieldCard
+                                {field}
+                                {state}
+                                modeOptions={MODE_OPTIONS}
+                                effectiveText={formatEffective(field)}
+                                effectiveSeasonRows={getEffectiveSeasonRows(field)}
+                                onModeChange={(modeValue) =>
+                                    setFieldMode(field.id, modeValue)}
+                                onStringChange={(value) =>
+                                    setFieldStringValue(field.id, value)}
+                                onAddSeason={() => handleAddSeason(field.id)}
+                                onUpdateSeason={(index, key, value) =>
+                                    updateSeasonRow(field.id, index, key, value)}
+                                onRemoveSeason={(index) =>
+                                    removeSeasonRow(field.id, index)} />
+                        {/each}
+                    </div>
+                </Tabs.Content>
+                <Tabs.Content value="json">
+                    <CodeEditor
+                        bind:value={rawJson}
+                        jsonSchema={mappingSchema}
+                        performanceMode={true} />
+                    {#if jsonError}
+                        <p class="mt-2 text-xs text-rose-300">{jsonError}</p>
+                    {/if}
+                </Tabs.Content>
+            </Tabs.Root>
+        {/if}
     </div>
 </Modal>
