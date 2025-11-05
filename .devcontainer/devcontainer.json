@@ -32,10 +32,7 @@
             ]
         }
     },
-    "forwardPorts": [
-        4848,
-        5173
-    ],
+    "forwardPorts": [4848, 5173],
     "portsAttributes": {
         "4848": {
             "label": "PlexAniBridge Server",

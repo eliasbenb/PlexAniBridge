@@ -4,7 +4,7 @@
             "type": "debugpy",
             "request": "launch",
             "name": "Run PlexAniBridge",
-            "program": "main.py",
+            "program": "main.py"
         }
-    ],
+    ]
 }
