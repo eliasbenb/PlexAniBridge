@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterable
 from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -31,7 +31,7 @@ from src.models.schemas.anilist import (
     MediaStatus,
     User,
 )
-from src.utils.cache import gattl_cache, generic_hash
+from src.utils.cache import gattl_cache, generic_hash, glru_cache
 
 __all__ = ["AniListClient"]
 
@@ -186,6 +186,47 @@ class AniListClient:
             return timezone(sign * timedelta(hours=h, minutes=m))
         except Exception:
             return UTC
+
+    @glru_cache(maxsize=1)
+    def _get_genres_and_tags(self) -> tuple[Iterable[str], Iterable[str]]:
+        """Get the list of AniList genres and tags.
+
+        Returns:
+            Iterable[str]: List of AniList genres and tags.
+        """
+        query = """
+        query {
+            genres: GenreCollection
+            tags: MediaTagCollection {
+                name
+            }
+        }
+        """
+        log.debug("Fetching AniList genres and tags")
+        response = asyncio.run(self._make_request(query))
+        genres = response["data"]["genres"]
+        tags = [tag["name"] for tag in response["data"]["tags"]]
+        return genres, tags
+
+    @property
+    def available_genres(self) -> Iterable[str]:
+        """Get the list of available AniList genres.
+
+        Returns:
+            Iterable[str]: List of AniList genres.
+        """
+        genres, _ = self._get_genres_and_tags()
+        return genres
+
+    @property
+    def available_tags(self) -> Iterable[str]:
+        """Get the list of available AniList tags.
+
+        Returns:
+            Iterable[str]: List of AniList tags.
+        """
+        _, tags = self._get_genres_and_tags()
+        return tags
 
     async def update_anime_entry(self, media_list_entry: MediaList) -> None:
         """Updates an anime entry on the authenticated user's list.

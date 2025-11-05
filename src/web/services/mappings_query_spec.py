@@ -1,10 +1,11 @@
 """Shared query field specifications for mappings search."""
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
 
+from src.core.anilist import AniListClient
 from src.models.db.animap import AniMap
 from src.models.schemas.anilist import MediaFormat, MediaStatus
 
@@ -59,10 +60,10 @@ class QueryFieldSpec:
     key: str
     kind: QueryFieldKind
     type: QueryFieldType
-    operators: tuple[QueryFieldOperator, ...]
+    operators: Iterable[QueryFieldOperator]
     desc: str | None = None
-    aliases: tuple[str, ...] = ()
-    values: tuple[str, ...] | None = None
+    aliases: Iterable[str] = ()
+    values: Iterable[str] | None = None
     column: Any | None = None
     json_array_numeric: bool = False
     anilist_field: str | None = None
@@ -191,7 +192,15 @@ _DB_FIELDS: tuple[QueryFieldSpec, ...] = (
         values=_HAS_VALUES,
     ),
 )
-
+try:
+    _anilist_client = AniListClient(
+        anilist_token=None, backup_dir=None, dry_run=False, profile_name=None
+    )
+    _anilist_genres = _anilist_client.available_genres
+    _anilist_tags = _anilist_client.available_tags
+except Exception:  # This is an import-time operation; can't afford to fail
+    _anilist_genres = []
+    _anilist_tags = []
 
 _ANILIST_FIELDS: tuple[QueryFieldSpec, ...] = (
     QueryFieldSpec(
@@ -270,20 +279,22 @@ _ANILIST_FIELDS: tuple[QueryFieldSpec, ...] = (
     QueryFieldSpec(
         key="anilist.genre",
         desc="AniList genre",
-        kind=QueryFieldKind.ANILIST_STRING,
-        type=QueryFieldType.STRING,
+        kind=QueryFieldKind.ANILIST_ENUM,
+        type=QueryFieldType.ENUM,
         operators=(QueryFieldOperator.EQ,),
+        values=_anilist_genres,
         anilist_field="genre",
-        anilist_value_type="string",
+        anilist_value_type="enum",
     ),
     QueryFieldSpec(
         key="anilist.tag",
         desc="AniList tag",
-        kind=QueryFieldKind.ANILIST_STRING,
-        type=QueryFieldType.STRING,
+        kind=QueryFieldKind.ANILIST_ENUM,
+        type=QueryFieldType.ENUM,
         operators=(QueryFieldOperator.EQ,),
+        values=_anilist_tags,
         anilist_field="tag",
-        anilist_value_type="string",
+        anilist_value_type="enum",
     ),
     QueryFieldSpec(
         key="anilist.average_score",
