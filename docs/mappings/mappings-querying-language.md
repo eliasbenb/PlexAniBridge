@@ -37,12 +37,13 @@ The querying language supports a wide range of operators to build flexible and c
 
 - `foo:bar,baz,qux` → Search for mappings where field `foo` matches any of the values `bar`, `baz`, or `qux`
 
+_Note: IN lists are not supported for all fields. The web UI will only suggest an IN list when it is supported for the selected field. See [`/api/mappings/query-capabilities`](../web/api.md) for details on which fields support IN lists._
+
 ### Escaping Reserved Characters
 
-Use either double quotes or a backslash to include reserved characters such as commas in a value without triggering list parsing.
+Use either double quotes to include reserved characters such as commas in a value without triggering list parsing.
 
 - `foo:"bar,baz"` → Treats `bar,baz` as a single literal value
-- `foo:bar\,baz` → Also treats `bar,baz` as a single literal value
 
 ### Ranges
 
@@ -132,8 +133,8 @@ tmdb_mappings:e12*
 anilist.status:RELEASING anilist.genre:Action
 # Currently releasing anime in the Action genre
 
--anilist.genre:Comedy,Romance
-# Exclude anime in the Comedy or Romance genres
+-anilist.format:SPECIAL,OVA
+# Exclude anime in the Special or OVA formats
 
 anilist.format:TV anilist.average_score:>80 anilist.popularity:>5000
 # TV format anime with average score over 80 and popularity over 5000
