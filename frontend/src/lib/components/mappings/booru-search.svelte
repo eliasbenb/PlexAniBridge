@@ -177,6 +177,29 @@
                     op === "wildcard" ? "*" : opMap[op] || "",
                 ]);
 
+                if (kinfo.type === "enum" && Array.isArray(kinfo.values)) {
+                    const filteredValues = vpart
+                        ? kinfo.values.filter((v) =>
+                              v.toLowerCase().startsWith(vpart.toLowerCase()),
+                          )
+                        : kinfo.values;
+                    for (const val of filteredValues) {
+                        out.push({
+                            label: base + val,
+                            kind: "value",
+                            apply: ({ replace }) => {
+                                replace(seg.start, seg.end, base + val);
+                            },
+                        });
+                    }
+
+                    // remove the '=' operator since we have direct value suggestions
+                    const eqIndex = allOps.findIndex(([op]) => op === "");
+                    if (eqIndex >= 0) {
+                        allOps.splice(eqIndex, 1);
+                    }
+                }
+
                 const filteredOps = vpart
                     ? allOps.filter(([op]) => op.startsWith(vpart))
                     : allOps;
