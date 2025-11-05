@@ -4,7 +4,7 @@
     import { ArrowRight, LoaderCircle, Search } from "@lucide/svelte";
     import { Popover } from "bits-ui";
 
-    import { apiJson } from "$lib/utils/api";
+    import { loadCapabilities, type FieldCapability } from "$lib/components/mappings/capabilities-cache";
 
     interface Props {
         value?: string;
@@ -27,19 +27,6 @@
         loading = false,
         onCancel,
     }: Props = $props();
-
-    type OperatorToken = "=" | ">" | ">=" | "<" | "<=" | "*" | "?" | "in" | "range";
-
-    type FieldCapability = {
-        key: string;
-        aliases?: string[];
-        type: "int" | "string" | "enum" | string;
-        operators: OperatorToken[];
-        values?: string[] | null;
-        desc?: string | null;
-    };
-
-    type CapabilitiesResponse = { fields: FieldCapability[] };
 
     let capabilities = $state<FieldCapability[] | null>(null);
     let KEYS: FieldCapability[] = $derived(capabilities ?? []);
@@ -361,12 +348,8 @@
 
         if (autoFocus) inputEl?.focus();
         try {
-            const res = await apiJson<CapabilitiesResponse>(
-                "/api/mappings/query-capabilities",
-            );
-            if (res && Array.isArray(res.fields) && res.fields.length) {
-                capabilities = res.fields as FieldCapability[];
-            }
+            const fields = await loadCapabilities();
+            capabilities = fields ? [...fields] : [];
         } catch {}
     });
 
