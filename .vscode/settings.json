@@ -2,45 +2,22 @@
     "[python]": {
         "editor.defaultFormatter": "charliermarsh.ruff"
     },
-    "[javascript][typescript]": {
-        "editor.defaultFormatter": "esbenp.prettier-vscode"
-    },
-    "[svelte]": {
-        "editor.defaultFormatter": "esbenp.prettier-vscode"
-    },
-    "[html]": {
-        "editor.defaultFormatter": "esbenp.prettier-vscode"
-    },
-    "[css][tailwindcss]": {
-        "editor.defaultFormatter": "esbenp.prettier-vscode"
-    },
     "[json]": {
         "editor.defaultFormatter": "esbenp.prettier-vscode"
     },
-    "files.associations": {
-        "*.css": "tailwindcss"
+    "[yaml]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.tabSize": 4
     },
     "editor.detectIndentation": false,
     "editor.formatOnSave": true,
     "editor.insertSpaces": true,
     "editor.tabSize": 4,
-    "eslint.workingDirectories": [
-        "./frontend"
-    ],
-    "eslint.validate": [
-        "javascript",
-        "typescript",
-        "svelte",
-        "html",
-    ],
-    "prettier.configPath": "./frontend/.prettierrc",
-    "prettier.prettierPath": "./frontend/node_modules/prettier",
+    "prettier.enable": true,
     "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
     "python.envFile": "",
     "python.terminal.activateEnvInCurrentTerminal": true,
-    "python.testing.pytestArgs": [
-        "tests"
-    ],
+    "python.testing.pytestArgs": ["tests"],
     "python.testing.pytestEnabled": true,
     "python.testing.unittestEnabled": false,
     "ruff.fixAll": true,

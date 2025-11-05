@@ -23,6 +23,9 @@
         "",
         ".css$"
     ],
-    "overrides": [{ "files": "*.svelte", "options": { "parser": "svelte" } }],
+    "overrides": [
+        { "files": "*.svelte", "options": { "parser": "svelte" } },
+        { "files": "*.json", "options": { "objectWrap": "preserve" } }
+    ],
     "tailwindStylesheet": "./src/app.css"
 }
