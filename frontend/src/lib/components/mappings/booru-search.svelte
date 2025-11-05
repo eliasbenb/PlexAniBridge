@@ -195,6 +195,7 @@
                         : [];
                     const opMap: Record<string, string> = {
                         "=": "Equals",
+                        in: "Comma-separated list",
                         ">": "Greater than",
                         ">=": "Greater or equal",
                         "<": "Less than",
@@ -206,7 +207,11 @@
 
                     // Transform to UI suffixes
                     const allOps: Array<[string, string]> = capOps.map((op) => [
-                        op === "=" ? "" : op === "range" ? ".." : op,
+                        op === "=" || op === "in"
+                            ? ""
+                            : op === "range"
+                                ? ".."
+                                : op,
                         op === "wildcard" ? "*" : opMap[op] || "",
                     ]);
 
