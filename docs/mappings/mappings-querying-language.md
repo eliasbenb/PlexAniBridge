@@ -15,6 +15,8 @@ PlexAniBridge provides a Booru-like querying language for searching the mappings
 
 The querying language supports a wide range of operators to build flexible and complex queries. The web UI includes a search bar with query suggestions to help you construct valid queries.
 
+**Escaping Reserved Characters:** Certain characters have special meanings in the querying language (e.g., commas, parentheses). To include these characters as literal values, wrap the value in double quotes. E.g. `foo:"bar,baz"` treats `bar,baz` as a single literal value rather than a list of two values.
+
 ### Search Terms
 
 - **Fielded search:** `foo:bar` → Search for `bar` in field `foo`
@@ -30,6 +32,18 @@ The querying language supports a wide range of operators to build flexible and c
 ### Grouping
 
 - `(foo | bar) baz` → Search for `(foo OR bar) AND baz`
+
+## IN Lists
+
+- `foo:bar,baz,qux` → Search for mappings where field `foo` matches any of the values `bar`, `baz`, or `qux`
+
+_Note: IN lists are not supported for all fields. The web UI will only suggest an IN list when it is supported for the selected field. See [`/api/mappings/query-capabilities`](../web/api.md) for details on which fields support IN lists._
+
+### Escaping Reserved Characters
+
+Use either double quotes to include reserved characters such as commas in a value without triggering list parsing.
+
+- `foo:"bar,baz"` → Treats `bar,baz` as a single literal value
 
 ### Ranges
 
@@ -118,6 +132,9 @@ tmdb_mappings:e12*
 
 anilist.status:RELEASING anilist.genre:Action
 # Currently releasing anime in the Action genre
+
+-anilist.format:SPECIAL,OVA
+# Exclude anime in the Special or OVA formats
 
 anilist.format:TV anilist.average_score:>80 anilist.popularity:>5000
 # TV format anime with average score over 80 and popularity over 5000

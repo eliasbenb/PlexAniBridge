@@ -145,14 +145,31 @@ class MappingsService:
         self,
         spec: QueryFieldSpec,
         raw_value: str,
+        multi_values: tuple[str, ...] | None = None,
     ) -> dict[str, Any]:
         """Translate an AniList term into GraphQL filter arguments."""
         value = raw_value.strip()
+        values_tuple = (
+            tuple(dict.fromkeys(multi_values or ())) if multi_values else None
+        )
 
         if not spec.anilist_field:
             raise AniListFilterError(f"AniList field mapping missing for '{spec.key}'")
 
         if spec.kind == QueryFieldKind.ANILIST_STRING:
+            if values_tuple:
+                if not spec.anilist_multi_field:
+                    raise AniListFilterError(
+                        f"AniList filter '{spec.key}' does not support multiple values"
+                    )
+                normalized = [self._normalize_text_query(item) for item in values_tuple]
+                filtered = [item for item in normalized if item]
+                if not filtered:
+                    raise AniListFilterError(
+                        f"AniList filter '{spec.key}' requires at least one value"
+                    )
+                unique = list(dict.fromkeys(filtered))
+                return {spec.anilist_multi_field: unique}
             text = self._normalize_text_query(value)
             if not text:
                 raise AniListFilterError(
@@ -166,27 +183,48 @@ class MappingsService:
                 raise AniListFilterError(
                     f"AniList filter '{spec.key}' is not configured with values"
                 )
-            candidate = value
-            if not candidate:
-                raise AniListFilterError(
-                    f"AniList filter '{spec.key}' requires a value"
-                )
             lookup = {val: val for val in allowed}
             lookup.update({val.lower(): val for val in allowed})
             lookup.update({val.upper(): val for val in allowed})
-            resolved = lookup.get(candidate)
-            if resolved is None:
-                resolved = lookup.get(candidate.lower())
-            if resolved is None:
-                resolved = lookup.get(candidate.upper())
-            if resolved is None:
-                raise AniListFilterError(
-                    f"'{candidate}' is not a valid value for AniList filter "
-                    f"'{spec.key}'"
-                )
+
+            def _resolve_enum(candidate: str) -> str:
+                if not candidate:
+                    raise AniListFilterError(
+                        f"AniList filter '{spec.key}' requires a value"
+                    )
+                resolved = lookup.get(candidate)
+                if resolved is None:
+                    resolved = lookup.get(candidate.lower())
+                if resolved is None:
+                    resolved = lookup.get(candidate.upper())
+                if resolved is None:
+                    raise AniListFilterError(
+                        f"'{candidate}' is not a valid value for AniList filter "
+                        f"'{spec.key}'"
+                    )
+                return resolved
+
+            if values_tuple:
+                if not spec.anilist_multi_field:
+                    raise AniListFilterError(
+                        f"AniList filter '{spec.key}' does not support multiple values"
+                    )
+                resolved_values = [_resolve_enum(item) for item in values_tuple]
+                unique_values = list(dict.fromkeys(resolved_values))
+                if not unique_values:
+                    raise AniListFilterError(
+                        f"AniList filter '{spec.key}' requires a value"
+                    )
+                return {spec.anilist_multi_field: unique_values}
+
+            resolved = _resolve_enum(value)
             return {spec.anilist_field: resolved}
 
         if spec.kind == QueryFieldKind.ANILIST_NUMERIC:
+            if values_tuple:
+                raise AniListFilterError(
+                    f"AniList filter '{spec.key}' does not support multiple values"
+                )
             cmp_filter, range_filter, text_value = self._parse_numeric_filters(value)
             filters_dict = self._build_anilist_numeric_filters(
                 spec, cmp_filter, range_filter, text_value
@@ -388,9 +426,25 @@ class MappingsService:
         cmp_filter: tuple[str, int] | None,
         range_filter: tuple[int, int] | None,
         raw_value: str,
+        values: tuple[str, ...] | None = None,
     ) -> set[int]:
         """Filters scalar columns using comparison or range syntax."""
         stmt = select(AniMap.anilist_id)
+        if values:
+            seen: set[int] = set()
+            numbers: list[int] = []
+            for raw in values:
+                try:
+                    num = int(raw)
+                except (TypeError, ValueError):
+                    return set()
+                if num in seen:
+                    continue
+                seen.add(num)
+                numbers.append(num)
+            if not numbers:
+                return set()
+            return self._fetch_ids(ctx, stmt.where(column.in_(numbers)))
         if cmp_filter:
             op, num = cmp_filter
             cond = self._scalar_cmp(column, op, num)
@@ -414,10 +468,28 @@ class MappingsService:
         raw_value: str,
         cmp_filter: tuple[str, int] | None,
         range_filter: tuple[int, int] | None,
+        values: tuple[str, ...] | None = None,
     ) -> set[int]:
         """Filters JSON array columns using scalar or wildcard logic."""
         stmt = select(AniMap.anilist_id)
         if numeric:
+            if values:
+                seen: set[int] = set()
+                nums: list[int] = []
+                for raw in values:
+                    try:
+                        val = int(raw)
+                    except (TypeError, ValueError):
+                        return set()
+                    if val in seen:
+                        continue
+                    seen.add(val)
+                    nums.append(val)
+                if not nums:
+                    return set()
+                return self._fetch_ids(
+                    ctx, stmt.where(json_array_contains(column, nums))
+                )
             if cmp_filter:
                 op, num = cmp_filter
                 return self._fetch_ids(
@@ -434,12 +506,49 @@ class MappingsService:
                 return set()
             return self._fetch_ids(ctx, stmt.where(json_array_contains(column, [num])))
         text = raw_value
+        if values:
+            if not any(self._has_wildcards(val) for val in values):
+                unique_values = list(dict.fromkeys(values))
+                if not unique_values:
+                    return set()
+                return self._fetch_ids(
+                    ctx, stmt.where(json_array_contains(column, unique_values))
+                )
+            conditions = []
+            for val in values:
+                if self._has_wildcards(val):
+                    conditions.append(json_array_like(column, val))
+                else:
+                    conditions.append(json_array_contains(column, [val]))
+            if not conditions:
+                return set()
+            return self._fetch_ids(ctx, stmt.where(or_(*conditions)))
         if self._has_wildcards(text):
             return self._fetch_ids(ctx, stmt.where(json_array_like(column, text)))
         return self._fetch_ids(ctx, stmt.where(json_array_contains(column, [text])))
 
-    def _filter_json_dict(self, ctx, column, raw_value: str) -> set[int]:
+    def _filter_json_dict(
+        self,
+        ctx,
+        column,
+        raw_value: str,
+        values: tuple[str, ...] | None = None,
+    ) -> set[int]:
         """Filters JSON dictionary columns using key/value lookups."""
+        if values:
+            conditions: list[Any] = []
+            for val in values:
+                if self._has_wildcards(val):
+                    conditions.append(json_dict_key_like(column, val))
+                    conditions.append(json_dict_value_like(column, val))
+                else:
+                    if val != "":
+                        conditions.append(json_dict_has_key(column, val))
+                    conditions.append(json_dict_has_value(column, val))
+            if not conditions:
+                return set()
+            stmt = select(AniMap.anilist_id).where(or_(*conditions))
+            return self._fetch_ids(ctx, stmt)
         text = raw_value
         conditions: list[Any] = []
         if self._has_wildcards(text):
@@ -689,41 +798,54 @@ class MappingsService:
                 ),
             )
 
-            ani_term_nodes: dict[tuple[str, str], deque[KeyTerm]] = {}
+            ani_term_nodes: dict[tuple[str, tuple[str, ...]], deque[KeyTerm]] = {}
             term_results: dict[int, set[int]] = {}
 
-            def resolve_db(key: str, value: str) -> set[int]:
-                """Resolves a query key/value pair to matching AniList identifiers.
-
-                Args:
-                    key (str): Field name provided by the booru query.
-                    value (str): Raw query value including operators or wildcards.
-
-                Returns:
-                    set[int]: AniList identifiers matching the filter.
-                """
-                lowered = key.lower()
+            def resolve_db(term: KeyTerm) -> set[int]:
+                """Resolve a KeyTerm into matching AniList identifiers."""
+                lowered = term.key.lower()
                 spec = self._FIELD_MAP.get(lowered)
                 if not spec:
                     return set()
-                value_key = value.strip()
+                raw_value = term.value if term.quoted else term.value.strip()
+                value_parts = term.values
+                value_key = value_parts or (raw_value,)
 
                 if spec.kind == QueryFieldKind.DB_SCALAR:
-                    cmp_filter, range_filter, text_value = self._parse_numeric_filters(
-                        value
-                    )
                     if not spec.column:
                         return set()
+                    if value_parts:
+                        return self._filter_scalar(
+                            ctx,
+                            spec.column,
+                            None,
+                            None,
+                            "",
+                            value_parts,
+                        )
+                    cmp_filter, range_filter, text_value = self._parse_numeric_filters(
+                        raw_value
+                    )
                     return self._filter_scalar(
                         ctx, spec.column, cmp_filter, range_filter, text_value
                     )
 
                 if spec.kind == QueryFieldKind.DB_JSON_ARRAY:
-                    cmp_filter, range_filter, text_value = self._parse_numeric_filters(
-                        value
-                    )
                     if not spec.column:
                         return set()
+                    if value_parts:
+                        return self._filter_json_array(
+                            ctx,
+                            spec.column,
+                            bool(spec.json_array_numeric),
+                            "",
+                            None,
+                            None,
+                            value_parts,
+                        )
+                    cmp_filter, range_filter, text_value = self._parse_numeric_filters(
+                        raw_value
+                    )
                     return self._filter_json_array(
                         ctx,
                         spec.column,
@@ -736,20 +858,27 @@ class MappingsService:
                 if spec.kind == QueryFieldKind.DB_JSON_DICT:
                     if not spec.column:
                         return set()
-                    return self._filter_json_dict(ctx, spec.column, value)
+                    if value_parts:
+                        return self._filter_json_dict(ctx, spec.column, "", value_parts)
+                    return self._filter_json_dict(ctx, spec.column, raw_value)
 
                 if spec.kind == QueryFieldKind.DB_HAS:
-                    return self._resolve_has(ctx, value)
+                    if value_parts:
+                        result: set[int] = set()
+                        for part in value_parts:
+                            result |= self._resolve_has(ctx, part)
+                        return result
+                    return self._resolve_has(ctx, raw_value)
 
                 if spec.kind in self._ANILIST_KINDS:
                     cache_key = (spec.key, value_key)
                     queue = ani_term_nodes.get(cache_key)
                     if queue:
                         term_node = queue[0]
-                        result = term_results.get(id(term_node))
-                        if result is not None:
+                        cached = term_results.get(id(term_node))
+                        if cached is not None:
                             queue.popleft()
-                            return set(result)
+                            return set(cached)
                     return set()
 
                 return set()
@@ -772,8 +901,9 @@ class MappingsService:
                 key_terms = collect_key_terms(node)
                 term_filters: dict[int, dict[str, Any]] = {}
                 term_specs: dict[int, QueryFieldSpec] = {}
-                term_values: dict[int, str] = {}
-                individual_cache: dict[tuple[str, str], set[int]] = {}
+                term_value_texts: dict[int, str] = {}
+                term_value_keys: dict[int, tuple[str, ...]] = {}
+                individual_cache: dict[tuple[str, tuple[str, ...]], set[int]] = {}
                 client = None
                 if key_terms:
                     for term in key_terms:
@@ -782,14 +912,16 @@ class MappingsService:
                         if not spec or spec.kind not in self._ANILIST_KINDS:
                             continue
                         term_id = id(term)
-                        term_value = term.value.strip()
+                        value_text = term.value if term.quoted else term.value.strip()
+                        value_parts = term.values or (value_text,)
                         ani_term_nodes.setdefault(
-                            (spec.key, term_value), deque()
+                            (spec.key, value_parts), deque()
                         ).append(term)
                         term_specs[term_id] = spec
-                        term_values[term_id] = term_value
+                        term_value_texts[term_id] = value_text
+                        term_value_keys[term_id] = value_parts
                         term_filters[term_id] = self._build_anilist_term_filters(
-                            spec, term_value
+                            spec, value_text, term.values
                         )
 
                     if term_filters:
@@ -848,17 +980,24 @@ class MappingsService:
                         term_id = id(term)
                         if term_id in term_results:
                             continue
-                        term_value = term_values.get(term_id)
-                        if term_value is None:
-                            term_value = term.value.strip()
-                            term_values[term_id] = term_value
+                        value_text = term_value_texts.get(term_id)
+                        value_key = term_value_keys.get(term_id)
+                        if value_text is None or value_key is None:
+                            value_text = (
+                                term.value if term.quoted else term.value.strip()
+                            )
+                            value_key = term.values or (value_text,)
+                            term_value_texts[term_id] = value_text
+                            term_value_keys[term_id] = value_key
                         filters_dict = term_filters.get(term_id)
                         if filters_dict is None:
                             filters_dict = self._build_anilist_term_filters(
-                                spec, term_value
+                                spec,
+                                value_text,
+                                term.values,
                             )
                             term_filters[term_id] = filters_dict
-                        cache_key = (spec.key, term_value)
+                        cache_key = (spec.key, value_key)
                         cached = individual_cache.get(cache_key)
                         if cached is None:
                             if client is None:
@@ -876,14 +1015,11 @@ class MappingsService:
                                     raise
                                 raise AniListSearchError(
                                     f"Failed to resolve AniList filter "
-                                    f"'{spec.key}:{term_value}'"
+                                    f"'{spec.key}:{value_text}'"
                                 ) from exc
                             cached = set(ids)
                             individual_cache[cache_key] = cached
                         term_results[term_id] = cached
-
-                def db_resolver(k: str, v: str) -> set[int]:
-                    return resolve_db(k, v)
 
                 def anilist_resolver(term: str) -> list[int]:
                     return bare_cache.get(term, [])
@@ -892,7 +1028,7 @@ class MappingsService:
                 try:
                     eval_res = evaluate(
                         node,
-                        db_resolver=db_resolver,
+                        db_resolver=resolve_db,
                         anilist_resolver=anilist_resolver,
                         universe_ids=all_ids,
                     )

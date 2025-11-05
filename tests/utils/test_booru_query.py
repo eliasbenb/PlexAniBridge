@@ -36,6 +36,46 @@ def test_collect_helpers_preserve_order_and_deduplicate():
     ]
 
 
+def test_parse_query_key_term_in_values():
+    """Comma-separated values should populate the KeyTerm.values tuple."""
+    node = bq.parse_query("tvdb:1, 2,3")
+
+    assert isinstance(node, bq.KeyTerm)
+    assert node.value == "1,2,3"
+    assert node.values == ("1", "2", "3")
+    assert node.quoted is False
+
+
+def test_parse_query_quoted_reserved_characters():
+    """Quoted values containing reserved characters should remain literal."""
+    node = bq.parse_query('anilist.title:"Full (Metal) Panic!"')
+
+    assert isinstance(node, bq.KeyTerm)
+    assert node.value == "Full (Metal) Panic!"
+    assert node.values is None
+    assert node.quoted is True
+
+
+def test_parse_query_quoted_value_with_comma_preserves_literal():
+    """Quoted values containing commas should remain a single value."""
+    node = bq.parse_query('tvdb:"1,2"')
+
+    assert isinstance(node, bq.KeyTerm)
+    assert node.value == "1,2"
+    assert node.values is None
+    assert node.quoted is True
+
+
+def test_parse_query_supports_mixed_list_with_escaped_values():
+    """Lists may include escaped commas without splitting the value."""
+    node = bq.parse_query('anilist.genre:"Action,Adventure",Drama,"Comedy"')
+
+    assert isinstance(node, bq.KeyTerm)
+    assert node.value == "Action,Adventure,Drama,Comedy"
+    assert node.values == ("Action,Adventure", "Drama", "Comedy")
+    assert node.quoted is False
+
+
 def test_parse_query_auto_groups_unquoted_terms_into_phrase():
     """Unquoted multi-word AniList searches should auto-merge into one term."""
     node = bq.parse_query("Full Metal Panic")
@@ -104,12 +144,12 @@ def test_evaluate_combines_or_group_with_and_filters():
     """Test that evaluate combines OR groups with AND filters."""
     node = bq.parse_query('~"Naruto" ~"Bleach" anilist.genre:action')
 
-    def db_resolver(key: str, value: str) -> set[int]:
+    def db_resolver(term: bq.KeyTerm) -> set[int]:
         mapping = {
             ("anilist.genre", "action"): {1, 2},
             ("anilist.genre", "drama"): {2, 3},
         }
-        return set(mapping.get((key, value), set()))
+        return set(mapping.get((term.key, term.value), set()))
 
     def anilist_resolver(term: str) -> list[int]:
         mapping = {
@@ -135,8 +175,8 @@ def test_evaluate_not_uses_provided_universe():
     """Test that NOT queries use the provided universe of IDs."""
     node = bq.parse_query("-anilist.genre:action")
 
-    def db_resolver(key: str, value: str) -> set[int]:
-        if (key, value) == ("anilist.genre", "action"):
+    def db_resolver(term: bq.KeyTerm) -> set[int]:
+        if (term.key, term.value) == ("anilist.genre", "action"):
             return {2, 3}
         return set()
 
@@ -148,5 +188,30 @@ def test_evaluate_not_uses_provided_universe():
     )
 
     assert result.ids == {1}
+    assert result.used_bare is False
+    assert result.order_hint == {}
+
+
+def test_evaluate_passes_in_values_to_db_resolver():
+    """Db resolver should receive the tuple of IN values for processing."""
+    node = bq.parse_query("tvdb:1,2,3")
+
+    seen: list[tuple[str, ...] | None] = []
+
+    def db_resolver(term: bq.KeyTerm) -> set[int]:
+        seen.append(term.values)
+        if not term.values:
+            return set()
+        return {int(part) for part in term.values}
+
+    result = bq.evaluate(
+        node,
+        db_resolver=db_resolver,
+        anilist_resolver=lambda _term: [],
+        universe_ids=None,
+    )
+
+    assert seen == [("1", "2", "3")]
+    assert result.ids == {1, 2, 3}
     assert result.used_bare is False
     assert result.order_hint == {}
