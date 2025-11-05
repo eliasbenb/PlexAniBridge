@@ -13,6 +13,7 @@ Supported syntax:
     between AND expressions
 - NOT: `-foo` search the negation of `foo`
 - Grouping: `(foo | bar) baz` search for `(foo OR bar) AND baz`
+- IN lists: `foo:bar,baz` search for foo matching any value in the list
 - Ranges: `foo:<10 | foo:100..210` search for foo less than 10 or between 100 and 210
 - Presence: `has:foo` search for mappings that have the field `foo`
 """
@@ -27,12 +28,20 @@ from src.exceptions import BooruQuerySyntaxError
 
 pp.ParserElement.enablePackrat()  # Supposed to speed up parsing
 
-DbResolver = Callable[[str, str], set[int]]
+DbResolver = Callable[["KeyTerm"], set[int]]
 AniListResolver = Callable[[str], list[int]]
 
 
 class Node:
     """Base AST node for booru-like queries."""
+
+
+@dataclass(frozen=True)
+class ParsedValueToken:
+    """Intermediate parsed representation of a key term value."""
+
+    text: str
+    quoted: bool
 
 
 @dataclass
@@ -41,6 +50,8 @@ class KeyTerm(Node):
 
     key: str
     value: str
+    values: tuple[str, ...] | None = None
+    quoted: bool = False
 
 
 @dataclass
@@ -90,6 +101,10 @@ def _make_parser() -> pp.ParserElement:
     restricted_chars = {"(", ")", "|", "~", '"'}
     word_chars = "".join(ch for ch in pp.printables if ch not in restricted_chars)
     word_token = pp.Word(word_chars)
+    value_word_chars = "".join(
+        ch for ch in pp.printables if ch not in (restricted_chars | {","})
+    )
+    value_word_token = pp.Word(value_word_chars)
     qstring_token = pp.QuotedString('"', escChar="\\", unquoteResults=True)
 
     # Tokens for comparisons and ranges
@@ -97,19 +112,59 @@ def _make_parser() -> pp.ParserElement:
     cmp_val = pp.Combine(cmp_op + pp.Word(pp.nums))
     range_val = pp.Combine(pp.Word(pp.nums) + pp.Literal("..") + pp.Word(pp.nums))
 
-    # Normalize value to string
-    value_word = word_token.copy()
-    value_qstring = qstring_token.copy()
-    value = (value_qstring | range_val | cmp_val | value_word | integer).setParseAction(
-        lambda _s, _loc, toks: str(toks[0])
+    def _value_token(
+        expr: pp.ParserElement, *, quoted: bool = False
+    ) -> pp.ParserElement:
+        """Wrap a value token parser to produce ParsedValueToken nodes."""
+        return expr.copy().setParseAction(
+            lambda _s, _loc, toks: ParsedValueToken(
+                text=str(toks[0]) if quoted else str(toks[0]).strip(),
+                quoted=quoted,
+            )
+        )
+
+    value_atom = (
+        _value_token(qstring_token, quoted=True)
+        | _value_token(range_val)
+        | _value_token(cmp_val)
+        | _value_token(value_word_token)
+        | _value_token(integer)
     )
+
+    value = pp.Group(pp.delimitedList(value_atom, delim=","))
 
     colon = pp.Suppress(":")
 
-    # Deserialize key:value into KeyTerm
-    key_term = (identifier + colon + value).setParseAction(
-        lambda _s, _loc, toks: KeyTerm(key=str(toks[0]), value=str(toks[1]))
-    )
+    def _key_term_action(_s, _loc, toks):
+        """Parse action to convert tokens into a KeyTerm node."""
+        key = str(toks[0])
+        raw_values = toks[1]
+        tokens: list[ParsedValueToken] = []
+
+        if isinstance(raw_values, ParsedValueToken):
+            tokens = [raw_values]
+        elif isinstance(raw_values, (pp.ParseResults, list)):
+            tokens = [cast(ParsedValueToken, item) for item in raw_values]
+        else:
+            tokens = [ParsedValueToken(text=str(raw_values).strip(), quoted=False)]
+
+        cleaned: list[ParsedValueToken] = [tok for tok in tokens if tok.text != ""]
+        if not cleaned:
+            return KeyTerm(key=key, value="", values=None, quoted=False)
+
+        if len(cleaned) == 1:
+            token = cleaned[0]
+            return KeyTerm(
+                key=key,
+                value=token.text,
+                values=None,
+                quoted=token.quoted,
+            )
+
+        parts = tuple(dict.fromkeys(tok.text for tok in cleaned))
+        return KeyTerm(key=key, value=",".join(parts), values=parts, quoted=False)
+
+    key_term = (identifier + colon + value).setParseAction(_key_term_action)
 
     # Normalize bare term to string
     bare_word = word_token.copy().setParseAction(
@@ -446,7 +501,7 @@ def evaluate(
             child = eval_node(n.child)
             return set(universe) - set(child)
         if isinstance(n, KeyTerm):
-            return set(db_resolver(n.key, n.value))
+            return set(db_resolver(n))
         if isinstance(n, BareTerm):
             used_bare = True
             ordered = anilist_resolver(n.text)
