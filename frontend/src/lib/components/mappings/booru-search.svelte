@@ -153,90 +153,47 @@
                         },
                     });
                 }
-            } else {
-                // Value suggestions depending on key type
-                if (kinfo?.type === "enum") {
-                    const opts = kinfo.values || [];
-                    for (const opt of opts) {
-                        const optLower = opt.toLowerCase();
-                        if (vpart && !optLower.startsWith(vpart.toLowerCase()))
-                            continue;
-                        out.push({
-                            label: `${prefix}${kinfo.key}:${opt}`,
-                            detail: kinfo.key === "has" ? "Has field" : "Enum",
-                            kind: "value",
-                            apply: ({ replace }) => {
-                                replace(
-                                    seg.start,
-                                    seg.end,
-                                    `${prefix}${kinfo.key}:${opt}`,
-                                );
-                            },
-                        });
-                    }
-                } else if (kinfo?.type === "bool") {
-                    ["true", "false"].forEach((v) =>
-                        out.push({
-                            label: `${prefix}${kinfo.key}:${v}`,
-                            detail: "Boolean",
-                            kind: "value",
-                            apply: ({ replace }) => {
-                                replace(
-                                    seg.start,
-                                    seg.end,
-                                    `${prefix}${kinfo.key}:${v}`,
-                                );
-                            },
-                        }),
-                    );
-                } else if (kinfo) {
-                    // Operators based on backend capabilities
-                    const base = `${prefix}${kinfo.key}:`;
-                    const capOps: string[] = Array.isArray(kinfo.operators)
-                        ? kinfo.operators
-                        : [];
-                    const opMap: Record<string, string> = {
-                        "=": "Equals",
-                        ">": "Greater than",
-                        ">=": "Greater or equal",
-                        "<": "Less than",
-                        "<=": "Less or equal",
-                        "*": "Wildcard (*)",
-                        "?": "Wildcard (?)",
-                        in: "In (a,b,c)",
-                        range: "Range (lo..hi)",
-                    };
+            } else if (kinfo) {
+                // Operators based on backend capabilities
+                const base = `${prefix}${kinfo.key}:`;
+                const capOps: string[] = Array.isArray(kinfo.operators)
+                    ? kinfo.operators
+                    : [];
+                const opMap: Record<string, string> = {
+                    "=": "Equals",
+                    ">": "Greater than",
+                    ">=": "Greater or equal",
+                    "<": "Less than",
+                    "<=": "Less or equal",
+                    "*": "Wildcard (*)",
+                    "?": "Wildcard (?)",
+                    in: "In (a,b,c)",
+                    range: "Range (lo..hi)",
+                };
 
-                    // Transform to UI suffixes
-                    const allOps: Array<[string, string]> = capOps.map((op) => [
-                        op === "="
-                            ? ""
-                            : op === "in"
-                              ? ","
-                              : op === "range"
-                                ? ".."
-                                : op,
-                        op === "wildcard" ? "*" : opMap[op] || "",
-                    ]);
+                // Transform to UI suffixes
+                const allOps: Array<[string, string]> = capOps.map((op) => [
+                    op === "=" ? "" : op === "in" ? "," : op === "range" ? ".." : op,
+                    op === "wildcard" ? "*" : opMap[op] || "",
+                ]);
 
-                    const filteredOps = vpart
-                        ? allOps.filter(([op]) => op.startsWith(vpart))
-                        : allOps;
-                    for (const [op, detail] of filteredOps) {
-                        out.push({
-                            label: base + op,
-                            detail: detail || undefined,
-                            kind: "value",
-                            apply: ({ replace }) => {
-                                const rest = vpart;
-                                let next = base + op;
-                                if (op === ".." && /\d$/.test(rest)) {
-                                    next = base + rest + "..";
-                                }
-                                replace(seg.start, seg.end, next);
-                            },
-                        });
-                    }
+                const filteredOps = vpart
+                    ? allOps.filter(([op]) => op.startsWith(vpart))
+                    : allOps;
+                for (const [op, detail] of filteredOps) {
+                    out.push({
+                        label: base + op,
+                        detail: detail || undefined,
+                        kind: "value",
+                        apply: ({ replace }) => {
+                            const rest = vpart;
+                            let next = base + op;
+                            if (op === ".." && /\d$/.test(rest)) {
+                                next = base + rest + "..";
+                            }
+                            replace(seg.start, seg.end, next);
+                        },
+                    });
                 }
             }
         }
