@@ -30,6 +30,7 @@ class QueryFieldOperator(StrEnum):
     """Supported operator tokens for query fields."""
 
     EQ = "="
+    IN = "in"
     GT = ">"
     GTE = ">="
     LT = "<"
@@ -66,6 +67,7 @@ class QueryFieldSpec:
     json_array_numeric: bool = False
     anilist_field: str | None = None
     anilist_value_type: str | None = None
+    anilist_multi_field: str | None = None
 
 
 _HAS_VALUES = (
@@ -84,6 +86,7 @@ _HAS_VALUES = (
 
 _INT_OPS = (
     QueryFieldOperator.EQ,
+    QueryFieldOperator.IN,
     QueryFieldOperator.GT,
     QueryFieldOperator.GTE,
     QueryFieldOperator.LT,
@@ -94,11 +97,13 @@ _INT_OPS = (
 
 _STRING_OPS = (
     QueryFieldOperator.EQ,
+    QueryFieldOperator.IN,
     QueryFieldOperator.STAR_WILDCARD,
     QueryFieldOperator.QMARK_WILDCARD,
 )
 
 _STRING_EQ_OPS = (QueryFieldOperator.EQ,)
+_STRING_EQ_IN_OPS = (QueryFieldOperator.EQ, QueryFieldOperator.IN)
 
 
 _DB_FIELDS: tuple[QueryFieldSpec, ...] = (
@@ -183,7 +188,7 @@ _DB_FIELDS: tuple[QueryFieldSpec, ...] = (
         desc="Presence filter",
         kind=QueryFieldKind.DB_HAS,
         type=QueryFieldType.ENUM,
-        operators=(QueryFieldOperator.EQ,),
+        operators=(QueryFieldOperator.EQ, QueryFieldOperator.IN),
         values=_HAS_VALUES,
     ),
 )
@@ -240,7 +245,7 @@ _ANILIST_FIELDS: tuple[QueryFieldSpec, ...] = (
         desc="AniList format",
         kind=QueryFieldKind.ANILIST_ENUM,
         type=QueryFieldType.ENUM,
-        operators=(QueryFieldOperator.EQ,),
+        operators=(QueryFieldOperator.EQ, QueryFieldOperator.IN),
         values=(
             MediaFormat.TV.value,
             MediaFormat.TV_SHORT.value,
@@ -252,6 +257,7 @@ _ANILIST_FIELDS: tuple[QueryFieldSpec, ...] = (
         ),
         anilist_field="format",
         anilist_value_type="enum",
+        anilist_multi_field="format_in",
     ),
     QueryFieldSpec(
         key="anilist.status",
@@ -268,24 +274,27 @@ _ANILIST_FIELDS: tuple[QueryFieldSpec, ...] = (
         ),
         anilist_field="status",
         anilist_value_type="enum",
+        anilist_multi_field="status_in",
     ),
     QueryFieldSpec(
         key="anilist.genre",
         desc="AniList genre",
         kind=QueryFieldKind.ANILIST_STRING,
         type=QueryFieldType.STRING,
-        operators=_STRING_EQ_OPS,
+        operators=_STRING_EQ_IN_OPS,
         anilist_field="genre",
         anilist_value_type="string",
+        anilist_multi_field="genre_in",
     ),
     QueryFieldSpec(
         key="anilist.tag",
         desc="AniList tag",
         kind=QueryFieldKind.ANILIST_STRING,
         type=QueryFieldType.STRING,
-        operators=_STRING_EQ_OPS,
+        operators=_STRING_EQ_IN_OPS,
         anilist_field="tag",
         anilist_value_type="string",
+        anilist_multi_field="tag_in",
     ),
     QueryFieldSpec(
         key="anilist.average_score",
