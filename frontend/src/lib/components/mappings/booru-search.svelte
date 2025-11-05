@@ -100,6 +100,17 @@
         return undefined;
     }
 
+    function shouldQuote(cap: FieldCapability | undefined): boolean {
+        if (!cap) return false;
+        const type = (cap.type || "").toLowerCase();
+        return type === "string" || type === "enum";
+    }
+
+    function normalizeValuePart(raw: string): string {
+        if (!raw) return raw;
+        return raw.replace(/^['"]/u, "").replace(/['"]$/u, "");
+    }
+
     function getSuggestions(val: string, caret: number): Suggestion[] {
         const seg = findSegment(val, caret);
         const t = seg.text;
@@ -114,6 +125,8 @@
             const hasColon = !!mKV[3];
             const vpart = mKV[4] || "";
             const kinfo = getKeyInfo(name);
+            const needsQuotes = shouldQuote(kinfo);
+            const matchPart = needsQuotes ? normalizeValuePart(vpart) : vpart;
 
             // Key suggestions (when typing name or missing colon)
             if (!hasColon) {
@@ -164,18 +177,22 @@
                     op === "wildcard" ? "*" : opMap[op] || "",
                 ]);
 
-                if (kinfo.type === "enum" && Array.isArray(kinfo.values)) {
-                    const filteredValues = vpart
+                if (Array.isArray(kinfo.values) && kinfo.values.length) {
+                    const filteredValues = matchPart
                         ? kinfo.values.filter((v) =>
-                              v.toLowerCase().startsWith(vpart.toLowerCase()),
+                              v
+                                  .toLowerCase()
+                                  .startsWith(matchPart.toLowerCase()),
                           )
                         : kinfo.values;
                     for (const val of filteredValues) {
+                        const quotedVal = needsQuotes ? `"${val}"` : val;
+                        const insertion = base + quotedVal;
                         out.push({
-                            label: base + val,
+                            label: insertion,
                             kind: "value",
                             apply: ({ replace }) => {
-                                replace(seg.start, seg.end, base + val);
+                                replace(seg.start, seg.end, insertion);
                             },
                         });
                     }
@@ -187,21 +204,28 @@
                     }
                 }
 
-                const filteredOps = vpart
-                    ? allOps.filter(([op]) => op.startsWith(vpart))
+                const filteredOps = matchPart
+                    ? allOps.filter(([op]) => op.startsWith(matchPart))
                     : allOps;
                 for (const [op, detail] of filteredOps) {
+                    const baseWithOp = (() => {
+                        if (needsQuotes && op === "") {
+                            return `${base}""`;
+                        }
+                        return base + op;
+                    })();
+                    const caretDelta = needsQuotes && op === "" ? -1 : 0;
                     out.push({
-                        label: base + op,
+                        label: baseWithOp,
                         detail: detail || undefined,
                         kind: "value",
                         apply: ({ replace }) => {
                             const rest = vpart;
-                            let next = base + op;
+                            let next = baseWithOp;
                             if (op === ".." && /\d$/.test(rest)) {
                                 next = base + rest + "..";
                             }
-                            replace(seg.start, seg.end, next);
+                            replace(seg.start, seg.end, next, caretDelta);
                         },
                     });
                 }
