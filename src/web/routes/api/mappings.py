@@ -1,6 +1,7 @@
 """API endpoints for mappings."""
 
 import asyncio
+from collections.abc import Iterable
 from enum import Enum
 from typing import Any
 
@@ -121,10 +122,10 @@ class FieldCapability(BaseModel):
     """Describes supported operators and value type for a query field."""
 
     key: str
-    aliases: list[str] = []
+    aliases: Iterable[str] = []
     type: QueryFieldType
-    operators: list[QueryFieldOperator]
-    values: list[str] | None = None  # for enums like has:*
+    operators: Iterable[QueryFieldOperator]
+    values: Iterable[str] | None = None  # for enums like has:*
     desc: str | None = None
 
 
@@ -145,10 +146,10 @@ async def get_query_capabilities() -> QueryCapabilitiesResponse:
     fields = [
         FieldCapability(
             key=spec.key,
-            aliases=list(spec.aliases),
+            aliases=spec.aliases,
             type=spec.type,
-            operators=list(spec.operators),
-            values=list(spec.values) if spec.values else None,
+            operators=spec.operators,
+            values=spec.values,
             desc=spec.desc,
         )
         for spec in specs
