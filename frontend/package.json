@@ -16,7 +16,7 @@
     },
     "devDependencies": {
         "@eslint/compat": "^1.4.1",
-        "@eslint/js": "^9.39.0",
+        "@eslint/js": "^9.39.1",
         "@ianvs/prettier-plugin-sort-imports": "^4.7.0",
         "@monaco-editor/loader": "^1.6.1",
         "@sveltejs/adapter-static": "3.0.10",
@@ -25,7 +25,7 @@
         "@tailwindcss/vite": "^4.1.16",
         "@types/node": "^24.10.0",
         "@vite-pwa/sveltekit": "^1.0.1",
-        "eslint": "^9.39.0",
+        "eslint": "^9.39.1",
         "eslint-config-prettier": "^10.1.8",
         "eslint-plugin-svelte": "^3.13.0",
         "globals": "^16.5.0",
@@ -36,7 +36,7 @@
         "svelte-check": "4.3.3",
         "tailwindcss": "^4.1.16",
         "typescript": "5.9.3",
-        "typescript-eslint": "^8.46.2",
+        "typescript-eslint": "^8.46.3",
         "vite": "7.1.12"
     },
     "dependencies": {
