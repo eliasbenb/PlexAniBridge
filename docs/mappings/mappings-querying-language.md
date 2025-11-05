@@ -39,12 +39,6 @@ The querying language supports a wide range of operators to build flexible and c
 
 _Note: IN lists are not supported for all fields. The web UI will only suggest an IN list when it is supported for the selected field. See [`/api/mappings/query-capabilities`](../web/api.md) for details on which fields support IN lists._
 
-### Escaping Reserved Characters
-
-Use either double quotes to include reserved characters such as commas in a value without triggering list parsing.
-
-- `foo:"bar,baz"` → Treats `bar,baz` as a single literal value
-
 ### Ranges
 
 - `foo:<10` → Search where `foo` is less than 10
