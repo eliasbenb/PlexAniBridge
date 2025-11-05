@@ -90,7 +90,6 @@ _ENUM_OPS = (
 )
 _INT_OPS = (
     QueryFieldOperator.EQ,
-    QueryFieldOperator.IN,
     QueryFieldOperator.GT,
     QueryFieldOperator.GTE,
     QueryFieldOperator.LT,
@@ -99,16 +98,12 @@ _INT_OPS = (
 )
 _STRING_OPS = (
     QueryFieldOperator.EQ,
-    QueryFieldOperator.IN,
     QueryFieldOperator.STAR_WILDCARD,
     QueryFieldOperator.QMARK_WILDCARD,
 )
-_STRING_EQ_OPS = (QueryFieldOperator.EQ,)
-_STRING_EQ_IN_OPS = (
-    QueryFieldOperator.EQ,
-    QueryFieldOperator.IN,
-)
 
+_INT_IN_OPS = (*_INT_OPS, QueryFieldOperator.IN)
+_STRING_IN_OPS = (*_STRING_OPS, QueryFieldOperator.IN)
 
 _DB_FIELDS: tuple[QueryFieldSpec, ...] = (
     QueryFieldSpec(
@@ -117,7 +112,7 @@ _DB_FIELDS: tuple[QueryFieldSpec, ...] = (
         desc="AniList ID",
         kind=QueryFieldKind.DB_SCALAR,
         type=QueryFieldType.INT,
-        operators=_INT_OPS,
+        operators=_INT_IN_OPS,
         column=AniMap.anilist_id,
     ),
     QueryFieldSpec(
@@ -125,7 +120,7 @@ _DB_FIELDS: tuple[QueryFieldSpec, ...] = (
         desc="AniDB ID",
         kind=QueryFieldKind.DB_SCALAR,
         type=QueryFieldType.INT,
-        operators=_INT_OPS,
+        operators=_INT_IN_OPS,
         column=AniMap.anidb_id,
     ),
     QueryFieldSpec(
@@ -133,7 +128,7 @@ _DB_FIELDS: tuple[QueryFieldSpec, ...] = (
         desc="IMDb ID",
         kind=QueryFieldKind.DB_JSON_ARRAY,
         type=QueryFieldType.STRING,
-        operators=_STRING_OPS,
+        operators=_STRING_IN_OPS,
         column=AniMap.imdb_id,
         json_array_numeric=False,
     ),
@@ -142,7 +137,7 @@ _DB_FIELDS: tuple[QueryFieldSpec, ...] = (
         desc="MyAnimeList ID",
         kind=QueryFieldKind.DB_JSON_ARRAY,
         type=QueryFieldType.INT,
-        operators=_INT_OPS,
+        operators=_INT_IN_OPS,
         column=AniMap.mal_id,
         json_array_numeric=True,
     ),
@@ -151,7 +146,7 @@ _DB_FIELDS: tuple[QueryFieldSpec, ...] = (
         desc="TMDB Movie ID",
         kind=QueryFieldKind.DB_JSON_ARRAY,
         type=QueryFieldType.INT,
-        operators=_INT_OPS,
+        operators=_INT_IN_OPS,
         column=AniMap.tmdb_movie_id,
         json_array_numeric=True,
     ),
@@ -160,7 +155,7 @@ _DB_FIELDS: tuple[QueryFieldSpec, ...] = (
         desc="TMDB TV Show ID",
         kind=QueryFieldKind.DB_SCALAR,
         type=QueryFieldType.INT,
-        operators=_INT_OPS,
+        operators=_INT_IN_OPS,
         column=AniMap.tmdb_show_id,
     ),
     QueryFieldSpec(
@@ -168,7 +163,7 @@ _DB_FIELDS: tuple[QueryFieldSpec, ...] = (
         desc="TVDB ID",
         kind=QueryFieldKind.DB_SCALAR,
         type=QueryFieldType.INT,
-        operators=_INT_OPS,
+        operators=_INT_IN_OPS,
         column=AniMap.tvdb_id,
     ),
     QueryFieldSpec(
@@ -176,7 +171,7 @@ _DB_FIELDS: tuple[QueryFieldSpec, ...] = (
         desc="Season/episode mappings",
         kind=QueryFieldKind.DB_JSON_DICT,
         type=QueryFieldType.STRING,
-        operators=_STRING_OPS,
+        operators=_STRING_IN_OPS,
         column=AniMap.tmdb_mappings,
     ),
     QueryFieldSpec(
@@ -184,7 +179,7 @@ _DB_FIELDS: tuple[QueryFieldSpec, ...] = (
         desc="Season/episode mappings",
         kind=QueryFieldKind.DB_JSON_DICT,
         type=QueryFieldType.STRING,
-        operators=_STRING_OPS,
+        operators=_STRING_IN_OPS,
         column=AniMap.tvdb_mappings,
     ),
     QueryFieldSpec(
@@ -192,7 +187,7 @@ _DB_FIELDS: tuple[QueryFieldSpec, ...] = (
         desc="Presence filter",
         kind=QueryFieldKind.DB_HAS,
         type=QueryFieldType.ENUM,
-        operators=(QueryFieldOperator.EQ, QueryFieldOperator.IN),
+        operators=_ENUM_OPS,
         values=_HAS_VALUES,
     ),
 )
@@ -204,7 +199,7 @@ _ANILIST_FIELDS: tuple[QueryFieldSpec, ...] = (
         desc="AniList title search",
         kind=QueryFieldKind.ANILIST_STRING,
         type=QueryFieldType.STRING,
-        operators=_STRING_EQ_OPS,
+        operators=_STRING_OPS,
         anilist_field="search",
         anilist_value_type="string",
     ),
@@ -250,15 +245,7 @@ _ANILIST_FIELDS: tuple[QueryFieldSpec, ...] = (
         kind=QueryFieldKind.ANILIST_ENUM,
         type=QueryFieldType.ENUM,
         operators=_ENUM_OPS,
-        values=(
-            MediaFormat.TV.value,
-            MediaFormat.TV_SHORT.value,
-            MediaFormat.MOVIE.value,
-            MediaFormat.SPECIAL.value,
-            MediaFormat.OVA.value,
-            MediaFormat.ONA.value,
-            MediaFormat.MUSIC.value,
-        ),
+        values=tuple(m.value for m in MediaFormat),
         anilist_field="format",
         anilist_value_type="enum",
         anilist_multi_field="format_in",
@@ -269,36 +256,32 @@ _ANILIST_FIELDS: tuple[QueryFieldSpec, ...] = (
         kind=QueryFieldKind.ANILIST_ENUM,
         type=QueryFieldType.ENUM,
         operators=_ENUM_OPS,
-        values=(
-            MediaStatus.FINISHED.value,
-            MediaStatus.RELEASING.value,
-            MediaStatus.NOT_YET_RELEASED.value,
-            MediaStatus.CANCELLED.value,
-            MediaStatus.HIATUS.value,
-        ),
+        values=tuple(s.value for s in MediaStatus),
         anilist_field="status",
         anilist_value_type="enum",
         anilist_multi_field="status_in",
     ),
+    # Annoyingly, AniList genres and tags diverge from typical `_in` behavior;
+    # instead of matching any of the provided values, they match ALL provided values.
+    # Essentially, they behave like a series of ANDed equality checks.
+    # Multivalue searches for these fields will be disabled to avoid confusion.
     QueryFieldSpec(
         key="anilist.genre",
         desc="AniList genre",
         kind=QueryFieldKind.ANILIST_STRING,
         type=QueryFieldType.STRING,
-        operators=_STRING_EQ_IN_OPS,
+        operators=_STRING_OPS,
         anilist_field="genre",
         anilist_value_type="string",
-        anilist_multi_field="genre_in",
     ),
     QueryFieldSpec(
         key="anilist.tag",
         desc="AniList tag",
         kind=QueryFieldKind.ANILIST_STRING,
         type=QueryFieldType.STRING,
-        operators=_STRING_EQ_IN_OPS,
+        operators=_STRING_OPS,
         anilist_field="tag",
         anilist_value_type="string",
-        anilist_multi_field="tag_in",
     ),
     QueryFieldSpec(
         key="anilist.average_score",
