@@ -84,6 +84,10 @@ _HAS_VALUES = (
 )
 
 
+_ENUM_OPS = (
+    QueryFieldOperator.EQ,
+    QueryFieldOperator.IN,
+)
 _INT_OPS = (
     QueryFieldOperator.EQ,
     QueryFieldOperator.IN,
@@ -93,17 +97,17 @@ _INT_OPS = (
     QueryFieldOperator.LTE,
     QueryFieldOperator.RANGE,
 )
-
-
 _STRING_OPS = (
     QueryFieldOperator.EQ,
     QueryFieldOperator.IN,
     QueryFieldOperator.STAR_WILDCARD,
     QueryFieldOperator.QMARK_WILDCARD,
 )
-
 _STRING_EQ_OPS = (QueryFieldOperator.EQ,)
-_STRING_EQ_IN_OPS = (QueryFieldOperator.EQ, QueryFieldOperator.IN)
+_STRING_EQ_IN_OPS = (
+    QueryFieldOperator.EQ,
+    QueryFieldOperator.IN,
+)
 
 
 _DB_FIELDS: tuple[QueryFieldSpec, ...] = (
@@ -245,7 +249,7 @@ _ANILIST_FIELDS: tuple[QueryFieldSpec, ...] = (
         desc="AniList format",
         kind=QueryFieldKind.ANILIST_ENUM,
         type=QueryFieldType.ENUM,
-        operators=(QueryFieldOperator.EQ, QueryFieldOperator.IN),
+        operators=_ENUM_OPS,
         values=(
             MediaFormat.TV.value,
             MediaFormat.TV_SHORT.value,
@@ -264,7 +268,7 @@ _ANILIST_FIELDS: tuple[QueryFieldSpec, ...] = (
         desc="AniList status",
         kind=QueryFieldKind.ANILIST_ENUM,
         type=QueryFieldType.ENUM,
-        operators=(QueryFieldOperator.EQ,),
+        operators=_ENUM_OPS,
         values=(
             MediaStatus.FINISHED.value,
             MediaStatus.RELEASING.value,
