@@ -2,6 +2,8 @@
 
 from typing import Any, Protocol
 
+__all__ = ["Comparable"]
+
 
 class Comparable(Protocol):
     """Protocol for objects that can be compared using <, >, <=, >= operators."""

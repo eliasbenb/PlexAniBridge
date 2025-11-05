@@ -8,6 +8,8 @@ from urllib3.exceptions import InsecureRequestWarning
 
 from src import log
 
+__all__ = ["SelectiveVerifySession"]
+
 
 class SelectiveVerifySession(requests.Session):
     """Session that selectively disables SSL verification for whitelisted domains."""

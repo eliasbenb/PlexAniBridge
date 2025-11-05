@@ -21,6 +21,20 @@ from plexapi.video import Episode, Movie, Season, Show, Video
 
 from src import log
 
+__all__ = [
+    "MetadataEpisode",
+    "MetadataLibrary",
+    "MetadataLibrarySection",
+    "MetadataMovie",
+    "MetadataMovieSection",
+    "MetadataSeason",
+    "MetadataShow",
+    "MetadataShowSection",
+    "MetadataVideo",
+    "PlexMetadataObject",
+    "PlexMetadataServer",
+]
+
 plex_metadata_limiter = Limiter(rate=300 / 60, capacity=30, jitter=True)
 
 

@@ -11,6 +11,8 @@ from pathlib import Path
 
 import bcrypt
 
+__all__ = ["HtpasswdFile"]
+
 
 class HtpasswdFile:
     """A minimal htpasswd file parser supporting bcrypt and SHA1."""

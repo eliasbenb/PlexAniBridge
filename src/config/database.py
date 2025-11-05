@@ -5,17 +5,22 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 from types import TracebackType
+from typing import TYPE_CHECKING
 
 from sqlalchemy import create_engine, event
-from sqlalchemy.connectors.aioodbc import AsyncAdapt_aioodbc_connection
-from sqlalchemy.engine import Engine
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import sessionmaker
 
 from src import __file__ as src_file
 from src import config, log
 from src.exceptions import DataPathError
 
 __all__ = ["PlexAniBridgeDB", "db"]
+
+
+if TYPE_CHECKING:
+    from sqlalchemy.connectors.aioodbc import AsyncAdapt_aioodbc_connection
+    from sqlalchemy.engine import Engine
+    from sqlalchemy.orm import Session
 
 
 class PlexAniBridgeDB:

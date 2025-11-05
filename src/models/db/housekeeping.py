@@ -5,6 +5,8 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from src.models.db.base import Base
 
+__all__ = ["Housekeeping"]
+
 
 class Housekeeping(Base):
     """Model for the Housekeeping table.

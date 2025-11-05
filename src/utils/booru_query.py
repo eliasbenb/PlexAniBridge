@@ -26,6 +26,20 @@ import pyparsing as pp
 
 from src.exceptions import BooruQuerySyntaxError
 
+__all__ = [
+    "And",
+    "BareTerm",
+    "EvalResult",
+    "KeyTerm",
+    "Node",
+    "Not",
+    "Or",
+    "collect_bare_terms",
+    "collect_key_terms",
+    "evaluate",
+    "parse_query",
+]
+
 pp.ParserElement.enablePackrat()  # Supposed to speed up parsing
 
 DbResolver = Callable[["KeyTerm"], set[int]]

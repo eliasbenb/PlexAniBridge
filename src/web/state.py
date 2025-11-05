@@ -4,18 +4,22 @@ Holds references to long-lived singletons (scheduler, log broadcaster, etc.) nee
 route handlers and websocket endpoints.
 """
 
+from __future__ import annotations
+
 from collections.abc import Callable
 from contextlib import suppress
 from datetime import UTC, datetime
 from functools import lru_cache
-from typing import Any
-
-from plexapi.server import PlexServer
+from typing import TYPE_CHECKING, Any
 
 from src.core.anilist import AniListClient
-from src.core.sched import SchedulerClient
 
 __all__ = ["AppState", "get_app_state"]
+
+if TYPE_CHECKING:
+    from plexapi.server import PlexServer
+
+    from src.core.sched import SchedulerClient
 
 
 class AppState:

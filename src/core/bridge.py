@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
-
-from plexapi.library import MovieSection, ShowSection
+from typing import TYPE_CHECKING
 
 from src import log
 from src.config.database import db
@@ -17,6 +16,10 @@ from src.models.db.housekeeping import Housekeeping
 from src.models.db.sync_history import SyncOutcome
 
 __all__ = ["BridgeClient"]
+
+
+if TYPE_CHECKING:
+    from plexapi.library import MovieSection, ShowSection
 
 
 class BridgeClient:

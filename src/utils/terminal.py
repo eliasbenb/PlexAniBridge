@@ -7,6 +7,8 @@ from functools import lru_cache
 
 import colorama
 
+__all__ = ["supports_color", "supports_utf8"]
+
 
 @lru_cache(maxsize=1)
 def supports_utf8() -> bool:

@@ -5,6 +5,8 @@ from pathlib import Path
 
 from src import __file__ as src_file
 
+__all__ = ["get_docker_status", "get_git_hash", "get_pyproject_version"]
+
 
 def get_pyproject_version() -> str:
     """Get the PlexAniBridge's version from the pyproject.toml file.

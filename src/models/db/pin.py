@@ -7,6 +7,8 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from src.models.db.base import Base
 
+__all__ = ["Pin"]
+
 
 class Pin(Base):
     """Model representing pinned AniList fields for a profile entry."""

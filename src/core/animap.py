@@ -1,16 +1,16 @@
 """AniMap Client."""
 
+from __future__ import annotations
+
 import json
 from collections.abc import Iterable, Iterator
 from hashlib import md5
 from itertools import batched
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import ValidationError
-from sqlalchemy.orm import Session
 from sqlalchemy.sql import and_, delete, or_, select
-from sqlalchemy.sql.elements import ColumnElement
 
 from src import log
 from src.config.database import db
@@ -21,6 +21,11 @@ from src.models.db.provenance import AniMapProvenance
 from src.utils.sql import json_array_contains
 
 __all__ = ["AniMapClient"]
+
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
+    from sqlalchemy.sql.elements import ColumnElement
 
 
 class AniMapClient:

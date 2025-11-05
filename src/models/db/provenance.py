@@ -7,6 +7,8 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from src.models.db.base import Base
 
+__all__ = ["AniMapProvenance"]
+
 
 class AniMapProvenance(Base):
     """Tracks the provenance (source paths/URLs) for each AniMap row.

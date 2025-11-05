@@ -1,16 +1,22 @@
 """Base Model Module."""
 
+from __future__ import annotations
+
 import json
 from datetime import datetime
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
-from pydantic.main import IncEx
 from sqlalchemy.orm import DeclarativeBase
 
 from src.exceptions import UnsupportedModeError
 
+__all__ = ["Base"]
 
-def generic_serialize(obj: Any) -> Any:
+if TYPE_CHECKING:
+    from pydantic.main import IncEx
+
+
+def _generic_serialize(obj: Any) -> Any:
     """Recursively convert an object to a JSON-serializable format.
 
     Args:
@@ -62,5 +68,5 @@ class Base(DeclarativeBase):
         if mode == "python":
             return result
         if mode == "json":
-            return json.loads(json.dumps(result, default=generic_serialize))
+            return json.loads(json.dumps(result, default=_generic_serialize))
         raise UnsupportedModeError(f"Unsupported mode: {mode}")

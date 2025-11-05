@@ -29,6 +29,8 @@ from src.models.schemas.anilist import (
 )
 from src.utils.types import Comparable
 
+__all__ = ["BaseSyncClient", "ParsedGuids"]
+
 _LEGACY_GUID_MAPPING = {
     "com.plexapp.agents.imdb": "imdb",
     "com.plexapp.agents.tmdb": "tmdb",

@@ -10,6 +10,8 @@ from limiter import Limiter
 
 from src import __version__, log
 
+__all__ = ["PlexCommunityClient"]
+
 plex_community_limiter = Limiter(rate=300 / 60, capacity=30, jitter=True)
 
 

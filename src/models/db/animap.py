@@ -12,7 +12,9 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from src.models.db.base import Base
 
-MAPPING_PATTERN = re.compile(
+__all__ = ["AniMap", "EpisodeMapping"]
+
+_MAPPING_PATTERN = re.compile(
     r"""
             (?:^|,)
             (?:
@@ -87,7 +89,7 @@ class EpisodeMapping(BaseModel):
         if not s:
             return [cls(season=season, service=service)]
 
-        range_matches = list(MAPPING_PATTERN.finditer(s))
+        range_matches = list(_MAPPING_PATTERN.finditer(s))
 
         episode_ranges = []
         for match in range_matches:

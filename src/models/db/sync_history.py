@@ -13,6 +13,8 @@ from sqlalchemy.orm import Mapped, mapped_column
 from src.exceptions import UnsupportedMediaTypeError
 from src.models.db.base import Base
 
+__all__ = ["MediaType", "SyncHistory", "SyncOutcome"]
+
 
 class MediaType(StrEnum):
     """Enumeration of media types for Plex items."""
