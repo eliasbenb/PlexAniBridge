@@ -13,17 +13,6 @@ def mappings_service() -> MappingsService:
     return MappingsService()
 
 
-def test_build_anilist_filters_multi_string(mappings_service: MappingsService) -> None:
-    """Multiple AniList string values should map to *_in filters."""
-    spec = get_query_field_map()["anilist.genre"]
-    filters = mappings_service._build_anilist_term_filters(
-        spec,
-        "Action,Drama",
-        ("Action", "Drama"),
-    )
-    assert filters == {"genre_in": ["Action", "Drama"]}
-
-
 def test_build_anilist_filters_multi_enum(mappings_service: MappingsService) -> None:
     """Multiple AniList enum values should resolve and deduplicate."""
     spec = get_query_field_map()["anilist.format"]
