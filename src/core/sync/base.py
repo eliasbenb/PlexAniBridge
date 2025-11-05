@@ -16,6 +16,10 @@ from src import log
 from src.config.database import db
 from src.config.settings import SyncField
 from src.core import AniListClient, AniMapClient, PlexClient
+from src.core.sync.guids import (
+    GuidParsingStrategy,
+    get_default_strategies,
+)
 from src.core.sync.stats import ItemIdentifier, SyncOutcome, SyncStats
 from src.models.db.animap import AniMap
 from src.models.db.pin import Pin
@@ -56,40 +60,36 @@ class ParsedGuids(BaseModel):
     imdb: str | None = None
 
     @staticmethod
-    def from_guids(guids: list[Guid]) -> ParsedGuids:
+    def from_guids(
+        guids: list[Guid],
+        strategies: list[GuidParsingStrategy] | None = None,
+    ) -> ParsedGuids:
         """Creates a ParsedGuids instance from a list of Plex GUIDs.
 
         Args:
             guids (list[Guid]): List of Plex GUID objects
+            strategies (list[GuidParsingStrategy] | None): List of parsing strategies.
+                If None, uses default strategies via dependency injection.
 
         Returns:
             ParsedGuids: New instance with parsed IDs
         """
         parsed_guids = ParsedGuids()
 
+        # Dependency injection: use provided strategies or get defaults
+        if strategies is None:
+            strategies = get_default_strategies()
+
         for guid in guids:
             if not guid.id:
                 continue
 
-            split_guid = guid.id.split("://")
-            if len(split_guid) != 2:
-                continue
-
-            service = split_guid[0]
-            id_part = split_guid[1]
-
-            # Remove query parameters if present (e.g., ?lang=en)
-            if "?" in id_part:
-                id_part = id_part.split("?")[0]
-
-            attr = _LEGACY_GUID_MAPPING.get(service, service)
-            if not hasattr(parsed_guids, attr):
-                continue
-
-            try:
-                setattr(parsed_guids, attr, int(id_part))
-            except ValueError:
-                setattr(parsed_guids, attr, str(id_part))
+            for strategy in strategies:
+                result = strategy.parse(guid.id)
+                if result:
+                    attr, value = result
+                    setattr(parsed_guids, attr, value)
+                    break
 
         return parsed_guids
 

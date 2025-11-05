@@ -177,3 +177,6 @@ cython_debug/
 # Node
 node_modules/
 .pnpm-store/
+
+#Idea
+.idea/
