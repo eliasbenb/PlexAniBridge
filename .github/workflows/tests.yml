@@ -1,34 +1,34 @@
 name: Tests
 
 on:
-  push:
-    branches:
-      - develop
-  pull_request:
+    push:
+        branches:
+            - develop
+    pull_request:
 
 jobs:
-  pytest:
-    runs-on: ubuntu-latest
+    pytest:
+        runs-on: ubuntu-latest
 
-    timeout-minutes: 10
+        timeout-minutes: 10
 
-    permissions:
-      contents: read
+        permissions:
+            contents: read
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v5
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v5
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: 3.13
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: 3.13
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v7
+            - name: Install uv
+              uses: astral-sh/setup-uv@v7
 
-      - name: Sync dependencies
-        run: uv sync --group dev --frozen
+            - name: Sync dependencies
+              run: uv sync --group dev --frozen
 
-      - name: Run pytest
-        run: uv run pytest
+            - name: Run pytest
+              run: uv run pytest

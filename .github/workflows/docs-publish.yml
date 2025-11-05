@@ -1,56 +1,56 @@
 name: MkDocs
 
 on:
-  push:
-    branches: [ main ]
-    paths:
-      - "data/mappings.example.*"
-      - "docs/**"
-      - "mkdocs.yml"
-      - ".env.example"
-  workflow_dispatch:
+    push:
+        branches: [main]
+        paths:
+            - "data/mappings.example.*"
+            - "docs/**"
+            - "mkdocs.yml"
+            - ".env.example"
+    workflow_dispatch:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
 
 jobs:
-  build-and-publish:
-    runs-on: ubuntu-latest
+    build-and-publish:
+        runs-on: ubuntu-latest
 
-    permissions:
-      contents: write
+        permissions:
+            contents: write
 
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v5
+        steps:
+            - name: Checkout Repository
+              uses: actions/checkout@v5
 
-      - name: Configure Git Credentials
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
+            - name: Configure Git Credentials
+              run: |
+                  git config --local user.email "action@github.com"
+                  git config --local user.name "GitHub Action"
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: 3.13
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: 3.13
 
-      - name: Setup uv
-        uses: astral-sh/setup-uv@v7
+            - name: Setup uv
+              uses: astral-sh/setup-uv@v7
 
-      - name: Determine Cache ID
-        run: echo "cache_id=$(date --utc '+%V')" >> $GITHUB_ENV
+            - name: Determine Cache ID
+              run: echo "cache_id=$(date --utc '+%V')" >> $GITHUB_ENV
 
-      - name: Setup Cache
-        uses: actions/cache@v4
-        with:
-          key: mkdocs-material-${{ env.cache_id }}
-          path: .cache
-          restore-keys: |
-            mkdocs-material-
+            - name: Setup Cache
+              uses: actions/cache@v4
+              with:
+                  key: mkdocs-material-${{ env.cache_id }}
+                  path: .cache
+                  restore-keys: |
+                      mkdocs-material-
 
-      - name: Install Dependencies
-        run: uv sync --package docs --frozen
+            - name: Install Dependencies
+              run: uv sync --package docs --frozen
 
-      - name: Build and Deploy Docs
-        run: uv run mkdocs gh-deploy --force
+            - name: Build and Deploy Docs
+              run: uv run mkdocs gh-deploy --force
