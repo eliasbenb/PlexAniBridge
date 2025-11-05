@@ -1,4 +1,4 @@
-; (function () {
+(function () {
     "use strict";
 
     const SALT_ROUNDS = 12;
@@ -15,7 +15,7 @@
     };
 
     // Apache's htpasswd expects $2y$ prefixes even though bcrypt.js outputs $2a$/$2b$.
-    const transformApachePrefix = hash => {
+    const transformApachePrefix = (hash) => {
         if (hash.startsWith("$2a$") || hash.startsWith("$2b$")) {
             return "$2y$" + hash.slice(4);
         }
@@ -51,10 +51,21 @@
         const output = root.querySelector("[data-htpasswd-output]");
         const copyButton = root.querySelector("[data-htpasswd-copy]");
         const feedback = root.querySelector("[data-htpasswd-feedback]");
-        const submitButton = form ? form.querySelector("button[type=submit]") : null;
+        const submitButton = form
+            ? form.querySelector("button[type=submit]")
+            : null;
 
-        if (!form || !usernameInput || !passwordInput || !output || !copyButton) {
-            console.warn("htpasswd generator is missing required elements", root);
+        if (
+            !form ||
+            !usernameInput ||
+            !passwordInput ||
+            !output ||
+            !copyButton
+        ) {
+            console.warn(
+                "htpasswd generator is missing required elements",
+                root,
+            );
             return;
         }
 
@@ -72,8 +83,13 @@
         };
 
         const toggleWorking = (working) => {
-            const controls = [usernameInput, passwordInput, submitButton, copyButton].filter(Boolean);
-            controls.forEach(control => {
+            const controls = [
+                usernameInput,
+                passwordInput,
+                submitButton,
+                copyButton,
+            ].filter(Boolean);
+            controls.forEach((control) => {
                 control.disabled = working;
                 if (working) {
                     control.setAttribute("aria-busy", "true");
@@ -85,7 +101,7 @@
 
         copyButton.disabled = true;
 
-        form.addEventListener("submit", async event => {
+        form.addEventListener("submit", async (event) => {
             event.preventDefault();
             const username = usernameInput.value.trim();
             const password = passwordInput.value;
@@ -108,14 +124,17 @@
                 output.select();
             } catch (error) {
                 console.error("Failed to generate htpasswd entry", error);
-                setFeedback("Failed to generate entry. Please try again.", true);
+                setFeedback(
+                    "Failed to generate entry. Please try again.",
+                    true,
+                );
             } finally {
                 toggleWorking(false);
                 copyButton.disabled = output.value.trim().length === 0;
             }
         });
 
-        copyButton.addEventListener("click", async event => {
+        copyButton.addEventListener("click", async (event) => {
             event.preventDefault();
             const value = output.value.trim();
             if (!value) {
@@ -130,13 +149,18 @@
                 }
                 output.focus();
                 output.select();
-                const successful = document.execCommand ? document.execCommand("copy") : false;
+                const successful = document.execCommand
+                    ? document.execCommand("copy")
+                    : false;
                 return successful;
             };
 
             try {
                 const success = await copyToClipboard();
-                setFeedback(success ? "Copied to clipboard." : "Copy failed.", !success);
+                setFeedback(
+                    success ? "Copied to clipboard." : "Copy failed.",
+                    !success,
+                );
             } catch (error) {
                 console.error("Clipboard copy failed", error);
                 setFeedback("Copy failed.", true);
@@ -147,13 +171,17 @@
     const bootstrap = () => {
         const bcrypt = resolveBcrypt();
         if (!bcrypt) {
-            console.warn("bcrypt.js is not available; htpasswd generator disabled.");
+            console.warn(
+                "bcrypt.js is not available; htpasswd generator disabled.",
+            );
             return;
         }
 
-        document.querySelectorAll("[data-htpasswd-generator]").forEach(root => {
-            initGenerator(root, bcrypt);
-        });
+        document
+            .querySelectorAll("[data-htpasswd-generator]")
+            .forEach((root) => {
+                initGenerator(root, bcrypt);
+            });
     };
 
     if (window.document$ && window.document$.subscribe) {
