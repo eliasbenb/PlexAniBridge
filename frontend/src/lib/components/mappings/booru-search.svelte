@@ -28,11 +28,13 @@
         onCancel,
     }: Props = $props();
 
+    type OperatorToken = "=" | ">" | ">=" | "<" | "<=" | "*" | "?" | "in" | "range";
+
     type FieldCapability = {
         key: string;
         aliases?: string[];
         type: "int" | "string" | "enum" | string;
-        operators: string[]; // "=", ">", ">=", "<", "<=", "*", "?", "range"
+        operators: OperatorToken[];
         values?: string[] | null;
         desc?: string | null;
     };
@@ -195,21 +197,23 @@
                         : [];
                     const opMap: Record<string, string> = {
                         "=": "Equals",
-                        in: "Comma-separated list",
                         ">": "Greater than",
                         ">=": "Greater or equal",
                         "<": "Less than",
                         "<=": "Less or equal",
                         "*": "Wildcard (*)",
                         "?": "Wildcard (?)",
+                        in: "In (a,b,c)",
                         range: "Range (lo..hi)",
                     };
 
                     // Transform to UI suffixes
                     const allOps: Array<[string, string]> = capOps.map((op) => [
-                        op === "=" || op === "in"
+                        op === "="
                             ? ""
-                            : op === "range"
+                            : op === "in"
+                              ? ","
+                              : op === "range"
                                 ? ".."
                                 : op,
                         op === "wildcard" ? "*" : opMap[op] || "",
