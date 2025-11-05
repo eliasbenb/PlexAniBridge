@@ -1,6 +1,12 @@
 {
-    "[python]": {
-        "editor.defaultFormatter": "charliermarsh.ruff"
+    "[css]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    "[html]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    "[javascript]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
     },
     "[json]": {
         "editor.defaultFormatter": "esbenp.prettier-vscode"
@@ -8,15 +14,33 @@
     "[markdown]": {
         "editor.defaultFormatter": "esbenp.prettier-vscode"
     },
+    "[python]": {
+        "editor.defaultFormatter": "charliermarsh.ruff"
+    },
+    "[svelte]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    "[tailwindcss]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    "[typescript]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
     "[yaml]": {
         "editor.defaultFormatter": "esbenp.prettier-vscode",
         "editor.tabSize": 4
+    },
+    "files.associations": {
+        "*.css": "tailwindcss"
     },
     "editor.detectIndentation": false,
     "editor.formatOnSave": true,
     "editor.insertSpaces": true,
     "editor.tabSize": 4,
+    "eslint.validate": ["javascript", "typescript", "svelte", "html"],
+    "eslint.workingDirectories": ["./frontend"],
     "prettier.enable": true,
+    "prettier.prettierPath": "./frontend/node_modules/prettier",
     "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
     "python.envFile": "",
     "python.terminal.activateEnvInCurrentTerminal": true,
