@@ -9,10 +9,7 @@
         "ghcr.io/devcontainers-extra/features/apt-packages:1": {
             "packages": "sqlite3"
         },
-        "ghcr.io/va-h/devcontainers-features/uv:1": {
-            "shellautocompletion": true,
-            "version": "0"
-        }
+        "ghcr.io/devcontainers-extra/features/uv": {}
     },
     "customizations": {
         "vscode": {
