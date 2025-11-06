@@ -169,6 +169,8 @@ By default, all three modes are enabled, allowing for instant, incremental updat
 
     Example webhook URL: `http://127.0.0.1:4848/webhook/plex`
 
+    _Note: If you have enabled HTTP Basic Authentication for the web UI, make sure to include the credentials in the webhook URL: `http://username:password@<your-server-host>:<port>/webhook/plex`._
+
     Once webhooks are set up, it is recommended to disable `poll` mode since it is redundant.
 
 ### `FULL_SCAN`

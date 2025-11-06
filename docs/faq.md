@@ -32,3 +32,11 @@ If Plex is not correctly identifying or updating the metadata for an item, it ma
 No, PlexAniBridge does not support the HAMA agent. It is recommended to use the default Plex TV and Movie agents for best compatibility (we recommend the "TheTVDB" episode ordering for TV shows).
 
 Support is not planned for HAMA since it is [slated for deprecation](https://forums.plex.tv/t/important-information-for-users-running-plex-media-server-on-nvidia-shield-devices/883484) in the near future.
+
+## 401 Unauthorized when using webhooks with HTTP Basic Authentication
+
+If you are attempting to use Plex webhooks with PlexAniBridge and have enabled HTTP Basic Authentication for the web UI, you may encounter `401 Unauthorized` errors.
+
+To resolve this, ensure that you include the credentials in the webhook URL used in Plex. Example webhook URL: `http://username:password@<your-server-host>:<port>/webhook/plex`.
+
+You may need to encode special characters in your username or password using [URL encoding](https://meyerweb.com/eric/tools/dencoder/). For example, if your password is `p@ssw0rd`, you would encode it as `p%40ssw0rd`.
