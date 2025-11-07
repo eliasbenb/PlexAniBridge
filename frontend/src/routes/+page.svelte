@@ -210,7 +210,13 @@
                 <div
                     class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
-                        <div class="font-medium text-slate-100">{name}</div>
+                        <div class="flex items-center gap-2">
+                            <div class="font-medium text-slate-100">{name}</div>
+                            <span
+                                class="rounded-md bg-blue-900/50 px-2 py-1 text-xs text-slate-200"
+                                >{p.config.anilist_user} &rarr; {p.config
+                                    .plex_user}</span>
+                        </div>
                         <div class="mt-1 text-xs text-slate-400">
                             {#if p.status?.last_synced}
                                 <span
@@ -313,23 +319,29 @@
                     </div>
                 {/if}
                 <div class="mt-3 flex flex-wrap gap-2 text-xs">
-                    {#if p.config?.anilist_user}<span
-                            class="rounded-md bg-slate-800/80 px-2 py-1 text-slate-200"
-                            >{p.config.anilist_user}</span
-                        >{/if}
-                    <span class="rounded-md bg-slate-800/80 px-2 py-1 text-slate-300"
-                        >Interval: {p.config?.sync_interval ?? "-"}</span>
-                    {#if p.config?.sync_modes?.includes("periodic")}<span
-                            class="rounded-md bg-blue-900/50 px-2 py-1 text-blue-200"
+                    {#if p.config.sync_modes?.includes("periodic")}<span
+                            class="rounded-md bg-slate-800/80 px-2 py-1 text-blue-200"
                             >Periodic Sync</span
                         >{/if}
-                    {#if p.config?.sync_modes?.includes("poll")}<span
-                            class="rounded-md bg-blue-900/50 px-2 py-1 text-blue-200"
+                    {#if p.config.sync_modes?.includes("poll")}<span
+                            class="rounded-md bg-slate-800/80 px-2 py-1 text-blue-200"
                             >Poll Sync</span
                         >{/if}
-                    {#if p.config?.sync_modes?.includes("webhook")}<span
-                            class="rounded-md bg-blue-900/50 px-2 py-1 text-blue-200"
+                    {#if p.config.sync_modes?.includes("webhook")}<span
+                            class="rounded-md bg-slate-800/80 px-2 py-1 text-blue-200"
                             >Webhook Sync</span
+                        >{/if}
+                    {#if p.config.full_scan}<span
+                            class="rounded-md bg-slate-800/80 px-2 py-1 text-blue-200"
+                            >Full Scan</span
+                        >{/if}
+                    {#if p.config.destructive_sync}<span
+                            class="rounded-md bg-slate-800/80 px-2 py-1 text-blue-200"
+                            >Destructive Sync</span
+                        >{/if}
+                    {#if p.config.batch_requests}<span
+                            class="rounded-md bg-slate-800/80 px-2 py-1 text-blue-200"
+                            >Batch Requests</span
                         >{/if}
                 </div>
             </button>

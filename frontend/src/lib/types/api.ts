@@ -92,6 +92,7 @@ export interface ProfileConfig {
     sync_modes?: string[];
     full_scan?: boolean | null;
     destructive_sync?: boolean | null;
+    batch_requests?: boolean | null;
 }
 
 export interface CurrentSync {
