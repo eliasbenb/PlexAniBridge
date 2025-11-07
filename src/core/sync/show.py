@@ -756,9 +756,9 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
     def _resolve_show_ordering(self, item: Show) -> Literal["tmdb", "tvdb", ""]:
         """Return the item's preferred episode ordering."""
         if item.showOrdering:
-            if item.showOrdering in ("tmdbAiring", "The Movie Database"):
+            if item.showOrdering == "tmdbAiring":
                 return "tmdb"
-            if item.showOrdering in ("aired", "TheTVDB"):
+            if item.showOrdering == "tvdbAiring" or item.showOrdering == "aired":
                 return "tvdb"
             return ""
 
@@ -778,9 +778,9 @@ class ShowSyncClient(BaseSyncClient[Show, Season, list[Episode]]):
             resolved = ""
         else:
             value = ordering_setting.value
-            if value in ("tmdbAiring", "The Movie Database"):
+            if value == "tmdbAiring":
                 resolved = "tmdb"
-            elif value in ("aired", "TheTVDB"):
+            elif value == "aired" or value == "tvdbAiring":
                 resolved = "tvdb"
             else:
                 resolved = ""
