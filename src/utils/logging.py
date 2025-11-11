@@ -183,15 +183,16 @@ class Logger(logging.Logger):
             stacklevel=stacklevel + 1,
         )
 
-    def success(self, msg, *args, **kwargs):
+    def success(self, msg, *args, stacklevel=1, **kwargs):
         """Log a message with SUCCESS level.
 
         Args:
             msg: Message to log
             *args: Variable length argument list
+            stacklevel: Stack level for logging
             **kwargs: Arbitrary keyword arguments
         """
-        self.log(self.SUCCESS, msg, *args, **kwargs)
+        self.log(self.SUCCESS, msg, *args, stacklevel=stacklevel + 1, **kwargs)
 
     def setup(self, log_level: str, log_dir: str | None = None) -> None:
         """Configure the logger with console and file output.
