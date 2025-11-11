@@ -19,7 +19,7 @@
         class: className,
         value = $bindable(),
         language = "json",
-        theme = "pab-dark",
+        theme = "anibridge-dark",
         modelUri = `inmemory://model/untitled-${crypto.randomUUID()}.json`,
         jsonSchema,
         performanceMode = true,
@@ -72,7 +72,7 @@
 
     const getBaseOptions = (): Monaco.editor.IStandaloneEditorConstructionOptions => ({
         language,
-        theme: theme === "pab-dark" ? "pab-dark" : theme,
+        theme: theme === "anibridge-dark" ? "anibridge-dark" : theme,
         automaticLayout: true,
         overviewRulerLanes: 0,
         overviewRulerBorder: false,
@@ -141,7 +141,7 @@
             loader.config({ monaco: monacoEditor.default });
             monaco = await loader.init();
 
-            monaco.editor.defineTheme("pab-dark", THEME_CONFIG);
+            monaco.editor.defineTheme("anibridge-dark", THEME_CONFIG);
 
             const uri = monaco.Uri.parse(modelUri);
             let model = monaco.editor.getModel(uri);

@@ -71,7 +71,7 @@
 </script>
 
 <svelte:head>
-    <title>PlexAniBridge</title>
+    <title>AniBridge</title>
 </svelte:head>
 
 <Tooltip.Provider>
@@ -110,7 +110,7 @@
                     href={resolve("/")}
                     class="group">
                     <h1 class="text-base font-semibold tracking-tight text-white">
-                        PlexAniBridge
+                        AniBridge
                     </h1>
                     <p class="text-[11px] tracking-wide text-slate-500 uppercase">
                         Sync Dashboard
@@ -161,11 +161,10 @@
                     <p class="px-3 text-[11px] text-slate-500">
                         © {new Date().getFullYear()}
                         <a
-                            href="https://plexanibridge.elias.eu.org"
+                            href="https://anibridge.eliasbenb.dev"
                             target="_blank"
                             rel="noopener"
-                            class="transition-colors hover:text-slate-200"
-                            >PlexAniBridge</a>
+                            class="transition-colors hover:text-slate-200">AniBridge</a>
                     </p>
                 </div>
             </nav>

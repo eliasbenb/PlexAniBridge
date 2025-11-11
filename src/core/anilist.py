@@ -93,7 +93,7 @@ class AniListClient:
             headers = {
                 "Accept": "application/json",
                 "Content-Type": "application/json",
-                "User-Agent": f"PlexAniBridge/{__version__}",
+                "User-Agent": f"AniBridge/{__version__}",
             }
             if self.anilist_token:
                 headers["Authorization"] = f"Bearer {self.anilist_token}"
@@ -840,7 +840,7 @@ class AniListClient:
                     )
 
         timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-        backup_filename = f"plexanibridge-{self.profile_name}.{timestamp}.json"
+        backup_filename = f"anibridge-{self.profile_name}.{timestamp}.json"
         backup_file = self.backup_dir / backup_filename
 
         if not backup_file.parent.exists():
@@ -882,7 +882,7 @@ class AniListClient:
 
         cutoff_date = datetime.now() - timedelta(days=self.backup_retention_days)
 
-        retention_pattern = f"plexanibridge-{self.profile_name}.*.json"
+        retention_pattern = f"anibridge-{self.profile_name}.*.json"
         for file in self.backup_dir.glob(retention_pattern):
             file_mtime = datetime.fromtimestamp(file.stat().st_mtime)
             if file_mtime < cutoff_date:

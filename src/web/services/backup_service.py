@@ -96,7 +96,7 @@ class BackupService:
         anilist_client = self._get_profile_bridge(profile).anilist_client
 
         count = 0
-        for f in sorted(bdir.glob(f"plexanibridge-{profile}.*.json")):
+        for f in sorted(bdir.glob(f"anibridge-{profile}.*.json")):
             try:
                 parts = f.name.split(".")
                 ts_raw = parts[-2] if len(parts) >= 2 else None

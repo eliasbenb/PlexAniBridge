@@ -1,1 +1,1 @@
-"""PlexAniBridge configuration module."""
+"""AniBridge configuration module."""

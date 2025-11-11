@@ -11,7 +11,7 @@ import pytest
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
-from src.config.database import PlexAniBridgeDB
+from src.config.database import AniBridgeDB
 from src.core.animap import AniMapClient
 from src.core.mappings import MappingsClient
 from src.models.db.animap import AniMap
@@ -99,7 +99,7 @@ def in_memory_db(monkeypatch: pytest.MonkeyPatch):
 
 @pytest.fixture
 def animap_client(
-    tmp_path: Path, in_memory_db: PlexAniBridgeDB, request: pytest.FixtureRequest
+    tmp_path: Path, in_memory_db: AniBridgeDB, request: pytest.FixtureRequest
 ) -> AniMapClient:
     """Provide an AniMapClient instance for testing."""
     client = AniMapClient(data_path=tmp_path, upstream_url=None)
@@ -112,7 +112,7 @@ def animap_client(
 
 
 def test_sync_db_creates_rows_and_provenance(
-    animap_client: AniMapClient, tmp_path: Path, in_memory_db: PlexAniBridgeDB
+    animap_client: AniMapClient, tmp_path: Path, in_memory_db: AniBridgeDB
 ):
     """Test that sync_db creates AniMap and provenance rows correctly."""
     mapping_data = {
@@ -168,7 +168,7 @@ def test_sync_db_creates_rows_and_provenance(
 
 
 def test_get_mappings_filters_by_identifiers(
-    animap_client: AniMapClient, tmp_path: Path, in_memory_db: PlexAniBridgeDB
+    animap_client: AniMapClient, tmp_path: Path, in_memory_db: AniBridgeDB
 ):
     """Test that get_mappings filters AniMap rows by provided identifiers."""
     mapping_data = {
@@ -215,7 +215,7 @@ def test_get_mappings_returns_empty_when_no_identifiers(
 
 
 def test_sync_db_filters_invalid_entries(
-    animap_client: AniMapClient, in_memory_db: PlexAniBridgeDB
+    animap_client: AniMapClient, in_memory_db: AniBridgeDB
 ):
     """Invalid mapping entries are ignored while null overrides are preserved."""
     fake_client = FakeMappingsClient(
@@ -255,7 +255,7 @@ def test_sync_db_filters_invalid_entries(
 
 
 def test_sync_db_refreshes_provenance_when_hash_matches(
-    animap_client: AniMapClient, in_memory_db: PlexAniBridgeDB
+    animap_client: AniMapClient, in_memory_db: AniBridgeDB
 ):
     """When hashes match, the sync still refreshes provenance rows."""
     fake_client = FakeMappingsClient(

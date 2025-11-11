@@ -10,8 +10,8 @@ from tzlocal import get_localzone
 
 from src import log
 from src.config.settings import (
-    PlexAnibridgeConfig,
-    PlexAnibridgeProfileConfig,
+    AniBridgeConfig,
+    AniBridgeProfileConfig,
     SyncMode,
 )
 from src.core import AniMapClient, BridgeClient
@@ -172,7 +172,7 @@ class SchedulerClient:
     the daily database sync. Provides centralized management and graceful shutdown.
     """
 
-    def __init__(self, global_config: PlexAnibridgeConfig):
+    def __init__(self, global_config: AniBridgeConfig):
         """Initialize the application scheduler.
 
         Args:
@@ -487,7 +487,7 @@ class SchedulerClient:
     @lru_cache(maxsize=128)
     def get_profiles_for_plex_account(
         self, account_id: int | str
-    ) -> list[tuple[str, PlexAnibridgeProfileConfig]]:
+    ) -> list[tuple[str, AniBridgeProfileConfig]]:
         """Find all profile names and their configs by Plex account id.
 
         This is memoized to avoid repeated linear scans of profile lists for
@@ -497,7 +497,7 @@ class SchedulerClient:
             account_id (int | str): Plex user account id to search for.
 
         Returns:
-            list[tuple[str, PlexAnibridgeProfileConfig]]: A list of tuples containing
+            list[tuple[str, AniBridgeProfileConfig]]: A list of tuples containing
                 the profile names and their configurations.
 
         Raises:

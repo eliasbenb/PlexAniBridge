@@ -133,7 +133,7 @@ export const defaultColumns: ColumnConfig[] = [
 ];
 
 export const mappingSchema: Monaco.languages.json.JSONSchema = {
-    title: "PlexAniBridge Mapping Override",
+    title: "AniBridge Mapping Override",
     type: "object",
     required: ["anilist_id"],
     additionalProperties: false,

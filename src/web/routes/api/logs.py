@@ -42,7 +42,7 @@ def _list_log_files() -> list[Path]:
         return []
     # Include the active log file and rotated backups.
     return sorted(
-        [p for p in LOG_DIR.glob("PlexAniBridge.*.log*") if p.is_file()],
+        [p for p in LOG_DIR.glob("AniBridge.*.log*") if p.is_file()],
         key=lambda p: p.stat().st_mtime,
         reverse=True,
     )
@@ -61,9 +61,9 @@ async def list_log_files() -> list[LogFileModel]:
     res: list[LogFileModel] = []
 
     # Determine current effective log level to identify active file.
-    root_logger = logging.getLogger("PlexAniBridge")
+    root_logger = logging.getLogger("AniBridge")
     current_level_name = logging.getLevelName(root_logger.getEffectiveLevel())
-    active_filename = f"PlexAniBridge.{current_level_name}.log"
+    active_filename = f"AniBridge.{current_level_name}.log"
 
     for f in files:
         st = f.stat()

@@ -38,7 +38,7 @@ body:
           description: |
               examples:
                 - **OS**: Ubuntu 22.04
-                - **AniBridge**: AniBridge 0.2.2
+                - **AniBridge**: AniBridge 2.0.0
                 - **Docker Install**: Yes
                 - **Database**: Sqlite 3.41.1
           value: |

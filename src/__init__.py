@@ -1,4 +1,4 @@
-"""PlexAniBridge Initialization Module."""
+"""AniBridge Initialization Module."""
 
 import os
 import uuid
@@ -32,7 +32,7 @@ if supports_utf8():
 ║  Author: {f"{__author__} @{__maintainer__}":<69}║
 ║  License: {__license__:<68}║
 ║  Repository: https://github.com/eliasbenb/PlexAniBridge                       ║
-║  Documentation: https://plexanibridge.elias.eu.org                            ║
+║  Documentation: https://anibridge.eliasbenb.dev                            ║
 ║                                                                               ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝
     """.strip()
@@ -48,7 +48,7 @@ else:
 |  Author: {f"{__author__} @{__maintainer__}":<69}|
 |  License: {__license__:<68}|
 |  Repository: https://github.com/eliasbenb/PlexAniBridge                       |
-|  Documentation: https://plexanibridge.elias.eu.org                            |
+|  Documentation: https://anibridge.eliasbenb.dev                            |
 |                                                                               |
 +-------------------------------------------------------------------------------+
     """.strip()
@@ -59,9 +59,9 @@ else:
 # the client is a new one every time it starts (which causes "New Device"
 # notifications)
 os.environ["PLEXAPI_HEADER_IDENTIFIER"] = uuid.uuid3(
-    uuid.NAMESPACE_DNS, "PlexAniBridge"
+    uuid.NAMESPACE_DNS, "AniBridge"
 ).hex
-os.environ["PLEXAPI_HEADER_DEVICE_NAME"] = "PlexAniBridge"
+os.environ["PLEXAPI_HEADER_DEVICE_NAME"] = "AniBridge"
 os.environ["PLEXAPI_HEADER_VERSION"] = __version__
 os.environ["PLEXAPI_HEADER_PROVIDES"] = ""
 os.environ["PLEXAPI_PLEXAPI_AUTORELOAD"] = "0"

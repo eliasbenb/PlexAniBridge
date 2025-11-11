@@ -302,7 +302,7 @@ def get_logger() -> Logger:
     config = get_config()
 
     return _get_logger(
-        log_name="PlexAniBridge",
+        log_name="AniBridge",
         log_level=config.log_level,
         log_dir=config.data_path / "logs",
     )

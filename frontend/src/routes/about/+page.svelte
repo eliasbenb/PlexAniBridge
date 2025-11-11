@@ -420,7 +420,7 @@
             <h3 class="text-base font-semibold">Project Resources</h3>
         </div>
         <p class="text-xs text-slate-400">
-            Deep dive into PlexAniBridge docs, releases, and support channels.
+            Deep dive into AniBridge docs, releases, and support channels.
         </p>
         <div class="grid gap-3 md:grid-cols-2">
             <a
@@ -464,7 +464,7 @@
                 </div>
             </a>
             <a
-                href="https://plexanibridge.elias.eu.org"
+                href="https://anibridge.eliasbenb.dev"
                 target="_blank"
                 rel="noreferrer noopener"
                 class="group flex h-full items-stretch gap-3 rounded-md border border-slate-800/70 bg-slate-900/50 p-4 transition-colors hover:bg-slate-900/70">
@@ -480,7 +480,7 @@
                         Installation guides, configuration examples, and FAQs.
                     </p>
                     <div class="mt-2 text-[11px] text-slate-500">
-                        plexanibridge.elias.eu.org
+                        anibridge.eliasbenb.dev
                     </div>
                 </div>
             </a>

@@ -194,7 +194,7 @@ async def test_load_mappings_uses_first_existing_custom_file(
     tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
     """Only the first existing mappings file is used when multiple are present."""
-    caplog.set_level("WARNING", logger="PlexAniBridge")
+    caplog.set_level("WARNING", logger="AniBridge")
 
     data_path = tmp_path / "data"
     data_path.mkdir()
@@ -290,7 +290,7 @@ async def test_get_provenance_skips_non_int_keys(
     tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
     """Non-numeric keys are excluded from the provenance output."""
-    caplog.set_level("WARNING", logger="PlexAniBridge")
+    caplog.set_level("WARNING", logger="AniBridge")
 
     data_path = tmp_path / "data"
     data_path.mkdir()

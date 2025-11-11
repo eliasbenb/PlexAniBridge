@@ -1,15 +1,15 @@
-"""PlexAniBridge exception classes."""
+"""AniBridge exception classes."""
 
 
-class PlexAniBridgeError(Exception):
-    """Base class for all PlexAniBridge exceptions."""
+class AniBridgeError(Exception):
+    """Base class for all AniBridge exceptions."""
 
     # Default HTTP status for API responses
     status_code: int = 500
 
 
 # Configuration errors
-class ConfigError(PlexAniBridgeError):
+class ConfigError(AniBridgeError):
     """Base class for configuration-related errors."""
 
     status_code = 500
@@ -46,7 +46,7 @@ class DataPathError(ConfigError, ValueError):
 
 
 # Database errors
-class DatabaseError(PlexAniBridgeError):
+class DatabaseError(AniBridgeError):
     """Base class for database-related errors."""
 
     status_code = 500
@@ -59,7 +59,7 @@ class UnsupportedModeError(DatabaseError, ValueError):
 
 
 # Media/model errors
-class MediaTypeError(PlexAniBridgeError):
+class MediaTypeError(AniBridgeError):
     """Base class for media type related errors."""
 
     status_code = 400
@@ -72,7 +72,7 @@ class UnsupportedMediaTypeError(MediaTypeError, ValueError):
 
 
 # AniList client errors
-class AniListError(PlexAniBridgeError):
+class AniListError(AniBridgeError):
     """Base class for AniList-related failures."""
 
     status_code = 500
@@ -103,7 +103,7 @@ class AniListSearchError(AniListQueryError):
 
 
 # Plex client errors
-class PlexError(PlexAniBridgeError):
+class PlexError(AniBridgeError):
     """Base class for Plex-related failures."""
 
     status_code = 500
@@ -128,7 +128,7 @@ class InvalidGuidError(PlexError, ValueError):
 
 
 # Scheduler errors
-class SchedulerError(PlexAniBridgeError):
+class SchedulerError(AniBridgeError):
     """Base class for scheduler-related failures."""
 
     status_code = 500
@@ -147,7 +147,7 @@ class SchedulerUnavailableError(SchedulerError):
 
 
 # Backup/restore errors
-class BackupError(PlexAniBridgeError):
+class BackupError(AniBridgeError):
     """Base class for backup and restore failures."""
 
     status_code = 500
@@ -166,7 +166,7 @@ class BackupFileNotFoundError(BackupError, FileNotFoundError):
 
 
 # History and actions errors
-class HistoryError(PlexAniBridgeError):
+class HistoryError(AniBridgeError):
     """Base class for history-related failures."""
 
     status_code = 500
@@ -179,7 +179,7 @@ class HistoryItemNotFoundError(HistoryError, KeyError):
 
 
 # Mappings errors
-class MappingError(PlexAniBridgeError):
+class MappingError(AniBridgeError):
     """Base class for mapping data source or parsing errors."""
 
     status_code = 500
@@ -228,7 +228,7 @@ class BooruQueryEvaluationError(BooruQueryError, RuntimeError):
 
 
 # Logs errors
-class LogsError(PlexAniBridgeError):
+class LogsError(AniBridgeError):
     """Base class for logs-related failures."""
 
     status_code = 500
@@ -247,7 +247,7 @@ class LogFileNotFoundError(LogsError, FileNotFoundError):
 
 
 # Webhook errors
-class WebhookError(PlexAniBridgeError):
+class WebhookError(AniBridgeError):
     """Base class for webhook-related errors."""
 
     status_code = 400

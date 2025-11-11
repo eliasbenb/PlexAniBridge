@@ -15,7 +15,7 @@ from starlette.requests import Request
 
 from src import __version__, config, log
 from src.core.sched import SchedulerClient
-from src.exceptions import PlexAniBridgeError
+from src.exceptions import AniBridgeError
 from src.web.middlewares.basic_auth import BasicAuthMiddleware
 from src.web.middlewares.request_logging import RequestLoggingMiddleware
 from src.web.routes import router
@@ -78,7 +78,7 @@ def create_app(scheduler: SchedulerClient | None = None) -> FastAPI:
     Returns:
         FastAPI: The created FastAPI application.
     """
-    app = FastAPI(title="PlexAniBridge", lifespan=lifespan, version=__version__)
+    app = FastAPI(title="AniBridge", lifespan=lifespan, version=__version__)
 
     if scheduler:
         app.extra["scheduler"] = scheduler
@@ -140,15 +140,15 @@ def create_app(scheduler: SchedulerClient | None = None) -> FastAPI:
             return FileResponse(index_file)
         return await http_exception_handler(request, exc)
 
-    @app.exception_handler(PlexAniBridgeError)
+    @app.exception_handler(AniBridgeError)
     async def domain_exception_handler(
-        request: Request, exc: PlexAniBridgeError
+        request: Request, exc: AniBridgeError
     ) -> JSONResponse:
-        """Handle PlexAniBridge errors with structured JSON responses.
+        """Handle AniBridge errors with structured JSON responses.
 
         Args:
             request (Request): The incoming HTTP request.
-            exc (PlexAniBridgeError): The exception instance.
+            exc (AniBridgeError): The exception instance.
 
         Returns:
             JSONResponse: Structured JSON response with error details.

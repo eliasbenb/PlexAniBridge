@@ -29,6 +29,6 @@ else
 fi
 
 CURRENT_UMASK=$(umask)
-log "Starting PlexAniBridge (UID: $PUID, GID: $PGID, UMASK: $CURRENT_UMASK)"
+log "Starting AniBridge (UID: $PUID, GID: $PGID, UMASK: $CURRENT_UMASK)"
 
 exec su-exec abc "$@"

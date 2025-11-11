@@ -1,1 +1,1 @@
-"""Core test utilities for PlexAniBridge."""
+"""Core test utilities for AniBridge."""
