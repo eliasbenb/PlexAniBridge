@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Redoc</title>
+  <link rel="stylesheet" type="text/css" id="slate-css" media="none" href="../../assets/stylesheets/redark.css" />
+  <script src="../../assets/javascripts/redark.js" charset="UTF-8"> </script>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+    }
+  </style>
+</head>
+
+<body style="background: ;">
+  <div id="redoc-container"></div>
+  <script src="../../assets/javascripts/redoc.standalone.js" charset="UTF-8"> </script>
+  <script>
+    const openapi_spec_url = "../openapi.json";
+
+    window.onload = function () {
+      const parent_scheme = parent.scheme
+      if (parent_scheme === "slate") {
+        enable_dark_mode();
+      } else {
+        disable_dark_mode();
+      }
+    }
+
+    enable_dark_mode = function(){
+      document.getElementById("slate-css").media = ""
+      Redoc.init(
+        openapi_spec_url,
+        { theme: redark },
+        document.getElementById('redoc-container'),
+      );
+    }
+
+    disable_dark_mode = function(){
+      document.getElementById("slate-css").media = "none"
+      Redoc.init(
+        openapi_spec_url,
+        {},
+        document.getElementById('redoc-container'),
+      );
+    }
+  </script>
+</body>
+
+</html>
