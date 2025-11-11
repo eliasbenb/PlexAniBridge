@@ -50,6 +50,7 @@ LABEL maintainer="Elias Benbourenane <eliasbenbourenane@gmail.com>" \
 
 ENV PYTHONPATH=/opt/venv/lib/python3.13/site-packages \
     PYTHONUNBUFFERED=1 \
+    PYTHON_JIT=1 \
     PUID=1000 \
     PGID=1000 \
     UMASK=022 \

@@ -42,6 +42,7 @@
     },
     "postCreateCommand": "uv run ab-deps-install",
     "containerEnv": {
+        "PYTHON_JIT": "1",
         "UV_LINK_MODE": "copy"
     }
 }
