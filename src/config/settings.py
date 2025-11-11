@@ -177,16 +177,6 @@ def _apply_deprecations(data: dict) -> dict:
     Returns:
         dict: Same mapping
     """
-    if not isinstance(data, dict):
-        return data
-    if "polling_scan" in data:
-        _log.warning(
-            "The 'polling_scan' setting is deprecated and will be removed in the future"
-        )
-        if "sync_modes" not in data:
-            polling_val = data.pop("polling_scan")
-            if polling_val:
-                data["sync_modes"] = [SyncMode.POLL]
     return data
 
 
@@ -218,11 +208,6 @@ class AniBridgeProfileConfig(BaseModel):
     sync_modes: list[SyncMode] = Field(
         default_factory=lambda: [SyncMode.PERIODIC, SyncMode.POLL, SyncMode.WEBHOOK],
         description="List of enabled sync modes (periodic, poll, webhook)",
-    )
-    polling_scan: bool | None = Field(
-        default=None,
-        deprecated="Use sync_modes list instead; True maps to ['poll']",
-        exclude=True,
     )
     full_scan: bool = Field(
         default=False, description="Perform full library scans, even on unwatched items"
@@ -400,11 +385,6 @@ class AniBridgeConfig(BaseSettings):
     )
     sync_modes: list[SyncMode] | None = Field(
         default=None, description="Global default list of sync modes"
-    )
-    polling_scan: bool | None = Field(
-        default=None,
-        deprecated="Use sync_modes list instead; True maps to ['poll']",
-        exclude=True,
     )
     full_scan: bool | None = Field(
         default=None, description="Global default full scan setting"

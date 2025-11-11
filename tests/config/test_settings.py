@@ -9,7 +9,6 @@ from pydantic import SecretStr, ValidationError
 from src.config.settings import (
     AniBridgeConfig,
     AniBridgeProfileConfig,
-    SyncMode,
     find_yaml_config_file,
 )
 from src.exceptions import (
@@ -118,25 +117,6 @@ def test_config_profile_inherits_global_values(
     profile = config.get_profile("primary")
 
     assert profile.plex_url == "http://global"
-
-
-def test_config_translates_deprecated_polling_scan(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Test that deprecated POLLING_SCAN is translated to sync_modes."""
-    monkeypatch.setenv("AB_DATA_PATH", str(tmp_path))
-    monkeypatch.setenv("AB_PROFILES__legacy__ANILIST_TOKEN", "anilist-token")
-    monkeypatch.setenv("AB_PROFILES__legacy__PLEX_TOKEN", "plex-token")
-    monkeypatch.setenv("AB_PROFILES__legacy__PLEX_USER", "eliasbenb")
-    monkeypatch.setenv("AB_PROFILES__legacy__PLEX_URL", "http://plex:32400")
-    monkeypatch.setenv("AB_PROFILES__legacy__POLLING_SCAN", "true")
-
-    with pytest.deprecated_call():
-        config = AniBridgeConfig()
-
-    profile = config.get_profile("legacy")
-
-    assert profile.sync_modes == [SyncMode.POLL]
 
 
 def test_get_profile_raises_for_unknown_name(
