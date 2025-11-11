@@ -108,6 +108,7 @@ async def run() -> int:
     server_task: asyncio.Task | None = None
     config = get_config()
 
+    ret = 0
     try:
         log.info("\n" + PLEXANIBDRIGE_HEADER)
 
@@ -174,12 +175,11 @@ async def run() -> int:
                 log.success("AniBridge: Application shutdown complete")
             except asyncio.CancelledError:
                 log.info("AniBridge: Shutdown cancelled")
-                return 1
+                ret = 1
             except Exception as e:
                 log.error(f"AniBridge: Error during shutdown: {e}", exc_info=True)
-                return 1
-
-    return 0
+                ret = 1
+    return ret
 
 
 def main(argv: list[str] | None = None) -> int:

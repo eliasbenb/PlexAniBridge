@@ -80,7 +80,7 @@ class MappingOverridePayload(BaseModel):
     raw: dict[str, Any] | None = None
 
     @model_validator(mode="after")
-    def _ensure_payload(self) -> "MappingOverridePayload":
+    def _ensure_payload(self) -> MappingOverridePayload:
         """Ensure at least one of fields or raw is provided."""
         if self.fields is None and self.raw is None:
             raise ValueError("Either 'fields' or 'raw' must be provided")

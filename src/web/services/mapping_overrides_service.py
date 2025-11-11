@@ -1,7 +1,5 @@
 """Service helpers for managing custom mapping overrides."""
 
-from __future__ import annotations
-
 import asyncio
 import copy
 import json

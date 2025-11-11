@@ -1,7 +1,5 @@
 """Database Configuration for AniBridge."""
 
-from __future__ import annotations
-
 from functools import lru_cache
 from pathlib import Path
 from types import TracebackType
