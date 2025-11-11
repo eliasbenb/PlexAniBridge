@@ -31,4 +31,4 @@ plex_url: ...
 # web_basic_auth_username: null
 # web_basic_auth_password: null
 # web_basic_auth_htpasswd_path: null
-# web_basic_auth_realm: "PlexAniBridge"
+# web_basic_auth_realm: "AniBridge"

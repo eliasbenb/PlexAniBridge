@@ -5,7 +5,7 @@ icon: simple/quicklook
 
 # Mappings Querying Language
 
-PlexAniBridge provides a Booru-like querying language for searching the mappings database and AniList API. You can use this language on the [Mappings Page](../web/screenshots.md#mappings) of the web interface or through the API at:
+AniBridge provides a Booru-like querying language for searching the mappings database and AniList API. You can use this language on the [Mappings Page](../web/screenshots.md#mappings) of the web interface or through the API at:
 
 ```
 /api/mappings?q=<query>

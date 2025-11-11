@@ -40,11 +40,11 @@ FROM python:3.13-alpine
 RUN apk add --no-cache shadow su-exec
 
 LABEL maintainer="Elias Benbourenane <eliasbenbourenane@gmail.com>" \
-    org.opencontainers.image.title="PlexAniBridge" \
+    org.opencontainers.image.title="AniBridge" \
     org.opencontainers.image.description="The smart way to keep your AniList profile perfectly synchronized with your Plex library." \
     org.opencontainers.image.authors="Elias Benbourenane <eliasbenbourenane@gmail.com>" \
-    org.opencontainers.image.url="https://plexanibridge.elias.eu.org" \
-    org.opencontainers.image.documentation="https://plexanibridge.elias.eu.org" \
+    org.opencontainers.image.url="https://anibridge.eliasbenb.dev" \
+    org.opencontainers.image.documentation="https://anibridge.eliasbenb.dev" \
     org.opencontainers.image.source="https://github.com/eliasbenb/PlexAniBridge" \
     org.opencontainers.image.licenses="MIT"
 

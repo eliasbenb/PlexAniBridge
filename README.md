@@ -1,12 +1,11 @@
-# <a href="https://plexanibridge.elias.eu.org"><img src="./docs/img/logo.png" alt="PlexAniBridge Logo" width="32" style="vertical-align: middle;"/></a> PlexAniBridge
+# <a href="https://anibridge.eliasbenb.dev"><img src="./docs/img/logo.png" alt="AniBridge Logo" width="32" style="vertical-align: middle;"/></a> AniBridge
 
 The smart way to keep your AniList profile perfectly synchronized with your Plex library.
 
 > [!IMPORTANT]
-> Visit the [PlexAniBridge documentation](https://plexanibridge.elias.eu.org) for detailed setup instructions and usage information.
+> Visit the [AniBridge documentation](https://anibridge.eliasbenb.dev) for detailed setup instructions and usage information.
 
-[![Discord Shield](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fdiscord.com%2Fapi%2Finvites%2Fey8kyQU9aD%3Fwith_counts%3Dtrue&query=%24.approximate_member_count&style=for-the-badge&logo=discord&label=Discord%20Users&labelColor=%23313338&color=%235865f2&cacheSeconds=10800)](https://discord.gg/ey8kyQU9aD) [![GitHub Shield](https://img.shields.io/github/stars/eliasbenb/PlexAniBridge?style=for-the-badge&logo=github&label=GitHub%20Stars&labelColor=%2324292e&color=%23f0f0f0)](https://github.com/eliasbenb/PlexAniBridge) [![Docker Pulls](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fghcr-badge.elias.eu.org%2Fapi%2Feliasbenb%2FPlexAniBridge%2Fplexanibridge&query=downloadCount&style=for-the-badge&logo=docker&label=Docker%20Pulls&color=2496ed)](https://github.com/eliasbenb/PlexAniBridge/pkgs/container/plexanibridge)
-
+[![Discord Shield](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fdiscord.com%2Fapi%2Finvites%2Fey8kyQU9aD%3Fwith_counts%3Dtrue&query=%24.approximate_member_count&style=for-the-badge&logo=discord&label=Discord%20Users&labelColor=%23313338&color=%235865f2&cacheSeconds=10800)](https://discord.gg/ey8kyQU9aD) [![GitHub Shield](https://img.shields.io/github/stars/eliasbenb/PlexAniBridge?style=for-the-badge&logo=github&label=GitHub%20Stars&labelColor=%2324292e&color=%23f0f0f0)](https://github.com/eliasbenb/PlexAniBridge) [![Docker Pulls](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fghcr-badge.eliasbenb.dev%2Fapi%2Feliasbenb%2FPlexAniBridge%2Fplexanibridge&query=downloadCount&style=for-the-badge&logo=docker&label=Docker%20Pulls&color=2496ed)](https://github.com/eliasbenb/PlexAniBridge/pkgs/container/plexanibridge)
 
 ## Key Features
 
@@ -25,7 +24,7 @@ The smart way to keep your AniList profile perfectly synchronized with your Plex
 
 ```yaml
 services:
-    plexanibridge:
+    anibridge:
         image: ghcr.io/eliasbenb/plexanibridge:v1
         environment:
             PUID: 1000
@@ -37,7 +36,7 @@ services:
             AB_PLEX_USER: ...
             AB_PLEX_URL: ...
         volumes:
-            - /path/to/plexanibridge/data:/config
+            - /path/to/anibridge/data:/config
         ports:
             - 4848:4848
         restart: unless-stopped
@@ -47,4 +46,4 @@ services:
 
 ![Web UI Screenshot](./docs/img/screenshots/timeline.png)
 
-_View more screenshots in the [documentation](https://plexanibridge.elias.eu.org/web/screenshots)_
+_View more screenshots in the [documentation](https://anibridge.eliasbenb.dev/web/screenshots)_

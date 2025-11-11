@@ -1,4 +1,4 @@
-"""Basic pytest smoke tests for PlexAniBridge."""
+"""Basic pytest smoke tests for AniBridge."""
 
 import re
 import tomllib
@@ -18,7 +18,7 @@ def test_project_metadata() -> None:
     project = pyproject.get("project")
     assert isinstance(project, dict), "[project] table must exist in pyproject.toml"
 
-    assert project.get("name") == "PlexAniBridge"
+    assert project.get("name") == "AniBridge"
 
     version = project.get("version")
     assert isinstance(version, str) and SEMVER_PATTERN.fullmatch(version), (

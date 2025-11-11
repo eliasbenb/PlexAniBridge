@@ -18,15 +18,15 @@ icon: material/wrench
 
 ```shell
 git clone https://github.com/eliasbenb/PlexAniBridge.git
-cd PlexAniBridge
+cd AniBridge
 
 cp .env.example .env # Edit the .env file
 
 # Setup environment
 uv sync
-uv run pab-deps-install
-uv run pab-build
+uv run ab-deps-install
+uv run ab-build
 
-# Run PlexAniBridge
-uv run pab-start
+# Run AniBridge
+uv run ab-start
 ```

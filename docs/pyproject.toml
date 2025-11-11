@@ -1,7 +1,7 @@
 [project]
 name = "docs"
 version = "0.1.0"
-description = "PlexAniBridge Documentation"
+description = "AniBridge Documentation"
 readme = "index.md"
 requires-python = ">=3.10"
 

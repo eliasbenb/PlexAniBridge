@@ -1,5 +1,5 @@
 services:
-    plexanibridge:
+    anibridge:
         image: ghcr.io/eliasbenb/plexanibridge:v1 # :vX, :vX.Y, :vX.Y.Z, :main, :develop, :experimental, :latest
         environment:
             PUID: 1000
@@ -34,7 +34,7 @@ services:
             # AB_WEB_BASIC_AUTH_HTPASSWD_PATH: null
             # AB_WEB_BASIC_AUTH_REALM: "AniBridge"
         volumes:
-            - /path/to/plexanibridge/data:/config
+            - /path/to/anibridge/data:/config
         ports:
             - 4848:4848
         restart: unless-stopped
