@@ -1,4 +1,4 @@
-"""PlexAniBridge Configuration Settings."""
+"""AniBridge Configuration Settings."""
 
 from __future__ import annotations
 
@@ -34,9 +34,9 @@ from src.exceptions import (
 from src.utils.logging import _get_logger
 
 __all__ = [
+    "AniBridgeConfig",
+    "AniBridgeProfileConfig",
     "LogLevel",
-    "PlexAnibridgeConfig",
-    "PlexAnibridgeProfileConfig",
     "PlexMetadataSource",
     "SyncField",
     "SyncMode",
@@ -52,7 +52,7 @@ def find_yaml_config_file() -> Path | None:
     Returns:
         Path | None: The path to the YAML configuration file
     """
-    data_path = Path(os.getenv("PAB_DATA_PATH", "./data")).resolve()
+    data_path = Path(os.getenv("AB_DATA_PATH", "./data")).resolve()
 
     for location in [data_path, Path(".")]:
         for ext in ["yaml", "yml"]:
@@ -157,7 +157,7 @@ class SyncMode(BaseStrEnum):
 
     periodic: Periodic scans every `sync_interval` seconds
     poll: Poll for incremental changes every 30 seconds
-    webhook: External webhook-triggered syncs, dependent on `pab_web_enabled`
+    webhook: External webhook-triggered syncs, dependent on `ab_web_enabled`
     """
 
     PERIODIC = "periodic"
@@ -190,8 +190,8 @@ def _apply_deprecations(data: dict) -> dict:
     return data
 
 
-class PlexAnibridgeProfileConfig(BaseModel):
-    """Configuration for a single PlexAniBridge profile.
+class AniBridgeProfileConfig(BaseModel):
+    """Configuration for a single AniBridge profile.
 
     Represents one sync profile with one Plex user and one AniList account.
     """
@@ -252,14 +252,14 @@ class PlexAnibridgeProfileConfig(BaseModel):
         ),
     )
 
-    _parent: PlexAnibridgeConfig | None = None
+    _parent: AniBridgeConfig | None = None
 
     @property
-    def parent(self) -> PlexAnibridgeConfig:
+    def parent(self) -> AniBridgeConfig:
         """Get the parent multi-config instance.
 
         Returns:
-            PlexAnibridgeConfig: Parent configuration
+            AniBridgeConfig: Parent configuration
 
         Raises:
             ProfileConfigError: If this config is not part of a multi-config
@@ -289,12 +289,12 @@ class PlexAnibridgeProfileConfig(BaseModel):
         return _apply_deprecations(values)
 
 
-class PlexAnibridgeConfig(BaseSettings):
-    """Multi-configuration manager for PlexAniBridge application.
+class AniBridgeConfig(BaseSettings):
+    """Multi-configuration manager for AniBridge application.
 
-    Supports loading multiple PlexAniBridge configurations from environment variables
+    Supports loading multiple AniBridge configurations from environment variables
     variables using nested delimiters. Automatically parses
-    PAB_PROFILES__${PROFILE_NAME}__${SETTING} format into individual profile
+    AB_PROFILES__${PROFILE_NAME}__${SETTING} format into individual profile
     configurations.
 
     Global settings are shared across all profiles, while profile-specific settings
@@ -302,27 +302,27 @@ class PlexAnibridgeConfig(BaseSettings):
 
     Environment Variable Format:
         Global settings:
-            PAB_DATA_PATH: Application data directory
-            PAB_LOG_LEVEL: Logging level
+            AB_DATA_PATH: Application data directory
+            AB_LOG_LEVEL: Logging level
 
         Profile settings:
-            PAB_PROFILES__${PROFILE_NAME}__ANILIST_TOKEN: AniList token
-            PAB_PROFILES__${PROFILE_NAME}__PLEX_TOKEN: Plex token
-            PAB_PROFILES__${PROFILE_NAME}__PLEX_USER: Plex username
-            PAB_PROFILES__${PROFILE_NAME}__PLEX_URL: Plex server URL
-            ... (all other PlexAnibridgeConfig settings)
+            AB_PROFILES__${PROFILE_NAME}__ANILIST_TOKEN: AniList token
+            AB_PROFILES__${PROFILE_NAME}__PLEX_TOKEN: Plex token
+            AB_PROFILES__${PROFILE_NAME}__PLEX_USER: Plex username
+            AB_PROFILES__${PROFILE_NAME}__PLEX_URL: Plex server URL
+            ... (all other AniBridgeConfig settings)
 
     Example:
-        PAB_DATA_PATH=/app/data
-        PAB_LOG_LEVEL=INFO
-        PAB_PROFILES__personal__ANILIST_TOKEN=token1
-        PAB_PROFILES__personal__PLEX_TOKEN=plex_token1
-        PAB_PROFILES__personal__PLEX_USER=user1
-        PAB_PROFILES__personal__PLEX_URL=http://plex_url1
-        PAB_PROFILES__family__ANILIST_TOKEN=token2
-        PAB_PROFILES__family__PLEX_TOKEN=plex_token2
-        PAB_PROFILES__family__PLEX_USER=user2
-        PAB_PROFILES__family__PLEX_URL=http://plex_url2
+        AB_DATA_PATH=/app/data
+        AB_LOG_LEVEL=INFO
+        AB_PROFILES__personal__ANILIST_TOKEN=token1
+        AB_PROFILES__personal__PLEX_TOKEN=plex_token1
+        AB_PROFILES__personal__PLEX_USER=user1
+        AB_PROFILES__personal__PLEX_URL=http://plex_url1
+        AB_PROFILES__family__ANILIST_TOKEN=token2
+        AB_PROFILES__family__PLEX_TOKEN=plex_token2
+        AB_PROFILES__family__PLEX_USER=user2
+        AB_PROFILES__family__PLEX_URL=http://plex_url2
     """
 
     def __init__(self, **data) -> None:
@@ -338,8 +338,8 @@ class PlexAnibridgeConfig(BaseSettings):
         exclude=True,
     )
 
-    profiles: dict[str, PlexAnibridgeProfileConfig] = Field(
-        default_factory=dict, description="PlexAniBridge profile configurations"
+    profiles: dict[str, AniBridgeProfileConfig] = Field(
+        default_factory=dict, description="AniBridge profile configurations"
     )
 
     data_path: Path = Field(
@@ -367,7 +367,7 @@ class PlexAnibridgeConfig(BaseSettings):
         default=None, description="Password for HTTP Basic Auth on the web UI"
     )
     web_basic_auth_realm: str = Field(
-        default="PlexAniBridge", description="Realm for HTTP Basic Auth on the web UI"
+        default="AniBridge", description="Realm for HTTP Basic Auth on the web UI"
     )
     web_basic_auth_htpasswd_path: Path | None = Field(
         default=None,
@@ -438,8 +438,8 @@ class PlexAnibridgeConfig(BaseSettings):
     @staticmethod
     def _shared_profile_fields() -> set[str]:
         """Compute field names present in both the global and per-profile models."""
-        return set(PlexAnibridgeProfileConfig.model_fields).intersection(
-            PlexAnibridgeConfig.model_fields
+        return set(AniBridgeProfileConfig.model_fields).intersection(
+            AniBridgeConfig.model_fields
         )
 
     def _apply_global_defaults(self) -> None:
@@ -453,7 +453,7 @@ class PlexAnibridgeConfig(BaseSettings):
                     if global_value is not None:
                         config_data[field_name] = global_value
             try:
-                profile = PlexAnibridgeProfileConfig(**config_data)
+                profile = AniBridgeProfileConfig(**config_data)
                 profile._parent = self
                 self.profiles[profile_name] = profile
             except Exception as e:
@@ -502,11 +502,11 @@ class PlexAnibridgeConfig(BaseSettings):
         return values
 
     @model_validator(mode="after")
-    def validate_global_config(self) -> PlexAnibridgeConfig:
+    def validate_global_config(self) -> AniBridgeConfig:
         """Validates global configuration settings.
 
         Returns:
-            PlexAnibridgeConfig: Self with validated settings
+            AniBridgeConfig: Self with validated settings
 
         Raises:
             ValueError: If required global settings are missing or invalid
@@ -529,9 +529,9 @@ class PlexAnibridgeConfig(BaseSettings):
             else:
                 raise NoProfilesConfiguredError(
                     "No sufficiently populated sync profiles are configured. Either "
-                    "define at least one profile via PAB_PROFILES__${PROFILE}__* or "
-                    "set global PAB_ANILIST_TOKEN, PAB_PLEX_TOKEN, PAB_PLEX_USER, and "
-                    "PAB_PLEX_URL."
+                    "define at least one profile via AB_PROFILES__${PROFILE}__* or "
+                    "set global AB_ANILIST_TOKEN, AB_PLEX_TOKEN, AB_PLEX_USER, and "
+                    "AB_PLEX_URL."
                 )
 
         if (not self.web_basic_auth_username) != (not self.web_basic_auth_password):
@@ -553,14 +553,14 @@ class PlexAnibridgeConfig(BaseSettings):
 
         return self
 
-    def get_profile(self, name: str) -> PlexAnibridgeProfileConfig:
+    def get_profile(self, name: str) -> AniBridgeProfileConfig:
         """Get a specific profile configuration.
 
         Args:
             name: Profile name
 
         Returns:
-            PlexAnibridgeProfileConfig: The profile configuration
+            AniBridgeProfileConfig: The profile configuration
 
         Raises:
             KeyError: If profile doesn't exist
@@ -582,7 +582,7 @@ class PlexAnibridgeConfig(BaseSettings):
         profile_names = ", ".join(self.profiles.keys())
 
         return (
-            f"PlexAniBridge Config: {profile_count} profile(s) [{profile_names}], "
+            f"AniBridge Config: {profile_count} profile(s) [{profile_names}], "
             f"DATA_PATH: {self.data_path}, LOG_LEVEL: {self.log_level}"
         )
 
@@ -605,14 +605,14 @@ class PlexAnibridgeConfig(BaseSettings):
         return (
             EnvSettingsSource(
                 settings_cls,
-                env_prefix="PAB_",
+                env_prefix="AB_",
                 env_nested_delimiter="__",
                 env_parse_none_str="null",
             ),
             DotEnvSettingsSource(
                 settings_cls,
                 env_file=".env",
-                env_prefix="PAB_",
+                env_prefix="AB_",
                 env_nested_delimiter="__",
                 env_parse_none_str="null",
             ),
@@ -623,10 +623,10 @@ class PlexAnibridgeConfig(BaseSettings):
 
 
 @lru_cache(maxsize=1)
-def get_config() -> PlexAnibridgeConfig:
-    """Get the singleton instance of PlexAnibridgeConfig.
+def get_config() -> AniBridgeConfig:
+    """Get the singleton instance of AniBridgeConfig.
 
     Returns:
-        PlexAnibridgeConfig: The singleton configuration instance
+        AniBridgeConfig: The singleton configuration instance
     """
-    return PlexAnibridgeConfig()
+    return AniBridgeConfig()

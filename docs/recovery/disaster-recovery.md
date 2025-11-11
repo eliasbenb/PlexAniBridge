@@ -11,7 +11,7 @@ Given that software will always be susceptible to bugs, PlexAniBridge offers mul
 
 ## Backups
 
-PlexAniBridge creates a JSON snapshot of the current AniList list data on startup and on a daily schedule. These backups are stored under the data folder (defined in `PAB_DATA_PATH`) in the `backups` directory as JSON files named like:
+AniBridge creates a JSON snapshot of the current AniList list data on startup and on a daily schedule. These backups are stored under the data folder (defined in `AB_DATA_PATH`) in the `backups` directory as JSON files named like:
 
 ```
 plexanibridge-<PROFILE_NAME>.<YYYYMMDDHHMMSS>.json
