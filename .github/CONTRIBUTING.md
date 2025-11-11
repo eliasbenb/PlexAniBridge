@@ -1,10 +1,10 @@
 # Contributing
 
-Contributions to PlexAniBridge are always appreciated! Please follow the guidelines below to help us maintain a high-quality codebase.
+Contributions to AniBridge are always appreciated! Please follow the guidelines below to help us maintain a high-quality codebase.
 
 ## Development
 
-This guide is for developers who want to contribute to the backend of the PlexAniBridge project. It assumes you'll be using Visual Studio Code with Dev Containers (requires Docker). Of course, you are free to use any IDE you prefer, but the VS Code IDE and Devcontainer settings are already pre-configured with linting and dependency management for you.
+This guide is for developers who want to contribute to the backend of the AniBridge project. It assumes you'll be using Visual Studio Code with Dev Containers (requires Docker). Of course, you are free to use any IDE you prefer, but the VS Code IDE and Devcontainer settings are already pre-configured with linting and dependency management for you.
 
 _If you decide to use a different IDE, you will need to set up the environment manually and infer the project's dependencies yourself. Take a look at [`.devcontainer/devcontainer.json`](/.devcontainer/devcontainer.json) and [`.vscode/settings.json`](/.vscode/settings.json) for an idea of what's required._
 
@@ -15,7 +15,7 @@ _If you decide to use a different IDE, you will need to set up the environment m
 
 ### Getting started
 
-1. Fork PlexAniBridge.
+1. Fork AniBridge.
 2. Clone the repository into your development machine ([_info_](https://docs.github.com/en/get-started/quickstart/fork-a-repo)).
 3. Open the project in Visual Studio Code, it will prompt you to reopen in a dev container, do so.
 4. If you didn't receive a prompt, you can also open the command palette (Ctrl+Shift+P) and select "Reopen in Container".
@@ -26,13 +26,13 @@ _If you decide to use a different IDE, you will need to set up the environment m
 
 If you are only making changes to the documentation, you can opt to clone the repository and edit the documentation files in your preferred text editor or directly in the GitHub web UI. The documentation is located in the `docs/` directory.
 
-1. Fork PlexAniBridge.
+1. Fork AniBridge.
 2. Clone the repository into your development machine ([_info_](https://docs.github.com/en/get-started/quickstart/fork-a-repo)) or edit directly in the GitHub web UI.
 3. Make your changes to the documentation files in the `docs/` directory.
 
 ## Contributing Code
 
-The PlexAniBridge codebase is primarily written in Python for the backend and Svelte/TypeScript for the frontend.
+The AniBridge codebase is primarily written in Python for the backend and Svelte/TypeScript for the frontend.
 
 The project has a set of developer scripts at `scripts/dev.py` to help with common tasks. You can run these scripts with `python scripts/dev.py <command>`. Run `python scripts/dev.py --help` to see a list of available commands.
 

@@ -1,4 +1,4 @@
-"""Development scripts for PlexAniBridge."""
+"""Development scripts for AniBridge."""
 
 import argparse
 import subprocess
@@ -162,7 +162,7 @@ def bump_version() -> None:
         )
 
         print_info("Syncing OpenAPI spec with new version...")
-        subprocess.run(["uv", "run", "pab-openapi"], cwd=ROOT_DIR, check=True)
+        subprocess.run(["uv", "run", "ab-openapi"], cwd=ROOT_DIR, check=True)
 
         print_success(f"Version bumped to {new_version} successfully!")
     except subprocess.CalledProcessError:
@@ -393,7 +393,7 @@ def test() -> None:
 
 
 def start() -> None:
-    """Start the PlexAniBridge application."""
+    """Start the AniBridge application."""
     target = parse_target_args()
 
     if target == "frontend":
@@ -404,7 +404,7 @@ def start() -> None:
         )
         sys.exit(1)
 
-    print_task("Starting PlexAniBridge application...")
+    print_task("Starting AniBridge application...")
 
     try:
         subprocess.run(["python3", "main.py"], cwd=ROOT_DIR, check=True)
@@ -455,9 +455,7 @@ def docs_serve() -> None:
 
 def main() -> None:
     """Main entry point for direct script execution."""
-    parser = argparse.ArgumentParser(
-        description="Development scripts for PlexAniBridge."
-    )
+    parser = argparse.ArgumentParser(description="Development scripts for AniBridge.")
     parser.add_argument(
         "command",
         choices=[

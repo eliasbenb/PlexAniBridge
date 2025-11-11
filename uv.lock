@@ -5,7 +5,7 @@ requires-python = ">=3.13"
 [manifest]
 members = [
     "docs",
-    "plexanibridge",
+    "anibridge",
 ]
 
 [[package]]
@@ -1173,7 +1173,7 @@ wheels = [
 ]
 
 [[package]]
-name = "plexanibridge"
+name = "anibridge"
 version = "1.10.1"
 source = { editable = "." }
 dependencies = [

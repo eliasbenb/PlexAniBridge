@@ -1,1 +1,1 @@
-"""PlexAniBridge tests."""
+"""AniBridge tests."""

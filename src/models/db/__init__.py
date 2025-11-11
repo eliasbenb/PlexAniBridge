@@ -1,4 +1,4 @@
-"""Models for PlexAniBridge database tables."""
+"""Models for AniBridge database tables."""
 
 from src.models.db.animap import AniMap
 from src.models.db.base import Base

@@ -9,10 +9,10 @@ __all__ = ["get_docker_status", "get_git_hash", "get_pyproject_version"]
 
 
 def get_pyproject_version() -> str:
-    """Get the PlexAniBridge's version from the pyproject.toml file.
+    """Get the AniBridge's version from the pyproject.toml file.
 
     Returns:
-        str: PlexAniBridge's version
+        str: AniBridge's version
     """
     try:
         project_root = Path(src_file).resolve().parent.parent
@@ -33,10 +33,10 @@ def get_pyproject_version() -> str:
 
 
 def get_git_hash() -> str:
-    """Get the git commit hash of the PlexAniBridge repository.
+    """Get the git commit hash of the AniBridge repository.
 
     Returns:
-        str: PlexAniBridge's current commit hash
+        str: AniBridge's current commit hash
     """
     try:
         project_root = Path(src_file).resolve().parent.parent
@@ -74,7 +74,7 @@ def get_git_hash() -> str:
 
 
 def get_docker_status() -> bool:
-    """Check if PlexAniBridge is running inside a Docker container.
+    """Check if AniBridge is running inside a Docker container.
 
     Returns:
         bool: True if running inside a Docker container, False otherwise

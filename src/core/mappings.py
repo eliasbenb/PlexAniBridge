@@ -48,7 +48,7 @@ class MappingsClient:
             headers = {
                 "Accept": "application/json",
                 "Content-Type": "application/json",
-                "User-Agent": f"PlexAniBridge/{__version__}",
+                "User-Agent": f"AniBridge/{__version__}",
             }
             self._session = aiohttp.ClientSession(headers=headers)
         return self._session

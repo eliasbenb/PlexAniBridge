@@ -1,1 +1,1 @@
-"""PlexAniBridge web server module."""
+"""AniBridge web server module."""

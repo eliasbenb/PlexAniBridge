@@ -1,5 +1,5 @@
 [project]
-name = "PlexAniBridge"
+name = "AniBridge"
 version = "1.10.1"
 description = "The smart way to keep your AniList profile perfectly synchronized with your Plex library."
 readme = "README.md"
@@ -23,7 +23,7 @@ keywords = [
     "plex",
     "anilist",
     "plexpy",
-    "plexanibridge",
+    "anibridge",
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -54,23 +54,23 @@ dependencies = [
 ]
 
 [project.scripts]
-pab-build = "scripts.dev:build"
-pab-bump-version = "scripts.dev:bump_version"
-pab-clean = "scripts.dev:clean"
-pab-deps-install = "scripts.dev:deps_install"
-pab-deps-upgrade = "scripts.dev:deps_upgrade"
-pab-dev = "scripts.dev:dev"
-pab-format = "scripts.dev:format"
-pab-lint = "scripts.dev:lint"
-pab-start = "scripts.dev:start"
-pab-test = "scripts.dev:test"
-pab-openapi = "scripts.openapi:main"
-pab-docs-build = "scripts.dev:docs_build"
-pab-docs-serve = "scripts.dev:docs_serve"
+ab-build = "scripts.dev:build"
+ab-bump-version = "scripts.dev:bump_version"
+ab-clean = "scripts.dev:clean"
+ab-deps-install = "scripts.dev:deps_install"
+ab-deps-upgrade = "scripts.dev:deps_upgrade"
+ab-dev = "scripts.dev:dev"
+ab-format = "scripts.dev:format"
+ab-lint = "scripts.dev:lint"
+ab-start = "scripts.dev:start"
+ab-test = "scripts.dev:test"
+ab-openapi = "scripts.openapi:main"
+ab-docs-build = "scripts.dev:docs_build"
+ab-docs-serve = "scripts.dev:docs_serve"
 
 [project.urls]
-Documentation = "https://plexanibridge.elias.eu.org"
-Homepage = "https://plexanibridge.elias.eu.org"
+Documentation = "https://anibridge.eliasbenb.dev"
+Homepage = "https://anibridge.eliasbenb.dev"
 Issues = "https://github.com/eliasbenb/PlexAniBridge/issues"
 Source = "https://github.com/eliasbenb/PlexAniBridge"
 

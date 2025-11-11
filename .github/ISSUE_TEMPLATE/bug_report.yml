@@ -38,12 +38,12 @@ body:
           description: |
               examples:
                 - **OS**: Ubuntu 22.04
-                - **PlexAniBridge**: PlexAniBridge 0.2.2
+                - **AniBridge**: AniBridge 2.0.0
                 - **Docker Install**: Yes
                 - **Database**: Sqlite 3.41.1
           value: |
               - OS: 
-              - PlexAniBridge: 
+              - AniBridge: 
               - Docker Install: 
               - Database:
           render: markdown

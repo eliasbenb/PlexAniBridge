@@ -5,7 +5,7 @@ icon: material/cog
 
 ## Example
 
-Below is an example `.env` file for PlexAniBridge:
+Below is an example `.env` file for AniBridge:
 
 ```dosini title=".env"
 --8<-- ".env.example"
@@ -33,7 +33,7 @@ Settings are applied in the following order:
 2. **Global default settings** (medium priority)
 3. **Built-in defaults** (lowest priority)
 
-For example, if `PAB_SYNC_INTERVAL=900` is set globally and `PAB_PROFILES__personal__SYNC_INTERVAL=1800` is set for a specific profile, the profile named 'personal' will use 1800 seconds as the sync interval while other profiles will use 900 seconds. If `PAB_PROFILES__personal__SYNC_INTERVAL` is unset it falls back to the application's built-in default of 86400 seconds (24 hours).
+For example, if `AB_SYNC_INTERVAL=900` is set globally and `AB_PROFILES__personal__SYNC_INTERVAL=1800` is set for a specific profile, the profile named 'personal' will use 1800 seconds as the sync interval while other profiles will use 900 seconds. If `AB_PROFILES__personal__SYNC_INTERVAL` is unset it falls back to the application's built-in default of 86400 seconds (24 hours).
 
 ## Configuration Options
 
@@ -77,7 +77,7 @@ Plex user to sync for this profile. Can be identified by:
 
 `str` (Required)
 
-URL to your Plex server that the PlexAniBridge host can access.
+URL to your Plex server that the AniBridge host can access.
 
 ---
 
@@ -162,10 +162,10 @@ By default, all three modes are enabled, allowing for instant, incremental updat
 
     To use Plex Webhooks, you must:
 
-    1. Have [`PAB_WEB_ENABLED`](#pab_web_enabled) set to `True` (the default).
+    1. Have [`AB_WEB_ENABLED`](#ab_web_enabled) set to `True` (the default).
     2. Include `webhook` in the enabled [`SYNC_MODES`](#sync_modes).
     3. [Configure the Plex server](https://support.plex.tv/articles/115002267687-webhooks/) to send webhook payloads to `http://<your-server-host>:<port>/webhook/plex`.
-    4. Ensure PlexAniBridge is accessible to Plex over the network.
+    4. Ensure AniBridge is accessible to Plex over the network.
 
     Example webhook URL: `http://127.0.0.1:4848/webhook/plex`
 
@@ -245,7 +245,7 @@ When enabled:
 
 `int` (Optional, default: `30`)
 
-Controls how many days PlexAniBridge keeps AniList backup snapshots before pruning older files. Set to `0` to disable automatic cleanup and retain all backups indefinitely.
+Controls how many days AniBridge keeps AniList backup snapshots before pruning older files. Set to `0` to disable automatic cleanup and retain all backups indefinitely.
 
 ---
 
@@ -284,7 +284,7 @@ The higher the value, the more strict the title matching. A value of `100` requi
 
 These global settings cannot be overridden on the profile level and apply to all profiles.
 
-### `PAB_DATA_PATH`
+### `AB_DATA_PATH`
 
 `str` (Optional, default: `./data`)
 
@@ -292,7 +292,7 @@ Path to store the database, backups, and custom mappings. This is shared across 
 
 ---
 
-### `PAB_LOG_LEVEL`
+### `AB_LOG_LEVEL`
 
 `Enum("DEBUG", "INFO", "SUCCESS", "WARNING", "ERROR", "CRITICAL")` (Optional, default: `INFO`)
 
@@ -308,7 +308,7 @@ Sets logging verbosity for the entire application.
 
 ---
 
-### `PAB_MAPPINGS_URL`
+### `AB_MAPPINGS_URL`
 
 `str` (Optional, default: `https://raw.githubusercontent.com/eliasbenb/PlexAniBridge-Mappings/v2/mappings.json`)
 
@@ -326,7 +326,7 @@ This option is only intended for advanced users who want to use their own upstre
 
 ---
 
-### `PAB_WEB_ENABLED`
+### `AB_WEB_ENABLED`
 
 `bool` (Optional, default: `True`)
 
@@ -334,7 +334,7 @@ When enabled, the [web interface](./web/screenshots.md) is accessible.
 
 ---
 
-### `PAB_WEB_HOST`
+### `AB_WEB_HOST`
 
 `str` (Optional, default: `0.0.0.0`)
 
@@ -342,7 +342,7 @@ The host address for the web interface.
 
 ---
 
-### `PAB_WEB_PORT`
+### `AB_WEB_PORT`
 
 `int` (Optional, default: `4848`)
 
@@ -350,7 +350,7 @@ The port for the web interface.
 
 ---
 
-### `PAB_WEB_BASIC_AUTH_USERNAME`
+### `AB_WEB_BASIC_AUTH_USERNAME`
 
 `str` (Optional, default: `None`)
 
@@ -358,7 +358,7 @@ HTTP Basic Authentication username for the web UI. Basic Auth is enabled only wh
 
 ---
 
-### `PAB_WEB_BASIC_AUTH_PASSWORD`
+### `AB_WEB_BASIC_AUTH_PASSWORD`
 
 `str` (Optional, default: `None`)
 
@@ -366,13 +366,13 @@ HTTP Basic Authentication password for the web UI. Basic Auth is enabled only wh
 
 ---
 
-### `PAB_WEB_BASIC_AUTH_HTPASSWD_PATH`
+### `AB_WEB_BASIC_AUTH_HTPASSWD_PATH`
 
 `str` (Optional, default: `None`)
 
 Path to an [Apache `htpasswd`](https://httpd.apache.org/docs/current/programs/htpasswd.html) file containing user credentials for HTTP Basic Authentication. When set, the web UI validates requests against this file. Only **bcrypt** (recommended) and **SHA1** hashed passwords are supported.
 
-Providing an `htpasswd` file allows you to manage multiple users and rotate passwords without exposing plaintext credentials in the configuration. You may still set `PAB_WEB_BASIC_AUTH_USERNAME` and `PAB_WEB_BASIC_AUTH_PASSWORD`; both authentication methods will be accepted.
+Providing an `htpasswd` file allows you to manage multiple users and rotate passwords without exposing plaintext credentials in the configuration. You may still set `AB_WEB_BASIC_AUTH_USERNAME` and `AB_WEB_BASIC_AUTH_PASSWORD`; both authentication methods will be accepted.
 
 !!! tip "Generate htpasswd entries"
 
@@ -399,9 +399,9 @@ Providing an `htpasswd` file allows you to manage multiple users and rotate pass
 
 ---
 
-### `PAB_WEB_BASIC_AUTH_REALM`
+### `AB_WEB_BASIC_AUTH_REALM`
 
-`str` (Optional, default: `PlexAniBridge`)
+`str` (Optional, default: `AniBridge`)
 
 Realm label presented in the browser Basic Auth prompt and `WWW-Authenticate` response header.
 
@@ -413,24 +413,24 @@ This example demonstrates configuring three distinct profiles, each with their o
 
 ```dosini
 # Global defaults shared by all profiles
-PAB_PLEX_TOKEN=admin_plex_token
-PAB_PLEX_URL=http://localhost:32400
-PAB_SYNC_MODES=["periodic"]
+AB_PLEX_TOKEN=admin_plex_token
+AB_PLEX_URL=http://localhost:32400
+AB_SYNC_MODES=["periodic"]
 
 # Admin user - aggressive sync with full features
-PAB_PROFILES__admin__ANILIST_TOKEN=admin_anilist_token
-PAB_PROFILES__admin__PLEX_USER=admin_plex_user
-PAB_PROFILES__admin__DESTRUCTIVE_SYNC=True
-PAB_PROFILES__admin__EXCLUDED_SYNC_FIELDS=[]
+AB_PROFILES__admin__ANILIST_TOKEN=admin_anilist_token
+AB_PROFILES__admin__PLEX_USER=admin_plex_user
+AB_PROFILES__admin__DESTRUCTIVE_SYNC=True
+AB_PROFILES__admin__EXCLUDED_SYNC_FIELDS=[]
 
 # Family member - typical sync
-PAB_PROFILES__family__ANILIST_TOKEN=family_anilist_token
-PAB_PROFILES__family__PLEX_USER=family_plex_user
+AB_PROFILES__family__ANILIST_TOKEN=family_anilist_token
+AB_PROFILES__family__PLEX_USER=family_plex_user
 
 # Guest user - minimal sync
-PAB_PROFILES__guest__ANILIST_TOKEN=guest_anilist_token
-PAB_PROFILES__guest__PLEX_USER=guest_plex_user
-PAB_PROFILES__guest__EXCLUDED_SYNC_FIELDS=["notes", "score", "repeat", "started_at", "completed_at"]
+AB_PROFILES__guest__ANILIST_TOKEN=guest_anilist_token
+AB_PROFILES__guest__PLEX_USER=guest_plex_user
+AB_PROFILES__guest__EXCLUDED_SYNC_FIELDS=["notes", "score", "repeat", "started_at", "completed_at"]
 ```
 
 ### Per-Library Profiles
@@ -439,18 +439,18 @@ This example shows how to create separate profiles for different Plex libraries,
 
 ```dosini
 # Global defaults shared by all profiles
-PAB_ANILIST_TOKEN=global_anilist_token
-PAB_PLEX_TOKEN=admin_plex_token
-PAB_PLEX_USER=admin_plex_user
-PAB_PLEX_URL=http://localhost:32400
+AB_ANILIST_TOKEN=global_anilist_token
+AB_PLEX_TOKEN=admin_plex_token
+AB_PLEX_USER=admin_plex_user
+AB_PLEX_URL=http://localhost:32400
 
 # Movies library - aggressive sync with full features
-PAB_PROFILES__movies__PLEX_SECTIONS=["Anime Movies"]
-PAB_PROFILES__movies__FULL_SCAN=True
-PAB_PROFILES__movies__SYNC_INTERVAL=1800
-PAB_PROFILES__movies__EXCLUDED_SYNC_FIELDS=[]
+AB_PROFILES__movies__PLEX_SECTIONS=["Anime Movies"]
+AB_PROFILES__movies__FULL_SCAN=True
+AB_PROFILES__movies__SYNC_INTERVAL=1800
+AB_PROFILES__movies__EXCLUDED_SYNC_FIELDS=[]
 
 # TV Shows library - more conservative with updates
-PAB_PROFILES__tvshows__PLEX_SECTIONS=["Anime"]
-PAB_PROFILES__tvshows__SYNC_MODES=["periodic"]
+AB_PROFILES__tvshows__PLEX_SECTIONS=["Anime"]
+AB_PROFILES__tvshows__SYNC_MODES=["periodic"]
 ```

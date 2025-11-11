@@ -1,4 +1,4 @@
-"""PlexAniBridge Main Application."""
+"""AniBridge Main Application."""
 
 import asyncio
 import signal
@@ -22,9 +22,7 @@ def _setup_signal_handlers_for_scheduler(scheduler: SchedulerClient) -> None:
 
     def _on_signal(sig):
         name = signal.Signals(sig).name if sig else "UNKNOWN"
-        log.info(
-            f"PlexAniBridge: Received {name} signal, initiating graceful shutdown..."
-        )
+        log.info(f"AniBridge: Received {name} signal, initiating graceful shutdown...")
         try:
             scheduler.request_shutdown()
         except Exception:
@@ -53,33 +51,31 @@ def validate_configuration():
         profile_names = list(config.profiles.keys())
 
         if profile_count == 0:
-            log.error("PlexAniBridge: No sync profiles configured")
+            log.error("AniBridge: No sync profiles configured")
             return False
 
         for profile_name in profile_names:
             try:
                 profile_config = config.get_profile(profile_name)
-                log.info(
-                    f"PlexAniBridge: Profile $$'{profile_name}'$$: {profile_config!s}"
-                )
+                log.info(f"AniBridge: Profile $$'{profile_name}'$$: {profile_config!s}")
             except KeyError as e:
-                log.error(f"PlexAniBridge: Profile $$'{profile_name}'$$ not found: {e}")
+                log.error(f"AniBridge: Profile $$'{profile_name}'$$ not found: {e}")
                 return False
             except ValidationError as e:
                 log.error(
-                    f"PlexAniBridge: Invalid configuration for profile "
+                    f"AniBridge: Invalid configuration for profile "
                     f"$$'{profile_name}'$$: {e}"
                 )
                 return False
             except ValueError as e:
                 log.error(
-                    f"PlexAniBridge: Configuration error for profile "
+                    f"AniBridge: Configuration error for profile "
                     f"$$'{profile_name}'$$: {e}"
                 )
                 return False
             except (AttributeError, TypeError) as e:
                 log.error(
-                    f"PlexAniBridge: Configuration structure error for profile "
+                    f"AniBridge: Configuration structure error for profile "
                     f"$$'{profile_name}'$$: {e}"
                 )
                 return False
@@ -87,16 +83,16 @@ def validate_configuration():
         return True
 
     except ValidationError as e:
-        log.error(f"PlexAniBridge: Global configuration validation failed: {e}")
+        log.error(f"AniBridge: Global configuration validation failed: {e}")
         return False
     except ValueError as e:
-        log.error(f"PlexAniBridge: Configuration value error: {e}")
+        log.error(f"AniBridge: Configuration value error: {e}")
         return False
     except (OSError, PermissionError) as e:
-        log.error(f"PlexAniBridge: File system error during configuration: {e}")
+        log.error(f"AniBridge: File system error during configuration: {e}")
         return False
     except Exception as e:
-        log.error(f"PlexAniBridge: Unexpected configuration error: {e}", exc_info=True)
+        log.error(f"AniBridge: Unexpected configuration error: {e}", exc_info=True)
         return False
 
 
@@ -141,7 +137,7 @@ async def run() -> int:
             server_task = asyncio.create_task(server._serve())
 
             log.success(
-                "PlexAniBridge: Web UI started at "
+                "AniBridge: Web UI started at "
                 f"\033[92mhttp://{config.web_host}:{config.web_port} "
                 "(ctrl+c to stop)\033[0m"
             )
@@ -154,33 +150,33 @@ async def run() -> int:
         else:
             await app_scheduler.wait_for_completion()
     except KeyboardInterrupt:
-        log.info("PlexAniBridge: Keyboard interrupt received, shutting down...")
+        log.info("AniBridge: Keyboard interrupt received, shutting down...")
     except ValidationError as e:
-        log.error(f"PlexAniBridge: Configuration validation error: {e}")
+        log.error(f"AniBridge: Configuration validation error: {e}")
         return 1
     except ConnectionError as e:
-        log.error(f"PlexAniBridge: Connection error: {e}")
+        log.error(f"AniBridge: Connection error: {e}")
         return 1
     except (OSError, PermissionError) as e:
-        log.error(f"PlexAniBridge: File system error: {e}")
+        log.error(f"AniBridge: File system error: {e}")
         return 1
     except asyncio.CancelledError:
-        log.info("PlexAniBridge: Application cancelled")
+        log.info("AniBridge: Application cancelled")
         return 0
     except Exception as e:
-        log.error(f"PlexAniBridge: Unexpected application error: {e}", exc_info=True)
+        log.error(f"AniBridge: Unexpected application error: {e}", exc_info=True)
         return 1
     finally:
         if app_scheduler:
-            log.info("PlexAniBridge: Shutting down application...")
+            log.info("AniBridge: Shutting down application...")
             try:
                 await app_scheduler.stop()
-                log.success("PlexAniBridge: Application shutdown complete")
+                log.success("AniBridge: Application shutdown complete")
             except asyncio.CancelledError:
-                log.info("PlexAniBridge: Shutdown cancelled")
+                log.info("AniBridge: Shutdown cancelled")
                 return 1
             except Exception as e:
-                log.error(f"PlexAniBridge: Error during shutdown: {e}", exc_info=True)
+                log.error(f"AniBridge: Error during shutdown: {e}", exc_info=True)
                 return 1
 
     return 0
@@ -200,10 +196,10 @@ def main(argv: list[str] | None = None) -> int:
     try:
         return asyncio.run(run())
     except KeyboardInterrupt:
-        log.info("PlexAniBridge: Application interrupted")
+        log.info("AniBridge: Application interrupted")
         return 0
     except Exception as e:
-        log.error(f"PlexAniBridge: Fatal error: {e}", exc_info=True)
+        log.error(f"AniBridge: Fatal error: {e}", exc_info=True)
         return 1
 
 

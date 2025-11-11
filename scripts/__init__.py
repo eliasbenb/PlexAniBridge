@@ -1,1 +1,1 @@
-"""Development scripts for PlexAniBridge."""
+"""Development scripts for AniBridge."""

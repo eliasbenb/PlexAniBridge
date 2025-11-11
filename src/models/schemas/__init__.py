@@ -1,1 +1,1 @@
-"""Schemas for external APIs used in PlexAniBridge."""
+"""Schemas for external APIs used in AniBridge."""

@@ -1,5 +1,5 @@
 {
-    "name": "PlexAniBridge",
+    "name": "AniBridge",
     "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
     "features": {
         "ghcr.io/devcontainers/features/node:1": {
@@ -32,15 +32,15 @@
     "forwardPorts": [4848, 5173],
     "portsAttributes": {
         "4848": {
-            "label": "PlexAniBridge Server",
+            "label": "AniBridge Server",
             "onAutoForward": "notify"
         },
         "5173": {
-            "label": "PlexAniBridge Frontend",
+            "label": "AniBridge Frontend",
             "onAutoForward": "notify"
         }
     },
-    "postCreateCommand": "uv run pab-deps-install",
+    "postCreateCommand": "uv run ab-deps-install",
     "containerEnv": {
         "UV_LINK_MODE": "copy"
     }

@@ -1,4 +1,4 @@
-"""Database Configuration for PlexAniBridge."""
+"""Database Configuration for AniBridge."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from src import __file__ as src_file
 from src import config, log
 from src.exceptions import DataPathError
 
-__all__ = ["PlexAniBridgeDB", "db"]
+__all__ = ["AniBridgeDB", "db"]
 
 
 if TYPE_CHECKING:
@@ -23,8 +23,8 @@ if TYPE_CHECKING:
     from sqlalchemy.orm import Session
 
 
-class PlexAniBridgeDB:
-    """Database manager for PlexAniBridge application.
+class AniBridgeDB:
+    """Database manager for AniBridge application.
 
     Handles the creation, initialization, and migration of the SQLite database,
     including file system operations and schema management. Uses SQLAlchemy for ORM
@@ -50,7 +50,7 @@ class PlexAniBridgeDB:
             ValueError: If data_path exists but is a file instead of a directory
         """
         self.data_path = data_path
-        self.db_path = data_path / "plexanibridge.db"
+        self.db_path = data_path / "anibridge.db"
 
         log.debug(f"Initializing database at $$'{self.db_path}'$$")
         self.engine = self._setup_db()
@@ -135,7 +135,7 @@ class PlexAniBridgeDB:
             log.error(f"Database migration failed: {e}", exc_info=True)
             raise
 
-    def __enter__(self) -> PlexAniBridgeDB:
+    def __enter__(self) -> AniBridgeDB:
         """Enters the context manager, returning the database instance."""
         self._session = self._SessionLocal()
         return self
@@ -160,12 +160,12 @@ class PlexAniBridgeDB:
 
 
 @lru_cache(maxsize=1)
-def db() -> PlexAniBridgeDB:
-    """Get the singleton instance of the PlexAniBridgeDB.
+def db() -> AniBridgeDB:
+    """Get the singleton instance of the AniBridgeDB.
 
     Uses LRU caching to ensure only one instance is created and reused.
 
     Returns:
-        PlexAniBridgeDB: The singleton database manager instance
+        AniBridgeDB: The singleton database manager instance
     """
-    return PlexAniBridgeDB(config.data_path)
+    return AniBridgeDB(config.data_path)

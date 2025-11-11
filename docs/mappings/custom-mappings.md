@@ -5,7 +5,7 @@ icon: material/map
 
 # Custom Mappings
 
-PlexAniBridge allows you to define custom mappings for Plex content to AniList, supplementing the [default mappings database](https://github.com/eliasbenb/PlexAniBridge-Mappings). This feature is particularly helpful for content that is missing or incorrectly mapped in the default database.
+AniBridge allows you to define custom mappings for Plex content to AniList, supplementing the [default mappings database](https://github.com/eliasbenb/PlexAniBridge-Mappings). This feature is particularly helpful for content that is missing or incorrectly mapped in the default database.
 
 !!! note
 
@@ -36,15 +36,15 @@ Below is an example mappings file. You can use [the JSON schema](https://github.
 
 ## Local Custom Mappings
 
-PlexAniBridge will look for a custom mappings file with the name `mappings.custom.(json|yaml|yml)` in the `PAB_DATA_PATH` directory. The file extension determines the format of the file (YAML or JSON).
+AniBridge will look for a custom mappings file with the name `mappings.custom.(json|yaml|yml)` in the `AB_DATA_PATH` directory. The file extension determines the format of the file (YAML or JSON).
 
 ## Community Custom Mappings
 
 There are community maintained mappings repositories that you can use to get pre-made mappings for your content. You can include these mappings in your custom mappings file using the `$includes` key as explained above.
 
-- <a href="https://github.com/LuceoEtzio/PlexAniBridge-Custom-Mappings">
+- <a href="https://github.com/LuceoEtzio/AniBridge-Custom-Mappings">
     <img src="https://avatars.githubusercontent.com/u/40282884?s=24&v=4" alt="LuceoEtzio" style="margin-right: 4px; border-radius: 50%; vertical-align: middle;">
-    <span>LuceoEtzio/PlexAniBridge-Custom-Mappings</span>
+    <span>LuceoEtzio/AniBridge-Custom-Mappings</span>
   </a>
 
 ## Default Mappings

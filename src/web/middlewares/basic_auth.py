@@ -25,7 +25,7 @@ class BasicAuthMiddleware(BaseHTTPMiddleware):
         username: str | None = None,
         password: str | None = None,
         htpasswd_path: Path | None = None,
-        realm: str = "PlexAniBridge",
+        realm: str = "AniBridge",
     ) -> None:
         """Initialize the BasicAuthMiddleware."""
         super().__init__(app)

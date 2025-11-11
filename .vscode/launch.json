@@ -3,7 +3,7 @@
         {
             "type": "debugpy",
             "request": "launch",
-            "name": "Run PlexAniBridge",
+            "name": "Run AniBridge",
             "program": "main.py"
         }
     ]

@@ -1,1 +1,1 @@
-"""PlexAniBridge application models."""
+"""AniBridge application models."""

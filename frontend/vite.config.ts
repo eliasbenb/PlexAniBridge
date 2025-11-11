@@ -20,8 +20,8 @@ export default defineConfig({
             devOptions: { enabled: false },
             workbox: { maximumFileSizeToCacheInBytes: 8000000 },
             manifest: {
-                name: "PlexAniBridge",
-                short_name: "PAB",
+                name: "AniBridge",
+                short_name: "AniBridge",
                 icons: [
                     {
                         src: "/pwa-192x192.png",

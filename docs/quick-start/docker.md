@@ -12,13 +12,13 @@ icon: material/docker
 
 ### Docker Compose
 
-Below is a PlexAniBridge Docker compose file with example values. Optional environment variables are commented out.
+Below is a AniBridge Docker compose file with example values. Optional environment variables are commented out.
 
 ```yaml title="compose.yaml"
 --8<-- "docs/compose.yaml"
 ```
 
-!!! tip "PlexAniBridge Configuration"
+!!! tip "AniBridge Configuration"
 
     Have a look at [the configuration page](../configuration.md) for a detailed list of configurable environment variables.
 
@@ -26,7 +26,7 @@ Below is a PlexAniBridge Docker compose file with example values. Optional envir
 
     While configuring the Docker variables are not required, they are highly recommended to improve file permission handling and debugging.
 
-    Setting the `PUID` and `PGID` variables allows PlexAniBridge to run with the same permissions as the user running the container, which is important if you want to access files on the host system. You can find your user ID and group ID by running `id -u` and `id -g` in the terminal.
+    Setting the `PUID` and `PGID` variables allows AniBridge to run with the same permissions as the user running the container, which is important if you want to access files on the host system. You can find your user ID and group ID by running `id -u` and `id -g` in the terminal.
 
     The `UMASK` variable sets the default file permissions for new files created by the container. A common value is `022`, which gives read and execute permissions to everyone, but only write permissions to the owner.
 
@@ -66,16 +66,16 @@ Below is a minimal example of a Docker run command with only the required variab
 
 ```shell
 docker run \
-    --name plexanibridge \
+    --name anibridge \
     -e PUID=1000 \
     -e PGID=1000 \
     -e UMASK=022 \
     -e TZ=Etc/UTC \
-    -e PAB_ANILIST_TOKEN=... \
-    -e PAB_PLEX_TOKEN=... \
-    -e PAB_PLEX_USER=... \
-    -e PAB_PLEX_URL=... \
+    -e AB_ANILIST_TOKEN=... \
+    -e AB_PLEX_TOKEN=... \
+    -e AB_PLEX_USER=... \
+    -e AB_PLEX_URL=... \
     -p 4848:4848 \
-    -v /path/to/plexanibridge/data:/config \
+    -v /path/to/anibridge/data:/config \
     ghcr.io/eliasbenb/plexanibridge:v1
 ```

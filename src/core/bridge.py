@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 from src import log
 from src.config.database import db
-from src.config.settings import PlexAnibridgeConfig, PlexAnibridgeProfileConfig
+from src.config.settings import AniBridgeConfig, AniBridgeProfileConfig
 from src.core import AniListClient, AniMapClient, PlexClient
 from src.core.sync import BaseSyncClient, MovieSyncClient, ShowSyncClient
 from src.core.sync.base import ParsedGuids
@@ -30,26 +30,26 @@ class BridgeClient:
 
     Args:
         profile_name (str): Name of the sync profile
-        profile_config (PlexAnibridgeProfileConfig): Profile-specific configuration
+        profile_config (AniBridgeProfileConfig): Profile-specific configuration
                                                      settings
-        global_config (PlexAnibridgeConfig): Global application configuration
+        global_config (AniBridgeConfig): Global application configuration
         shared_animap_client (AniMapClient): Shared anime mapping client
     """
 
     def __init__(
         self,
         profile_name: str,
-        profile_config: PlexAnibridgeProfileConfig,
-        global_config: PlexAnibridgeConfig,
+        profile_config: AniBridgeProfileConfig,
+        global_config: AniBridgeConfig,
         shared_animap_client: AniMapClient,
     ) -> None:
         """Initialize the single-profile BridgeClient.
 
         Args:
             profile_name (str): Name of the sync profile
-            profile_config (PlexAnibridgeProfileConfig): Profile-specific configuration
+            profile_config (AniBridgeProfileConfig): Profile-specific configuration
                                                          settings
-            global_config (PlexAnibridgeConfig): Global application configuration
+            global_config (AniBridgeConfig): Global application configuration
             shared_animap_client (AniMapClient): Shared anime mapping client
         """
         self.profile_name = profile_name

@@ -1,5 +1,5 @@
 name: Feature Request
-description: "Suggest an idea for PlexAniBridge"
+description: "Suggest an idea for AniBridge"
 labels: ["enhancement"]
 body:
     - type: checkboxes
