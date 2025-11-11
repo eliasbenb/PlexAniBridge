@@ -17,16 +17,13 @@ AniBridge creates a JSON snapshot of the current AniList list data on startup an
 anibridge-<PROFILE_NAME>.<YYYYMMDDHHMMSS>.json
 ```
 
-You can work with these backups in two ways:
-
-1. Web UI (recommended for most cases) - browse, preview, and restore directly.
-2. CLI [restore script](https://github.com/eliasbenb/PlexAniBridge/blob/HEAD/scripts/anilist_restore.py) (legacy, deprecated).
+You can view or restore these back ups through the web UI's [backups page](../web/backups.md).
 
 !!! warning
 
     Backups are kept for 30 days by default. Adjust [BACKUP_RETENTION_DAYS](../configuration.md#backup_retention_days) if you need a longer retention window.
 
-### Viewing & Restoring Backups in the Web UI
+### Restoring from Backups
 
 1. Open the Web UI and navigate to: Backups → select a profile.
 2. You will see a table of recent backups (filename, created time, size, age, detected user if available).
@@ -37,12 +34,6 @@ You can work with these backups in two ways:
 !!! warning
 
     Initiating a restore will **overwrite all current AniList entries** for that profile.
-
-## Restoring from Backups (CLI Script)
-
-_This method is no longer recommended for typical users; prefer the Web UI above._
-
-To restore from a backup without the Web UI, use the [restore script](https://github.com/eliasbenb/PlexAniBridge/blob/HEAD/scripts/anilist_restore.py) in the `scripts` folder. You will need to pass the backup file and AniList token as arguments:
 
 ## Undoing Individual Sync Changes
 
