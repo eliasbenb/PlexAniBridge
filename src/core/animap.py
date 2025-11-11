@@ -1,7 +1,5 @@
 """AniMap Client."""
 
-from __future__ import annotations
-
 import json
 from collections.abc import Iterable, Iterator
 from hashlib import md5

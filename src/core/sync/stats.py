@@ -1,7 +1,5 @@
 """Synchronization statistics and tracking module."""
 
-from __future__ import annotations
-
 from datetime import datetime
 from typing import Literal
 

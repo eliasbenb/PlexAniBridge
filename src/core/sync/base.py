@@ -1,7 +1,5 @@
 """Abstract base class for media synchronization between Plex and AniList."""
 
-from __future__ import annotations
-
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator, Callable
 from datetime import UTC, datetime

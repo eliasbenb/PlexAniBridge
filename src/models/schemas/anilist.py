@@ -1,7 +1,5 @@
 """AniList Models Module."""
 
-from __future__ import annotations
-
 from collections.abc import Iterable
 from datetime import UTC, date, datetime, timedelta
 from enum import StrEnum

@@ -1,7 +1,5 @@
 """AniBridge Configuration Settings."""
 
-from __future__ import annotations
-
 import os
 from enum import StrEnum
 from functools import lru_cache

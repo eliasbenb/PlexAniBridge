@@ -4,7 +4,10 @@
     import { ArrowRight, LoaderCircle, Search } from "@lucide/svelte";
     import { Popover } from "bits-ui";
 
-    import { loadCapabilities, type FieldCapability } from "$lib/components/mappings/capabilities-cache";
+    import {
+        loadCapabilities,
+        type FieldCapability,
+    } from "$lib/components/mappings/capabilities-cache";
 
     interface Props {
         value?: string;
@@ -180,9 +183,7 @@
                 if (Array.isArray(kinfo.values) && kinfo.values.length) {
                     const filteredValues = matchPart
                         ? kinfo.values.filter((v) =>
-                              v
-                                  .toLowerCase()
-                                  .startsWith(matchPart.toLowerCase()),
+                              v.toLowerCase().startsWith(matchPart.toLowerCase()),
                           )
                         : kinfo.values;
                     for (const val of filteredValues) {

@@ -3,12 +3,12 @@ name = "docs"
 version = "0.1.0"
 description = "AniBridge Documentation"
 readme = "index.md"
-requires-python = ">=3.10"
+requires-python = "==3.14.*"
 
 dependencies = [
     "mkdocs-awesome-nav>=3.2.0",
-    "mkdocs-git-revision-date-localized-plugin>=1.4.7",
+    "mkdocs-git-revision-date-localized-plugin>=1.5.0",
     "mkdocs-git-tag-plugin>=0.1.0",
-    "mkdocs-material>=9.6.22",
+    "mkdocs-material>=9.7.0",
     "mkdocs-redoc-tag>=0.2.0",
 ]
