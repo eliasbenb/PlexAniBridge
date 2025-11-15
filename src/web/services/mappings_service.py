@@ -15,7 +15,6 @@ from sqlalchemy.sql import exists
 
 from src.config.database import db
 from src.config.settings import get_config
-from src.core.anilist import AniListClient
 from src.exceptions import (
     AniListFilterError,
     AniListSearchError,
@@ -26,6 +25,7 @@ from src.exceptions import (
 from src.models.db.animap import AniMap
 from src.models.db.provenance import AniMapProvenance
 from src.models.schemas.anilist import MediaWithoutList as AniListMetadata
+from src.providers.anilist.client import AniListClient
 from src.utils.booru_query import (
     And,
     KeyTerm,

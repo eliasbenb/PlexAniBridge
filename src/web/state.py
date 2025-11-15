@@ -10,7 +10,7 @@ from datetime import UTC, datetime
 from functools import lru_cache
 from typing import TYPE_CHECKING, Any
 
-from src.core.anilist import AniListClient
+from src.providers.anilist.client import AniListClient
 
 __all__ = ["AppState", "get_app_state"]
 

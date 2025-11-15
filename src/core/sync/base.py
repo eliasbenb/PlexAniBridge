@@ -13,7 +13,7 @@ from sqlalchemy import or_
 from src import log
 from src.config.database import db
 from src.config.settings import SyncField
-from src.core import AniListClient, AniMapClient, PlexClient
+from src.core import AniMapClient, PlexClient
 from src.core.sync.stats import ItemIdentifier, SyncOutcome, SyncStats
 from src.models.db.animap import AniMap
 from src.models.db.pin import Pin
@@ -25,6 +25,7 @@ from src.models.schemas.anilist import (
     MediaListStatus,
     ScoreFormat,
 )
+from src.providers.anilist.client import AniListClient
 from src.utils.types import Comparable
 
 __all__ = ["BaseSyncClient", "ParsedGuids"]

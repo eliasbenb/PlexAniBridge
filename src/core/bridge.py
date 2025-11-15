@@ -6,12 +6,14 @@ from typing import TYPE_CHECKING
 from src import log
 from src.config.database import db
 from src.config.settings import AniBridgeConfig, AniBridgeProfileConfig
-from src.core import AniListClient, AniMapClient, PlexClient
+from src.core.animap import AniMapClient
+from src.core.plex import PlexClient
 from src.core.sync import BaseSyncClient, MovieSyncClient, ShowSyncClient
 from src.core.sync.base import ParsedGuids
 from src.core.sync.stats import SyncProgress, SyncStats
 from src.models.db.housekeeping import Housekeeping
 from src.models.db.sync_history import SyncOutcome
+from src.providers.anilist.client import AniListClient
 
 __all__ = ["BridgeClient"]
 

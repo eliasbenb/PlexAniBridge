@@ -12,7 +12,6 @@ from pydantic import BaseModel
 from sqlalchemy import func, select
 
 from src.config.database import db
-from src.core.anilist import AniListClient
 from src.exceptions import (
     HistoryItemNotFoundError,
     ProfileNotFoundError,
@@ -21,6 +20,7 @@ from src.exceptions import (
 from src.models.db.pin import Pin
 from src.models.db.sync_history import SyncHistory, SyncOutcome
 from src.models.schemas.anilist import MediaList as AniMediaList
+from src.providers.anilist.client import AniListClient
 from src.web.state import get_app_state
 
 __all__ = ["HistoryService", "get_history_service"]

@@ -1,0 +1,1 @@
+"""AniList provider package."""

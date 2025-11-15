@@ -1,0 +1,1 @@
+"""AniList list provider implementation."""
