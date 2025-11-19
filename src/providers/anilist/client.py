@@ -784,7 +784,7 @@ class AniListClient:
 
         return result
 
-    async def backup_anilist(self) -> None:
+    async def backup_anilist(self) -> Path:
         """Creates a JSON backup of the user's AniList data.
 
         Fetches all anime entries from the user's lists and saves them to a JSON
@@ -876,7 +876,7 @@ class AniListClient:
         log.info(f"Exported AniList data to $$'{backup_file}'$$")
 
         if self.backup_retention_days <= 0:
-            return
+            return backup_file
 
         cutoff_date = datetime.now() - timedelta(days=self.backup_retention_days)
 
@@ -886,6 +886,8 @@ class AniListClient:
             if file_mtime < cutoff_date:
                 file.unlink()
                 log.debug(f"Deleted old backup '{file}'")
+
+        return backup_file
 
     def _media_list_entry_to_media(self, media_list_entry: MediaListWithMedia) -> Media:
         """Converts a MediaListWithMedia object to a Media object.

@@ -33,9 +33,6 @@ class ListEntity(Protocol):
     key: str
     title: str
 
-    # Any additional metadata that may be used downstream
-    extras: dict | None = None
-
     def provider(self) -> ListProvider:
         """Get the list provider this entity belongs to.
 
@@ -143,16 +140,22 @@ class ListProvider(Protocol):
         """
         self.config = config or {}
 
+    async def initialize(self) -> None:
+        """Perform any asynchronous startup work before the provider is used."""
+        ...
+
     async def backup_list(self) -> str:
         """Backup the entire list from the provider.
 
         It is up to the implementation to decide the format of the backup data. Whatever
         format, it should be serializable/deserializable in string form.
 
+        This is optional and may not be supported by all providers.
+
         Returns:
             str: A serialized string representation of all list entries.
         """
-        ...
+        raise NotImplementedError("List backup not implemented for this provider.")
 
     async def delete_entry(self, media_key: str) -> None:
         """Delete a list entry by its media key.
@@ -176,10 +179,12 @@ class ListProvider(Protocol):
     async def restore_list(self, backup: str) -> None:
         """Restore the list from a backup sequence of list entries.
 
+        This is optional and may not be supported by all providers.
+
         Args:
             backup (str): The serialized string representation of the list entries.
         """
-        ...
+        raise NotImplementedError("List restore not implemented for this provider.")
 
     async def search(self, query: str) -> Sequence[ListEntry]:
         """Search the provider for entries matching the query.
@@ -200,6 +205,14 @@ class ListProvider(Protocol):
             entry (ListEntry): The updated entry information.
         """
         ...
+
+    async def update_entries_batch(self, entries: Sequence[ListEntry]) -> None:
+        """Update multiple list entries in a single operation.
+
+        This is optional and may not be supported by all providers.
+        """
+        for entry in entries:
+            await self.update_entry(entry.key, entry)
 
     async def user(self) -> ListUser | None:
         """Get the user associated with the list.

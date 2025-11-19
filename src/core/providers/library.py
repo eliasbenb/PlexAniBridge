@@ -40,9 +40,6 @@ class LibraryEntity(Protocol):
     media_kind: MediaKind
     title: str
 
-    # Any additional metadata that may be used downstream
-    extras: dict | None = None
-
     def provider(self) -> LibraryProvider:
         """Get the library provider this entity belongs to.
 
@@ -249,6 +246,10 @@ class LibraryProvider(Protocol):
             config (dict | None): Optional configuration options for the provider.
         """
         self.config = config or {}
+
+    async def initialize(self) -> None:
+        """Perform any asynchronous startup work before the provider is used."""
+        ...
 
     async def user(self) -> LibraryUser | None:
         """Get the user associated with the library.
