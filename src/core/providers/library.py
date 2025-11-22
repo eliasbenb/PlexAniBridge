@@ -1,6 +1,6 @@
 """Library provider protocols for media libraries."""
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
@@ -23,13 +23,21 @@ class ExternalId:
     namespace: str
     value: str
 
+    def __repr__(self) -> str:
+        """Return a string representation of the external ID."""
+        return f"{self.namespace}: {self.value}"
+
 
 @dataclass(frozen=True, slots=True)
 class LibraryUser:
     """User information for a media library."""
 
     key: str  # Any unique identifier for the user
-    display_name: str
+    title: str
+
+    def __hash__(self) -> int:
+        """Compute the hash based on the user's key."""
+        return hash(self.key)
 
 
 @runtime_checkable
@@ -50,14 +58,11 @@ class LibraryEntity(Protocol):
 
     def __hash__(self) -> int:
         """Compute the hash based on the entity's key."""
-        return hash(self.provider().NAMESPACE + self.key)
+        return hash(f"{self.provider().NAMESPACE}:{self.__class__.__name__}:{self.key}")
 
     def __repr__(self) -> str:
         """Return a string representation of the library entity."""
-        return (
-            f"<{self.__class__.__name__}:{self.provider().NAMESPACE}:{self.key}:"
-            f"{self.title[:32]}>"
-        )
+        return f"<{self.__class__.__name__}:{self.key}:{self.title[:32]}>"
 
 
 @runtime_checkable
@@ -68,8 +73,6 @@ class LibrarySection(LibraryEntity, Protocol):
 @runtime_checkable
 class LibraryMedia(LibraryEntity, Protocol):
     """Base protocol for library items."""
-
-    external_ids: Sequence[ExternalId]
 
     @property
     def on_watching(self) -> bool:
@@ -90,14 +93,6 @@ class LibraryMedia(LibraryEntity, Protocol):
 
         Returns:
             bool: True if on watchlist, False otherwise.
-        """
-        ...
-
-    async def review(self) -> str | None:
-        """Get the user's review for the media item.
-
-        Returns:
-            str | None: The user's review text, or None if not reviewed.
         """
         ...
 
@@ -128,6 +123,24 @@ class LibraryMedia(LibraryEntity, Protocol):
 
         Returns:
             Sequence[HistoryEntry]: User history entries.
+        """
+        ...
+
+    def ids(self) -> Sequence[ExternalId]:
+        """Get external identifiers associated with the media item.
+
+        The ID namespace should be recognizable to AniBridge's mappings database.
+
+        Returns:
+            Sequence[ExternalId]: External identifiers.
+        """
+        ...
+
+    async def review(self) -> str | None:
+        """Get the user's review for the media item.
+
+        Returns:
+            str | None: The user's review text, or None if not reviewed.
         """
         ...
 
@@ -199,6 +212,13 @@ class LibrarySeason(LibraryMedia, Protocol):
         """
         ...
 
+    def __repr__(self) -> str:
+        """Return a string representation of the library entity."""
+        return (
+            f"<{self.__class__.__name__}:{self.key}:{self.show().title[:32]}:"
+            f"S{self.index:02d}>"
+        )
+
 
 @runtime_checkable
 class LibraryEpisode(LibraryMedia, Protocol):
@@ -222,6 +242,13 @@ class LibraryEpisode(LibraryMedia, Protocol):
             LibraryShow: The parent show.
         """
         ...
+
+    def __repr__(self) -> str:
+        """Return a string representation of the library entity."""
+        return (
+            f"<{self.__class__.__name__}:{self.key}:{self.show().title[:32]}:"
+            f"S{self.index:02d}E{self.season_index:02d}>"
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -251,7 +278,7 @@ class LibraryProvider(Protocol):
         """Perform any asynchronous startup work before the provider is used."""
         ...
 
-    async def user(self) -> LibraryUser | None:
+    def user(self) -> LibraryUser | None:
         """Get the user associated with the library.
 
         Returns:
@@ -259,7 +286,7 @@ class LibraryProvider(Protocol):
         """
         ...
 
-    def get_sections(self) -> Sequence[LibrarySection]:
+    async def get_sections(self) -> Sequence[LibrarySection]:
         """Get all available library sections.
 
         Returns:
@@ -267,31 +294,31 @@ class LibraryProvider(Protocol):
         """
         ...
 
-    def iter_items(
+    async def list_items(
         self,
         section: LibrarySection,
         *,
         min_last_modified: datetime | None = None,
         require_watched: bool = False,
-        media_keys: Sequence[str] | None = None,
-    ) -> Iterable[LibraryMedia]:
-        """Iterate over items in a library section.
+        keys: Sequence[str] | None = None,
+    ) -> Sequence[LibraryMedia]:
+        """List items in a library section.
 
-        Each item yeilded must belong to the specified section and meet the provided
+        Each item returned must belong to the specified section and meet the provided
         filtering criteria.
 
         Args:
-            section (LibrarySection): The library section to iterate items from.
+            section (LibrarySection): The library section to list items from.
             min_last_modified (datetime | None): If provided, only items modified after
                 this timestamp will be included.
             require_watched (bool): If True, only include items that have been marked as
                 watched/viewed.
-            media_keys (Sequence[str] | None): If provided, only include items whose
-                media keys are in this list.
+            keys (Sequence[str] | None): If provided, only include items whose keys are
+                in this sequence.
         """
         ...
 
-    def clear_cache(self) -> None:
+    async def clear_cache(self) -> None:
         """Clear any cached data within the provider."""
         ...
 
