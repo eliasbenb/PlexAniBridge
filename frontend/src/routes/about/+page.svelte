@@ -337,14 +337,14 @@
                             <tr class="hover:bg-slate-900/40">
                                 <td class="px-4 py-3">
                                     <div class="font-medium text-slate-100">{name}</div>
-                                    {#if profile.config?.anilist_user}
+                                    {#if profile.config?.library_user}
                                         <div class="text-[11px] text-slate-400">
-                                            AniList · {profile.config.anilist_user}
+                                            {profile.config.library_namespace} · {profile.config.library_user}
                                         </div>
                                     {/if}
-                                    {#if profile.config?.plex_user}
+                                    {#if profile.config?.list_user}
                                         <div class="text-[11px] text-slate-500">
-                                            Plex · {profile.config.plex_user}
+                                            {profile.config.list_namespace} · {profile.config.list_user}
                                         </div>
                                     {/if}
                                 </td>

@@ -20,7 +20,6 @@ from src.exceptions import (
 from src.models.db.pin import Pin
 from src.models.db.sync_history import SyncHistory, SyncOutcome
 from src.models.schemas.anilist import MediaList as AniMediaList
-from src.providers.anilist.client import AniListClient
 from src.web.state import get_app_state
 
 __all__ = ["HistoryService", "get_history_service"]
@@ -63,15 +62,10 @@ class HistoryService:
     """Service to paginate and enrich sync history records."""
 
     def _get_bridge(self, profile: str):
-        """Get the bridge client for a specific profile.
-
-        Raises:
-            SchedulerNotInitializedError: If the scheduler is not running.
-            ProfileNotFoundError: If the profile is unknown.
-        """
+        """Get the bridge client for a specific profile."""
         scheduler = get_app_state().scheduler
         if not scheduler:
-            raise SchedulerNotInitializedError("Scheduler not initialised")
+            raise SchedulerNotInitializedError("Scheduler not available")
         bridge = scheduler.bridge_clients.get(profile)
         if not bridge:
             raise ProfileNotFoundError(f"Unknown profile: {profile}")
@@ -91,8 +85,9 @@ class HistoryService:
             Dictionary mapping AniList ID to serialized media data
         """
         logger.debug(f"Fetching AniList batch for profile {profile}: {ids_tuple}")
-        bridge = self._get_bridge(profile)
-        medias = await bridge.anilist_client.batch_get_anime(list(ids_tuple))
+        public_anilist = await get_app_state().ensure_public_anilist()
+
+        medias = await public_anilist.batch_get_anime(list(ids_tuple))
 
         result = {}
         for m in medias:
@@ -330,7 +325,7 @@ class HistoryService:
                     anilist=anilist_map.get(r.anilist_id) if r.anilist_id else None,
                     plex=plex_map.get(r.plex_guid) if r.plex_guid else None,
                     pinned_fields=(
-                        pin_map[(r.profile_name, r.anilist_id)].fields
+                        pin_map[r.profile_name, r.anilist_id].fields
                         if r.anilist_id and (r.profile_name, r.anilist_id) in pin_map
                         else None
                     ),
@@ -410,8 +405,6 @@ class HistoryService:
         new_outcome = row.outcome
         error_message: str | None = None
 
-        anilist_client: AniListClient = bridge.anilist_client
-
         try:
             # Revert update
             if (
@@ -420,7 +413,8 @@ class HistoryService:
                 and after_state is not None
             ):
                 entry = AniMediaList(**before_state)
-                await anilist_client.update_anime_entry(entry)
+                # TODO: entry should be stored and loaded as a ListEntry object
+                await bridge.list_provider.update_entry(str(entry.media_id), entry)
                 new_before = after_state
                 new_after = before_state
 
@@ -430,12 +424,9 @@ class HistoryService:
             elif (
                 outcome == "synced" and before_state is None and after_state is not None
             ):
-                entry_id = after_state.get("id")
                 media_id = after_state.get("mediaId")
-                if entry_id and media_id:
-                    await anilist_client.delete_anime_entry(
-                        entry_id=entry_id, media_id=media_id
-                    )
+                if media_id:
+                    await bridge.list_provider.delete_entry(media_id)
                     new_before = after_state
                     new_after = None
 
@@ -450,7 +441,8 @@ class HistoryService:
                 and after_state is None
             ):
                 entry = AniMediaList(**before_state)
-                await anilist_client.update_anime_entry(entry)
+                # TODO: entry should be stored and loaded as a ListEntry object
+                await bridge.list_provider.update_entry(str(entry.media_id), entry)
                 new_before = None
                 new_after = before_state
 

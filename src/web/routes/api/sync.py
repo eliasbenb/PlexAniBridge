@@ -58,14 +58,14 @@ async def sync_database() -> OkResponse:
 async def sync_profile(
     profile: str = Path(...),
     poll: bool = Query(False),
-    rating_keys: list[str] | None = Body(default=None, embed=True),
+    library_keys: list[str] | None = Body(default=None, embed=True),
 ) -> OkResponse:
     """Trigger a sync for a specific profile.
 
     Args:
         profile (str): The profile to sync.
         poll (bool): Whether to poll for updates.
-        rating_keys (list[str] | None): Specific rating keys to sync (if any).
+        library_keys (list[str] | None): Specific rating keys to sync (if any).
 
     Returns:
         OkResponse: The response containing the sync status.
@@ -77,5 +77,5 @@ async def sync_profile(
     scheduler = get_app_state().scheduler
     if not scheduler:
         raise SchedulerNotInitializedError("Scheduler not available")
-    await scheduler.trigger_sync(profile, poll=poll, rating_keys=rating_keys)
+    await scheduler.trigger_sync(profile, poll=poll, library_keys=library_keys)
     return OkResponse(ok=True)

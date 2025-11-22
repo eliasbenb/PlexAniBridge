@@ -1,8 +1,6 @@
 """Backup listing and restore service."""
 
-import contextlib
 import json
-from dataclasses import dataclass
 from datetime import UTC, datetime
 from functools import lru_cache
 from pathlib import Path
@@ -14,11 +12,11 @@ from pydantic import BaseModel
 from src import log
 from src.exceptions import (
     BackupFileNotFoundError,
+    BackupParseError,
     InvalidBackupFilenameError,
     ProfileNotFoundError,
     SchedulerNotInitializedError,
 )
-from src.models.schemas.anilist import MediaList
 from src.web.state import get_app_state
 
 __all__ = ["BackupService", "get_backup_service"]
@@ -48,20 +46,14 @@ class RestoreSummary(BaseModel):
     elapsed_seconds: float
 
 
-@dataclass
-class _ParsedBackup:
-    entries: list[MediaList]
-    user: str | None
-
-
 class BackupService:
-    """Service for listing and restoring AniList backups."""
+    """Service for listing and restoring provider-managed backups."""
 
     def _get_profile_bridge(self, profile: str):
         """Get the scheduler bridge client for a profile."""
         scheduler = get_app_state().scheduler
         if not scheduler:
-            raise SchedulerNotInitializedError("Scheduler not initialised")
+            raise SchedulerNotInitializedError("Scheduler not available")
         bridge = scheduler.bridge_clients.get(profile)
         if not bridge:
             raise ProfileNotFoundError(f"Unknown profile: {profile}")
@@ -86,17 +78,20 @@ class BackupService:
             ProfileNotFoundError: If the profile is unknown.
         """
         log.debug(f"Listing backups for profile $$'{profile}'$$")
-        bdir = self._backup_dir(profile)
+        bdir = self._backup_dir(profile) / profile
         if not bdir.exists():
             log.debug(f"Backup directory $$'{bdir}'$$ does not exist")
             return []
         metas: list[BackupMeta] = []
         now = datetime.now(UTC)
 
-        anilist_client = self._get_profile_bridge(profile).anilist_client
+        bridge = self._get_profile_bridge(profile)
+        list_provider = bridge.list_provider
+        provider_user = list_provider.user()
 
         count = 0
-        for f in sorted(bdir.glob(f"anibridge-{profile}.*.json")):
+        pattern = f"anibridge_{profile}_{list_provider.NAMESPACE}_*.json"
+        for f in sorted(bdir.glob(pattern)):
             try:
                 parts = f.name.split(".")
                 ts_raw = parts[-2] if len(parts) >= 2 else None
@@ -116,7 +111,7 @@ class BackupService:
                         created_at=dt,
                         size_bytes=f.stat().st_size,
                         entries=None,  # Can be populated on demand
-                        user=anilist_client.user.name,
+                        user=provider_user.title if provider_user else None,
                         age_seconds=(now - dt).total_seconds(),
                     )
                 )
@@ -143,20 +138,14 @@ class BackupService:
             BackupFileNotFoundError: If the file does not exist.
         """
         log.debug(f"Reading raw backup $$'{filename}'$$ for profile $$'{profile}'$$")
-        bdir = self._backup_dir(profile)
-        path = (bdir / filename).resolve()
-        if path.parent != bdir.resolve():  # Path traversal protection
-            raise InvalidBackupFilenameError("Invalid backup filename")
-        if not path.exists():
-            raise BackupFileNotFoundError("Backup file not found")
+        path = self._resolve_backup_path(profile, filename)
 
         with path.open("r", encoding="utf-8") as fh:
             return json.load(fh)
 
-    def _parse_backup(self, profile: str, filename: str) -> _ParsedBackup:
-        """Parse a backup file and return its entries."""
-        log.debug(f"Parsing backup $$'{filename}'$$ for profile $$'{profile}'$$")
-        bdir = self._backup_dir(profile)
+    def _resolve_backup_path(self, profile: str, filename: str) -> Path:
+        """Resolve and validate a backup filename for a profile."""
+        bdir = self._backup_dir(profile) / profile
         path = (bdir / filename).resolve()
 
         if path.parent != bdir.resolve():
@@ -164,25 +153,7 @@ class BackupService:
         if not path.exists():
             raise BackupFileNotFoundError("Backup file not found")
 
-        raw = json.loads(path.read_text())
-        user = None
-
-        with contextlib.suppress(Exception):
-            user = raw.get("user", {}).get("name")
-        entries: list[MediaList] = []
-
-        for lst in raw.get("lists", []) or []:
-            if lst.get("isCustomList"):
-                continue
-            for entry in lst.get("entries", []) or []:
-                try:
-                    entries.append(MediaList(**entry))
-                except Exception:
-                    continue
-        log.debug(
-            f"Parsed backup entries: {len(entries)} for user $$'{user or 'unknown'}'$$"
-        )
-        return _ParsedBackup(entries=entries, user=user)
+        return path
 
     async def restore_backup(self, profile: str, filename: str) -> RestoreSummary:
         """Restore a backup file for a profile.
@@ -199,31 +170,47 @@ class BackupService:
         """
         log.info(f"Restoring backup $$'{filename}'$$ for profile $$'{profile}'$$")
         bridge = self._get_profile_bridge(profile)
-        parsed = self._parse_backup(profile, filename)
+        path = self._resolve_backup_path(profile, filename)
+
+        try:
+            raw_payload = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            raise BackupParseError("Backup file is not valid JSON") from exc
+
+        try:
+            parsed = bridge.list_provider.deserialize_backup_entries(raw_payload)
+        except NotImplementedError as exc:
+            raise BackupParseError(
+                "List provider does not support backup deserialization"
+            ) from exc
+
         total = len(parsed.entries)
         start = perf_counter()
         errors: list[dict[str, Any]] = []
 
-        BATCH = 50
         restored = 0
-        for i in range(0, total, BATCH):
-            batch = parsed.entries[i : i + BATCH]
-            try:
-                await bridge.anilist_client.batch_update_anime_entries(batch)
-                restored += len(batch)
-                log.debug(f"Restored batch entries {i}-{i + len(batch) - 1}")
-            except Exception as e:
-                errors.append(
-                    {
-                        "index_start": i,
-                        "count": len(batch),
-                        "error": str(e),
-                    }
-                )
-                log.error(
-                    f"Error restoring batch {i}-{i + len(batch) - 1}: {e}",
-                    exc_info=True,
-                )
+        list_provider = bridge.list_provider
+        entries = list(parsed.entries)
+        log.debug(
+            "Parsed backup entries: %s for user %s",
+            len(entries),
+            parsed.user or "unknown",
+        )
+        try:
+            await list_provider.restore_entries(entries)
+            restored = len(entries)
+        except Exception as e:
+            errors.append(
+                {
+                    "index_start": 0,
+                    "count": len(entries),
+                    "error": str(e),
+                }
+            )
+            log.error(
+                f"Error restoring backup entries: {e}",
+                exc_info=True,
+            )
         elapsed = perf_counter() - start
         log.info(
             f"Restore completed for profile "

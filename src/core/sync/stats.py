@@ -1,11 +1,17 @@
 """Synchronization statistics and tracking module."""
 
+from collections.abc import Sequence
 from datetime import datetime
 from typing import Literal
 
-from plexapi.video import Episode, Movie, Season, Show
 from pydantic import BaseModel
 
+from src.core.providers.library import (
+    LibraryEpisode,
+    LibraryMedia,
+    LibrarySeason,
+    MediaKind,
+)
 from src.exceptions import UnsupportedMediaTypeError
 from src.models.db.sync_history import SyncOutcome
 
@@ -28,33 +34,29 @@ class ItemIdentifier(BaseModel):
     repr: str | None = None  # Cached string representation
 
     @classmethod
-    def from_item(cls, item: Movie | Show | Season | Episode) -> ItemIdentifier:
-        """Create an ItemIdentifier from a Plex media object.
-
-        Args:
-            item (Movie | Show | Season | Episode): Plex media object
-
-        Returns:
-            ItemIdentifier: New identifier for the media item
-        """
+    def from_item(cls, item: LibraryMedia) -> ItemIdentifier:
+        """Create an identifier from a library media entity."""
         kwargs = {
-            "rating_key": str(item.ratingKey),
+            "rating_key": str(item.key),
             "title": item.title,
-            "item_type": item.type,
+            "item_type": item.media_kind.value,
             "parent_title": None,
             "season_index": None,
             "episode_index": None,
-            "repr": item.__repr__(),
+            "repr": repr(item),
         }
 
-        if isinstance(item, Episode):
-            kwargs["parent_title"] = item.grandparentTitle
-            kwargs["season_index"] = item.parentIndex
+        if isinstance(item, LibraryEpisode):
+            show = item.show()
+            kwargs["parent_title"] = show.title if show else None
+            kwargs["season_index"] = item.season_index
             kwargs["episode_index"] = item.index
-        elif isinstance(item, Season):
-            kwargs["parent_title"] = item.parentTitle
+        elif isinstance(item, LibrarySeason):
+            show = item.show()
+            kwargs["parent_title"] = show.title if show else None
             kwargs["season_index"] = item.index
-        elif isinstance(item, Movie | Show):
+        elif item.media_kind in (MediaKind.MOVIE, MediaKind.SHOW):
+            # No additional metadata required for top-level movie/show types
             pass
         else:
             raise UnsupportedMediaTypeError(f"Unsupported media type: {type(item)}")
@@ -62,17 +64,14 @@ class ItemIdentifier(BaseModel):
         return cls(**kwargs)
 
     @classmethod
-    def from_items(
-        cls, items: list[Movie] | list[Show] | list[Season] | list[Episode]
-    ) -> list[ItemIdentifier]:
+    def from_items(cls, items: Sequence[LibraryMedia]) -> Sequence[ItemIdentifier]:
         """Create ItemIdentifiers from a list of Plex media objects.
 
         Args:
-            items (list[Movie] | list[Show] | list[Season] | list[Episode]): List of
-                Plex media objects
+            items (Sequence[LibraryMedia]): List of library media objects
 
         Returns:
-            list[ItemIdentifier]: List of identifiers for the media items
+            Sequence[ItemIdentifier]: List of identifiers for the media items
         """
         return [cls.from_item(item) for item in items]
 
@@ -113,7 +112,9 @@ class SyncStats(BaseModel):
         """
         self._item_outcomes[item_id] = outcome
 
-    def track_items(self, item_ids: list[ItemIdentifier], outcome: SyncOutcome) -> None:
+    def track_items(
+        self, item_ids: Sequence[ItemIdentifier], outcome: SyncOutcome
+    ) -> None:
         """Track the same outcome for multiple items.
 
         Args:
@@ -135,11 +136,11 @@ class SyncStats(BaseModel):
         if item_id in self._item_outcomes:
             del self._item_outcomes[item_id]
 
-    def untrack_items(self, item_ids: list[ItemIdentifier]) -> None:
+    def untrack_items(self, item_ids: Sequence[ItemIdentifier]) -> None:
         """Remove multiple items from tracking.
 
         Args:
-            item_ids (list[ItemIdentifier]): List of item identifiers to untrack
+            item_ids (Sequence[ItemIdentifier]): List of item identifiers to untrack
         """
         for item_id in item_ids:
             self.untrack_item(item_id)

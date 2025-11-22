@@ -86,8 +86,10 @@ export interface LogEntry {
 
 // --- Status / System API ---
 export interface ProfileConfig {
-    plex_user?: string | null;
-    anilist_user?: string | null;
+    library_namespace?: string;
+    list_namespace?: string;
+    library_user?: string | null;
+    list_user?: string | null;
     sync_interval?: number | null;
     sync_modes?: string[];
     full_scan?: boolean | null;

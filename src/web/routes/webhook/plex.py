@@ -122,7 +122,7 @@ async def plex_webhook(
             await scheduler.trigger_sync(
                 profile_name=profile_name,
                 poll=False,
-                rating_keys=[payload.top_level_rating_key],
+                library_keys=[payload.top_level_rating_key],
             )
             success = True
         except KeyError:

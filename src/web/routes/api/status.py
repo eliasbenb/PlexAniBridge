@@ -16,8 +16,10 @@ __all__ = [
 class ProfileConfigModel(BaseModel):
     """Serialized profile configuration exposed to the web UI."""
 
-    plex_user: str | None = None
-    anilist_user: str | None = None
+    library_namespace: str
+    list_namespace: str
+    library_user: str | None = None
+    list_user: str | None = None
     sync_interval: int | None = None
     sync_modes: list[str] = []
     full_scan: bool | None = None
