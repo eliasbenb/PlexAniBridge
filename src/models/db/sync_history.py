@@ -4,62 +4,13 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
-from plexapi.video import Episode, Movie, Season, Show
 from sqlalchemy import JSON, DateTime, Enum, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
-from src.exceptions import UnsupportedMediaTypeError
+from src.core.providers.library import MediaKind
 from src.models.db.base import Base
 
-__all__ = ["MediaType", "SyncHistory", "SyncOutcome"]
-
-
-class MediaType(StrEnum):
-    """Enumeration of media types for Plex items."""
-
-    MOVIE = "movie"
-    SHOW = "show"
-    SEASON = "season"
-    EPISODE = "episode"
-
-    @classmethod
-    def from_item(cls, item: Movie | Show | Season | Episode) -> MediaType:
-        """Get the media type from a Plex item.
-
-        Args:
-            item (Movie | Show | Season | Episode): Plex media item
-
-        Returns:
-            MediaType: Corresponding media type enum value.
-        """
-        if isinstance(item, Movie):
-            return cls.MOVIE
-        elif isinstance(item, Show):
-            return cls.SHOW
-        elif isinstance(item, Season):
-            return cls.SEASON
-        elif isinstance(item, Episode):
-            return cls.EPISODE
-        else:
-            raise UnsupportedMediaTypeError(f"Unsupported media type: {type(item)}")
-
-    def to_cls(self) -> type[Movie | Show | Season | Episode]:
-        """Get the corresponding Plex class for this media type.
-
-        Returns:
-            type[Movie | Show | Season | Episode]: The Plex class for this media type.
-        """
-        match self:
-            case self.MOVIE:
-                return Movie
-            case self.SHOW:
-                return Show
-            case self.SEASON:
-                return Season
-            case self.EPISODE:
-                return Episode
-            case _:
-                raise UnsupportedMediaTypeError(f"Unsupported media type: {self}")
+__all__ = ["SyncHistory", "SyncOutcome"]
 
 
 class SyncOutcome(StrEnum):
@@ -84,7 +35,7 @@ class SyncHistory(Base):
     plex_guid: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
     plex_rating_key: Mapped[str] = mapped_column(String)
     plex_child_rating_key: Mapped[str | None] = mapped_column(String)
-    plex_type: Mapped[MediaType] = mapped_column(Enum(MediaType), index=True)
+    plex_type: Mapped[MediaKind] = mapped_column(Enum(MediaKind), index=True)
     anilist_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     outcome: Mapped[SyncOutcome] = mapped_column(Enum(SyncOutcome), index=True)
     before_state: Mapped[dict[str, Any] | None] = mapped_column(
