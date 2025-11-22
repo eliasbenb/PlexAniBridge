@@ -2,6 +2,7 @@
 
 import asyncio
 import contextlib
+from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -59,19 +60,19 @@ class ProfileScheduler:
         self._tasks: set[asyncio.Task] = set()  # Prevents early GC
 
     async def sync(
-        self, poll: bool = False, rating_keys: list[str] | None = None
+        self, poll: bool = False, library_keys: Sequence[str] | None = None
     ) -> None:
         """Execute a single synchronization cycle with error handling.
 
         Args:
-            poll: Flag to enable polling-based sync
-            rating_keys: Optional list of Plex rating keys to restrict the sync
-                to. When provided, only those items will be processed.
+            poll (bool): Flag to enable polling-based sync.
+            library_keys (Sequence[str] | None): Sequence of library media keys to
+                restrict the sync scope.
         """
         async with self._sync_lock:
             try:
                 self._current_task = asyncio.create_task(
-                    self.bridge_client.sync(poll=poll, rating_keys=rating_keys)
+                    self.bridge_client.sync(poll=poll, library_keys=library_keys)
                 )
                 await self._current_task
             except asyncio.CancelledError:
@@ -176,7 +177,7 @@ class SchedulerClient:
         """Initialize the application scheduler.
 
         Args:
-            global_config: Global application configuration
+            global_config (AniBridgeConfig): Global application configuration.
         """
         self.global_config = global_config
         self.shared_animap_client = AniMapClient(
@@ -353,15 +354,15 @@ class SchedulerClient:
         self,
         profile_name: str | None = None,
         poll: bool = False,
-        rating_keys: list[str] | None = None,
+        library_keys: Sequence[str] | None = None,
     ) -> None:
         """Manually trigger a sync for one or all profiles.
 
         Args:
-            profile_name: Specific profile to sync, or None for all profiles
-            poll: Whether to use polling mode for the sync
-            rating_keys: Optional list of Plex rating keys to restrict the sync
-                scope for each profile.
+            profile_name (str | None): Specific profile to sync, or None for all.
+            poll (bool): Whether to use polling mode for the sync.
+            library_keys (Sequence[str] | None): Optional list of library media keys to.
+                restrict the sync scope for each profile.
 
         Raises:
             KeyError: If the specified profile doesn't exist
@@ -372,13 +373,13 @@ class SchedulerClient:
 
             log.info(f"[{profile_name}] Manually triggering sync (poll={poll})")
             scheduler = self.profile_schedulers[profile_name]
-            await scheduler.sync(poll=poll, rating_keys=rating_keys)
+            await scheduler.sync(poll=poll, library_keys=library_keys)
         else:
             log.info(f"Manually triggering sync for all profiles (poll={poll})")
             sync_tasks = []
             for name, scheduler in self.profile_schedulers.items():
                 log.info(f"[{name}] Triggering sync")
-                sync_tasks.append(scheduler.sync(poll=poll, rating_keys=rating_keys))
+                sync_tasks.append(scheduler.sync(poll=poll, library_keys=library_keys))
 
             if sync_tasks:
                 await asyncio.gather(*sync_tasks, return_exceptions=True)
@@ -387,7 +388,7 @@ class SchedulerClient:
         """Get the status of all profiles.
 
         Returns:
-            dict: Status information for each profile
+            dict[str, dict[str, Any]]: A dictionary containing the profile info.
         """
         status = {}
 
@@ -396,12 +397,29 @@ class SchedulerClient:
             bridge_client = self.bridge_clients.get(profile_name)
             scheduler = self.profile_schedulers.get(profile_name)
 
+            library_namespace: str | None = None
+            list_namespace: str | None = None
+            library_user_title: str | None = None
+            list_user_title: str | None = None
+
+            if bridge_client is not None:
+                library_namespace = bridge_client.library_provider.NAMESPACE.title()
+                list_namespace = bridge_client.list_provider.NAMESPACE.title()
+
+                library_user = bridge_client.library_provider.user()
+                if library_user is not None:
+                    library_user_title = library_user.title
+
+                list_user = bridge_client.list_provider.user()
+                if list_user is not None:
+                    list_user_title = list_user.title
+
             status[profile_name] = {
                 "config": {
-                    "plex_user": profile_config.plex_user,
-                    "anilist_user": bridge_client.anilist_client.user.name
-                    if bridge_client
-                    else "Unknown",
+                    "library_namespace": library_namespace,
+                    "list_namespace": list_namespace,
+                    "library_user": library_user_title,
+                    "list_user": list_user_title,
                     "sync_interval": profile_config.sync_interval,
                     "sync_modes": [m.value for m in profile_config.sync_modes],
                     "full_scan": profile_config.full_scan,
@@ -469,9 +487,9 @@ class SchedulerClient:
                     await self.shared_animap_client.sync_db()
                     log.success("Daily database sync completed")
 
-                    log.info("Reinitializing all AniList clients")
+                    log.info("Reinitializing all list providers")
                     for bridge_client in self.bridge_clients.values():
-                        await bridge_client.anilist_client.initialize()
+                        await bridge_client.refresh_list_provider()
                 except Exception as e:
                     log.error(f"Daily database sync failed: {e}", exc_info=True)
 
@@ -503,19 +521,23 @@ class SchedulerClient:
         Raises:
             KeyError: If no profile matches the given account id
         """
-        profiles = []
+        account_key = str(account_id)
+        profiles: list[tuple[str, AniBridgeProfileConfig]] = []
         for profile_name, bridge_client in self.bridge_clients.items():
-            if not bridge_client:
+            if bridge_client is None:
                 continue
-            if not bridge_client.plex_client:
+
+            library_user = bridge_client.library_provider.user()
+            if library_user is None:
                 continue
-            if bridge_client.plex_client.user_account_id == account_id:
+
+            if str(library_user.key) == account_key:
                 profile_config = self.global_config.get_profile(profile_name)
                 profiles.append((profile_name, profile_config))
 
         if not profiles:
             raise ProfileNotFoundError(
-                f"Profile for Plex account id '{account_id}' not found"
+                f"Profile for Plex account id '{account_key}' not found"
             )
 
         return profiles

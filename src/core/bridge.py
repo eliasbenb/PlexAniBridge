@@ -1,40 +1,32 @@
 """Bridge Client Module."""
 
+import contextlib
+from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING
 
 from src import log
 from src.config.database import db
 from src.config.settings import AniBridgeConfig, AniBridgeProfileConfig
 from src.core.animap import AniMapClient
-from src.core.plex import PlexClient
+from src.core.providers.library import (
+    ExternalId,
+    LibraryMedia,
+    LibraryProvider,
+    LibrarySection,
+    MediaKind,
+)
+from src.core.providers.list import ListProvider
 from src.core.sync import BaseSyncClient, MovieSyncClient, ShowSyncClient
-from src.core.sync.base import ParsedGuids
 from src.core.sync.stats import SyncProgress, SyncStats
 from src.models.db.housekeeping import Housekeeping
 from src.models.db.sync_history import SyncOutcome
-from src.providers.anilist.client import AniListClient
+from src.providers.factory import build_library_provider, build_list_provider
 
 __all__ = ["BridgeClient"]
 
 
-if TYPE_CHECKING:
-    from plexapi.library import MovieSection, ShowSection
-
-
 class BridgeClient:
-    """Single-profile bridge client for synchronizing Plex and AniList libraries.
-
-    This class manages the synchronization process for one Plex user with one AniList
-    account, using the settings from a single profile configuration.
-
-    Args:
-        profile_name (str): Name of the sync profile
-        profile_config (AniBridgeProfileConfig): Profile-specific configuration
-                                                     settings
-        global_config (AniBridgeConfig): Global application configuration
-        shared_animap_client (AniMapClient): Shared anime mapping client
-    """
+    """Single-profile bridge client that coordinates provider synchronization."""
 
     def __init__(
         self,
@@ -43,98 +35,75 @@ class BridgeClient:
         global_config: AniBridgeConfig,
         shared_animap_client: AniMapClient,
     ) -> None:
-        """Initialize the single-profile BridgeClient.
+        """Initialize the bridge client for a single profile.
 
         Args:
-            profile_name (str): Name of the sync profile
-            profile_config (AniBridgeProfileConfig): Profile-specific configuration
-                                                         settings
-            global_config (AniBridgeConfig): Global application configuration
-            shared_animap_client (AniMapClient): Shared anime mapping client
+            profile_name (str): The name of the profile.
+            profile_config (AniBridgeProfileConfig): The profile-specific configuration.
+            global_config (AniBridgeConfig): The global application configuration.
+            shared_animap_client (AniMapClient): The shared AniMap client instance.
         """
         self.profile_name = profile_name
         self.profile_config = profile_config
         self.global_config = global_config
         self.animap_client = shared_animap_client
 
-        self.anilist_client = AniListClient(
-            anilist_token=profile_config.anilist_token.get_secret_value(),
-            backup_dir=profile_config.data_path / "backups",
-            dry_run=profile_config.dry_run,
-            profile_name=profile_name,
-            backup_retention_days=profile_config.backup_retention_days,
-        )
-
-        self.plex_client = PlexClient(
-            plex_token=profile_config.plex_token.get_secret_value(),
-            plex_user=profile_config.plex_user,
-            plex_url=profile_config.plex_url,
-            plex_sections=profile_config.plex_sections,
-            plex_genres=profile_config.plex_genres,
-            plex_metadata_source=profile_config.plex_metadata_source,
+        self.library_provider: LibraryProvider = build_library_provider(profile_config)
+        self.list_provider: ListProvider = build_list_provider(
+            profile_name, profile_config
         )
 
         self.last_synced = self._get_last_synced()
         self.current_sync: SyncProgress | None = None
 
     async def initialize(self) -> None:
-        """Initialize the bridge client with async setup.
+        """Initialize both providers and prepare for synchronization."""
+        log.debug(f"[{self.profile_name}] Initializing bridge client")
 
-        This should be called after creating the bridge instance.
-        """
-        log.info(f"[{self.profile_name}] Initializing bridge client")
+        await self.library_provider.initialize()
+        await self.list_provider.initialize()
 
-        self.plex_client.clear_cache()
-        await self.anilist_client.initialize()
+        await self.library_provider.clear_cache()
+        await self.list_provider.clear_cache()
+
+        await self._backup_list()
+
+        library_user = self.library_provider.user()
+        list_user = self.list_provider.user()
+        library_label = library_user.title if library_user else "unknown"
+        list_label = list_user.title if list_user else "unknown"
 
         log.info(
-            f"[{self.profile_name}] Bridge client "
-            f"initialized for Plex user $$'{self.profile_config.plex_user}'$$ -> "
-            f"AniList user $$'{self.anilist_client.user.name}'$$"
+            f"[{self.profile_name}] Bridge client initialized for "
+            f"library user $$'{library_label}'$$ -> "
+            f"list user $$'{list_label}'$$"
         )
 
     async def close(self) -> None:
-        """Close all async clients."""
+        """Close all provider connections."""
         log.debug(f"[{self.profile_name}] Closing bridge client")
-        await self.anilist_client.close()
-        await self.plex_client.close()
+        await self.list_provider.close()
+        await self.library_provider.close()
+
+    async def refresh_list_provider(self) -> None:
+        """Reinitialize the list provider, refreshing any remote state."""
+        await self.list_provider.initialize()
+        await self.list_provider.clear_cache()
 
     async def __aenter__(self) -> BridgeClient:
-        """Context manager enter method.
-
-        Returns:
-            BridgeClient: The initialized bridge client instance.
-        """
+        """Enter async context manager."""
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
-        """Context manager exit method.
-
-        Args:
-            exc_type: Exception type if an exception occurred.
-            exc_val: Exception value if an exception occurred.
-            exc_tb: Traceback object if an exception occurred.
-        """
+        """Exit async context manager."""
         await self.close()
 
     def _get_last_synced_key(self) -> str:
-        """Generate the database key for this profile's last sync timestamp.
-
-        Returns:
-            str: Database key for last sync timestamp
-        """
+        """Return the database key storing the last sync timestamp."""
         return f"last_synced_{self.profile_name}"
 
     def _get_last_synced(self) -> datetime | None:
-        """Retrieves the timestamp of the last successful sync from the database.
-
-        Returns:
-            datetime | None: UTC timestamp of the last sync, None if never synced
-
-        Note:
-            Used to determine whether polling scanning is possible and
-            to filter items for incremental syncs
-        """
+        """Fetch the last successful sync timestamp from the database."""
         with db() as ctx:
             last_synced = ctx.session.get(Housekeeping, self._get_last_synced_key())
             if last_synced is None or last_synced.value is None:
@@ -142,14 +111,7 @@ class BridgeClient:
             return datetime.fromisoformat(last_synced.value)
 
     def _set_last_synced(self, last_synced: datetime) -> None:
-        """Stores the timestamp of a successful sync in the database.
-
-        Args:
-            last_synced (datetime): UTC timestamp to store
-
-        Note:
-            Only called after a completely successful sync operation
-        """
+        """Persist the timestamp of the most recent successful sync."""
         self.last_synced = last_synced
         with db() as ctx:
             ctx.session.merge(
@@ -159,35 +121,78 @@ class BridgeClient:
             )
             ctx.session.commit()
 
-    async def sync(
-        self, poll: bool = False, rating_keys: list[str] | None = None
-    ) -> None:
-        """Initiates the synchronization process for this profile.
+    async def _backup_list(self) -> None:
+        """Persist an initial list backup when supported by the provider."""
+        try:
+            payload = await self.list_provider.backup_list()
+        except NotImplementedError:
+            return
+        except Exception:
+            log.error(
+                f"[{self.profile_name}] Failed to export list backup",
+                exc_info=True,
+            )
+            return
 
-        This is the main entry point for the sync process. It:
-        1. Determines the appropriate sync mode (polling/partial/full, destructive/not)
-        2. Processes the configured Plex sections
-        3. Updates sync metadata upon successful completion
+        if not payload:
+            log.debug(
+                f"[{self.profile_name}] List provider produced an empty backup; "
+                "skipping write"
+            )
+            return
+
+        target_fname = (
+            f"anibridge_{self.profile_name}_{self.list_provider.NAMESPACE}_"
+            f"{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}.json"
+        )
+        target_path = (
+            self.profile_config.data_path / "backups" / self.profile_name / target_fname
+        )
+
+        try:
+            target_path.parent.mkdir(parents=True, exist_ok=True)
+            target_path.write_text(payload, encoding="utf-8")
+        except Exception:
+            log.error(
+                f"[{self.profile_name}] Failed to write backup file to "
+                f"$$'{target_path}'$$",
+                exc_info=True,
+            )
+            return
+
+        log.info(
+            f"[{self.profile_name}] List provider backup written to $$'{target_path}'$$"
+        )
+
+    async def sync(
+        self, poll: bool = False, library_keys: Sequence[str] | None = None
+    ) -> None:
+        """Run a synchronization cycle for the configured profile.
 
         Args:
-            poll (bool): Flag to enable polling scan mode, default False
-            rating_keys (list[str] | None): Optional list of Plex rating keys to
-                restrict the sync to.
+            poll (bool): Whether to poll for updates.
+            library_keys (Sequence[str] | None): Sequence of library media keys to
+                restrict the sync scope.
         """
+        library_user = self.library_provider.user()
+        list_user = self.list_provider.user()
+        library_label = library_user.title if library_user else "unknown"
+        list_label = list_user.title if list_user else "unknown"
+
         log.info(
             f"[{self.profile_name}] Starting "
             f"{'full ' if self.profile_config.full_scan else 'partial '}"
             f"{'and destructive ' if self.profile_config.destructive_sync else ''}"
-            f"sync for Plex user $$'{self.profile_config.plex_user}'$$ "
-            f"-> AniList user $$'{self.anilist_client.user.name}'$$"
+            f"sync for library user $$'{library_label}'$$ "
+            f"-> list user $$'{list_label}'$$"
         )
 
         sync_start_time = datetime.now(UTC)
 
         movie_sync = MovieSyncClient(
-            anilist_client=self.anilist_client,
+            library_provider=self.library_provider,
+            list_provider=self.list_provider,
             animap_client=self.animap_client,
-            plex_client=self.plex_client,
             excluded_sync_fields=self.profile_config.excluded_sync_fields,
             full_scan=self.profile_config.full_scan,
             destructive_sync=self.profile_config.destructive_sync,
@@ -195,11 +200,10 @@ class BridgeClient:
             batch_requests=self.profile_config.batch_requests,
             profile_name=self.profile_name,
         )
-
         show_sync = ShowSyncClient(
-            anilist_client=self.anilist_client,
+            library_provider=self.library_provider,
+            list_provider=self.list_provider,
             animap_client=self.animap_client,
-            plex_client=self.plex_client,
             excluded_sync_fields=self.profile_config.excluded_sync_fields,
             full_scan=self.profile_config.full_scan,
             destructive_sync=self.profile_config.destructive_sync,
@@ -208,13 +212,16 @@ class BridgeClient:
             profile_name=self.profile_name,
         )
 
-        plex_sections = self.plex_client.get_sections()
+        movie_sync.clear_cache()
+        show_sync.clear_cache()
+
+        sections = list(await self.library_provider.get_sections())
 
         self.current_sync = SyncProgress(
             state="running",
             started_at=sync_start_time,
             section_index=0,
-            section_count=len(plex_sections),
+            section_count=len(sections),
             section_title=None,
             stage="initializing",
             section_items_total=0,
@@ -223,7 +230,7 @@ class BridgeClient:
         sync_stats = SyncStats()
 
         try:
-            for idx, section in enumerate(plex_sections, start=1):
+            for idx, section in enumerate(sections, start=1):
                 if self.current_sync is not None:
                     self.current_sync = self.current_sync.model_copy(
                         update={
@@ -240,9 +247,9 @@ class BridgeClient:
                     poll,
                     movie_sync,
                     show_sync,
-                    rating_keys=rating_keys,
+                    keys=library_keys,
                     section_index=idx,
-                    section_count=len(plex_sections),
+                    section_count=len(sections),
                 )
                 sync_stats = sync_stats.combine(section_stats)
 
@@ -265,19 +272,17 @@ class BridgeClient:
             )
             if unprocessed_items:
                 log.debug(
-                    f"[{self.profile_name}] "
-                    f"Unprocessed items: {
-                        ', '.join([repr(i) for i in unprocessed_items])
-                    }"
+                    f"[{self.profile_name}] Unprocessed items: "
+                    f"{', '.join([repr(item) for item in unprocessed_items])}"
                 )
 
-        except Exception as e:
+        except Exception as exc:
             end_time = datetime.now(UTC)
             duration = end_time - sync_start_time
 
             log.error(
                 f"[{self.profile_name}] Sync failed after "
-                f"{duration.total_seconds():.2f} seconds: {e}",
+                f"{duration.total_seconds():.2f} seconds: {exc}",
                 exc_info=True,
             )
             raise
@@ -289,30 +294,16 @@ class BridgeClient:
 
     async def _sync_section(
         self,
-        section: MovieSection | ShowSection,
+        section: LibrarySection,
         poll: bool,
         movie_sync: MovieSyncClient,
         show_sync: ShowSyncClient,
-        rating_keys: list[str] | None = None,
+        keys: Sequence[str] | None = None,
         *,
         section_index: int,
         section_count: int,
     ) -> SyncStats:
-        """Synchronizes a single Plex library section.
-
-        Args:
-            section (MovieSection | ShowSection): Plex library section to process
-            poll (bool): Flag to enable polling scan mode
-            movie_sync (MovieSyncClient): Movie sync client
-            show_sync (ShowSyncClient): Show sync client
-            rating_keys (list[str] | None): Optional list of Plex rating keys to
-                restrict sync to for this section.
-            section_index (int): 1-based index of the current section being processed.
-            section_count (int): Total number of sections to process.
-
-        Returns:
-            SyncStats: Statistics about the sync operation for the section
-        """
+        """Synchronize a single library section."""
         log.info(f"[{self.profile_name}] Syncing section $$'{section.title}'$$")
 
         min_last_modified = (self.last_synced or datetime.now(UTC)) - timedelta(
@@ -320,11 +311,11 @@ class BridgeClient:
         )
 
         items = list(
-            self.plex_client.get_section_items(
+            await self.library_provider.list_items(
                 section,
                 min_last_modified=min_last_modified if poll else None,
                 require_watched=not self.profile_config.full_scan,
-                rating_keys=rating_keys,
+                keys=keys,
             )
         )
 
@@ -344,42 +335,27 @@ class BridgeClient:
                 }
             )
 
-        if self.profile_config.batch_requests:
-            parsed_guids = [ParsedGuids.from_guids(item.guids) for item in items]
-            imdb_ids = [guid.imdb for guid in parsed_guids if guid.imdb is not None]
-            tmdb_ids = [guid.tmdb for guid in parsed_guids if guid.tmdb is not None]
-            tvdb_ids = [guid.tvdb for guid in parsed_guids if guid.tvdb is not None]
-
-            animappings = list(
-                self.animap_client.get_mappings(
-                    imdb_ids, tmdb_ids, tvdb_ids, is_movie=section.type != "show"
-                )
-            )
-            anilist_ids = [
-                a.anilist_id for a in animappings if a.anilist_id is not None
-            ]
-
-            log.info(
-                f"[{self.profile_name}] Prefetching "
-                f"{len(anilist_ids)} entries from the AniList API in batch requests"
-                f"(this may take a while)"
+        if self.profile_config.batch_requests and items:
+            await self._prefetch_list_entries(
+                items,
+                is_movie_section=section.media_kind == MediaKind.MOVIE,
             )
 
-            if self.current_sync is not None:
-                self.current_sync = self.current_sync.model_copy(
-                    update={"stage": "prefetching"}
-                )
-
-            await self.anilist_client.batch_get_anime(anilist_ids)
-
-        sync_client: BaseSyncClient = {
-            "movie": movie_sync,
-            "show": show_sync,
-        }[section.type]
+        sync_client: BaseSyncClient
+        if section.media_kind == MediaKind.MOVIE:
+            sync_client = movie_sync
+        elif section.media_kind == MediaKind.SHOW:
+            sync_client = show_sync
+        else:
+            log.warning(
+                f"[{self.profile_name}] Unsupported section kind "
+                f"'{section.media_kind.value}', skipping"
+            )
+            return SyncStats()
 
         for item in items:
             try:
-                await sync_client.process_media(item)
+                await sync_client.process_media(item)  # type: ignore[arg-type]
 
                 if self.current_sync is not None:
                     self.current_sync = self.current_sync.model_copy(
@@ -405,3 +381,82 @@ class BridgeClient:
             await sync_client.batch_sync()
 
         return sync_client.sync_stats
+
+    async def _prefetch_list_entries(
+        self,
+        items: Sequence[LibraryMedia],
+        *,
+        is_movie_section: bool,
+    ) -> None:
+        """Prefetch list entries for the provided media items when batching."""
+        imdb_ids, tmdb_ids, tvdb_ids = self._collect_external_ids(items)
+        if not imdb_ids and not tmdb_ids and not tvdb_ids:
+            return
+
+        mappings = list(
+            self.animap_client.get_mappings(
+                imdb=imdb_ids or None,
+                tmdb=tmdb_ids or None,
+                tvdb=tvdb_ids or None,
+                is_movie=is_movie_section,
+            )
+        )
+        keys = sorted(
+            {
+                str(mapping.anilist_id)
+                for mapping in mappings
+                if mapping.anilist_id is not None
+            }
+        )
+        if not keys:
+            return
+
+        log.info(
+            f"[{self.profile_name}] Prefetching {len(keys)} entries from list "
+            "provider in batch mode (this may take a while)"
+        )
+
+        if self.current_sync is not None:
+            self.current_sync = self.current_sync.model_copy(
+                update={"stage": "prefetching"}
+            )
+
+        try:
+            await self.list_provider.get_entries_batch(keys)
+        except Exception:
+            log.error(
+                f"[{self.profile_name}] Failed to prefetch list entries",
+                exc_info=True,
+            )
+
+    def _collect_external_ids(
+        self, items: Sequence[LibraryMedia]
+    ) -> tuple[list[str], list[int], list[int]]:
+        """Collect external identifiers across a set of media items."""
+        imdb_ids: set[str] = set()
+        tmdb_ids: set[int] = set()
+        tvdb_ids: set[int] = set()
+
+        for item in items:
+            for external in item.ids():
+                self._append_external_id(external, imdb_ids, tmdb_ids, tvdb_ids)
+
+        return sorted(imdb_ids), sorted(tmdb_ids), sorted(tvdb_ids)
+
+    @staticmethod
+    def _append_external_id(
+        external: ExternalId,
+        imdb_ids: set[str],
+        tmdb_ids: set[int],
+        tvdb_ids: set[int],
+    ) -> None:
+        """Normalise and append an external identifier to the appropriate set."""
+        namespace = external.namespace.lower()
+        if namespace == "imdb":
+            imdb_ids.add(external.value)
+        elif namespace == "tmdb":
+            with contextlib.suppress(ValueError):
+                tmdb_ids.add(int(external.value))
+        elif namespace == "tvdb":
+            with contextlib.suppress(ValueError):
+                tvdb_ids.add(int(external.value))
