@@ -7,7 +7,7 @@ import sys
 import uvicorn
 from pydantic import ValidationError
 
-from src import PLEXANIBDRIGE_HEADER, log
+from src import ANIBDRIGE_HEADER, log
 from src.config.settings import get_config
 from src.core.sched import SchedulerClient
 from src.web.app import create_app
@@ -110,7 +110,7 @@ async def run() -> int:
 
     ret = 0
     try:
-        log.info("\n" + PLEXANIBDRIGE_HEADER)
+        log.info("\n" + ANIBDRIGE_HEADER)
 
         if not validate_configuration():
             return 1
