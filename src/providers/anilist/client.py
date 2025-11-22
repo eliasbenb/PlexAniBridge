@@ -4,7 +4,7 @@ import asyncio
 import contextlib
 import json
 from collections.abc import AsyncIterator, Iterable
-from datetime import UTC, datetime, timedelta, timezone
+from datetime import UTC, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -47,7 +47,6 @@ class AniListClient:
     """
 
     API_URL = "https://graphql.anilist.co"
-    BACKUP_RETENTION_DAYS = 30
 
     def __init__(
         self,
@@ -55,7 +54,6 @@ class AniListClient:
         backup_dir: Path | None,
         dry_run: bool,
         profile_name: str | None,
-        backup_retention_days: int | None = None,
     ) -> None:
         """Initialize the AniList client.
 
@@ -73,12 +71,8 @@ class AniListClient:
         self.dry_run = dry_run
         self.profile_name = profile_name or "public"
         self._session: aiohttp.ClientSession | None = None
-        self.backup_retention_days = (
-            self.BACKUP_RETENTION_DAYS
-            if backup_retention_days is None
-            else backup_retention_days
-        )
 
+        self.user: User | None = None
         self.offline_anilist_entries: dict[int, Media] = {}
 
     async def _get_session(self) -> aiohttp.ClientSession:
@@ -136,7 +130,6 @@ class AniListClient:
         self.user = await self.get_user()
         self.user_tz = self.get_user_tz()
         self.offline_anilist_entries.clear()
-        await self.backup_anilist()
 
     def _ensure_authenticated(self) -> None:
         """Ensure that client has authentication for privileged operations."""
@@ -174,6 +167,8 @@ class AniListClient:
         Returns:
             timezone: The timezone of the authenticated user
         """
+        if not self.user:
+            return UTC
         try:
             tz = self.user.options.timezone if self.user.options else None
             if not tz:
@@ -381,6 +376,8 @@ class AniListClient:
         Raises:
             aiohttp.ClientError: If the API request fails.
         """
+        if not self.user:
+            raise aiohttp.ClientError("User information is required for deletions")
         self._ensure_authenticated()
 
         query = """
@@ -784,7 +781,7 @@ class AniListClient:
 
         return result
 
-    async def backup_anilist(self) -> Path:
+    async def backup_anilist(self) -> str:
         """Creates a JSON backup of the user's AniList data.
 
         Fetches all anime entries from the user's lists and saves them to a JSON
@@ -800,9 +797,9 @@ class AniListClient:
             aiohttp.ClientError: If the API request fails.
             OSError: If unable to create backup directory or write backup file.
         """
+        if not self.user:
+            raise aiohttp.ClientError("User information is required for deletions")
         self._ensure_authenticated()
-        if self.backup_dir is None:
-            raise aiohttp.ClientError("backup_dir must be set for backups")
 
         query = f"""
         query MediaListCollection($userId: Int, $type: MediaType, $chunk: Int) {{
@@ -837,13 +834,6 @@ class AniListClient:
                         self._media_list_entry_to_media(entry)
                     )
 
-        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-        backup_filename = f"anibridge-{self.profile_name}.{timestamp}.json"
-        backup_file = self.backup_dir / backup_filename
-
-        if not backup_file.parent.exists():
-            backup_file.parent.mkdir(parents=True)
-
         # To compress the backup file, remove the unecessary media field from each entry
         sanitized_lists: list[MediaListGroup] = []
         for li in data.lists:
@@ -872,22 +862,7 @@ class AniListClient:
             user=data.user, lists=sanitized_lists, has_next_chunk=data.has_next_chunk
         )
 
-        backup_file.write_text(data_without_media.model_dump_json())
-        log.info(f"Exported AniList data to $$'{backup_file}'$$")
-
-        if self.backup_retention_days <= 0:
-            return backup_file
-
-        cutoff_date = datetime.now() - timedelta(days=self.backup_retention_days)
-
-        retention_pattern = f"anibridge-{self.profile_name}.*.json"
-        for file in self.backup_dir.glob(retention_pattern):
-            file_mtime = datetime.fromtimestamp(file.stat().st_mtime)
-            if file_mtime < cutoff_date:
-                file.unlink()
-                log.debug(f"Deleted old backup '{file}'")
-
-        return backup_file
+        return data_without_media.model_dump_json()
 
     def _media_list_entry_to_media(self, media_list_entry: MediaListWithMedia) -> Media:
         """Converts a MediaListWithMedia object to a Media object.
