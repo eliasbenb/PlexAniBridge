@@ -255,7 +255,7 @@ class LibraryEpisode(LibraryMedia, Protocol):
 class HistoryEntry:
     """User history event for an item in the library."""
 
-    media_key: str
+    library_key: str
     viewed_at: datetime  # Timestamps must be in UTC
 
 

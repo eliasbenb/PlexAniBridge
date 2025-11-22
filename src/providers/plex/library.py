@@ -601,7 +601,7 @@ class PlexLibraryProvider(LibraryProvider):
         """
         history = await self._client.fetch_history(item)
         return tuple(
-            HistoryEntry(media_key=rating_key, viewed_at=viewed_at)
+            HistoryEntry(library_key=rating_key, viewed_at=viewed_at)
             for rating_key, viewed_at in history
         )
 
