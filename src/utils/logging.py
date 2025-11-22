@@ -279,13 +279,13 @@ def _get_logger(
         Logger: Configured logger instance
     """
     logger = logging.getLogger(log_name)
-    _log_dir = str(log_dir) if log_dir is not None else None
+    log_dir = str(log_dir) if log_dir is not None else None
 
     if isinstance(logger, Logger):
-        logger.setup(log_level, _log_dir)
+        logger.setup(log_level, log_dir)
     else:
         logger = Logger(log_name)
-        logger.setup(log_level, _log_dir)
+        logger.setup(log_level, log_dir)
 
     return logger
 

@@ -165,6 +165,12 @@ class BackupFileNotFoundError(BackupError, FileNotFoundError):
     status_code = 404
 
 
+class BackupParseError(BackupError, ValueError):
+    """Backup file content could not be parsed for the provider."""
+
+    status_code = 400
+
+
 # History and actions errors
 class HistoryError(AniBridgeError):
     """Base class for history-related failures."""

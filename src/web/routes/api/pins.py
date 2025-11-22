@@ -67,7 +67,7 @@ class OkResponse(BaseModel):
 
 
 @router.get("/fields", response_model=PinOptionsResponse)
-async def get_pin_fields() -> PinOptionsResponse:
+def get_pin_fields() -> PinOptionsResponse:
     """Return selectable pin field metadata.
 
     Returns:
@@ -147,7 +147,7 @@ async def search_pins(
     results: list[PinSearchItem] = []
     seen: set[int] = set()
 
-    async def add_media(media) -> None:
+    def add_media(media) -> None:
         if media is None or getattr(media, "id", None) is None:
             return
         aid = int(media.id)
@@ -167,7 +167,7 @@ async def search_pins(
                 async for media in client.search_anime(
                     query, is_movie=None, episodes=None, limit=limit
                 ):
-                    await add_media(media)
+                    add_media(media)
                     count += 1
                     if count >= limit:
                         break
@@ -258,7 +258,7 @@ async def upsert_pin(
 
 
 @router.delete("/{profile}/{anilist_id}", response_model=OkResponse)
-async def delete_pin(
+def delete_pin(
     profile: str = Path(..., min_length=1), anilist_id: int = Path(..., ge=1)
 ) -> OkResponse:
     """Delete pin configuration for an AniList entry.

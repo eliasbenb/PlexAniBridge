@@ -141,9 +141,7 @@ def create_app(scheduler: SchedulerClient | None = None) -> FastAPI:
         return await http_exception_handler(request, exc)
 
     @app.exception_handler(AniBridgeError)
-    async def domain_exception_handler(
-        request: Request, exc: AniBridgeError
-    ) -> JSONResponse:
+    def domain_exception_handler(request: Request, exc: AniBridgeError) -> JSONResponse:
         """Handle AniBridge errors with structured JSON responses.
 
         Args:

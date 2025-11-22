@@ -68,6 +68,8 @@ class Library(PlexObject):
     def tags(self, tag): ...
 
 class LibrarySection(PlexObject):
+    title: str
+    type: str
     @cached_property
     def totalSize(self) -> int: ...
     @property
@@ -134,7 +136,7 @@ class LibrarySection(PlexObject):
         limit: Incomplete | None = None,
         filters: Incomplete | None = None,
         **kwargs,
-    ): ...
+    ) -> list[Video]: ...
     def sync(
         self,
         policy: Policy,

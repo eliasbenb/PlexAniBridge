@@ -104,14 +104,14 @@ class MappingOverridesService:
     }
 
     def __init__(self) -> None:
-        """Initialise service state."""
+        """Initialize service state."""
         self._lock = asyncio.Lock()
 
     def _ensure_scheduler(self):
         """Ensure the application scheduler is available."""
         scheduler = get_app_state().scheduler
         if not scheduler:
-            raise SchedulerNotInitializedError("Scheduler not initialised")
+            raise SchedulerNotInitializedError("Scheduler not initialized")
         return scheduler
 
     def _resolve_custom_file(self) -> tuple[Path, Literal["json", "yaml"]]:

@@ -88,7 +88,7 @@ router = APIRouter()
     summary="Return serialized configuration",
     response_model=SettingsResponse,
 )
-async def api_settings() -> SettingsResponse:
+def api_settings() -> SettingsResponse:
     """Return the current application configuration as JSON.
 
     Returns:
@@ -258,7 +258,7 @@ async def api_about() -> AboutResponse:
 
 
 @router.get("/meta", tags=["meta"], response_model=MetaResponse)
-async def meta() -> MetaResponse:
+def meta() -> MetaResponse:
     """Application metadata (version, git hash).
 
     Returns:

@@ -51,7 +51,7 @@ def _list_log_files() -> list[Path]:
 @router.get(
     "/files", summary="List available log files", response_model=list[LogFileModel]
 )
-async def list_log_files() -> list[LogFileModel]:
+def list_log_files() -> list[LogFileModel]:
     """Return metadata about available log files.
 
     Returns:
@@ -161,7 +161,7 @@ def _tail_lines(path: Path, max_lines: int) -> list[str]:
     summary="Fetch parsed tail of a log file",
     response_model=list[LogEntryModel],
 )
-async def get_log_file(
+def get_log_file(
     name: str, lines: int = Query(500, ge=0, le=2000)
 ) -> list[LogEntryModel]:
     """Return the last N lines of a log file parsed into JSON entries.

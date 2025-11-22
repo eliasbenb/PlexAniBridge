@@ -4,7 +4,7 @@ from functools import cached_property
 from typing import Self
 
 from plexapi.base import Playable, PlexHistory, PlexPartialObject, PlexSession
-from plexapi.media import Review, Role, SubtitleStream
+from plexapi.media import Guid, Review, Role, SubtitleStream
 from plexapi.mixins import (
     AdvancedSettingsMixin,
     ArtMixin,
@@ -116,7 +116,7 @@ class Movie(
     editionTitle: str
     enableCreditsMarkerGeneration: int
     genres: list
-    guids: list
+    guids: list[Guid]
     labels: list
     languageOverride: str
     markers: list

@@ -64,7 +64,7 @@
     let loadingDetail = $state(false);
     let saving = $state(false);
     let loadedDetailId: number | null = $state(null);
-    let initialised = $state(false);
+    let initialized = $state(false);
     let currentAbort: AbortController | null = null;
 
     function updateFieldStateFromOverride(
@@ -434,11 +434,11 @@
 
     $effect(() => {
         if (!open) {
-            initialised = false;
+            initialized = false;
             resetEditorState();
             return;
         }
-        if (!initialised) {
+        if (!initialized) {
             if (mode === "edit" && mapping) {
                 anilistIdInput = String(mapping.anilist_id);
                 fetchDetail(mapping.anilist_id);
@@ -447,7 +447,7 @@
                 rawJson = toJsonString(null);
                 updateFieldStateFromOverride(null);
             }
-            initialised = true;
+            initialized = true;
         }
     });
 

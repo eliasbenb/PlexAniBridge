@@ -2,7 +2,7 @@
 
 import asyncio
 from collections.abc import Iterable
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from fastapi import Request
@@ -57,7 +57,7 @@ class DeleteMappingResponse(BaseModel):
     ok: bool
 
 
-class MappingOverrideMode(str, Enum):
+class MappingOverrideMode(StrEnum):
     """Supported modes for mapping override fields."""
 
     OMIT = "omit"
@@ -93,7 +93,7 @@ class MappingDetailModel(MappingItemModel):
     override: dict[str, Any] | None = None
 
 
-class OverrideDeleteKind(str, Enum):
+class OverrideDeleteKind(StrEnum):
     """Supported deletion behaviours for mapping overrides."""
 
     CUSTOM = "custom"
@@ -137,7 +137,7 @@ router = APIRouter()
 
 
 @router.get("/query-capabilities", response_model=QueryCapabilitiesResponse)
-async def get_query_capabilities() -> QueryCapabilitiesResponse:
+def get_query_capabilities() -> QueryCapabilitiesResponse:
     """Return supported operators for each queryable field.
 
     This allows the frontend to tailor suggestions based on backend capabilities.
