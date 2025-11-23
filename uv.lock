@@ -191,7 +191,7 @@ dependencies = [
 [[package]]
 name = "anibridge-plex-provider"
 version = "0.1.0"
-source = { git = "https://github.com/anibridge/anibridge-plex-provider.git#9be02853970560b2c5b01e61a830d845ade3c8c4" }
+source = { git = "https://github.com/anibridge/anibridge-plex-provider.git#7c92da91838a0a854663df2a76e6011a52f898a3" }
 dependencies = [
     { name = "aiohttp" },
     { name = "anibridge-providers" },
@@ -203,7 +203,10 @@ dependencies = [
 [[package]]
 name = "anibridge-providers"
 version = "0.1.0"
-source = { git = "https://github.com/anibridge/anibridge-providers.git#d8d1b1f2439bd9c770a2df1b5e476cd79f68d189" }
+source = { git = "https://github.com/anibridge/anibridge-providers.git#e39a220dee316897f7e8f7755d7a65fa91145fd7" }
+dependencies = [
+    { name = "starlette" },
+]
 
 [[package]]
 name = "annotated-doc"

@@ -12,6 +12,7 @@ from anibridge_providers.library import (
     MediaKind,
 )
 from anibridge_providers.list import ListProvider
+from starlette.requests import Request
 
 from src import log
 from src.config.database import db
@@ -294,6 +295,22 @@ class BridgeClient:
                     update={"stage": "completed", "state": "idle"}
                 )
 
+    async def parse_webhook(
+        self, request: Request
+    ) -> tuple[bool, Sequence[str] | None]:
+        """Parse a webhook request and extract relevant library keys.
+
+        Args:
+            request (Request): The incoming webhook request.
+
+        Returns:
+            tuple[bool, Sequence[str] | None]: A tuple containing a boolean
+                indicating whether the webhook is valid and targetting the profile,
+                and a sequence of library media keys to sync, or None if not
+                applicable.
+        """
+        return await self.library_provider.parse_webhook(request)
+
     async def _sync_section(
         self,
         section: LibrarySection,
@@ -338,10 +355,7 @@ class BridgeClient:
             )
 
         if self.profile_config.batch_requests and items:
-            await self._prefetch_list_entries(
-                items,
-                is_movie_section=section.media_kind == MediaKind.MOVIE,
-            )
+            await self._prefetch_list_entries(items)
 
         sync_client: BaseSyncClient
         if section.media_kind == MediaKind.MOVIE:
@@ -384,12 +398,7 @@ class BridgeClient:
 
         return sync_client.sync_stats
 
-    async def _prefetch_list_entries(
-        self,
-        items: Sequence[LibraryMedia],
-        *,
-        is_movie_section: bool,
-    ) -> None:
+    async def _prefetch_list_entries(self, items: Sequence[LibraryMedia]) -> None:
         """Prefetch list entries for the provided media items when batching."""
         imdb_ids, tmdb_ids, tvdb_ids = self._collect_external_ids(items)
         if not imdb_ids and not tmdb_ids and not tvdb_ids:
@@ -400,7 +409,6 @@ class BridgeClient:
                 imdb=imdb_ids or None,
                 tmdb=tmdb_ids or None,
                 tvdb=tvdb_ids or None,
-                is_movie=is_movie_section,
             )
         )
         keys = sorted(

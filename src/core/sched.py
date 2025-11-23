@@ -10,11 +10,7 @@ from cachetools.func import lru_cache
 from tzlocal import get_localzone
 
 from src import log
-from src.config.settings import (
-    AniBridgeConfig,
-    AniBridgeProfileConfig,
-    SyncMode,
-)
+from src.config.settings import AniBridgeConfig, SyncMode
 from src.core.animap import AniMapClient
 from src.core.bridge import BridgeClient
 from src.exceptions import ProfileNotFoundError
@@ -504,41 +500,31 @@ class SchedulerClient:
         log.info("Daily database sync scheduler stopped")
 
     @lru_cache(maxsize=128)
-    def get_profiles_for_plex_account(
-        self, account_id: int | str
-    ) -> list[tuple[str, AniBridgeProfileConfig]]:
-        """Find all profile names and their configs by Plex account id.
+    def get_profiles_for_library_provider(self, namespace: str) -> Sequence[str]:
+        """Find all profile names and their configs by provider account id.
 
         This is memoized to avoid repeated linear scans of profile lists for
         frequent webhook requests.
 
         Args:
-            account_id (int | str): Plex user account id to search for.
+            namespace (str): The provider namespace to search for.
 
         Returns:
-            list[tuple[str, AniBridgeProfileConfig]]: A list of tuples containing
-                the profile names and their configurations.
+            Sequence[str]: A sequence of profile names matching the namespace.
 
         Raises:
             KeyError: If no profile matches the given account id
         """
-        account_key = str(account_id)
-        profiles: list[tuple[str, AniBridgeProfileConfig]] = []
+        profiles: list[str] = []
         for profile_name, bridge_client in self.bridge_clients.items():
             if bridge_client is None:
                 continue
-
-            library_user = bridge_client.library_provider.user()
-            if library_user is None:
-                continue
-
-            if str(library_user.key) == account_key:
-                profile_config = self.global_config.get_profile(profile_name)
-                profiles.append((profile_name, profile_config))
+            if namespace == bridge_client.library_provider.NAMESPACE:
+                profiles.append(profile_name)
 
         if not profiles:
             raise ProfileNotFoundError(
-                f"Profile for Plex account id '{account_key}' not found"
+                f"Profile for library provider namespace '{namespace}' not found"
             )
 
         return profiles
