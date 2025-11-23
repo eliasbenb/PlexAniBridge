@@ -328,7 +328,7 @@ def format() -> None:
     try:
         if target in ("both", "backend"):
             print_info("Running ruff formatter on Python code...")
-            subprocess.run(["ruff", "check", ".", "--fix"], cwd=ROOT_DIR, check=True)
+            subprocess.run(["ruff", "format", "."], cwd=ROOT_DIR, check=True)
             print_success("Python code formatted successfully!")
 
         if target in ("both", "frontend"):

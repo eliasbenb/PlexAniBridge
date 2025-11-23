@@ -36,8 +36,8 @@ class Video(PlexPartialObject, PlayedUnplayedMixin):
     art: str
     artBlurHash: str
     fields: list
-    lastRatedAt: datetime
-    lastViewedAt: datetime
+    lastRatedAt: datetime | None
+    lastViewedAt: datetime | None
     librarySectionID: int
     librarySectionKey: str
     librarySectionTitle: str
