@@ -15,7 +15,8 @@ from src.config.settings import (
     AniBridgeProfileConfig,
     SyncMode,
 )
-from src.core import AniMapClient, BridgeClient
+from src.core.animap import AniMapClient
+from src.core.bridge import BridgeClient
 from src.exceptions import ProfileNotFoundError
 
 __all__ = ["SchedulerClient"]

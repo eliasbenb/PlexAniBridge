@@ -17,9 +17,8 @@ from src.core.providers.library import (
 )
 from src.core.providers.list import ListProvider
 from src.core.sync import BaseSyncClient, MovieSyncClient, ShowSyncClient
-from src.core.sync.stats import SyncProgress, SyncStats
+from src.core.sync.stats import SyncOutcome, SyncProgress, SyncStats
 from src.models.db.housekeeping import Housekeeping
-from src.models.db.sync_history import SyncOutcome
 from src.providers.factory import build_library_provider, build_list_provider
 
 __all__ = ["BridgeClient"]

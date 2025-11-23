@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator, Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from rapidfuzz import fuzz
 from sqlalchemy import or_
@@ -12,14 +12,15 @@ from sqlalchemy import or_
 from src import log
 from src.config.database import db
 from src.config.settings import SyncField
-from src.core.animap import AniMapClient
 from src.core.providers.library import ExternalId, LibraryMedia, LibraryProvider
 from src.core.providers.list import ListEntry, ListProvider, ListStatus
 from src.core.sync.stats import ItemIdentifier, SyncOutcome, SyncStats
 from src.models.db.animap import AniMap
 from src.models.db.pin import Pin
-from src.models.db.sync_history import SyncHistory
 from src.utils.types import Comparable
+
+if TYPE_CHECKING:
+    from src.core.animap import AniMapClient
 
 __all__ = ["BaseSyncClient"]
 

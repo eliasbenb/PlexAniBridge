@@ -2,6 +2,7 @@
 
 from collections.abc import Sequence
 from datetime import datetime
+from enum import StrEnum
 from typing import Literal
 
 from pydantic import BaseModel
@@ -13,9 +14,8 @@ from src.core.providers.library import (
     MediaKind,
 )
 from src.exceptions import UnsupportedMediaTypeError
-from src.models.db.sync_history import SyncOutcome
 
-__all__ = ["ItemIdentifier", "SyncProgress", "SyncStats"]
+__all__ = ["ItemIdentifier", "SyncOutcome", "SyncProgress", "SyncStats"]
 
 
 class ItemIdentifier(BaseModel):
@@ -92,6 +92,18 @@ class ItemIdentifier(BaseModel):
         if self.repr:
             return self.repr
         return super().__repr__()
+
+
+class SyncOutcome(StrEnum):
+    """Enumeration of possible synchronization outcomes for media items."""
+
+    SYNCED = "synced"
+    SKIPPED = "skipped"
+    FAILED = "failed"
+    NOT_FOUND = "not_found"
+    DELETED = "deleted"
+    PENDING = "pending"
+    UNDONE = "undone"
 
 
 class SyncStats(BaseModel):

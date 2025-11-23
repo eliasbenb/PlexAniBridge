@@ -8,21 +8,10 @@ from sqlalchemy import JSON, DateTime, Enum, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.providers.library import MediaKind
+from src.core.sync.stats import SyncOutcome
 from src.models.db.base import Base
 
 __all__ = ["SyncHistory", "SyncOutcome"]
-
-
-class SyncOutcome(StrEnum):
-    """Enumeration of possible synchronization outcomes for media items."""
-
-    SYNCED = "synced"  # Successfully synchronized to AniList
-    SKIPPED = "skipped"  # Item already up to date, no changes needed
-    FAILED = "failed"  # Failed to process due to error
-    NOT_FOUND = "not_found"  # No matching AniList entry could be found
-    DELETED = "deleted"  # Item was deleted from AniList (destructive sync)
-    PENDING = "pending"  # Item was identified for processing but not yet processed
-    UNDONE = "undone"  # Resulting entry produced by an explicit user undo action
 
 
 class SyncHistory(Base):
