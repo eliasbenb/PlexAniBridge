@@ -451,7 +451,7 @@ class AniListClient:
             ):
                 yield m
 
-    @alru_cache(maxsize=None, ttl=604800)
+    @alru_cache(ttl=300)
     async def _search_anime(
         self, search_str: str, is_movie: bool | None, limit: int = 10
     ) -> list[Media]:

@@ -1,6 +1,5 @@
 """Plex client abstractions consumed by the Plex library provider."""
 
-from asyncio import to_thread
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -11,7 +10,6 @@ from urllib.parse import urlparse
 from plexapi.library import LibrarySection, MovieSection, ShowSection
 from plexapi.myplex import MyPlexAccount, MyPlexUser
 from plexapi.server import PlexServer
-from plexapi.utils import joinArgs
 from plexapi.video import Movie, Show, Video
 from tzlocal import get_localzone
 
@@ -274,7 +272,7 @@ class PlexClient:
         if reference_dt is None:
             reference_dt = datetime.now(tz=UTC)
 
-        if getattr(section, "TYPE", "") == "movie":
+        if section.type == "movie":
             return {
                 "or": [
                     {"lastViewedAt>>=": reference_dt},
@@ -303,7 +301,7 @@ class PlexClient:
 
     def _build_watched_filter(self, section: LibrarySection) -> dict:
         epoch = datetime.fromtimestamp(0, tz=UTC)
-        if getattr(section, "TYPE", "") == "movie":
+        if section.type == "movie":
             return {
                 "or": [
                     {"viewCount>>": 0},
@@ -333,9 +331,8 @@ class PlexClient:
         rating_keys: set[str] = set()
         try:
             for item in section.continueWatching():
-                rating_key = getattr(item, "ratingKey", None)
-                if rating_key is not None:
-                    rating_keys.add(str(rating_key))
+                if item.ratingKey is not None:
+                    rating_keys.add(str(item.ratingKey))
         except Exception:
             rating_keys.clear()
 
@@ -460,7 +457,7 @@ def _create_user_client(
         )
     try:
         return admin_client.switchUser(login)
-    except Exception as exc:  # pragma: no cover - Plex API raises generic errors
+    except Exception as exc:
         raise PlexUserNotFoundError(f"Failed to switch to Plex user '{login}'") from exc
 
 
