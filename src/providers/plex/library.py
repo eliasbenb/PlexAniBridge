@@ -1,5 +1,6 @@
 """Runtime models for Plex-backed library providers."""
 
+import itertools
 from collections.abc import Sequence
 from datetime import datetime
 from typing import Literal, cast
@@ -530,14 +531,13 @@ class PlexLibraryProvider(LibraryProvider):
                 "Plex providers expect section objects created by the provider"
             )
 
-        raw_items = self._client.iter_section_items(
+        raw_items = await self._client.list_section_items(
             section.raw(),
             min_last_modified=min_last_modified,
             require_watched=require_watched,
             keys=keys,
         )
-
-        return [self._wrap_media(section, item) for item in raw_items]
+        return tuple(self._wrap_media(section, item) for item in raw_items)
 
     async def clear_cache(self) -> None:
         """Reset any cached Plex responses maintained by the provider."""
@@ -599,38 +599,49 @@ class PlexLibraryProvider(LibraryProvider):
         Returns:
             Sequence[HistoryEntry]: A sequence of history entries for the media item.
         """
-        base_history = await self._client.fetch_history(item)
+        plex_history = await self._client.fetch_history(item)
 
-        # The Plex database isn't great at consistently tracking history, so in addition
-        # to pulling from the history endpoint, we also derive history from the
-        # lastViewedAt attribute.
-        derived_history: list[HistoryEntry] = []
-        children = (
-            item.episodes()
-            if isinstance(item, (plexapi_video.Show, plexapi_video.Season))
-            else [item]
-        )
+        if isinstance(item, (plexapi_video.Show, plexapi_video.Season)):
+            children_iter = item.episodes()
+        else:
+            children_iter = (item,)
+
+        children = list(children_iter)
 
         if not children:
             return tuple(
                 HistoryEntry(library_key=rating_key, viewed_at=viewed_at)
-                for rating_key, viewed_at in base_history
+                for rating_key, viewed_at in plex_history
             )
 
-        # Find all child items that have been viewed but aren't in the base history
-        children_dict = {str(child.ratingKey): child for child in children}
-        base_keys = {rating_key for rating_key, _ in base_history}
-        for child_key, child in children_dict.items():
-            if child.lastViewedAt is None or child_key in base_keys:
+        base_entries: list[HistoryEntry] = []
+        base_keys = set()
+
+        for rating_key, viewed_at in plex_history:
+            base_keys.add(rating_key)
+            base_entries.append(
+                HistoryEntry(library_key=rating_key, viewed_at=viewed_at)
+            )
+
+        derived_children: list[HistoryEntry] = []
+
+        for child in children:
+            last_viewed = child.lastViewedAt
+            if last_viewed is None:
                 continue
-            derived_history.append(
-                HistoryEntry(library_key=child_key, viewed_at=child.lastViewedAt)
+
+            rating_key_str = str(child.ratingKey)
+            if rating_key_str in base_keys:
+                continue
+
+            derived_children.append(
+                HistoryEntry(
+                    library_key=rating_key_str,
+                    viewed_at=last_viewed,
+                )
             )
 
-        return tuple(
-            HistoryEntry(library_key=rating_key, viewed_at=viewed_at)
-            for rating_key, viewed_at in base_history
-        ) + tuple(derived_history)
+        return tuple(itertools.chain(derived_children, base_entries))
 
     def _build_sections(self) -> list[PlexLibrarySection]:
         """Construct the list of Plex library sections available to the user."""

@@ -1,6 +1,7 @@
 """Plex client abstractions consumed by the Plex library provider."""
 
-from collections.abc import Iterator, Sequence
+import asyncio
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from time import monotonic
@@ -85,13 +86,13 @@ class PlexClient:
 
     async def initialize(self) -> None:
         """Establish the Plex session and prime provider caches."""
-        bundle = self._create_client_bundle()
+        bundle = await asyncio.to_thread(self._create_client_bundle)
         self._bundle = bundle
         self._admin_client = bundle.admin_client
         self._user_client = bundle.user_client
 
-        self._sections = self._load_sections()
-        self._on_deck_window = self._get_on_deck_window()
+        self._sections = await asyncio.to_thread(self._load_sections)
+        self._on_deck_window = await asyncio.to_thread(self._get_on_deck_window)
         self.clear_cache()
 
     async def close(self) -> None:
@@ -124,7 +125,7 @@ class PlexClient:
         """Return the configured on-deck time window if available."""
         return self._on_deck_window
 
-    def iter_section_items(
+    async def list_section_items(
         self,
         section: LibrarySection,
         *,
@@ -132,43 +133,47 @@ class PlexClient:
         require_watched: bool = False,
         keys: Sequence[str] | None = None,
         **kwargs,
-    ) -> Iterator[Movie | Show]:
-        """Yield Plex media items that match the provided filters."""
-        filters: list[dict] = []
+    ) -> Sequence[Movie | Show]:
+        """Return Plex media items that match the provided filters."""
 
-        if min_last_modified is not None:
-            filters.append(self._build_modified_filter(section, min_last_modified))
+        def _search_sync() -> tuple[Movie | Show, ...]:
+            filters: list[dict] = []
 
-        if require_watched:
-            filters.append(self._build_watched_filter(section))
+            if min_last_modified is not None:
+                filters.append(self._build_modified_filter(section, min_last_modified))
 
-        if self._genre_filter:
-            filters.append({"genre": list(self._genre_filter)})
+            if require_watched:
+                filters.append(self._build_watched_filter(section))
 
-        filter_payload = {"and": filters} if filters else None
-        search_kwargs = dict(kwargs)
-        if filter_payload:
-            search_kwargs["filters"] = filter_payload
+            if self._genre_filter:
+                filters.append({"genre": self._genre_filter})
 
-        try:
-            results = section.search(**search_kwargs)
-        except Exception:
-            results = []
+            search_kwargs = dict(kwargs)
+            if filters:
+                search_kwargs["filters"] = {"and": filters}
 
-        key_filter = {str(key) for key in (keys or [])}
-        if key_filter:
+            try:
+                results = section.search(**search_kwargs)
+            except Exception:
+                return ()
+
+            key_filter: frozenset[str] | None = (
+                frozenset(str(k) for k in keys) if keys else None
+            )
+
+            items: list[Movie | Show] = []
             for item in results:
-                rating_key = item.ratingKey
-                if (
-                    rating_key is not None
-                    and str(rating_key) in key_filter
-                    and isinstance(item, (Movie, Show))
-                ):
-                    yield item
-        else:
-            for item in results:
-                if isinstance(item, (Movie, Show)):
-                    yield item
+                if not isinstance(item, (Movie, Show)):
+                    continue
+
+                if key_filter is not None and str(item.ratingKey) not in key_filter:
+                    continue
+
+                items.append(item)
+
+            return tuple(items)
+
+        return await asyncio.to_thread(_search_sync)
 
     def is_on_continue_watching(
         self,
@@ -187,7 +192,8 @@ class PlexClient:
         """Return the watch history for the given Plex item."""
         admin_client = self._ensure_admin_client()
         try:
-            history_objects = admin_client.history(
+            history_objects = await asyncio.to_thread(
+                admin_client.history,
                 ratingKey=item.ratingKey,
                 accountID=1 if self.bundle.is_admin else self.bundle.user_id,
                 librarySectionID=item.librarySectionID,
@@ -200,7 +206,6 @@ class PlexClient:
             for record in history_objects
             if record.viewedAt is not None
         ]
-
         return entries
 
     def is_on_watchlist(self, item: Video) -> bool:
@@ -464,12 +469,11 @@ def _matches_account(requested: str, account: MyPlexAccount) -> bool:
 def _match_plex_user(plex_user: str, users: Sequence[MyPlexUser]) -> MyPlexUser:
     target = plex_user.lower()
     for user in users:
-        candidates = (
+        if target in (
             (user.username or "").lower(),
             (user.email or "").lower(),
             (user.title or "").lower(),
-        )
-        if target in candidates:
+        ):
             return user
     raise PlexUserNotFoundError(f"User '{plex_user}' not found in Plex account")
 
