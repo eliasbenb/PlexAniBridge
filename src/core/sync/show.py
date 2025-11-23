@@ -53,10 +53,9 @@ class ShowSyncClient(BaseSyncClient[LibraryShow, LibrarySeason, LibraryEpisode])
         processed_seasons: set[int] = set()
 
         for animapping in mappings:
-            if not animapping.anilist_id:
-                continue
-
             parsed_mappings = self._get_effective_mappings(item, animapping)
+            # A season is only relevant if it has at least one mapping.
+            # Special seasons are more strict and must match the show's ordering.
             relevant_seasons = {
                 mapping.season: seasons[mapping.season]
                 for mapping in parsed_mappings
@@ -66,12 +65,15 @@ class ShowSyncClient(BaseSyncClient[LibraryShow, LibrarySeason, LibraryEpisode])
             if not relevant_seasons:
                 continue
 
+            # To continue with this mapping, there must be at least one episode in the
+            # mapping range with some user activity, or we must be doing a full scan
+            # or destructive sync.
             if not (self.destructive_sync or self.full_scan):
                 any_relevant = False
                 for mapping in parsed_mappings:
                     season_episodes = episodes_by_season.get(mapping.season, [])
                     if any(
-                        episode.view_count
+                        (episode.view_count or episode.user_rating is not None)
                         and episode.index >= mapping.start
                         and (mapping.end is None or episode.index <= mapping.end)
                         for episode in season_episodes
