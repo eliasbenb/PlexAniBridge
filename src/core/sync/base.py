@@ -1,5 +1,6 @@
 """Provider-agnostic base class for library/list synchronization."""
 
+import contextlib
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator, Callable, Sequence
 from datetime import UTC, datetime
@@ -694,6 +695,41 @@ class BaseSyncClient[
             case "lte":
                 return new_value <= current_value
         return False
+
+    def _extract_external_ids(
+        self, item: LibraryMedia
+    ) -> tuple[list[str], list[int], list[int], list[int], list[int], list[int]]:
+        """Extract external IDs from a library media item."""
+        anidb_ids: list[int] = []
+        anilist_ids: list[int] = []
+        imdb_ids: list[str] = []
+        mal_ids: list[int] = []
+        tmdb_ids: list[int] = []
+        tvdb_ids: list[int] = []
+
+        for external in item.ids():
+            match external.namespace:
+                case "imdb":
+                    imdb_ids.append(external.value)
+                case "tmdb":
+                    with contextlib.suppress(ValueError):
+                        tmdb_ids.append(int(external.value))
+                case "tvdb":
+                    with contextlib.suppress(ValueError):
+                        tvdb_ids.append(int(external.value))
+                case "anidb":
+                    with contextlib.suppress(ValueError):
+                        anidb_ids.append(int(external.value))
+                case "mal":
+                    with contextlib.suppress(ValueError):
+                        mal_ids.append(int(external.value))
+                case "anilist":
+                    with contextlib.suppress(ValueError):
+                        anilist_ids.append(int(external.value))
+                case _:
+                    continue
+
+        return imdb_ids, tmdb_ids, tvdb_ids, anidb_ids, anilist_ids, mal_ids
 
     def _format_external_ids(self, ids: Sequence[ExternalId]) -> str:
         """Format external identifiers for debug logging."""

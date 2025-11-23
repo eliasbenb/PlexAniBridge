@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from pydantic import ValidationError
-from sqlalchemy.sql import and_, delete, or_, select
+from sqlalchemy.sql import delete, or_, select
 
 from src import log
 from src.config.database import db
@@ -337,75 +337,84 @@ class AniMapClient:
         imdb: str | list[str] | None = None,
         tmdb: int | list[int] | None = None,
         tvdb: int | list[int] | None = None,
-        is_movie: bool = True,
+        anidb: int | list[int] | None = None,
+        anilist: int | list[int] | None = None,
+        mal: int | list[int] | None = None,
     ) -> Iterator[AniMap]:
         """Retrieve anime ID mappings based on provided criteria.
 
-        Performs a complex database query to find entries that match the given
-        identifiers and metadata. The search logic differs between movies and TV
-        shows, with movies using IMDB/TMDB and shows using TVDB with optional
-        season filtering.
-
         Args:
-            imdb: IMDB ID(s) to match. Can be partial match within array.
-            tmdb: TMDB ID(s) to match for movies and TV shows.
-            tvdb: TVDB ID(s) to match for TV shows only.
-            season: TVDB season number for exact matching on TV shows only.
-            is_movie: Whether the search is for a movie or TV show.
+            imdb (str | list[str] | None): IMDB ID(s) to search for
+            tmdb (int | list[int] | None): TMDB ID(s) to search for
+            tvdb (int | list[int] | None): TVDB ID(s) to search for
+            anidb (int | list[int] | None): AniDB ID(s) to search for
+            anilist (int | list[int] | None): AniList ID(s) to search for
+            mal (int | list[int] | None): MyAnimeList ID(s) to search for
 
         Yields:
-            Matching anime mapping entries.
+            AniMap: Matching AniMap entries
         """
-        log.debug(
-            f"Querying mappings with imdb={imdb}, "
-            f"tmdb={tmdb}, tvdb={tvdb}, is_movie={is_movie}"
-        )
 
-        if not imdb and not tmdb and not tvdb:
-            return []
+        def _normalize_ids(value, *, is_str: bool = False) -> list:
+            """Normalize input into a deduplicated list."""
+            if value is None:
+                return []
+            if is_str:
+                seq = [value] if isinstance(value, str) else list(value)
+            else:
+                if isinstance(value, int):
+                    seq = [value]
+                elif isinstance(value, Iterable) and not isinstance(
+                    value, (str, bytes)
+                ):
+                    seq = list(value)
+                else:
+                    seq = [value]
+            return list(dict.fromkeys(seq))
 
-        imdb_list = (
-            [imdb] if isinstance(imdb, str) else imdb if isinstance(imdb, list) else []
+        imdb_list = _normalize_ids(imdb, is_str=True)
+        tmdb_list = _normalize_ids(tmdb)
+        tvdb_list = _normalize_ids(tvdb)
+        anidb_list = _normalize_ids(anidb)
+        anilist_list = _normalize_ids(anilist)
+        mal_list = _normalize_ids(mal)
+
+        if not (
+            imdb_list
+            or tmdb_list
+            or tvdb_list
+            or anidb_list
+            or anilist_list
+            or mal_list
+        ):
+            log.debug("No IDs provided to query AniMap, returning no results")
+            return
+
+        ids_string = (
+            f"imdb={imdb_list}, tmdb={tmdb_list}, tvdb={tvdb_list}, "
+            f"anidb={anidb_list}, anilist={anilist_list}, mal={mal_list}"
         )
-        tmdb_list = (
-            [tmdb] if isinstance(tmdb, int) else tmdb if isinstance(tmdb, list) else []
-        )
-        tvdb_list = (
-            [tvdb] if isinstance(tvdb, int) else tvdb if isinstance(tvdb, list) else []
-        )
+        log.debug(f"Querying mapping database with provided IDs: {ids_string}")
+
+        or_conditions: list[ColumnElement] = []
+
+        if imdb_list:
+            or_conditions.append(json_array_contains(AniMap.imdb_id, imdb_list))
+        if tmdb_list:
+            or_conditions.append(json_array_contains(AniMap.tmdb_movie_id, tmdb_list))
+            or_conditions.append(AniMap.tmdb_show_id.in_(tmdb_list))
+        if tvdb_list:
+            or_conditions.append(AniMap.tvdb_id.in_(tvdb_list))
+        if anidb_list:
+            or_conditions.append(AniMap.anidb_id.in_(anidb_list))
+        if anilist_list:
+            or_conditions.append(AniMap.anilist_id.in_(anilist_list))
+        if mal_list:
+            or_conditions.append(json_array_contains(AniMap.mal_id, mal_list))
+        if not or_conditions:
+            return
+
+        query = select(AniMap).where(or_(*or_conditions))
 
         with db() as ctx:
-            or_conditions = []
-            and_conditions = []
-
-            if is_movie:
-                if imdb_list:
-                    or_conditions.append(json_array_contains(AniMap.imdb_id, imdb_list))
-                if tmdb_list:
-                    or_conditions.append(
-                        json_array_contains(AniMap.tmdb_movie_id, tmdb_list)
-                    )
-            else:
-                if imdb_list:
-                    or_conditions.append(json_array_contains(AniMap.imdb_id, imdb_list))
-                if tmdb_list:
-                    if len(tmdb_list) == 1:
-                        or_conditions.append(AniMap.tmdb_show_id == tmdb_list[0])
-                    else:
-                        or_conditions.append(AniMap.tmdb_show_id.in_(tmdb_list))
-                if tvdb_list:
-                    if len(tvdb_list) == 1:
-                        or_conditions.append(AniMap.tvdb_id == tvdb_list[0])
-                    else:
-                        or_conditions.append(AniMap.tvdb_id.in_(tvdb_list))
-
-            merged_conditions: list[ColumnElement[bool]] = []
-            if or_conditions:
-                merged_conditions.append(or_(*or_conditions))
-            if and_conditions:
-                merged_conditions.append(and_(*and_conditions))
-            where_clause = and_(*merged_conditions)
-
-            query = select(AniMap).where(where_clause)
-
-            yield from ctx.session.execute(query).scalars()
+            yield from ctx.session.scalars(query)

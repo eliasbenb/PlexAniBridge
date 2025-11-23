@@ -1,8 +1,8 @@
 """Initial revision
 
-Revision ID: 77574a748435
+Revision ID: 9de097e7574e
 Revises: 
-Create Date: 2025-11-23 04:20:43.663382
+Create Date: 2025-11-23 14:49:52.337077
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '77574a748435'
+revision: str = '9de097e7574e'
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -33,9 +33,7 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('anilist_id')
     )
     with op.batch_alter_table('animap', schema=None) as batch_op:
-        batch_op.create_index('idx_imdb_tmdb', ['imdb_id', 'tmdb_movie_id'], unique=False)
-        batch_op.create_index('idx_tmdb_season', ['tmdb_show_id', 'tmdb_mappings'], unique=False)
-        batch_op.create_index('idx_tvdb_season', ['tvdb_id', 'tvdb_mappings'], unique=False)
+        batch_op.create_index('idx_all_ids', ['imdb_id', 'tmdb_movie_id', 'anidb_id', 'anilist_id', 'tvdb_id'], unique=False)
         batch_op.create_index(batch_op.f('ix_animap_imdb_id'), ['imdb_id'], unique=False)
         batch_op.create_index(batch_op.f('ix_animap_tmdb_mappings'), ['tmdb_mappings'], unique=False)
         batch_op.create_index(batch_op.f('ix_animap_tmdb_movie_id'), ['tmdb_movie_id'], unique=False)
@@ -139,9 +137,7 @@ def downgrade() -> None:
         batch_op.drop_index(batch_op.f('ix_animap_tmdb_movie_id'))
         batch_op.drop_index(batch_op.f('ix_animap_tmdb_mappings'))
         batch_op.drop_index(batch_op.f('ix_animap_imdb_id'))
-        batch_op.drop_index('idx_tvdb_season')
-        batch_op.drop_index('idx_tmdb_season')
-        batch_op.drop_index('idx_imdb_tmdb')
+        batch_op.drop_index('idx_all_ids')
 
     op.drop_table('animap')
     # ### end Alembic commands ###

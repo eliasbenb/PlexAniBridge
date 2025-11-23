@@ -178,9 +178,7 @@ class AniMap(Base):
     )
 
     __table_args__ = (
-        Index("idx_imdb_tmdb", "imdb_id", "tmdb_movie_id"),
-        Index("idx_tmdb_season", "tmdb_show_id", "tmdb_mappings"),
-        Index("idx_tvdb_season", "tvdb_id", "tvdb_mappings"),
+        Index("idx_all_ids", imdb_id, tmdb_movie_id, anidb_id, anilist_id, tvdb_id),
     )
 
     def __init__(self, **kwargs) -> None:

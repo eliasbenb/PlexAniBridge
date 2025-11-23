@@ -190,12 +190,10 @@ def test_get_mappings_filters_by_identifiers(
 
     asyncio.run(animap_client.sync_db())
 
-    movie_matches = list(animap_client.get_mappings(imdb="tt99999", is_movie=True))
-    tmdb_matches = list(animap_client.get_mappings(tmdb=222, is_movie=True))
-    tvdb_matches = list(animap_client.get_mappings(tvdb=444, is_movie=False))
-    tmdb_show_matches = list(
-        animap_client.get_mappings(tmdb=[999, 333], is_movie=False)
-    )
+    movie_matches = list(animap_client.get_mappings(imdb="tt99999"))
+    tmdb_matches = list(animap_client.get_mappings(tmdb=222))
+    tvdb_matches = list(animap_client.get_mappings(tvdb=444))
+    tmdb_show_matches = list(animap_client.get_mappings(tmdb=[999, 333]))
     empty_matches = list(animap_client.get_mappings())
 
     assert {row.anilist_id for row in movie_matches} == {10}

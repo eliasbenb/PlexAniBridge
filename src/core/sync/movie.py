@@ -1,6 +1,5 @@
 """Sync client for library movies using provider abstractions."""
 
-import contextlib
 from collections.abc import AsyncIterator, Sequence
 from datetime import datetime
 
@@ -21,13 +20,17 @@ class MovieSyncClient(BaseSyncClient[LibraryMovie, LibraryMovie, LibraryMovie]):
         tuple[LibraryMovie, Sequence[LibraryMovie], AniMap | None, ListEntry | None]
     ]:
         """Map a library movie to its corresponding list entry."""
-        imdb_ids, tmdb_ids, tvdb_ids = self._extract_external_ids(item)
+        imdb_ids, tmdb_ids, tvdb_ids, anidb_ids, anilist_ids, mal_ids = (
+            self._extract_external_ids(item)
+        )
         mappings = list(
             self.animap_client.get_mappings(
                 imdb=imdb_ids or None,
                 tmdb=tmdb_ids or None,
                 tvdb=tvdb_ids or None,
-                is_movie=True,
+                anidb=anidb_ids or None,
+                anilist=anilist_ids or None,
+                mal=mal_ids or None,
             )
         )
 
@@ -187,21 +190,3 @@ class MovieSyncClient(BaseSyncClient[LibraryMovie, LibraryMovie, LibraryMovie]):
             if ids
             else ""
         )
-
-    def _extract_external_ids(
-        self, item: LibraryMovie
-    ) -> tuple[list[str], list[int], list[int]]:
-        imdb_ids: list[str] = []
-        tmdb_ids: list[int] = []
-        tvdb_ids: list[int] = []
-        for external in item.ids():
-            namespace = external.namespace.lower()
-            if namespace == "imdb":
-                imdb_ids.append(external.value)
-            elif namespace == "tmdb":
-                with contextlib.suppress(ValueError):
-                    tmdb_ids.append(int(external.value))
-            elif namespace == "tvdb":
-                with contextlib.suppress(ValueError):
-                    tvdb_ids.append(int(external.value))
-        return imdb_ids, tmdb_ids, tvdb_ids

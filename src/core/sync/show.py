@@ -39,7 +39,9 @@ class ShowSyncClient(BaseSyncClient[LibraryShow, LibrarySeason, LibraryEpisode])
             if episode.season_index in episodes_by_season:
                 episodes_by_season[episode.season_index].append(episode)
 
-        imdb_ids, tmdb_ids, tvdb_ids = self._extract_external_ids(item)
+        imdb_ids, tmdb_ids, tvdb_ids, anidb_ids, anilist_ids, mal_ids = (
+            self._extract_external_ids(item)
+        )
         ordering = self._get_effective_show_ordering(item, tmdb_ids, tvdb_ids)
 
         mappings = list(
@@ -47,7 +49,9 @@ class ShowSyncClient(BaseSyncClient[LibraryShow, LibrarySeason, LibraryEpisode])
                 imdb=imdb_ids or None,
                 tmdb=tmdb_ids or None,
                 tvdb=tvdb_ids or None,
-                is_movie=False,
+                anidb=anidb_ids or None,
+                anilist=anilist_ids or None,
+                mal=mal_ids or None,
             )
         )
 
@@ -354,24 +358,6 @@ class ShowSyncClient(BaseSyncClient[LibraryShow, LibrarySeason, LibraryEpisode])
             if ids
             else ""
         )
-
-    def _extract_external_ids(
-        self, item: LibraryShow
-    ) -> tuple[list[str], list[int], list[int]]:
-        imdb_ids: list[str] = []
-        tmdb_ids: list[int] = []
-        tvdb_ids: list[int] = []
-        for external in item.ids():
-            namespace = external.namespace.lower()
-            if namespace == "imdb":
-                imdb_ids.append(external.value)
-            elif namespace == "tmdb":
-                with contextlib.suppress(ValueError):
-                    tmdb_ids.append(int(external.value))
-            elif namespace == "tvdb":
-                with contextlib.suppress(ValueError):
-                    tvdb_ids.append(int(external.value))
-        return imdb_ids, tmdb_ids, tvdb_ids
 
     @glru_cache(maxsize=32, key=lambda self, item: item)
     def __get_wanted_seasons(self, item: LibraryShow) -> dict[int, LibrarySeason]:
