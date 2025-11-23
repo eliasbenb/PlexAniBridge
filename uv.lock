@@ -191,7 +191,7 @@ dependencies = [
 [[package]]
 name = "anibridge-plex-provider"
 version = "0.1.0"
-source = { git = "https://github.com/anibridge/anibridge-plex-provider.git#49c293416001bfba1f6f8774229a481fc62dae48" }
+source = { git = "https://github.com/anibridge/anibridge-plex-provider.git#9be02853970560b2c5b01e61a830d845ade3c8c4" }
 dependencies = [
     { name = "aiohttp" },
     { name = "anibridge-providers" },
@@ -203,7 +203,7 @@ dependencies = [
 [[package]]
 name = "anibridge-providers"
 version = "0.1.0"
-source = { git = "https://github.com/anibridge/anibridge-providers.git#34416f6183dc067ac09d229dde1b25ece5e7ff66" }
+source = { git = "https://github.com/anibridge/anibridge-providers.git#d8d1b1f2439bd9c770a2df1b5e476cd79f68d189" }
 
 [[package]]
 name = "annotated-doc"
