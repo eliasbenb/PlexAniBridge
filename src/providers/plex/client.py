@@ -187,21 +187,22 @@ class PlexClient:
     async def fetch_history(self, item: Video) -> Sequence[tuple[str, datetime]]:
         """Return the watch history for the given Plex item."""
         admin_client = self._ensure_admin_client()
-        history_objects = await to_thread(
-            self._fetch_history_records, admin_client, item
-        )
-        entries: list[tuple[str, datetime]] = []
-        for record in history_objects:
-            rating_key = str(
-                getattr(record, "ratingKey", getattr(item, "ratingKey", ""))
+        try:
+            history_objects = admin_client.history(
+                ratingKey=item.ratingKey,
+                accountID=1 if self.bundle.is_admin else self.bundle.user_id,
+                librarySectionID=item.librarySectionID,
             )
-            viewed_at = getattr(record, "viewedAt", None)
-            dt = self._coerce_datetime(viewed_at)
-            if dt is None:
-                continue
-            entries.append((rating_key, dt))
-        entries.sort(key=lambda entry: entry[1])
-        return tuple(entries)
+        except Exception:
+            return []
+
+        entries = [
+            (str(record.ratingKey), record.viewedAt)
+            for record in history_objects
+            if record.viewedAt is not None
+        ]
+
+        return entries
 
     def get_ordering(self, show: Show) -> Literal["tmdb", "tvdb", ""]:
         """Return the preferred episode ordering for the provided show."""
@@ -344,18 +345,6 @@ class PlexClient:
         )
         self._continue_cache[section.key] = entry
         return entry
-
-    def _fetch_history_records(self, admin_client: PlexServer, item: Video) -> list:
-        metadata_key = getattr(item, "ratingKey", None)
-        args = {"metadataItemID": metadata_key}
-        bundle = self._bundle
-        if bundle is not None:
-            args["accountID"] = bundle.user_id
-        path = f"/status/sessions/history/all{joinArgs(args)}"
-        try:
-            return list(admin_client.fetchItems(path))
-        except Exception:
-            return []
 
     def _coerce_datetime(self, value: datetime | str | None) -> datetime | None:
         """Convert various datetime representations into a timezone-aware datetime."""

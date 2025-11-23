@@ -388,18 +388,6 @@ class ShowSyncClient(BaseSyncClient[LibraryShow, LibrarySeason, LibraryEpisode])
         episode_keys = {episode.key for episode in episodes}
         history = await item.history()
         filtered = [entry for entry in history if entry.library_key in episode_keys]
-        seen_keys = {entry.library_key for entry in filtered}
-
-        for episode in episodes:
-            if episode.key in seen_keys:
-                continue
-            episode_history = await episode.history()
-            for entry in episode_history:
-                if entry.library_key == episode.key:
-                    filtered.append(entry)
-                    seen_keys.add(episode.key)
-                    break
-
         filtered.sort(key=lambda record: record.viewed_at)
         return filtered
 
