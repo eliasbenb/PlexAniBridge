@@ -107,7 +107,7 @@ class PlexLibraryMedia(LibraryMedia):
     @property
     def on_watchlist(self) -> bool:
         """Check if the media item is on the user's watchlist."""
-        return self._provider._client.is_on_watchlist(self._item)
+        return self._provider.is_on_watchlist(self._item)
 
     @property
     def user_rating(self) -> int | None:
@@ -555,6 +555,17 @@ class PlexLibraryProvider(LibraryProvider):
             bool: True if the item is on the Continue Watching list, False otherwise.
         """
         return self._client.is_on_continue_watching(section.raw(), item)
+
+    def is_on_watchlist(self, item: plexapi_video.Video) -> bool:
+        """Determine whether the given item appears in the user's watchlist.
+
+        Args:
+            item (plexapi_video.Video): The Plex media item to check.
+
+        Returns:
+            bool: True if the item is on the watchlist, False otherwise.
+        """
+        return self._client.is_on_watchlist(item)
 
     async def get_review(self, item: plexapi_video.Video) -> str | None:
         """Fetch the user's review for the provided Plex item, if available.
