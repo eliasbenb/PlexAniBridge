@@ -241,10 +241,16 @@ class BaseSyncClient[
             debug_ids = self._debug_log_ids(
                 item=item, child_item=child_item, entry=entry, animapping=animapping
             )
-            log.debug(
-                f"[{self.profile_name}] Found list entry for {item.media_kind.value} "
-                f"{debug_ids}"
-            )
+            if entry is None:
+                log.debug(
+                    f"[{self.profile_name}] No existing list entry for "
+                    f"{item.media_kind.value} {debug_ids}; preparing new entry"
+                )
+            else:
+                log.debug(
+                    f"[{self.profile_name}] Found list entry for "
+                    f"{item.media_kind.value} {debug_ids}"
+                )
 
             try:
                 outcome = await self.sync_media(
@@ -290,7 +296,7 @@ class BaseSyncClient[
             ChildMediaT,
             Sequence[GrandchildMediaT],
             AniMap | None,
-            ListEntry,
+            ListEntry | None,
         ]
     ]:
         """Yield potential list entries matching the supplied library item."""
@@ -328,14 +334,29 @@ class BaseSyncClient[
         item: ParentMediaT,
         child_item: ChildMediaT,
         grandchild_items: Sequence[GrandchildMediaT],
-        entry: ListEntry,
+        entry: ListEntry | None,
         animapping: AniMap | None,
     ) -> SyncOutcome:
         """Synchronize a mapped media item with the list provider."""
+        entry_missing = entry is None
+        entry = await self._ensure_entry(
+            item=item,
+            child_item=child_item,
+            grandchild_items=grandchild_items,
+            entry=entry,
+            animapping=animapping,
+        )
+
         debug_title = self._debug_log_title(item=item, animapping=animapping)
         debug_ids = self._debug_log_ids(
             item=item, child_item=child_item, entry=entry, animapping=animapping
         )
+
+        if entry_missing:
+            log.debug(
+                f"[{self.profile_name}] Prepared new list entry for "
+                f"{item.media_kind.value} {debug_title} {debug_ids}"
+            )
 
         before_snapshot = EntrySnapshot.from_entry(entry)
         list_media_key = self._resolve_list_media_key(
@@ -812,7 +833,29 @@ class BaseSyncClient[
         *,
         item: ParentMediaT,
         child_item: ChildMediaT,
-        entry: ListEntry,
+        entry: ListEntry | None,
         animapping: AniMap | None,
     ) -> str:
         """Return a debug-friendly identifier representation."""
+
+    async def _ensure_entry(
+        self,
+        *,
+        item: ParentMediaT,
+        child_item: ChildMediaT,
+        grandchild_items: Sequence[GrandchildMediaT],
+        entry: ListEntry | None,
+        animapping: AniMap | None,
+    ) -> ListEntry:
+        """Materialize a list entry for synchronization, constructing when missing."""
+        if entry is not None:
+            return entry
+
+        list_media_key = self._resolve_list_media_key(animapping, None)
+        if list_media_key is None:
+            raise ValueError(
+                f"Unable to determine list media key for {item.media_kind.value} "
+                f"{self._debug_log_title(item=item, animapping=animapping)}"
+            )
+
+        return await self.list_provider.build_entry(list_media_key)

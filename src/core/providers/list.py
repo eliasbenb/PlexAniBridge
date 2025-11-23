@@ -124,21 +124,6 @@ class ListMedia(ListEntity, Protocol):
 class ListEntry(ListEntity, Protocol):
     """Base protocol for list entries."""
 
-    @classmethod
-    def create_empty(
-        cls, provider: ListProvider, media: ListMedia | None = None
-    ) -> ListEntry:
-        """Create an empty list entry instance.
-
-        Args:
-            provider (ListProvider): The list provider for the entry.
-            media (ListMedia | None): Optional media item for the entry.
-
-        Returns:
-            ListEntry: An empty list entry.
-        """
-        ...
-
     @property
     def progress(self) -> int | None:
         """Get the progress for the entry.
@@ -303,6 +288,22 @@ class ListProvider(Protocol):
 
         Returns:
             ListEntry | None: The list entry if found, otherwise None.
+        """
+        ...
+
+    async def build_entry(self, key: str) -> ListEntry:
+        """Construct a list entry for the supplied media key.
+
+        Implementations must return a list entry instance suitable for creating or
+        updating a record, even if the user does not currently have the media in
+        their list. This typically involves fetching provider metadata for the
+        media and wrapping it with the provider's ``ListEntry`` implementation.
+
+        Args:
+            key (str): The unique key of the media item to prepare an entry for.
+
+        Returns:
+            ListEntry: The prepared list entry instance.
         """
         ...
 

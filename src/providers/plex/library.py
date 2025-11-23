@@ -107,7 +107,7 @@ class PlexLibraryMedia(LibraryMedia):
     @property
     def on_watchlist(self) -> bool:
         """Check if the media item is on the user's watchlist."""
-        return self._provider._client.is_on_watchlist(self._item)
+        return self._provider.is_on_watchlist(self._item)
 
     @property
     def user_rating(self) -> int | None:
@@ -242,6 +242,7 @@ class PlexLibraryMovie(PlexLibraryMedia, LibraryMovie):
             item (plexapi_video.Movie): The underlying Plex movie item.
         """
         super().__init__(provider, section, item, MediaKind.MOVIE)
+        self._item = cast(plexapi_video.Movie, self._item)
 
 
 class PlexLibraryShow(PlexLibraryMedia, LibraryShow):
@@ -263,6 +264,7 @@ class PlexLibraryShow(PlexLibraryMedia, LibraryShow):
             item (plexapi_video.Show): The underlying Plex show item.
         """
         super().__init__(provider, section, item, MediaKind.SHOW)
+        self._item = cast(plexapi_video.Show, self._item)
 
     @property
     def ordering(self) -> Literal["tmdb", "tvdb", ""]:
@@ -312,6 +314,7 @@ class PlexLibrarySeason(PlexLibraryMedia, LibrarySeason):
             show (PlexLibraryShow | None): The parent show, if known.
         """
         super().__init__(provider, section, item, MediaKind.SEASON)
+        self._item = cast(plexapi_video.Season, self._item)
         self._show = show
         self.index = self._item.index
 
@@ -369,6 +372,7 @@ class PlexLibraryEpisode(PlexLibraryMedia, LibraryEpisode):
             show (PlexLibraryShow | None): The parent show, if known.
         """
         super().__init__(provider, section, item, MediaKind.EPISODE)
+        self._item = cast(plexapi_video.Episode, self._item)
         self._show = show
         self._season = season
         self.index = self._item.index
@@ -464,10 +468,7 @@ class PlexLibraryProvider(LibraryProvider):
         await self._client.initialize()
         bundle = self._client.bundle
         self._is_admin_user = bundle.is_admin
-        self._user = LibraryUser(
-            key=str(bundle.user_id),
-            title=bundle.display_name,
-        )
+        self._user = LibraryUser(key=str(bundle.user_id), title=bundle.display_name)
 
         self._sections = self._build_sections()
         self._community_client = PlexCommunityClient(self._client_config.token)
@@ -556,6 +557,17 @@ class PlexLibraryProvider(LibraryProvider):
         """
         return self._client.is_on_continue_watching(section.raw(), item)
 
+    def is_on_watchlist(self, item: plexapi_video.Video) -> bool:
+        """Determine whether the given item appears in the user's watchlist.
+
+        Args:
+            item (plexapi_video.Video): The Plex media item to check.
+
+        Returns:
+            bool: True if the item is on the watchlist, False otherwise.
+        """
+        return self._client.is_on_watchlist(item)
+
     async def get_review(self, item: plexapi_video.Video) -> str | None:
         """Fetch the user's review for the provided Plex item, if available.
 
@@ -632,9 +644,7 @@ class PlexLibraryProvider(LibraryProvider):
         return sections
 
     def _wrap_media(
-        self,
-        section: PlexLibrarySection,
-        item: plexapi_video.Video,
+        self, section: PlexLibrarySection, item: plexapi_video.Video
     ) -> LibraryMedia:
         """Wrap a Plex media item in the appropriate library media class."""
         if isinstance(item, plexapi_video.Episode):
