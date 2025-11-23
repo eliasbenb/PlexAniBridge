@@ -2,7 +2,6 @@
 
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator, Callable, Sequence
-from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, ClassVar
 
@@ -13,7 +12,13 @@ from rapidfuzz import fuzz
 from src import log
 from src.config.database import db
 from src.config.settings import SyncField
-from src.core.sync.stats import ItemIdentifier, SyncOutcome, SyncStats
+from src.core.sync.stats import (
+    BatchUpdate,
+    EntrySnapshot,
+    ItemIdentifier,
+    SyncOutcome,
+    SyncStats,
+)
 from src.models.db.animap import AniMap
 from src.models.db.pin import Pin
 from src.utils.types import Comparable
@@ -22,74 +27,6 @@ if TYPE_CHECKING:
     from src.core.animap import AniMapClient
 
 __all__ = ["BaseSyncClient"]
-
-
-@dataclass(slots=True)
-class EntrySnapshot:
-    """Snapshot of list entry fields used for comparison and history."""
-
-    media_key: str
-    status: ListStatus | None
-    progress: int | None
-    repeats: int | None
-    review: str | None
-    user_rating: int | None
-    started_at: datetime | None
-    finished_at: datetime | None
-
-    @classmethod
-    def from_entry(cls, entry: ListEntry) -> EntrySnapshot:
-        """Create a snapshot from a list entry."""
-        return cls(
-            media_key=entry.media().key,
-            status=entry.status,
-            progress=entry.progress,
-            repeats=entry.repeats,
-            review=entry.review,
-            user_rating=entry.user_rating,
-            started_at=entry.started_at,
-            finished_at=entry.finished_at,
-        )
-
-    def asdict(self) -> dict[str, Any]:
-        """Return a raw dictionary representation."""
-        return {
-            "media_key": self.media_key,
-            "status": self.status,
-            "progress": self.progress,
-            "repeats": self.repeats,
-            "review": self.review,
-            "user_rating": self.user_rating,
-            "started_at": self.started_at,
-            "finished_at": self.finished_at,
-        }
-
-    def serialize(self) -> dict[str, Any]:
-        """Serialize values into JSON-friendly primitives."""
-
-        def _serialize(value: Any) -> Any:
-            if isinstance(value, datetime):
-                dt = value
-                dt = dt.replace(tzinfo=UTC) if dt.tzinfo is None else dt.astimezone(UTC)
-                return dt.isoformat()
-            if isinstance(value, ListStatus):
-                return value.value
-            return value
-
-        return {key: _serialize(value) for key, value in self.asdict().items()}
-
-
-@dataclass(slots=True)
-class BatchUpdate[ParentMediaT: LibraryMedia, ChildMediaT: LibraryMedia]:
-    """Container for deferred batch updates and associated metadata."""
-
-    item: ParentMediaT
-    child: ChildMediaT
-    grandchildren: Sequence[LibraryMedia]
-    mapping: AniMap | None
-    before: EntrySnapshot | None
-    after: EntrySnapshot
-    entry: ListEntry
 
 
 def diff_snapshots(

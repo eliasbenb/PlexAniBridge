@@ -1,9 +1,10 @@
 """Synchronization statistics and tracking module."""
 
 from collections.abc import Sequence
-from datetime import datetime
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from enum import StrEnum
-from typing import Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from anibridge_providers.library import (
     LibraryEpisode,
@@ -14,8 +15,19 @@ from anibridge_providers.library import (
 from pydantic import BaseModel
 
 from src.exceptions import UnsupportedMediaTypeError
+from src.models.db.animap import AniMap
 
-__all__ = ["ItemIdentifier", "SyncOutcome", "SyncProgress", "SyncStats"]
+if TYPE_CHECKING:
+    from anibridge_providers.list import ListEntry, ListStatus
+
+__all__ = [
+    "BatchUpdate",
+    "EntrySnapshot",
+    "ItemIdentifier",
+    "SyncOutcome",
+    "SyncProgress",
+    "SyncStats",
+]
 
 
 class ItemIdentifier(BaseModel):
@@ -313,3 +325,71 @@ class SyncProgress(BaseModel):
     stage: str
     section_items_total: int
     section_items_processed: int
+
+
+@dataclass(slots=True)
+class EntrySnapshot:
+    """Snapshot of list entry fields used for comparison and history."""
+
+    media_key: str
+    status: ListStatus | None
+    progress: int | None
+    repeats: int | None
+    review: str | None
+    user_rating: int | None
+    started_at: datetime | None
+    finished_at: datetime | None
+
+    @classmethod
+    def from_entry(cls, entry: ListEntry) -> EntrySnapshot:
+        """Create a snapshot from a list entry."""
+        return cls(
+            media_key=entry.media().key,
+            status=entry.status,
+            progress=entry.progress,
+            repeats=entry.repeats,
+            review=entry.review,
+            user_rating=entry.user_rating,
+            started_at=entry.started_at,
+            finished_at=entry.finished_at,
+        )
+
+    def asdict(self) -> dict[str, Any]:
+        """Return a raw dictionary representation."""
+        return {
+            "media_key": self.media_key,
+            "status": self.status,
+            "progress": self.progress,
+            "repeats": self.repeats,
+            "review": self.review,
+            "user_rating": self.user_rating,
+            "started_at": self.started_at,
+            "finished_at": self.finished_at,
+        }
+
+    def serialize(self) -> dict[str, Any]:
+        """Serialize values into JSON-friendly primitives."""
+
+        def _serialize(value: Any) -> Any:
+            if isinstance(value, datetime):
+                dt = value
+                dt = dt.replace(tzinfo=UTC) if dt.tzinfo is None else dt.astimezone(UTC)
+                return dt.isoformat()
+            if isinstance(value, ListStatus):
+                return value.value
+            return value
+
+        return {key: _serialize(value) for key, value in self.asdict().items()}
+
+
+@dataclass(slots=True)
+class BatchUpdate[ParentMediaT: LibraryMedia, ChildMediaT: LibraryMedia]:
+    """Container for deferred batch updates and associated metadata."""
+
+    item: ParentMediaT
+    child: ChildMediaT
+    grandchildren: Sequence[LibraryMedia]
+    mapping: AniMap | None
+    before: EntrySnapshot | None
+    after: EntrySnapshot
+    entry: ListEntry
