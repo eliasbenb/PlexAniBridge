@@ -8,7 +8,6 @@
         type PinsPanelContext,
     } from "$lib/components/timeline/timeline-item.svelte";
     import type { OutcomeMeta } from "$lib/components/timeline/types";
-    import type { MediaWithoutList as AniListMediaWithoutList } from "$lib/types/anilist";
     import type {
         HistoryItem,
         PinFieldOption,
@@ -16,8 +15,8 @@
         PinResponse,
         PinSearchResponse,
         PinSearchResult,
+        ProviderMediaMetadata,
     } from "$lib/types/api";
-    import { preferredTitle } from "$lib/utils/anilist";
     import { apiFetch } from "$lib/utils/api";
     import { toast } from "$lib/utils/notify";
     import { clearPinOptionsCache, loadPinOptions } from "$lib/utils/pin-options";
@@ -47,7 +46,35 @@
     let results: PinSearchResult[] = $state([]);
 
     // Per-row editor state
-    type RowKey = number; // anilist id
+    type RowKey = string;
+    const ROW_KEY_SEPARATOR = "::";
+
+    const makeRowKey = (namespace?: string | null, mediaKey?: string | null) => {
+        if (!namespace || !mediaKey) return null;
+        return `${namespace}${ROW_KEY_SEPARATOR}${mediaKey}`;
+    };
+
+    const parseRowKey = (key: RowKey) => {
+        const idx = key.indexOf(ROW_KEY_SEPARATOR);
+        if (idx === -1) return { namespace: "", mediaKey: key };
+        return {
+            namespace: key.slice(0, idx),
+            mediaKey: key.slice(idx + ROW_KEY_SEPARATOR.length),
+        };
+    };
+
+    let rowIds: Record<RowKey, number> = $state({});
+    let nextRowId = $state(1);
+
+    function ensureRowId(key: RowKey): number {
+        const existing = rowIds[key];
+        if (existing) return existing;
+        const assigned = nextRowId;
+        nextRowId = assigned + 1;
+        rowIds[key] = assigned;
+        return assigned;
+    }
+
     let expanded: Record<RowKey, boolean> = $state({});
     let saving: Record<RowKey, boolean> = $state({});
     let rowError: Record<RowKey, string | null> = $state({});
@@ -83,49 +110,59 @@
     }
 
     const timelineDisplayTitle = (item: HistoryItem): string | null =>
-        preferredTitle(item.anilist?.title) ||
-        (item.anilist_id ? `AniList ${item.anilist_id}` : null) ||
+        item.list_media?.title ??
+        item.library_media?.title ??
+        (item.list_namespace && item.list_media_key
+            ? `${item.list_namespace}:${item.list_media_key}`
+            : null) ??
+        (item.library_namespace && item.library_media_key
+            ? `${item.library_namespace}:${item.library_media_key}`
+            : null) ??
         "Unknown";
 
     const timelineCoverImage = (item: HistoryItem): string | null =>
-        item.anilist?.coverImage?.large ||
-        item.anilist?.coverImage?.medium ||
-        item.anilist?.coverImage?.extraLarge ||
-        null;
+        item.list_media?.poster_url ?? item.library_media?.poster_url ?? null;
 
-    const timelineAnilistUrl = (item: HistoryItem): string | null => {
-        const id = item.anilist?.id || item.anilist_id;
-        if (!id) return null;
-        return `https://anilist.co/anime/${id}`;
-    };
+    const timelineListUrl = (item: HistoryItem): string | null =>
+        item.list_media?.external_url ?? null;
 
-    const timelinePlexUrl = () => null;
+    const timelineLibraryUrl = (item: HistoryItem): string | null =>
+        item.library_media?.external_url ?? null;
 
     function toHistoryItem(
-        aid: number,
+        key: RowKey,
         pin: PinResponse | null | undefined,
-        anilist: AniListMediaWithoutList | null,
+        media: ProviderMediaMetadata | null,
         outcome: string,
     ): HistoryItem {
-        const timestamp = pin?.updated_at || pin?.created_at || "";
+        const { namespace, mediaKey } = parseRowKey(key);
+        const rowId = ensureRowId(key);
+        const timestamp = pin?.updated_at || pin?.created_at || new Date().toISOString();
+        const resolvedMedia = media ?? pin?.media ?? null;
         return {
-            id: aid,
+            id: rowId,
             profile_name: profile,
-            anilist_id: aid,
+            library_namespace: null,
+            library_section_key: null,
+            library_media_key: null,
+            list_namespace: namespace || null,
+            list_media_key: mediaKey || null,
+            media_kind: null,
             outcome,
             before_state: null,
             after_state: null,
             error_message: null,
             timestamp,
-            anilist: anilist ?? null,
-            plex: null,
+            library_media: null,
+            list_media: resolvedMedia,
             pinned_fields: pin?.fields ?? [],
         } satisfies HistoryItem;
     }
 
-    function setRow(aid: number, fields: string[], updateBaseline = false) {
-        selections[aid] = [...fields];
-        if (updateBaseline) baselines[aid] = [...fields];
+    function setRow(key: RowKey | null, fields: string[], updateBaseline = false) {
+        if (!key) return;
+        selections[key] = [...fields];
+        if (updateBaseline) baselines[key] = [...fields];
     }
 
     async function ensureOptions(force = false) {
@@ -147,11 +184,15 @@
         pinnedLoading = true;
         pinnedError = null;
         try {
-            const r = await apiFetch(`/api/pins/${profile}?with_anilist=true`);
+            const r = await apiFetch(`/api/pins/${profile}?with_media=true`);
             if (!r.ok) throw new Error("HTTP " + r.status);
             const d = (await r.json()) as PinListResponse;
             pinned = d.pins || [];
-            for (const p of pinned) setRow(p.anilist_id, p.fields || [], true);
+            for (const entry of pinned) {
+                const key = makeRowKey(entry.list_namespace, entry.list_media_key);
+                if (key) ensureRowId(key);
+                setRow(key, entry.fields || [], true);
+            }
         } catch (e) {
             console.error(e);
             pinnedError = (e as Error)?.message || "Failed to load pins";
@@ -177,8 +218,12 @@
             const d = (await r.json()) as PinSearchResponse;
             results = d.results || [];
             for (const res of results) {
+                const key = makeRowKey(res.media.namespace, res.media.key);
                 const base = res.pin?.fields || [];
-                setRow(Number(res.anilist.id), base, true);
+                if (key) {
+                    ensureRowId(key);
+                }
+                setRow(key, base, true);
             }
         } catch (e) {
             console.error(e);
@@ -188,26 +233,40 @@
         }
     }
 
-    async function save(aid: number, fields: string[]) {
-        if (saving[aid]) return;
-        saving[aid] = true;
-        rowError[aid] = null;
+    async function save(
+        rowKey: RowKey,
+        namespace: string,
+        mediaKey: string,
+        fields: string[],
+        metadata: ProviderMediaMetadata | null,
+    ) {
+        if (saving[rowKey]) return;
+        saving[rowKey] = true;
+        rowError[rowKey] = null;
         try {
             if (!fields.length) {
-                const r = await apiFetch(`/api/pins/${profile}/${aid}`, {
+                const r = await apiFetch(`/api/pins/${profile}/${namespace}/${mediaKey}`, {
                     method: "DELETE",
                 });
                 if (!r.ok) throw new Error("HTTP " + r.status);
-                setRow(aid, [], true);
-                pinned = pinned.filter((p) => p.anilist_id !== aid);
+                setRow(rowKey, [], true);
+                pinned = pinned.filter(
+                    (p) =>
+                        !(
+                            p.list_namespace === namespace &&
+                            p.list_media_key === mediaKey
+                        ),
+                );
                 results = results.map((res) =>
-                    Number(res.anilist.id) === aid ? { ...res, pin: null } : res,
+                    res.media.namespace === namespace && res.media.key === mediaKey
+                        ? { ...res, pin: null }
+                        : res,
                 );
                 toast("Pins cleared", "success");
                 return;
             }
             const r = await apiFetch(
-                `/api/pins/${profile}/${aid}?with_anilist=true`,
+                `/api/pins/${profile}/${namespace}/${mediaKey}?with_media=true`,
                 {
                     method: "PUT",
                     headers: { "Content-Type": "application/json" },
@@ -218,32 +277,33 @@
             if (!r.ok) throw new Error("HTTP " + r.status);
             const d = (await r.json()) as PinResponse;
             const next = d.fields || [];
-            setRow(aid, next, true);
+            setRow(rowKey, next, true);
 
-            const existing = pinned.find((p) => p.anilist_id === aid) || null;
-            let anilistMeta = d.anilist ?? existing?.anilist ?? null;
-            if (!anilistMeta) {
-                const resMatch = results.find((res) => Number(res.anilist.id) === aid);
-                anilistMeta = resMatch?.anilist ?? null;
-            }
+            const idx = pinned.findIndex(
+                (p) => p.list_namespace === namespace && p.list_media_key === mediaKey,
+            );
+            const existing = idx >= 0 ? pinned[idx] : null;
+            const resolvedMedia = d.media ?? metadata ?? existing?.media ?? null;
             const merged: PinResponse = {
                 ...(existing ?? {}),
                 ...d,
-                anilist: anilistMeta,
-            } as PinResponse;
+                media: resolvedMedia,
+            };
 
-            const idx = pinned.findIndex((p) => p.anilist_id === aid);
             if (idx >= 0) pinned[idx] = merged;
             else pinned = [merged, ...pinned];
+
             results = results.map((res) =>
-                Number(res.anilist.id) === aid ? { ...res, pin: merged } : res,
+                res.media.namespace === namespace && res.media.key === mediaKey
+                    ? { ...res, pin: merged }
+                    : res,
             );
         } catch (e) {
             console.error(e);
-            rowError[aid] = (e as Error)?.message || "Failed to save";
+            rowError[rowKey] = (e as Error)?.message || "Failed to save";
             toast("Failed to save pins", "error");
         } finally {
-            saving[aid] = false;
+            saving[rowKey] = false;
         }
     }
 
@@ -263,8 +323,8 @@
         if (q.trim()) void search();
     }
 
-    function toggleRow(aid: number) {
-        expanded[aid] = !expanded[aid];
+    function toggleRow(key: RowKey) {
+        expanded[key] = !expanded[key];
     }
 
     $effect(() => {
@@ -279,18 +339,26 @@
         void ensureOptions(false);
     });
 
-    function panelDataFor(aid: number, base: string[], sel: string[]): PinsPanelData {
+    function panelDataFor(
+        key: RowKey,
+        base: string[],
+        sel: string[],
+        namespace: string,
+        mediaKey: string,
+        metadata: ProviderMediaMetadata | null,
+    ): PinsPanelData {
         return {
             value: sel,
-            baseline: baselines[aid] ?? base,
+            baseline: baselines[key] ?? base,
             options,
             optionsLoading,
-            saving: saving[aid] || false,
-            error: rowError[aid] || null,
+            saving: saving[key] || false,
+            error: rowError[key] || null,
             optionsError,
             disabled: !!optionsError,
-            onSave: (value: string[]) => save(aid, value),
-            onChange: (value: string[]) => (selections[aid] = [...value]),
+            onSave: (value: string[]) =>
+                save(key, namespace, mediaKey, value, metadata),
+            onChange: (value: string[]) => (selections[key] = [...value]),
             onRefresh: (force: boolean) => ensureOptions(force),
         };
     }
@@ -355,7 +423,7 @@
                         class="pointer-events-none absolute top-1/2 left-2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
                     <input
                         class="h-8 w-full rounded-md border border-slate-700 bg-slate-900 pr-8 pl-8 text-[12px] text-slate-100 placeholder-slate-500 focus:border-slate-500 focus:outline-none"
-                        placeholder="Search AniList titles"
+                        placeholder="Search list titles"
                         bind:value={q}
                         onkeydown={(e) => (e.key === "Enter" ? search() : undefined)} />
                     {#if q}
@@ -424,35 +492,49 @@
                     {:else if !pinnedLoading && !pinned.length}
                         <div class="px-3 py-2 text-slate-400">No pinned entries.</div>
                     {/if}
-                    {#each pinned as p (p.anilist_id)}
-                        {@const aid = p.anilist_id}
+                    {#each pinned as p (p.profile_name + ":" + (p.list_namespace ?? "") + ":" + (p.list_media_key ?? ""))}
+                        {@const rowKey = makeRowKey(p.list_namespace, p.list_media_key)}
                         {@const base = p.fields || []}
-                        {@const sel = selections[aid] ?? base}
-                        {@const historyItem = toHistoryItem(
-                            aid,
-                            p,
-                            p.anilist ?? null,
-                            "pinned",
-                        )}
-                        {@const panelData = panelDataFor(aid, base, sel)}
-                        <div class="px-3 py-2">
-                            <TimelineItem
-                                {profile}
-                                item={historyItem}
-                                meta={PINNED_META}
-                                displayTitle={timelineDisplayTitle}
-                                coverImage={timelineCoverImage}
-                                anilistUrl={timelineAnilistUrl}
-                                plexUrl={timelinePlexUrl}
-                                hasPins={true}
-                                togglePins={(item) => toggleRow(item.id)}
-                                openPins={expanded[aid] || false}
-                                pinButtonLoading={saving[aid] || false}
-                                pinButtonDisabled={!!optionsError}
-                                pinCount={sel.length}
-                                pinsPanel={PinEditorPanel}
-                                pinsPanelData={panelData} />
-                        </div>
+                        {@const sel = rowKey ? selections[rowKey] ?? base : base}
+                        {#if rowKey}
+                            {@const identifiers = parseRowKey(rowKey)}
+                            {@const historyItem = toHistoryItem(
+                                rowKey,
+                                p,
+                                p.media ?? null,
+                                "pinned",
+                            )}
+                            {@const panelData = panelDataFor(
+                                rowKey,
+                                base,
+                                sel,
+                                identifiers.namespace,
+                                identifiers.mediaKey,
+                                p.media ?? null,
+                            )}
+                            <div class="px-3 py-2">
+                                <TimelineItem
+                                    {profile}
+                                    item={historyItem}
+                                    meta={PINNED_META}
+                                    displayTitle={timelineDisplayTitle}
+                                    coverImage={timelineCoverImage}
+                                    anilistUrl={timelineListUrl}
+                                    plexUrl={timelineLibraryUrl}
+                                    hasPins={true}
+                                    togglePins={() => toggleRow(rowKey)}
+                                    openPins={expanded[rowKey] || false}
+                                    pinButtonLoading={saving[rowKey] || false}
+                                    pinButtonDisabled={!!optionsError}
+                                    pinCount={sel.length}
+                                    pinsPanel={PinEditorPanel}
+                                    pinsPanelData={panelData} />
+                            </div>
+                        {:else}
+                            <div class="px-3 py-2 text-[11px] text-amber-200">
+                                Missing provider identifiers for pinned entry.
+                            </div>
+                        {/if}
                     {/each}
                 </div>
             </div>
@@ -484,36 +566,50 @@
                     {:else if !searchLoading && q && !results.length}
                         <div class="px-3 py-2 text-slate-400">No results.</div>
                     {/if}
-                    {#each results as r (r.anilist.id)}
-                        {@const aid = Number(r.anilist.id)}
+                    {#each results as r (r.media.namespace + ":" + r.media.key)}
+                        {@const rowKey = makeRowKey(r.media.namespace, r.media.key)}
                         {@const base = r.pin?.fields || []}
-                        {@const sel = selections[aid] ?? base}
+                        {@const sel = rowKey ? selections[rowKey] ?? base : base}
                         {@const meta = r.pin ? PINNED_META : SEARCH_META}
-                        {@const historyItem = toHistoryItem(
-                            aid,
-                            r.pin ?? null,
-                            r.anilist ?? null,
-                            r.pin ? "pinned" : "search",
-                        )}
-                        {@const panelData = panelDataFor(aid, base, sel)}
-                        <div class="px-3 py-2">
-                            <TimelineItem
-                                {profile}
-                                item={historyItem}
-                                {meta}
-                                displayTitle={timelineDisplayTitle}
-                                coverImage={timelineCoverImage}
-                                anilistUrl={timelineAnilistUrl}
-                                plexUrl={timelinePlexUrl}
-                                hasPins={true}
-                                togglePins={(item) => toggleRow(item.id)}
-                                openPins={expanded[aid] || false}
-                                pinButtonLoading={saving[aid] || false}
-                                pinButtonDisabled={!!optionsError}
-                                pinCount={sel.length}
-                                pinsPanel={PinEditorPanel}
-                                pinsPanelData={panelData} />
-                        </div>
+                        {#if rowKey}
+                            {@const identifiers = parseRowKey(rowKey)}
+                            {@const historyItem = toHistoryItem(
+                                rowKey,
+                                r.pin ?? null,
+                                r.media ?? null,
+                                r.pin ? "pinned" : "search",
+                            )}
+                            {@const panelData = panelDataFor(
+                                rowKey,
+                                base,
+                                sel,
+                                identifiers.namespace,
+                                identifiers.mediaKey,
+                                r.media ?? null,
+                            )}
+                            <div class="px-3 py-2">
+                                <TimelineItem
+                                    {profile}
+                                    item={historyItem}
+                                    meta={meta}
+                                    displayTitle={timelineDisplayTitle}
+                                    coverImage={timelineCoverImage}
+                                    anilistUrl={timelineListUrl}
+                                    plexUrl={timelineLibraryUrl}
+                                    hasPins={true}
+                                    togglePins={() => toggleRow(rowKey)}
+                                    openPins={expanded[rowKey] || false}
+                                    pinButtonLoading={saving[rowKey] || false}
+                                    pinButtonDisabled={!!optionsError}
+                                    pinCount={sel.length}
+                                    pinsPanel={PinEditorPanel}
+                                    pinsPanelData={panelData} />
+                            </div>
+                        {:else}
+                            <div class="px-3 py-2 text-[11px] text-amber-200">
+                                Missing provider identifiers for search result.
+                            </div>
+                        {/if}
                     {/each}
                 </div>
             </div>

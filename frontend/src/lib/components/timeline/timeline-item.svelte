@@ -100,16 +100,17 @@
     }: Props = $props();
 
     function mappingUrl(item: HistoryItem): string | null {
-        if (item.anilist?.id) {
-            return (
-                resolve("/mappings") +
-                "?" +
-                new SvelteURLSearchParams({
-                    q: `anilist:${item.anilist.id.toString()}`,
-                }).toString()
-            );
-        }
-        return null;
+        const namespace = item.list_namespace ?? item.list_media?.namespace ?? null;
+        if (namespace !== "anilist") return null;
+        const key = item.list_media_key ?? item.list_media?.key ?? null;
+        if (!key) return null;
+        const id = Number.parseInt(key, 10);
+        if (!Number.isFinite(id)) return null;
+        return (
+            resolve("/mappings") +
+            "?" +
+            new SvelteURLSearchParams({ q: `anilist:${id}` }).toString()
+        );
     }
     const coverHref = anilistUrl(item);
 
@@ -162,8 +163,7 @@
                             src={coverImage(item)!}
                             alt={displayTitle(item) || "Cover"}
                             loading="lazy"
-                            class="timeline-cover-img h-full w-full object-cover transition-[filter] duration-150 ease-out group-hover:blur-none"
-                            class:blur-sm={item.anilist?.isAdult} />
+                            class="timeline-cover-img h-full w-full object-cover transition-[filter] duration-150 ease-out group-hover:blur-none" />
                     </div>
                 {:else}
                     <div
@@ -181,8 +181,7 @@
                         src={coverImage(item)!}
                         alt={displayTitle(item) || "Cover"}
                         loading="lazy"
-                        class="timeline-cover-img h-full w-full object-cover transition-[filter] duration-150 ease-out group-hover:blur-none"
-                        class:blur-sm={item.anilist?.isAdult} />
+                        class="timeline-cover-img h-full w-full object-cover transition-[filter] duration-150 ease-out group-hover:blur-none" />
                 </div>
             </div>
         {:else}
@@ -258,35 +257,23 @@
                                     {timestampLabel}
                                 </span>
                             {/if}
-                            {#if item.anilist?.format}
+                            {#if item.media_kind}
                                 <span
                                     class="inline-flex items-center rounded bg-slate-800/70 px-1.5 py-0.5 tracking-wide text-slate-400 uppercase">
-                                    {item.anilist.format}
+                                    {item.media_kind}
                                 </span>
                             {/if}
-                            {#if item.anilist?.status}
+                            {#if item.list_namespace}
                                 <span
-                                    class="inline-flex items-center rounded bg-slate-800/70 px-1.5 py-0.5 tracking-wide text-slate-400 uppercase">
-                                    {item.anilist.status}
+                                    class="inline-flex items-center rounded bg-slate-800/70 px-1.5 py-0.5 text-slate-400 uppercase">
+                                    LIST: {item.list_namespace}
                                 </span>
                             {/if}
-                            {#if item.anilist?.season && item.anilist?.seasonYear}
+                            {#if item.library_namespace}
                                 <span
-                                    class="inline-flex items-center rounded bg-slate-800/70 px-1.5 py-0.5 tracking-wide text-slate-400 uppercase">
-                                    {item.anilist.season}
-                                    {item.anilist.seasonYear}
+                                    class="inline-flex items-center rounded bg-slate-800/70 px-1.5 py-0.5 text-slate-400 uppercase">
+                                    LIB: {item.library_namespace}
                                 </span>
-                            {/if}
-                            {#if item.anilist?.episodes}
-                                <span
-                                    class="inline-flex items-center rounded bg-slate-800/70 px-1.5 py-0.5 text-slate-400">
-                                    EP {item.anilist.episodes}
-                                </span>
-                            {/if}
-                            {#if item.anilist?.isAdult}
-                                <span
-                                    class="inline-flex items-center rounded bg-rose-800 px-1.5 py-0.5 text-slate-100"
-                                    title="ADULT content">ADULT</span>
                             {/if}
                         </div>
                         <div class="mt-2 flex items-center gap-2">

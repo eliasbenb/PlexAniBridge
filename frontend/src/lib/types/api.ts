@@ -1,13 +1,18 @@
-import type {
-    Media as AniListMedia,
-    MediaWithoutList as AniListMediaWithoutList,
-} from "$lib/types/anilist";
+import type { Media as AniListMedia } from "$lib/types/anilist";
 
 // --- Generic ---
 export type ApiResult<T> = Promise<T>;
 
 export interface OkResponse {
     ok: boolean;
+}
+
+export interface ProviderMediaMetadata {
+    namespace: string;
+    key: string;
+    title?: string | null;
+    poster_url?: string | null;
+    external_url?: string | null;
 }
 
 // --- Mappings API ---
@@ -180,24 +185,19 @@ export interface MetaResponse {
 export interface HistoryItem {
     id: number;
     profile_name: string;
-    plex_guid?: string | null;
-    plex_rating_key?: string;
-    plex_child_rating_key?: string | null;
-    plex_type?: string;
-    anilist_id?: number | null;
+    library_namespace?: string | null;
+    library_section_key?: string | null;
+    library_media_key?: string | null;
+    list_namespace?: string | null;
+    list_media_key?: string | null;
+    media_kind?: string | null;
     outcome: string;
     before_state?: Record<string, unknown> | null;
     after_state?: Record<string, unknown> | null;
     error_message?: string | null;
     timestamp: string;
-    anilist?: AniListMediaWithoutList | null;
-    plex?: {
-        guid?: string;
-        title?: string;
-        type?: string | null;
-        art?: string | null;
-        thumb?: string | null;
-    } | null;
+    library_media?: ProviderMediaMetadata | null;
+    list_media?: ProviderMediaMetadata | null;
     pinned_fields?: string[] | null;
 }
 
@@ -221,11 +221,12 @@ export interface PinFieldOption {
 
 export interface PinResponse {
     profile_name: string;
-    anilist_id: number;
+    list_namespace: string;
+    list_media_key: string;
     fields: string[];
     created_at: string;
     updated_at: string;
-    anilist?: AniListMediaWithoutList | null;
+    media?: ProviderMediaMetadata | null;
 }
 
 export interface PinListResponse {
@@ -237,7 +238,7 @@ export interface PinOptionsResponse {
 }
 
 export interface PinSearchResult {
-    anilist: AniListMediaWithoutList;
+    media: ProviderMediaMetadata;
     pin?: PinResponse | null;
 }
 

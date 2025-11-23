@@ -21,7 +21,6 @@
     import TimelineOutcomeFilters from "$lib/components/timeline/timeline-outcome-filters.svelte";
     import type { ItemDiffUi } from "$lib/components/timeline/types";
     import type { CurrentSync, HistoryItem } from "$lib/types/api";
-    import { preferredTitle } from "$lib/utils/anilist";
     import { apiFetch } from "$lib/utils/api";
     import { toast } from "$lib/utils/notify";
 
@@ -112,33 +111,32 @@
 
     function displayTitle(item: HistoryItem) {
         return (
-            preferredTitle(item.anilist?.title) ||
-            item.plex?.title ||
-            (item.anilist_id ? `AniList ID: ${item.anilist_id}` : null) ||
-            (item.plex_guid ? item.plex_guid : "Unknown Title")
+            item.list_media?.title ??
+            item.library_media?.title ??
+            (item.list_namespace && item.list_media_key
+                ? `${item.list_namespace}:${item.list_media_key}`
+                : null) ??
+            (item.library_namespace && item.library_media_key
+                ? `${item.library_namespace}:${item.library_media_key}`
+                : null) ??
+            "Unknown title"
         );
     }
 
     function coverImage(item: HistoryItem) {
         return (
-            item.anilist?.coverImage?.large ||
-            item.anilist?.coverImage?.medium ||
-            item.anilist?.coverImage?.extraLarge ||
-            item.plex?.thumb ||
-            item.plex?.art ||
+            item.list_media?.poster_url ??
+            item.library_media?.poster_url ??
             null
         );
     }
 
     function anilistUrl(item: HistoryItem) {
-        return item.anilist?.id ? `https://anilist.co/anime/${item.anilist.id}` : null;
+        return item.list_media?.external_url ?? null;
     }
 
     function plexUrl(item: HistoryItem) {
-        if (!item.plex_guid) return null;
-        const cleanGuid = item.plex_guid.split("/").pop();
-        const key = encodeURIComponent(`/library/metadata/${cleanGuid}`);
-        return `https://app.plex.tv/desktop/#!/provider/tv.plex.provider.discover/details?key=${key}`;
+        return item.library_media?.external_url ?? null;
     }
 
     async function deleteHistory(item: HistoryItem) {
@@ -162,59 +160,22 @@
         }
     }
 
-    function canUndo(item: HistoryItem): boolean {
-        if (
-            item.outcome === "synced" &&
-            item.before_state != null &&
-            item.after_state != null
-        )
-            return true; // revert update
-        if (
-            item.outcome === "synced" &&
-            item.before_state == null &&
-            item.after_state != null
-        )
-            return true; // undo creation (delete)
-        if (
-            item.outcome === "deleted" &&
-            item.before_state != null &&
-            item.after_state == null
-        )
-            return true; // restore deletion
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    function canUndo(_item: HistoryItem): boolean {
+        // TODO: Implement undo logic on provider side
         return false;
     }
 
-    function canRetry(item: HistoryItem): boolean {
-        return (
-            !!item.plex_rating_key &&
-            (item.outcome === "failed" || item.outcome === "not_found")
-        );
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    function canRetry(_item: HistoryItem): boolean {
+        // TODO: Implement retry logic on provider side
+        return false;
     }
 
-    async function retryHistory(item: HistoryItem) {
-        if (!canRetry(item)) return toast("Retry not available for this entry", "warn");
-        if (retryLoading[item.id]) return;
-        if (!item.plex_rating_key) return;
-        retryLoading[item.id] = true;
-        try {
-            const res = await apiFetch(
-                `/api/sync/profile/${params.profile}?poll=false`,
-                {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ rating_keys: [item.plex_rating_key] }),
-                },
-                {
-                    successMessage: `Retry requested for ${item.plex?.title || item.plex_rating_key}`,
-                },
-            );
-            if (!res.ok) throw new Error("HTTP " + res.status);
-        } catch (e) {
-            console.error(e);
-            toast("Retry failed", "error");
-        } finally {
-            retryLoading[item.id] = false;
-        }
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    async function retryHistory(_item: HistoryItem) {
+        // TODO: Implement retry logic on provider side
+        toast("Retry is not available for provider-based history entries", "info");
     }
 
     function canShowDiff(item: HistoryItem): boolean {
@@ -237,9 +198,18 @@
         return count;
     }
 
-    function applyPins(anilistId: number, fields: string[]) {
+    function getListIdentifier(
+        item: HistoryItem,
+    ): { namespace: string; mediaKey: string } | null {
+        const namespace = item.list_namespace ?? item.list_media?.namespace ?? null;
+        const mediaKey = item.list_media_key ?? item.list_media?.key ?? null;
+        if (!namespace || !mediaKey) return null;
+        return { namespace, mediaKey };
+    }
+
+    function applyPins(namespace: string, mediaKey: string, fields: string[]) {
         items = items.map((entry) =>
-            entry.anilist_id === anilistId
+            entry.list_namespace === namespace && entry.list_media_key === mediaKey
                 ? { ...entry, pinned_fields: fields.length ? [...fields] : null }
                 : entry,
         );
@@ -256,7 +226,8 @@
     }
 
     function handlePinsSaved(item: HistoryItem, fields: string[]) {
-        if (item.anilist_id) applyPins(item.anilist_id, fields);
+        const identifier = getListIdentifier(item);
+        if (identifier) applyPins(identifier.namespace, identifier.mediaKey, fields);
         pinDraftCounts[item.id] = fields.length;
     }
 
@@ -265,8 +236,9 @@
     }
 
     function togglePinsPanel(item: HistoryItem) {
-        if (!item.anilist_id) {
-            toast("Pins are only available when AniList is linked", "warn");
+        const identifier = getListIdentifier(item);
+        if (!identifier) {
+            toast("Pins require a linked list entry", "warn");
             return;
         }
         const next = !openPins[item.id];
@@ -283,55 +255,10 @@
 
     let undoLoading: Record<number, boolean> = $state({});
 
-    async function undoHistory(item: HistoryItem) {
-        if (
-            !confirm(
-                "Undo this history entry? This will revert the changes made by this entry on AniList.",
-            )
-        )
-            return;
-        if (undoLoading[item.id]) return;
-        if (!canUndo(item)) return toast("Undo not available for this entry", "warn");
-        undoLoading[item.id] = true;
-        try {
-            const res = await apiFetch(
-                `/api/history/${params.profile}/${item.id}/undo`,
-                { method: "POST" },
-                { successMessage: "Undo requested" },
-            );
-            if (!res.ok) throw new Error("HTTP " + res.status);
-            const data = await res.json();
-            const newItem: HistoryItem | undefined = data.item;
-            if (newItem) {
-                // Stats update
-                if (newItem.outcome) {
-                    stats[newItem.outcome] = (stats[newItem.outcome] || 0) + 1;
-                }
-                const passesFilter =
-                    !outcomeFilter || newItem.outcome === outcomeFilter;
-                if (passesFilter) {
-                    items = [newItem, ...items];
-                    knownIds.add(newItem.id);
-
-                    if (newItem.before_state || newItem.after_state) {
-                        openDiff[newItem.id] = true;
-                        ensureDiffUi(newItem.id);
-                    }
-
-                    if (!isNearTop) newItemsCount += 1;
-                } else {
-                    toast(
-                        `Undo created a '${newItem.outcome}' entry hidden by current filter`,
-                        "info",
-                    );
-                }
-            }
-        } catch (e) {
-            console.error(e);
-            toast("Undo failed", "error");
-        } finally {
-            undoLoading[item.id] = false;
-        }
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    async function undoHistory(_item: HistoryItem) {
+        // TODO: Implement undo logic on provider side
+        toast("Undo is not available for provider-based history entries", "info");
     }
 
     let isNearTop = $state(true);
@@ -547,7 +474,7 @@
                 openDiff={openDiff[item.id] || false}
                 {ensureDiffUi}
                 diffCount={diffCountFor(item)}
-                hasPins={!!item.anilist_id}
+                hasPins={Boolean(getListIdentifier(item))}
                 togglePins={togglePinsPanel}
                 openPins={openPins[item.id] || false}
                 pinButtonLoading={pinBusy[item.id] || false}

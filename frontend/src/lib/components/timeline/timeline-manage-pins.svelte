@@ -26,7 +26,19 @@
     let selected: string[] = $state([]);
     let baseline: string[] = $state([]);
 
-    const hasAniListId = $derived(Boolean(item.anilist_id));
+    interface ListIdentifier {
+        namespace: string;
+        mediaKey: string;
+    }
+
+    function getListIdentifier(): ListIdentifier | null {
+        const namespace = item.list_namespace ?? item.list_media?.namespace ?? null;
+        const mediaKey = item.list_media_key ?? item.list_media?.key ?? null;
+        if (!namespace || !mediaKey) return null;
+        return { namespace, mediaKey };
+    }
+
+    const hasListIdentifier = () => Boolean(getListIdentifier());
 
     function arraysEqual(a: string[], b: string[]): boolean {
         if (a.length !== b.length) return false;
@@ -74,8 +86,9 @@
     }
 
     async function saveSelection(fields: string[] = selected) {
-        if (!item.anilist_id) {
-            toast("Pins require a linked AniList entry.", "error");
+        const identifier = getListIdentifier();
+        if (!identifier) {
+            toast("Pins require a linked list entry.", "error");
             return;
         }
         if (arraysEqual(fields, baseline)) return;
@@ -85,7 +98,7 @@
         try {
             if (!fields.length) {
                 const res = await apiFetch(
-                    `/api/pins/${profile}/${item.anilist_id}`,
+                    `/api/pins/${profile}/${identifier.namespace}/${identifier.mediaKey}`,
                     { method: "DELETE" },
                     { successMessage: "Pins cleared" },
                 );
@@ -95,7 +108,7 @@
                 return;
             }
             const res = await apiFetch(
-                `/api/pins/${profile}/${item.anilist_id}`,
+                `/api/pins/${profile}/${identifier.namespace}/${identifier.mediaKey}?with_media=true`,
                 {
                     method: "PUT",
                     headers: { "Content-Type": "application/json" },
@@ -148,18 +161,18 @@
     });
 </script>
 
-<PinFieldsEditor
-    bind:value={selected}
-    {baseline}
-    {options}
-    loading={optionsLoading}
-    {saving}
-    {error}
-    {optionsError}
-    missingMessage={hasAniListId ? null : "Pins require a linked AniList entry."}
-    title="Pin fields"
-    subtitle="Choose the fields to keep unchanged for this entry when syncing."
-    disabled={!hasAniListId}
-    onSave={(value) => void saveSelection(value)}
-    onRefresh={(force) => void refreshAll(force)}
-    onChange={(value) => setSelection(value)} />
+    <PinFieldsEditor
+        bind:value={selected}
+        {baseline}
+        {options}
+        loading={optionsLoading}
+        {saving}
+        {error}
+        {optionsError}
+        missingMessage={hasListIdentifier() ? null : "Pins require a linked list entry."}
+        title="Pin fields"
+        subtitle="Choose the fields to keep unchanged for this entry when syncing."
+        disabled={!hasListIdentifier()}
+        onSave={(value) => void saveSelection(value)}
+        onRefresh={(force) => void refreshAll(force)}
+        onChange={(value) => setSelection(value)} />
