@@ -198,6 +198,7 @@ class BridgeClient:
             destructive_sync=self.profile_config.destructive_sync,
             search_fallback_threshold=self.profile_config.search_fallback_threshold,
             batch_requests=self.profile_config.batch_requests,
+            dry_run=self.profile_config.dry_run,
             profile_name=self.profile_name,
         )
         show_sync = ShowSyncClient(
@@ -209,6 +210,7 @@ class BridgeClient:
             destructive_sync=self.profile_config.destructive_sync,
             search_fallback_threshold=self.profile_config.search_fallback_threshold,
             batch_requests=self.profile_config.batch_requests,
+            dry_run=self.profile_config.dry_run,
             profile_name=self.profile_name,
         )
 

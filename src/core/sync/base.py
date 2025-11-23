@@ -145,6 +145,7 @@ class BaseSyncClient[
         destructive_sync: bool,
         search_fallback_threshold: int,
         batch_requests: bool,
+        dry_run: bool,
         profile_name: str,
     ) -> None:
         """Initialize the base synchronisation client."""
@@ -156,6 +157,7 @@ class BaseSyncClient[
         self.destructive_sync = destructive_sync
         self.search_fallback_threshold = search_fallback_threshold
         self.batch_requests = batch_requests
+        self.dry_run = dry_run
         self.profile_name = profile_name
 
         self.sync_stats = SyncStats()
@@ -385,11 +387,19 @@ class BaseSyncClient[
                 and before_snapshot.status is not None
                 and SyncField.STATUS.value not in skip_fields
             ):
-                await self.list_provider.delete_entry(before_snapshot.media_key)
                 log.success(
                     f"[{self.profile_name}] Deleting list entry for "
                     f"{item.media_kind.value} {debug_title} {debug_ids}"
                 )
+                if self.dry_run:
+                    log.info(
+                        f"[{self.profile_name}] Dry run enabled; skipping deletion of "
+                        f"{item.media_kind.value} {debug_title} {debug_ids}"
+                    )
+                    return SyncOutcome.SKIPPED
+                else:
+                    await self.list_provider.delete_entry(before_snapshot.media_key)
+
                 await self._create_sync_history(
                     item=item,
                     child_item=child_item,
@@ -486,6 +496,14 @@ class BaseSyncClient[
             )
             return SyncOutcome.SYNCED
 
+        if self.dry_run:
+            log.info(
+                f"[{self.profile_name}] Dry run enabled; skipping sync of "
+                f"{item.media_kind.value} {debug_title} {debug_ids}"
+            )
+            log.success(f"\t\tDRY RUN UPDATE: {diff_str}")
+            return SyncOutcome.SKIPPED
+
         try:
             await self.list_provider.update_entry(after_snapshot.media_key, entry)
             log.success(
@@ -528,6 +546,36 @@ class BaseSyncClient[
             f"[{self.profile_name}] Syncing {len(self._batch_entries)} items "
             f"to list provider in batch mode"
         )
+
+        if self.dry_run:
+            log.info(
+                f"[{self.profile_name}] Dry run enabled; skipping batch sync of "
+                f"{len(self._batch_entries)} items"
+            )
+            for record in self.batch_history_items:
+                before_snapshot = record.before
+                after_snapshot = record.after
+                diff = diff_snapshots(
+                    before_snapshot, after_snapshot, set(after_snapshot.asdict().keys())
+                )
+                diff_str = self._format_diff(diff)
+                debug_title = self._debug_log_title(
+                    item=record.item, animapping=record.mapping
+                )
+                debug_ids = self._debug_log_ids(
+                    item=record.item,
+                    child_item=record.child,
+                    entry=record.entry,
+                    animapping=record.mapping,
+                )
+                log.success(
+                    f"[{self.profile_name}] Dry run update for "
+                    f"{record.item.media_kind.value} {debug_title} {debug_ids}"
+                )
+                log.success(f"\t\tDRY RUN BATCH UPDATE: {diff_str}")
+            self._batch_entries.clear()
+            self.batch_history_items.clear()
+            return
 
         try:
             await self.list_provider.update_entries_batch(self._batch_entries)
