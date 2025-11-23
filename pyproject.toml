@@ -27,11 +27,14 @@ keywords = [
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
 dependencies = [
+    "anibridge-anilist-provider @ git+https://github.com/anibridge/anibridge-anilist-provider.git",
+    "anibridge-plex-provider @ git+https://github.com/anibridge/anibridge-plex-provider.git",
+    "anibridge-providers @ git+https://github.com/anibridge/anibridge-providers.git",
     "aiocache>=0.12.3",
     "aiohttp>=3.13.2",
     "alembic>=1.17.1",
@@ -77,8 +80,8 @@ Source = "https://github.com/eliasbenb/PlexAniBridge"
 [tool.hatch.build.targets.wheel]
 packages = ["scripts"]
 
-[tool.pyright]
-stubPath = "typings"
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [tool.ruff]
 exclude = ["alembic"]

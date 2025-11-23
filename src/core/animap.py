@@ -362,7 +362,7 @@ class AniMapClient:
         )
 
         if not imdb and not tmdb and not tvdb:
-            yield from ()
+            return []
 
         imdb_list = (
             [imdb] if isinstance(imdb, str) else imdb if isinstance(imdb, list) else []

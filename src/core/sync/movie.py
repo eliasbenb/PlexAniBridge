@@ -4,8 +4,9 @@ import contextlib
 from collections.abc import AsyncIterator, Sequence
 from datetime import datetime
 
-from src.core.providers.library import LibraryMovie
-from src.core.providers.list import ListEntry, ListMediaType, ListStatus
+from anibridge_providers.library import LibraryMovie
+from anibridge_providers.list import ListEntry, ListMediaType, ListStatus
+
 from src.core.sync.base import BaseSyncClient
 from src.core.sync.stats import ItemIdentifier
 from src.models.db.animap import AniMap

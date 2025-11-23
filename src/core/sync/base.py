@@ -6,13 +6,13 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, ClassVar
 
+from anibridge_providers.library import ExternalId, LibraryMedia, LibraryProvider
+from anibridge_providers.list import ListEntry, ListProvider, ListStatus
 from rapidfuzz import fuzz
 
 from src import log
 from src.config.database import db
 from src.config.settings import SyncField
-from src.core.providers.library import ExternalId, LibraryMedia, LibraryProvider
-from src.core.providers.list import ListEntry, ListProvider, ListStatus
 from src.core.sync.stats import ItemIdentifier, SyncOutcome, SyncStats
 from src.models.db.animap import AniMap
 from src.models.db.pin import Pin

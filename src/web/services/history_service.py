@@ -23,8 +23,8 @@ from src.models.schemas.provider import ProviderMediaMetadata
 from src.web.state import get_app_state
 
 if TYPE_CHECKING:
-    from src.core.providers.library import LibraryProvider, LibrarySection
-    from src.core.providers.list import ListProvider
+    from anibridge_providers.library import LibraryProvider, LibrarySection
+    from anibridge_providers.list import ListProvider
 
 __all__ = ["HistoryService", "get_history_service"]
 

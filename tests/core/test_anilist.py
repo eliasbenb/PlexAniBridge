@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from src.core.anilist import AniListClient
 from src.exceptions import AniListFilterError
 from src.models.schemas.anilist import (
     Media,
@@ -13,7 +14,6 @@ from src.models.schemas.anilist import (
     User,
     UserOptions,
 )
-from src.providers.anilist.client import AniListClient
 
 
 @pytest.mark.asyncio

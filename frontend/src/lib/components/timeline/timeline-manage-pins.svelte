@@ -161,18 +161,18 @@
     });
 </script>
 
-    <PinFieldsEditor
-        bind:value={selected}
-        {baseline}
-        {options}
-        loading={optionsLoading}
-        {saving}
-        {error}
-        {optionsError}
-        missingMessage={hasListIdentifier() ? null : "Pins require a linked list entry."}
-        title="Pin fields"
-        subtitle="Choose the fields to keep unchanged for this entry when syncing."
-        disabled={!hasListIdentifier()}
-        onSave={(value) => void saveSelection(value)}
-        onRefresh={(force) => void refreshAll(force)}
-        onChange={(value) => setSelection(value)} />
+<PinFieldsEditor
+    bind:value={selected}
+    {baseline}
+    {options}
+    loading={optionsLoading}
+    {saving}
+    {error}
+    {optionsError}
+    missingMessage={hasListIdentifier() ? null : "Pins require a linked list entry."}
+    title="Pin fields"
+    subtitle="Choose the fields to keep unchanged for this entry when syncing."
+    disabled={!hasListIdentifier()}
+    onSave={(value) => void saveSelection(value)}
+    onRefresh={(force) => void refreshAll(force)}
+    onChange={(value) => setSelection(value)} />

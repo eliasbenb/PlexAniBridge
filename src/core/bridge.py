@@ -4,18 +4,19 @@ import contextlib
 from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 
-from src import log
-from src.config.database import db
-from src.config.settings import AniBridgeConfig, AniBridgeProfileConfig
-from src.core.animap import AniMapClient
-from src.core.providers.library import (
+from anibridge_providers.library import (
     ExternalId,
     LibraryMedia,
     LibraryProvider,
     LibrarySection,
     MediaKind,
 )
-from src.core.providers.list import ListProvider
+from anibridge_providers.list import ListProvider
+
+from src import log
+from src.config.database import db
+from src.config.settings import AniBridgeConfig, AniBridgeProfileConfig
+from src.core.animap import AniMapClient
 from src.core.sync import BaseSyncClient, MovieSyncClient, ShowSyncClient
 from src.core.sync.stats import SyncOutcome, SyncProgress, SyncStats
 from src.models.db.housekeeping import Housekeeping

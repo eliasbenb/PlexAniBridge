@@ -124,11 +124,7 @@
     }
 
     function coverImage(item: HistoryItem) {
-        return (
-            item.list_media?.poster_url ??
-            item.library_media?.poster_url ??
-            null
-        );
+        return item.list_media?.poster_url ?? item.library_media?.poster_url ?? null;
     }
 
     function anilistUrl(item: HistoryItem) {

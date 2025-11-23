@@ -137,7 +137,8 @@
     ): HistoryItem {
         const { namespace, mediaKey } = parseRowKey(key);
         const rowId = ensureRowId(key);
-        const timestamp = pin?.updated_at || pin?.created_at || new Date().toISOString();
+        const timestamp =
+            pin?.updated_at || pin?.created_at || new Date().toISOString();
         const resolvedMedia = media ?? pin?.media ?? null;
         return {
             id: rowId,
@@ -245,9 +246,10 @@
         rowError[rowKey] = null;
         try {
             if (!fields.length) {
-                const r = await apiFetch(`/api/pins/${profile}/${namespace}/${mediaKey}`, {
-                    method: "DELETE",
-                });
+                const r = await apiFetch(
+                    `/api/pins/${profile}/${namespace}/${mediaKey}`,
+                    { method: "DELETE" },
+                );
                 if (!r.ok) throw new Error("HTTP " + r.status);
                 setRow(rowKey, [], true);
                 pinned = pinned.filter(
@@ -495,7 +497,7 @@
                     {#each pinned as p (p.profile_name + ":" + (p.list_namespace ?? "") + ":" + (p.list_media_key ?? ""))}
                         {@const rowKey = makeRowKey(p.list_namespace, p.list_media_key)}
                         {@const base = p.fields || []}
-                        {@const sel = rowKey ? selections[rowKey] ?? base : base}
+                        {@const sel = rowKey ? (selections[rowKey] ?? base) : base}
                         {#if rowKey}
                             {@const identifiers = parseRowKey(rowKey)}
                             {@const historyItem = toHistoryItem(
@@ -569,7 +571,7 @@
                     {#each results as r (r.media.namespace + ":" + r.media.key)}
                         {@const rowKey = makeRowKey(r.media.namespace, r.media.key)}
                         {@const base = r.pin?.fields || []}
-                        {@const sel = rowKey ? selections[rowKey] ?? base : base}
+                        {@const sel = rowKey ? (selections[rowKey] ?? base) : base}
                         {@const meta = r.pin ? PINNED_META : SEARCH_META}
                         {#if rowKey}
                             {@const identifiers = parseRowKey(rowKey)}
@@ -591,7 +593,7 @@
                                 <TimelineItem
                                     {profile}
                                     item={historyItem}
-                                    meta={meta}
+                                    {meta}
                                     displayTitle={timelineDisplayTitle}
                                     coverImage={timelineCoverImage}
                                     anilistUrl={timelineListUrl}

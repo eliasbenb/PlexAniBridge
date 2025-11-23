@@ -5,14 +5,14 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Literal
 
-from pydantic import BaseModel
-
-from src.core.providers.library import (
+from anibridge_providers.library import (
     LibraryEpisode,
     LibraryMedia,
     LibrarySeason,
     MediaKind,
 )
+from pydantic import BaseModel
+
 from src.exceptions import UnsupportedMediaTypeError
 
 __all__ = ["ItemIdentifier", "SyncOutcome", "SyncProgress", "SyncStats"]

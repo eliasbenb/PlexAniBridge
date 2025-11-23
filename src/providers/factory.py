@@ -1,21 +1,15 @@
 """Provider factory helpers."""
 
-from src.config.settings import AniBridgeProfileConfig, PlexMetadataSource
-from src.core.providers.library import LibraryProvider
-from src.core.providers.list import ListProvider
-from src.providers.anilist.list import AniListListProvider
-from src.providers.plex.library import PlexLibraryProvider
-from src.providers.plex_metadata.client import PlexOnlineLibraryProvider
+from anibridge_anilist_provider.list import AniListListProvider
+from anibridge_plex_provider.library import PlexLibraryProvider
+from anibridge_providers.library import LibraryProvider
+from anibridge_providers.list import ListProvider
+
+from src.config.settings import AniBridgeProfileConfig
 
 
 def build_library_provider(profile: AniBridgeProfileConfig) -> LibraryProvider:
     """Instantiate the configured library provider for the profile."""
-    provider_cls = (
-        PlexOnlineLibraryProvider
-        if profile.plex_metadata_source == PlexMetadataSource.ONLINE
-        else PlexLibraryProvider
-    )
-
     config = {
         "url": profile.plex_url,
         "token": profile.plex_token.get_secret_value(),
@@ -24,7 +18,7 @@ def build_library_provider(profile: AniBridgeProfileConfig) -> LibraryProvider:
         "genres": profile.plex_genres,
     }
 
-    return provider_cls(config=config)
+    return PlexLibraryProvider(config=config)
 
 
 def build_list_provider(

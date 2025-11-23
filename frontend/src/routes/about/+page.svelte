@@ -339,12 +339,14 @@
                                     <div class="font-medium text-slate-100">{name}</div>
                                     {#if profile.config?.library_user}
                                         <div class="text-[11px] text-slate-400">
-                                            {profile.config.library_namespace} · {profile.config.library_user}
+                                            {profile.config.library_namespace} · {profile
+                                                .config.library_user}
                                         </div>
                                     {/if}
                                     {#if profile.config?.list_user}
                                         <div class="text-[11px] text-slate-500">
-                                            {profile.config.list_namespace} · {profile.config.list_user}
+                                            {profile.config.list_namespace} · {profile
+                                                .config.list_user}
                                         </div>
                                     {/if}
                                 </td>

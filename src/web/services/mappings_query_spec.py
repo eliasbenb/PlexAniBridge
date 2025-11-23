@@ -5,9 +5,9 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
 
+from src.core.anilist import AniListClient
 from src.models.db.animap import AniMap
 from src.models.schemas.anilist import MediaFormat, MediaStatus
-from src.providers.anilist.client import AniListClient
 
 __all__ = [
     "QueryFieldKind",

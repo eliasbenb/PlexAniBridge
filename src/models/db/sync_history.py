@@ -3,10 +3,10 @@
 from datetime import UTC, datetime
 from typing import Any
 
+from anibridge_providers.library import MediaKind
 from sqlalchemy import JSON, DateTime, Enum, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
-from src.core.providers.library import MediaKind
 from src.core.sync.stats import SyncOutcome
 from src.models.db.base import Base
 
