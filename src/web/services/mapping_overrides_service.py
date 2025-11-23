@@ -308,7 +308,6 @@ class MappingOverridesService:
 
         with db() as ctx:
             source = str(self._resolve_custom_file()[0].resolve())
-            print(source)
             delete_stmt = delete(AniMapProvenance).where(
                 AniMapProvenance.anilist_id == anilist_id,
                 AniMapProvenance.source == source,
