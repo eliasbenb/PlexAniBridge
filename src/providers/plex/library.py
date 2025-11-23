@@ -599,11 +599,38 @@ class PlexLibraryProvider(LibraryProvider):
         Returns:
             Sequence[HistoryEntry]: A sequence of history entries for the media item.
         """
-        history = await self._client.fetch_history(item)
+        base_history = await self._client.fetch_history(item)
+
+        # The Plex database isn't great at consistently tracking history, so in addition
+        # to pulling from the history endpoint, we also derive history from the
+        # lastViewedAt attribute.
+        derived_history: list[HistoryEntry] = []
+        children = (
+            item.episodes()
+            if isinstance(item, (plexapi_video.Show, plexapi_video.Season))
+            else [item]
+        )
+
+        if not children:
+            return tuple(
+                HistoryEntry(library_key=rating_key, viewed_at=viewed_at)
+                for rating_key, viewed_at in base_history
+            )
+
+        # Find all child items that have been viewed but aren't in the base history
+        children_dict = {str(child.ratingKey): child for child in children}
+        base_keys = {rating_key for rating_key, _ in base_history}
+        for child_key, child in children_dict.items():
+            if child.lastViewedAt is None or child_key in base_keys:
+                continue
+            derived_history.append(
+                HistoryEntry(library_key=child_key, viewed_at=child.lastViewedAt)
+            )
+
         return tuple(
             HistoryEntry(library_key=rating_key, viewed_at=viewed_at)
-            for rating_key, viewed_at in history
-        )
+            for rating_key, viewed_at in base_history
+        ) + tuple(derived_history)
 
     def _build_sections(self) -> list[PlexLibrarySection]:
         """Construct the list of Plex library sections available to the user."""
