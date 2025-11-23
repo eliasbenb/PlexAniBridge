@@ -107,12 +107,7 @@ class PlexLibraryMedia(LibraryMedia):
     @property
     def on_watchlist(self) -> bool:
         """Check if the media item is on the user's watchlist."""
-        if not isinstance(self._item, (plexapi_video.Movie, plexapi_video.Show)):
-            return False
-        try:
-            return bool(self._item.onWatchlist())
-        except Exception:
-            return False
+        return self._provider._client.is_on_watchlist(self._item)
 
     @property
     def user_rating(self) -> int | None:
@@ -246,12 +241,7 @@ class PlexLibraryMovie(PlexLibraryMedia, LibraryMovie):
             section (PlexLibrarySection): The parent Plex library section.
             item (plexapi_video.Movie): The underlying Plex movie item.
         """
-        self._provider = provider
-        self._section = section
-        self._item = item
-        self.media_kind = MediaKind.MOVIE
-        self.key = str(item.ratingKey)
-        self.title = item.title
+        super().__init__(provider, section, item, MediaKind.MOVIE)
 
 
 class PlexLibraryShow(PlexLibraryMedia, LibraryShow):
@@ -272,12 +262,7 @@ class PlexLibraryShow(PlexLibraryMedia, LibraryShow):
             section (PlexLibrarySection): The parent Plex library section.
             item (plexapi_video.Show): The underlying Plex show item.
         """
-        self._provider = provider
-        self._section = section
-        self._item = item
-        self.media_kind = MediaKind.SHOW
-        self.key = str(item.ratingKey)
-        self.title = item.title
+        super().__init__(provider, section, item, MediaKind.SHOW)
 
     @property
     def ordering(self) -> Literal["tmdb", "tvdb", ""]:
@@ -326,12 +311,7 @@ class PlexLibrarySeason(PlexLibraryMedia, LibrarySeason):
             item (plexapi_video.Season): The underlying Plex season item.
             show (PlexLibraryShow | None): The parent show, if known.
         """
-        self._provider = provider
-        self._section = section
-        self._item = item
-        self.media_kind = MediaKind.SEASON
-        self.key = str(item.ratingKey)
-        self.title = item.title
+        super().__init__(provider, section, item, MediaKind.SEASON)
         self._show = show
         self.index = self._item.index
 
@@ -388,12 +368,7 @@ class PlexLibraryEpisode(PlexLibraryMedia, LibraryEpisode):
             season (PlexLibrarySeason | None): The parent season, if known.
             show (PlexLibraryShow | None): The parent show, if known.
         """
-        self._provider = provider
-        self._section = section
-        self._item = item
-        self.media_kind = MediaKind.EPISODE
-        self.key = str(item.ratingKey)
-        self.title = item.title
+        super().__init__(provider, section, item, MediaKind.EPISODE)
         self._show = show
         self._season = season
         self.index = self._item.index

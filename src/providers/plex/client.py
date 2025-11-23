@@ -42,10 +42,10 @@ class PlexClientBundle:
 
 
 @dataclass(slots=True)
-class _ContinueWatchingCacheEntry:
-    """Cache entry for continue-watching lookups."""
+class _FrozenCacheEntry:
+    """Immutable cache entry for storing Plex item keys with expiration."""
 
-    rating_keys: frozenset[str]
+    keys: frozenset[str]
     expires_at: float
 
 
@@ -78,8 +78,9 @@ class PlexClient:
         self._user_client: PlexServer | None = None
 
         self._sections: list[MovieSection | ShowSection] = []
-        self._continue_cache: dict[str, _ContinueWatchingCacheEntry] = {}
+        self._continue_cache: dict[str, _FrozenCacheEntry] = {}
         self._ordering_cache: dict[int, Literal["tmdb", "tvdb", ""]] = {}
+        self._watchlist_cache: _FrozenCacheEntry | None = None
         self._on_deck_window: timedelta | None = None
 
     async def initialize(self) -> None:
@@ -180,7 +181,7 @@ class PlexClient:
         now = monotonic()
         if cache_entry is None or cache_entry.expires_at <= now:
             cache_entry = self._refresh_continue_cache(section)
-        return str(item.ratingKey) in cache_entry.rating_keys
+        return str(item.ratingKey) in cache_entry.keys
 
     async def fetch_history(self, item: Video) -> Sequence[tuple[str, datetime]]:
         """Return the watch history for the given Plex item."""
@@ -201,6 +202,18 @@ class PlexClient:
         ]
 
         return entries
+
+    def is_on_watchlist(self, item: Video) -> bool:
+        """Determine whether the given item appears in the user's watchlist."""
+        if not self.bundle.is_admin:
+            return False
+
+        now = monotonic()
+        cache_entry = self._watchlist_cache
+        if cache_entry is None or cache_entry.expires_at <= now:
+            cache_entry = self._refresh_watchlist_cache()
+
+        return item.guid is not None and item.guid in cache_entry.keys
 
     def get_ordering(self, show: Show) -> Literal["tmdb", "tvdb", ""]:
         """Return the preferred episode ordering for the provided show."""
@@ -324,9 +337,7 @@ class PlexClient:
             ]
         }
 
-    def _refresh_continue_cache(
-        self, section: LibrarySection
-    ) -> _ContinueWatchingCacheEntry:
+    def _refresh_continue_cache(self, section: LibrarySection) -> _FrozenCacheEntry:
         """Refresh the continue-watching cache for the given section."""
         rating_keys: set[str] = set()
         try:
@@ -336,11 +347,33 @@ class PlexClient:
         except Exception:
             rating_keys.clear()
 
-        entry = _ContinueWatchingCacheEntry(
-            rating_keys=frozenset(rating_keys),
+        entry = _FrozenCacheEntry(
+            keys=frozenset(rating_keys),
             expires_at=monotonic() + 300,
         )
         self._continue_cache[section.key] = entry
+        return entry
+
+    def _refresh_watchlist_cache(self) -> _FrozenCacheEntry:
+        """Refresh the watchlist cache for the given section."""
+        if not self.bundle.is_admin:
+            return _FrozenCacheEntry(keys=frozenset(), expires_at=monotonic() + 300)
+        try:
+            # Rating keys won't work here because watchlist items can exist outside of
+            # the user's server. We'll use GUIDs as as substitute.
+            keys = {
+                str(item.guid)
+                for item in self.bundle.account.watchlist()
+                if item.guid is not None
+            }
+        except Exception:
+            keys = set()
+
+        entry = _FrozenCacheEntry(
+            keys=frozenset(keys),
+            expires_at=monotonic() + 300,
+        )
+        self._watchlist_cache = entry
         return entry
 
     def _coerce_datetime(self, value: datetime | str | None) -> datetime | None:
