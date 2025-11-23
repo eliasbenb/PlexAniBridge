@@ -69,18 +69,30 @@ class ShowSyncClient(BaseSyncClient[LibraryShow, LibrarySeason, LibraryEpisode])
             # mapping range with some user activity, or we must be doing a full scan
             # or destructive sync.
             if not (self.destructive_sync or self.full_scan):
+                mapping_candidates: list[LibraryEpisode] = []
                 any_relevant = False
                 for mapping in parsed_mappings:
                     season_episodes = episodes_by_season.get(mapping.season, [])
-                    if any(
-                        (episode.view_count or episode.user_rating is not None)
-                        and episode.index >= mapping.start
-                        and (mapping.end is None or episode.index <= mapping.end)
+                    selected = [
+                        episode
                         for episode in season_episodes
+                        if episode.index >= mapping.start
+                        and (mapping.end is None or episode.index <= mapping.end)
+                    ]
+                    if any(
+                        episode.view_count or episode.user_rating is not None
+                        for episode in selected
                     ):
                         any_relevant = True
-                        break
+                    mapping_candidates.extend(selected)
                 if not any_relevant:
+                    if mapping_candidates:
+                        # These range-mapped episodes have no activity, so treat them
+                        # as intentionally skipped instead of leaving them pending.
+                        self.sync_stats.track_items(
+                            ItemIdentifier.from_items(mapping_candidates),
+                            SyncOutcome.SKIPPED,
+                        )
                     continue
 
             episodes: list[LibraryEpisode] = []
