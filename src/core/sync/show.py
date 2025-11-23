@@ -53,10 +53,9 @@ class ShowSyncClient(BaseSyncClient[LibraryShow, LibrarySeason, LibraryEpisode])
         processed_seasons: set[int] = set()
 
         for animapping in mappings:
-            if not animapping.anilist_id:
-                continue
-
             parsed_mappings = self._get_effective_mappings(item, animapping)
+            # A season is only relevant if it has at least one mapping.
+            # Special seasons are more strict and must match the show's ordering.
             relevant_seasons = {
                 mapping.season: seasons[mapping.season]
                 for mapping in parsed_mappings
@@ -66,19 +65,34 @@ class ShowSyncClient(BaseSyncClient[LibraryShow, LibrarySeason, LibraryEpisode])
             if not relevant_seasons:
                 continue
 
-            if not (self.destructive_sync or self.full_scan):
+            # To continue with this mapping, there must be at least one episode in the
+            # mapping range with some user activity, or we must be doing a full scan
+            # or destructive sync.
+            if not (self.destructive_sync or self.full_scan or item.on_watchlist):
+                mapping_candidates: list[LibraryEpisode] = []
                 any_relevant = False
                 for mapping in parsed_mappings:
                     season_episodes = episodes_by_season.get(mapping.season, [])
-                    if any(
-                        episode.view_count
-                        and episode.index >= mapping.start
-                        and (mapping.end is None or episode.index <= mapping.end)
+                    selected = [
+                        episode
                         for episode in season_episodes
+                        if episode.index >= mapping.start
+                        and (mapping.end is None or episode.index <= mapping.end)
+                    ]
+                    if any(
+                        episode.view_count or episode.user_rating is not None
+                        for episode in selected
                     ):
                         any_relevant = True
-                        break
+                    mapping_candidates.extend(selected)
                 if not any_relevant:
+                    if mapping_candidates:
+                        # These range-mapped episodes have no activity, so treat them
+                        # as intentionally skipped instead of leaving them pending.
+                        self.sync_stats.track_items(
+                            ItemIdentifier.from_items(mapping_candidates),
+                            SyncOutcome.SKIPPED,
+                        )
                     continue
 
             episodes: list[LibraryEpisode] = []
@@ -303,14 +317,13 @@ class ShowSyncClient(BaseSyncClient[LibraryShow, LibrarySeason, LibraryEpisode])
         entry: ListEntry,
         animapping: AniMap | None,
     ) -> str | None:
-        for episode in grandchild_items:
-            review = await episode.review()
+        # If this is a single-episode entry, prefer the episode's review first.
+        if entry.total_units == 1 and len(grandchild_items) == 1:
+            review = await grandchild_items[0].review()
             if review:
                 return review
-        review = await child_item.review()
-        if review:
-            return review
-        return await item.review()
+        # Otherwise, prefer the season's review before the show's review.
+        return await child_item.review() or await item.review()
 
     def _debug_log_title(
         self, item: LibraryShow, animapping: AniMap | None = None

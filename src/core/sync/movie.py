@@ -31,8 +31,6 @@ class MovieSyncClient(BaseSyncClient[LibraryMovie, LibraryMovie, LibraryMovie]):
         )
 
         for mapping in mappings:
-            if not mapping.anilist_id:
-                continue
             try:
                 entry = await self.list_provider.get_entry(str(mapping.anilist_id))
             except Exception:
