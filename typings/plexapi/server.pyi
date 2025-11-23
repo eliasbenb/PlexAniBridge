@@ -8,14 +8,14 @@ from _typeshed import Incomplete
 
 from plexapi.alert import AlertListener
 from plexapi.audio import Audio
-from plexapi.base import PlexHistory, PlexObject
+from plexapi.base import PlexObject
 from plexapi.library import File, Library, LibrarySection, Path
 from plexapi.media import Agent, Session, TranscodeSession
 from plexapi.myplex import MyPlexAccount, MyPlexUser
 from plexapi.photo import Photo
 from plexapi.playlist import Playlist
 from plexapi.settings import Settings
-from plexapi.video import Video
+from plexapi.video import ClipHistory, EpisodeHistory, MovieHistory, Video
 
 class PlexServer(PlexObject):
     _baseurl: str
@@ -115,7 +115,7 @@ class PlexServer(PlexObject):
         ratingKey: int | str | None = None,
         accountID: int | str | None = None,
         librarySectionID: int | str | None = None,
-    ) -> PlexHistory: ...
+    ) -> list[ClipHistory | EpisodeHistory | MovieHistory]: ...
     def playlists(
         self,
         playlistType: str | None = None,
@@ -144,8 +144,8 @@ class PlexServer(PlexObject):
         mediatype: str | None = None,
         limit: int | None = None,
         sectionId: int | None = None,
-    ): ...
-    def continueWatching(self): ...
+    ) -> list[Video]: ...
+    def continueWatching(self) -> list[Video]: ...
     def sessions(self) -> list[Session]: ...
     def transcodeSessions(self) -> list[TranscodeSession]: ...
     def startAlertListener(

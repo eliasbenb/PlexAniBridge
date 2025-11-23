@@ -6,12 +6,20 @@ from xml.etree.ElementTree import Element
 import requests
 from _typeshed import Incomplete
 
-from plexapi.base import PlexHistory, PlexObject
+from plexapi.base import PlexObject
 from plexapi.client import PlexClient
 from plexapi.library import LibrarySection
 from plexapi.server import PlexServer
 from plexapi.sync import SyncItem, SyncList
-from plexapi.video import Episode, Movie, Season, Show
+from plexapi.video import (
+    ClipHistory,
+    Episode,
+    EpisodeHistory,
+    Movie,
+    MovieHistory,
+    Season,
+    Show,
+)
 
 class MyPlexAccount(PlexObject):
     FRIENDINVITE: str
@@ -200,7 +208,7 @@ class MyPlexAccount(PlexObject):
     def claimToken(self) -> str: ...
     def history(
         self, maxresults: int | None = None, mindate: datetime | None = None
-    ) -> list[PlexHistory]: ...
+    ) -> list[ClipHistory | EpisodeHistory | MovieHistory]: ...
     def onlineMediaSources(self): ...
     def videoOnDemand(self): ...
     def tidal(self): ...
@@ -258,7 +266,7 @@ class MyPlexUser(PlexObject):
     def server(self, name): ...
     def history(
         self, maxresults: int | None = None, mindate: datetime | None = None
-    ) -> list[PlexHistory]: ...
+    ) -> list[ClipHistory | EpisodeHistory | MovieHistory]: ...
 
 class MyPlexInvite(PlexObject):
     REQUESTS: str
@@ -267,14 +275,14 @@ class MyPlexInvite(PlexObject):
 class Section(PlexObject):
     def history(
         self, maxresults: int | None = None, mindate: datetime | None = None
-    ) -> list[PlexHistory]: ...
+    ) -> list[ClipHistory | EpisodeHistory | MovieHistory]: ...
 
 class MyPlexServerShare(PlexObject):
     def section(self, name): ...
     def sections(self): ...
     def history(
         self, maxresults: int = 9999999, mindate: datetime | None = None
-    ) -> list[PlexHistory]: ...
+    ) -> list[ClipHistory | EpisodeHistory | MovieHistory]: ...
 
 class MyPlexResource(PlexObject):
     DEFAULT_LOCATION_ORDER: list[str]

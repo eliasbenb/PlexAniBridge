@@ -12,6 +12,7 @@ from plexapi.library import LibrarySection
 from plexapi.media import AudioStream, LyricStream, SubtitleStream, VideoStream
 from plexapi.myplex import MyPlexAccount, MyPlexUser
 from plexapi.server import PlexServer
+from plexapi.video import Video
 
 PlexObjectT = TypeVar("PlexObjectT", bound="PlexObject")
 MediaContainerT = TypeVar("MediaContainerT", bound="MediaContainer")
@@ -117,7 +118,12 @@ class PlexSession:
     def stop(self, reason: str = ""): ...
 
 class PlexHistory:
-    def source(self): ...
+    accountID: int
+    deviceID: int
+    historyKey: str
+    viewedAt: datetime
+
+    def source(self) -> Video | None: ...
     def delete(self): ...
 
 class MediaContainer[PlexObjectT: PlexObject](list[PlexObjectT], PlexObject):

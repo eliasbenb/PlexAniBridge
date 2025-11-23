@@ -6,7 +6,7 @@ from typing import Any
 from _typeshed import Incomplete
 
 from plexapi.audio import Audio, Track
-from plexapi.base import PlexHistory, PlexObject
+from plexapi.base import PlexObject
 from plexapi.media import Agent
 from plexapi.mixins import (
     AlbumEditMixins,
@@ -23,7 +23,16 @@ from plexapi.myplex import MyPlexDevice
 from plexapi.photo import Photo
 from plexapi.settings import Setting
 from plexapi.sync import MediaSettings, Policy, SyncItem
-from plexapi.video import Episode, Movie, Season, Show, Video
+from plexapi.video import (
+    ClipHistory,
+    Episode,
+    EpisodeHistory,
+    Movie,
+    MovieHistory,
+    Season,
+    Show,
+    Video,
+)
 
 class Library(PlexObject):
     def sections(self) -> list[LibrarySection]: ...
@@ -64,7 +73,7 @@ class Library(PlexObject):
     ): ...
     def history(
         self, maxresults: int | None = None, mindate: datetime | None = None
-    ) -> PlexHistory: ...
+    ) -> list[ClipHistory | EpisodeHistory | MovieHistory]: ...
     def tags(self, tag): ...
 
 class LibrarySection(PlexObject):
@@ -98,8 +107,8 @@ class LibrarySection(PlexObject):
     def lockAllField(self, field, libtype: Incomplete | None = None): ...
     def unlockAllField(self, field, libtype: Incomplete | None = None): ...
     def timeline(self): ...
-    def onDeck(self): ...
-    def continueWatching(self): ...
+    def onDeck(self) -> list[Video]: ...
+    def continueWatching(self) -> list[Video]: ...
     def recentlyAdded(
         self, maxresults: int = 50, libtype: Incomplete | None = None
     ): ...
@@ -150,7 +159,7 @@ class LibrarySection(PlexObject):
     ) -> SyncItem: ...
     def history(
         self, maxresults: int | None = None, mindate: datetime | None = None
-    ) -> PlexHistory: ...
+    ) -> list[ClipHistory | EpisodeHistory | MovieHistory]: ...
     def createCollection(
         self,
         title,
