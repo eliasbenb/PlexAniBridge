@@ -48,8 +48,8 @@ class Video(PlexPartialObject, PlayedUnplayedMixin):
     title: str
     titleSort: str
     type: str
-    updatedAt: datetime
-    userRating: float
+    updatedAt: datetime | None
+    userRating: float | None
     viewCount: int
 
     def url(self, part: str) -> str | None: ...

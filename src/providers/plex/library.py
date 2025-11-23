@@ -592,6 +592,8 @@ class PlexLibraryProvider(LibraryProvider):
         """
         if not self._community_client or not self._is_admin_user:
             return None
+        if item.userRating is None and item.lastRatedAt is None:  # Prereq for reviews
+            return None
         if not item.guid:
             return None
         metadata_id = item.guid.rsplit("/", 1)[-1]

@@ -317,14 +317,13 @@ class ShowSyncClient(BaseSyncClient[LibraryShow, LibrarySeason, LibraryEpisode])
         entry: ListEntry,
         animapping: AniMap | None,
     ) -> str | None:
-        for episode in grandchild_items:
-            review = await episode.review()
+        # If this is a single-episode entry, prefer the episode's review first.
+        if entry.total_units == 1 and len(grandchild_items) == 1:
+            review = await grandchild_items[0].review()
             if review:
                 return review
-        review = await child_item.review()
-        if review:
-            return review
-        return await item.review()
+        # Otherwise, prefer the season's review before the show's review.
+        return await child_item.review() or await item.review()
 
     def _debug_log_title(
         self, item: LibraryShow, animapping: AniMap | None = None
