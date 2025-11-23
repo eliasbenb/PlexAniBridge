@@ -68,7 +68,7 @@ class ShowSyncClient(BaseSyncClient[LibraryShow, LibrarySeason, LibraryEpisode])
             # To continue with this mapping, there must be at least one episode in the
             # mapping range with some user activity, or we must be doing a full scan
             # or destructive sync.
-            if not (self.destructive_sync or self.full_scan):
+            if not (self.destructive_sync or self.full_scan or item.on_watchlist):
                 mapping_candidates: list[LibraryEpisode] = []
                 any_relevant = False
                 for mapping in parsed_mappings:
