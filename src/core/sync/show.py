@@ -24,7 +24,7 @@ class ShowSyncClient(BaseSyncClient[LibraryShow, LibrarySeason, LibraryEpisode])
     async def map_media(
         self, item: LibraryShow
     ) -> AsyncIterator[
-        tuple[LibrarySeason, Sequence[LibraryEpisode], AniMap | None, ListEntry]
+        tuple[LibrarySeason, Sequence[LibraryEpisode], AniMap | None, ListEntry | None]
     ]:
         """Yield mapping candidates for the provided show item."""
         seasons = self.__get_wanted_seasons(item)
@@ -140,8 +140,6 @@ class ShowSyncClient(BaseSyncClient[LibraryShow, LibrarySeason, LibraryEpisode])
             try:
                 entry = await self.list_provider.get_entry(str(animapping.anilist_id))
             except Exception:
-                continue
-            if entry is None:
                 continue
 
             processed_seasons.update(episode_counts.keys())
@@ -340,13 +338,17 @@ class ShowSyncClient(BaseSyncClient[LibraryShow, LibrarySeason, LibraryEpisode])
         *,
         item: LibraryShow,
         child_item: LibrarySeason,
-        entry: ListEntry,
+        entry: ListEntry | None,
         animapping: AniMap | None,
     ) -> str:
         ids = ", ".join(repr(external) for external in item.ids())
         ids = ids or "none"
+        media_key = self._resolve_list_media_key(
+            animapping, entry.media().key if entry else None
+        )
+        media_key = media_key or "unknown"
         return (
-            f"$${{library_key: {child_item.key}, media_key: {entry.media().key}"
+            f"$${{library_key: {child_item.key}, media_key: {media_key}"
             + f", {ids}}}$$"
             if ids
             else ""

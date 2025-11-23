@@ -17,7 +17,7 @@ class MovieSyncClient(BaseSyncClient[LibraryMovie, LibraryMovie, LibraryMovie]):
     async def map_media(
         self, item: LibraryMovie
     ) -> AsyncIterator[
-        tuple[LibraryMovie, Sequence[LibraryMovie], AniMap | None, ListEntry]
+        tuple[LibraryMovie, Sequence[LibraryMovie], AniMap | None, ListEntry | None]
     ]:
         """Map a library movie to its corresponding list entry."""
         imdb_ids, tmdb_ids, tvdb_ids = self._extract_external_ids(item)
@@ -171,13 +171,17 @@ class MovieSyncClient(BaseSyncClient[LibraryMovie, LibraryMovie, LibraryMovie]):
         *,
         item: LibraryMovie,
         child_item: LibraryMovie,
-        entry: ListEntry,
+        entry: ListEntry | None,
         animapping: AniMap | None,
     ) -> str:
         ids = ", ".join(repr(external) for external in item.ids())
         ids = ids or "none"
+        media_key = self._resolve_list_media_key(
+            animapping, entry.media().key if entry else None
+        )
+        media_key = media_key or "unknown"
         return (
-            f"$${{library_key: {child_item.key}, media_key: {entry.media().key}"
+            f"$${{library_key: {child_item.key}, media_key: {media_key}"
             + f", {ids}}}$$"
             if ids
             else ""

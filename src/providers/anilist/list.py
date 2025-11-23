@@ -101,38 +101,6 @@ class AniListListEntry(ListEntry):
             media.title.romaji or media.title.english or "" if media.title else ""
         )
 
-    @classmethod
-    def create_empty(
-        cls, provider: ListProvider, media: ListMedia | None = None
-    ) -> AniListListEntry:
-        """Create an empty list entry instance.
-
-        Args:
-            provider (AniListListProvider): The list provider instance.
-            media (AniListListMedia | None): The media instance. If None, a placeholder
-                media will be used.
-        """
-        if not isinstance(provider, AniListListProvider):
-            raise TypeError("Provider must be an instance of AniListListProvider")
-        if not isinstance(media, AniListListMedia) and media is not None:
-            raise TypeError("Media must be an instance of AniListListMedia")
-
-        empty_media = media or AniListListMedia(
-            provider,
-            Media(
-                id=0,
-                title=None,
-                format=None,
-            ),
-        )
-        user = provider.user()
-        empty_entry = MediaList(
-            id=0,
-            user_id=int(user.key) if user else 0,
-            media_id=media._media.id if media else 0,
-        )
-        return cls(provider, empty_media._media, empty_entry)
-
     @property
     def status(self) -> ListStatus | None:
         """Get the status of the list entry."""
@@ -403,6 +371,13 @@ class AniListListProvider(ListProvider):
             key (str): The media key of the entry to retrieve.
         """
         media = await self._client.get_anime(int(key))
+        if media.media_list_entry is None:
+            return None
+        return AniListListEntry(self, media=media, entry=media.media_list_entry)
+
+    async def build_entry(self, key: str) -> AniListListEntry:
+        """Construct an AniList list entry for the supplied media key."""
+        media = await self._client.get_anime(int(key))
         entry = media.media_list_entry or MediaList(
             id=0,
             user_id=self._client.user.id if self._client.user else 0,
@@ -526,19 +501,17 @@ class AniListListProvider(ListProvider):
             return [None] * len(keys)
 
         medias = await self._client.batch_get_anime(ids)
-        return [
-            AniListListEntry(
-                self,
-                media=media,
-                entry=media.media_list_entry
-                or MediaList(
-                    id=0,
-                    user_id=self._client.user.id if self._client.user else 0,
-                    media_id=media.id,
-                ),
+        media_by_id = {media.id: media for media in medias}
+        entries: list[AniListListEntry | None] = []
+        for key in keys:
+            media = media_by_id.get(int(key))
+            if media is None or media.media_list_entry is None:
+                entries.append(None)
+                continue
+            entries.append(
+                AniListListEntry(self, media=media, entry=media.media_list_entry)
             )
-            for media in medias
-        ]
+        return entries
 
     async def _build_media_payload(
         self, media_key: str | int, entry: AniListListEntry
