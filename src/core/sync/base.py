@@ -36,8 +36,8 @@ def diff_snapshots(
 ) -> dict[str, tuple[Any, Any]]:
     """Compute differences between two snapshots for the specified fields."""
     diff: dict[str, tuple[Any, Any]] = {}
-    before_map = before.asdict() if before else {}
-    after_map = after.asdict() if after else {}
+    before_map = before.to_dict() if before else {}
+    after_map = after.to_dict() if after else {}
     for field in fields:
         if before_map.get(field) != after_map.get(field):
             diff[field] = (before_map.get(field), after_map.get(field))
@@ -183,7 +183,7 @@ class BaseSyncClient[
             if entry is None:
                 log.debug(
                     f"[{self.profile_name}] No existing list entry for "
-                    f"{item.media_kind.value} {debug_ids}; preparing new entry"
+                    f"{item.media_kind.value}; preparing new entry {debug_ids}"
                 )
             else:
                 log.debug(
@@ -479,7 +479,7 @@ class BaseSyncClient[
         if not self._batch_entries:
             return
 
-        log.info(
+        log.success(
             f"[{self.profile_name}] Syncing {len(self._batch_entries)} items "
             f"to list provider in batch mode"
         )
@@ -493,7 +493,9 @@ class BaseSyncClient[
                 before_snapshot = record.before
                 after_snapshot = record.after
                 diff = diff_snapshots(
-                    before_snapshot, after_snapshot, set(after_snapshot.asdict().keys())
+                    before_snapshot,
+                    after_snapshot,
+                    set(after_snapshot.to_dict().keys()),
                 )
                 diff_str = self._format_diff(diff)
                 debug_title = self._debug_log_title(

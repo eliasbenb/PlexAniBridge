@@ -11,6 +11,7 @@ from fastapi.param_functions import Query
 from pydantic import BaseModel
 from sqlalchemy import func, select
 
+from src import log
 from src.config.database import db
 from src.exceptions import (
     HistoryItemNotFoundError,
@@ -25,6 +26,8 @@ from src.web.state import get_app_state
 if TYPE_CHECKING:
     from anibridge_providers.library import LibraryProvider, LibrarySection
     from anibridge_providers.list import ListProvider
+
+    from src.core.bridge import BridgeClient
 
 __all__ = ["HistoryService", "get_history_service"]
 
@@ -66,7 +69,7 @@ class HistoryPage(BaseModel):
 class HistoryService:
     """Service to paginate and enrich sync history records."""
 
-    def _get_bridge(self, profile: str):
+    def _get_bridge(self, profile: str) -> BridgeClient:
         """Return the bridge client for a specific profile."""
         scheduler = get_app_state().scheduler
         if not scheduler:
@@ -362,6 +365,33 @@ class HistoryService:
             HistoryItemNotFoundError: If the specified item does not exist.
         """
         logger.info(f"Undoing history item id={item_id} for profile {profile}")
+        bridge = self._get_bridge(profile)
+        list_provider = bridge.list_provider
+
+        with db() as ctx:
+            row = (
+                ctx.session.query(SyncHistory)
+                .filter(SyncHistory.profile_name == profile, SyncHistory.id == item_id)
+                .first()
+            )
+            if not row:
+                raise HistoryItemNotFoundError("Not found")
+
+        if not row.list_media_key:
+            raise HistoryItemNotFoundError(
+                "Cannot undo history item without list media key"
+            )
+
+        if not row.before_state:
+            log.success(f"Deleting list entry {row.list_media_key} as part of undo")
+            if bridge.profile_config.dry_run:
+                log.info(
+                    "Dry run enabled; skipping deletion of list entry "
+                    f"{row.list_media_key}"
+                )
+            else:
+                await list_provider.delete_entry(row.list_media_key)
+
         # TODO: Implement undo logic on provider side
         raise NotImplementedError(
             "Undo operations are not supported with the provider abstraction."

@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any, Literal
+from typing import Any, Literal
 
 from anibridge_providers.library import (
     LibraryEpisode,
@@ -12,13 +12,11 @@ from anibridge_providers.library import (
     LibrarySeason,
     MediaKind,
 )
+from anibridge_providers.list import ListEntry, ListStatus
 from pydantic import BaseModel
 
 from src.exceptions import UnsupportedMediaTypeError
 from src.models.db.animap import AniMap
-
-if TYPE_CHECKING:
-    from anibridge_providers.list import ListEntry, ListStatus
 
 __all__ = [
     "BatchUpdate",
@@ -354,7 +352,25 @@ class EntrySnapshot:
             finished_at=entry.finished_at,
         )
 
-    def asdict(self) -> dict[str, Any]:
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> EntrySnapshot:
+        """Create a snapshot from a raw dictionary."""
+        return cls(
+            media_key=data.get("media_key", ""),
+            status=ListStatus(data["status"]) if data.get("status") else None,
+            progress=data.get("progress"),
+            repeats=data.get("repeats"),
+            review=data.get("review"),
+            user_rating=data.get("user_rating"),
+            started_at=datetime.fromisoformat(data["started_at"])
+            if data.get("started_at")
+            else None,
+            finished_at=datetime.fromisoformat(data["finished_at"])
+            if data.get("finished_at")
+            else None,
+        )
+
+    def to_dict(self) -> dict[str, Any]:
         """Return a raw dictionary representation."""
         return {
             "media_key": self.media_key,
@@ -379,7 +395,7 @@ class EntrySnapshot:
                 return value.value
             return value
 
-        return {key: _serialize(value) for key, value in self.asdict().items()}
+        return {key: _serialize(value) for key, value in self.to_dict().items()}
 
 
 @dataclass(slots=True)
