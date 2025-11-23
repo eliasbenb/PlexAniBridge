@@ -1,4 +1,4 @@
-"""Service for managing AniList field pins per profile."""
+"""Service for managing provider-specific field pins per profile."""
 
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from src.config.database import db
 from src.config.settings import SyncField
 from src.models.db.pin import Pin
-from src.models.schemas.anilist import MediaWithoutList as AniListMetadata
+from src.models.schemas.provider import ProviderMediaMetadata
 
 __all__ = [
     "PinEntry",
@@ -43,11 +43,12 @@ class PinEntry(BaseModel):
     """Serialized representation of a pin row."""
 
     profile_name: str
-    anilist_id: int
+    list_namespace: str
+    list_media_key: str
     fields: list[str]
     created_at: datetime
     updated_at: datetime
-    anilist: AniListMetadata | None = None
+    media: ProviderMediaMetadata | None = None
 
 
 class UpdatePinPayload(BaseModel):
@@ -102,19 +103,23 @@ class PinService:
 
         return [self._serialize(row) for row in rows]
 
-    def get_pin(self, profile: str, anilist_id: int) -> PinEntry | None:
+    def get_pin(self, profile: str, namespace: str, media_key: str) -> PinEntry | None:
         """Return a single pin entry if it exists."""
         with db() as ctx:
             pin = (
                 ctx.session.query(Pin)
-                .filter(Pin.profile_name == profile, Pin.anilist_id == anilist_id)
+                .filter(
+                    Pin.profile_name == profile,
+                    Pin.list_namespace == namespace,
+                    Pin.list_media_key == media_key,
+                )
                 .first()
             )
 
         return self._serialize(pin) if pin else None
 
     def upsert_pin(
-        self, profile: str, anilist_id: int, fields: Iterable[str]
+        self, profile: str, namespace: str, media_key: str, fields: Iterable[str]
     ) -> PinEntry:
         """Create or update a pin configuration."""
         sanitized = self._sanitize_fields(fields)
@@ -124,7 +129,11 @@ class PinService:
         with db() as ctx:
             pin = (
                 ctx.session.query(Pin)
-                .filter(Pin.profile_name == profile, Pin.anilist_id == anilist_id)
+                .filter(
+                    Pin.profile_name == profile,
+                    Pin.list_namespace == namespace,
+                    Pin.list_media_key == media_key,
+                )
                 .first()
             )
 
@@ -132,7 +141,8 @@ class PinService:
             if not pin:
                 pin = Pin(
                     profile_name=profile,
-                    anilist_id=anilist_id,
+                    list_namespace=namespace,
+                    list_media_key=media_key,
                     fields=sanitized,
                     created_at=now,
                     updated_at=now,
@@ -147,12 +157,16 @@ class PinService:
 
         return self._serialize(pin)
 
-    def delete_pin(self, profile: str, anilist_id: int) -> None:
+    def delete_pin(self, profile: str, namespace: str, media_key: str) -> None:
         """Remove a pin configuration if it exists."""
         with db() as ctx:
             pin = (
                 ctx.session.query(Pin)
-                .filter(Pin.profile_name == profile, Pin.anilist_id == anilist_id)
+                .filter(
+                    Pin.profile_name == profile,
+                    Pin.list_namespace == namespace,
+                    Pin.list_media_key == media_key,
+                )
                 .first()
             )
             if not pin:
@@ -174,14 +188,15 @@ class PinService:
         return sanitized
 
     @staticmethod
-    def _serialize(pin: Pin, media: AniListMetadata | None = None) -> PinEntry:
+    def _serialize(pin: Pin, media: ProviderMediaMetadata | None = None) -> PinEntry:
         return PinEntry(
             profile_name=pin.profile_name,
-            anilist_id=pin.anilist_id,
+            list_namespace=pin.list_namespace,
+            list_media_key=pin.list_media_key,
             fields=list(pin.fields or []),
             created_at=pin.created_at,
             updated_at=pin.updated_at,
-            anilist=media,
+            media=media,
         )
 
 

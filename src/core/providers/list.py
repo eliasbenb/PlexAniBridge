@@ -110,6 +110,11 @@ class ListMedia(ListEntity, Protocol):
         ...
 
     @property
+    def poster_image(self) -> str | None:
+        """Return a provider-supplied poster or cover image URL if available."""
+        ...
+
+    @property
     def total_units(self) -> int | None:
         """Return the total number of units (e.g. episodes) for the media."""
         ...

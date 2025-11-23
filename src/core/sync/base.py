@@ -7,7 +7,6 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from rapidfuzz import fuzz
-from sqlalchemy import or_
 
 from src import log
 from src.config.database import db
@@ -160,7 +159,7 @@ class BaseSyncClient[
         self.profile_name = profile_name
 
         self.sync_stats = SyncStats()
-        self._pin_cache: dict[int, list[str]] = {}
+        self._pin_cache: dict[tuple[str, str], list[str]] = {}
         self._batch_entries: list[ListEntry] = []
         self.batch_history_items: list[BatchUpdate[ParentMediaT, ChildMediaT]] = []
 
@@ -185,12 +184,13 @@ class BaseSyncClient[
                 value.cache_clear()  # type: ignore
         self._pin_cache.clear()
 
-    def _get_pinned_fields(self, media_id: int | None) -> list[str]:
-        """Return the set of pinned fields for the given media identifier."""
-        if not media_id:
+    def _get_pinned_fields(self, namespace: str, media_key: str | None) -> list[str]:
+        """Return the set of pinned fields for the given list media identifier."""
+        if not media_key:
             return []
 
-        cached = self._pin_cache.get(media_id)
+        cache_key = (namespace, media_key)
+        cached = self._pin_cache.get(cache_key)
         if cached is not None:
             return cached
 
@@ -199,13 +199,14 @@ class BaseSyncClient[
                 ctx.session.query(Pin)
                 .filter(
                     Pin.profile_name == self.profile_name,
-                    Pin.anilist_id == media_id,
+                    Pin.list_namespace == namespace,
+                    Pin.list_media_key == media_key,
                 )
                 .first()
             )
 
         fields = list(pin.fields) if pin and pin.fields else []
-        self._pin_cache[media_id] = fields
+        self._pin_cache[cache_key] = fields
         return fields
 
     async def process_media(self, item: ParentMediaT) -> None:
@@ -337,8 +338,12 @@ class BaseSyncClient[
         )
 
         before_snapshot = EntrySnapshot.from_entry(entry)
-        media_id = self._resolve_media_id(animapping, before_snapshot.media_key)
-        pinned_fields = self._get_pinned_fields(media_id)
+        list_media_key = self._resolve_list_media_key(
+            animapping, before_snapshot.media_key
+        )
+        pinned_fields = self._get_pinned_fields(
+            self.list_provider.NAMESPACE, list_media_key
+        )
         skip_fields = set(self.excluded_sync_fields) | set(pinned_fields)
 
         calc_kwargs = {
@@ -543,62 +548,76 @@ class BaseSyncClient[
         error_message: str | None = None,
     ) -> None:
         """Record the outcome of a sync attempt."""
+        from src.models.db.sync_history import SyncHistory
+
         before_snapshot, after_snapshot = snapshots
         before_state = before_snapshot.serialize() if before_snapshot else None
         after_state = after_snapshot.serialize() if after_snapshot else None
 
-        plex_rating_key = str(item.key)
-        plex_child_rating_key = str(child_item.key) if child_item else None
-        plex_type = item.media_kind
-        plex_guid = self._resolve_guid(item)
-
-        media_key = (
+        resolved_media_key = (
             after_snapshot.media_key
             if after_snapshot
             else before_snapshot.media_key
             if before_snapshot
             else None
         )
-        media_id = self._resolve_media_id(animapping, media_key)
+        list_media_key = self._resolve_list_media_key(animapping, resolved_media_key)
+
+        library_target: LibraryMedia = child_item if child_item is not None else item
+        library_media_key = str(library_target.key)
+        library_namespace = self.library_provider.NAMESPACE
+        list_namespace = self.list_provider.NAMESPACE
+        media_kind = library_target.media_kind
+
+        library_section_key: str | None = None
+        try:
+            section = library_target.section()
+            library_section_key = section.key
+        except Exception:
+            library_section_key = None
 
         with db() as ctx:
             if outcome == SyncOutcome.SYNCED:
-                delete_query = ctx.session.query(SyncHistory).filter(
+                delete_filters = [
                     SyncHistory.profile_name == self.profile_name,
-                    SyncHistory.plex_rating_key == plex_rating_key,
-                    SyncHistory.plex_type == plex_type,
+                    SyncHistory.library_section_key == library_section_key,
+                    SyncHistory.library_namespace == library_namespace,
+                    SyncHistory.library_media_key == library_media_key,
                     SyncHistory.outcome.in_(
                         [SyncOutcome.NOT_FOUND, SyncOutcome.FAILED]
                     ),
+                ]
+                if list_media_key is not None:
+                    delete_filters.extend(
+                        [
+                            SyncHistory.list_namespace == list_namespace,
+                            SyncHistory.list_media_key == list_media_key,
+                        ]
+                    )
+                ctx.session.query(SyncHistory).filter(*delete_filters).delete(
+                    synchronize_session=False
                 )
-                if plex_child_rating_key is not None:
-                    delete_query = delete_query.filter(
-                        or_(
-                            SyncHistory.plex_child_rating_key == plex_child_rating_key,
-                            SyncHistory.plex_child_rating_key.is_(None),
-                        )
-                    )
-                else:
-                    delete_query = delete_query.filter(
-                        SyncHistory.plex_child_rating_key.is_(None)
-                    )
-                delete_query.delete(synchronize_session=False)
 
             if outcome == SyncOutcome.SKIPPED:
                 return
 
             if outcome in (SyncOutcome.NOT_FOUND, SyncOutcome.FAILED):
-                existing = (
-                    ctx.session.query(SyncHistory)
-                    .filter(
-                        SyncHistory.profile_name == self.profile_name,
-                        SyncHistory.plex_rating_key == plex_rating_key,
-                        SyncHistory.plex_child_rating_key == plex_child_rating_key,
-                        SyncHistory.plex_type == plex_type,
-                        SyncHistory.outcome == outcome,
+                filters = [
+                    SyncHistory.profile_name == self.profile_name,
+                    SyncHistory.library_namespace == library_namespace,
+                    SyncHistory.library_media_key == library_media_key,
+                    SyncHistory.outcome == outcome,
+                ]
+                if list_media_key is None:
+                    filters.append(SyncHistory.list_media_key.is_(None))
+                else:
+                    filters.extend(
+                        [
+                            SyncHistory.list_namespace == list_namespace,
+                            SyncHistory.list_media_key == list_media_key,
+                        ]
                     )
-                    .first()
-                )
+                existing = ctx.session.query(SyncHistory).filter(*filters).first()
                 if existing:
                     if existing.error_message == error_message:
                         return
@@ -611,11 +630,12 @@ class BaseSyncClient[
 
             history_record = SyncHistory(
                 profile_name=self.profile_name,
-                plex_guid=plex_guid,
-                plex_rating_key=plex_rating_key,
-                plex_child_rating_key=plex_child_rating_key,
-                plex_type=plex_type,
-                anilist_id=media_id,
+                library_namespace=library_namespace,
+                library_section_key=library_section_key,
+                library_media_key=library_media_key,
+                list_namespace=list_namespace,
+                list_media_key=list_media_key,
+                media_kind=media_kind,
                 outcome=outcome,
                 before_state=before_state,
                 after_state=after_state,
@@ -624,25 +644,15 @@ class BaseSyncClient[
             ctx.session.add(history_record)
             ctx.session.commit()
 
-    def _resolve_media_id(
+    def _resolve_list_media_key(
         self, animapping: AniMap | None, media_key: str | None
-    ) -> int | None:
+    ) -> str | None:
         """Resolve the list provider media identifier for logging/history."""
         if animapping and animapping.anilist_id:
-            return animapping.anilist_id
+            return str(animapping.anilist_id)
         if media_key is None:
             return None
-        try:
-            return int(media_key)
-        except (TypeError, ValueError):
-            return None
-
-    def _resolve_guid(self, item: LibraryMedia) -> str | None:
-        """Resolve the provider-specific GUID for a library item if available."""
-        for external in item.ids():
-            if external.namespace == "plex":
-                return external.value
-        return None
+        return str(media_key)
 
     def _should_update_field(
         self,

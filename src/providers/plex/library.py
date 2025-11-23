@@ -216,6 +216,17 @@ class PlexLibraryMedia(LibraryMedia):
         self._section = PlexLibrarySection(self._provider, raw_section)
         return self._section
 
+    @property
+    def poster_image(self) -> str | None:
+        """Return the full URL to the item's poster artwork if available."""
+        if not self._item.thumb:
+            return None
+        try:
+            bundle = self._provider._client.bundle
+            return bundle.user_client.url(self._item.thumb)
+        except Exception:
+            return None
+
 
 class PlexLibraryMovie(PlexLibraryMedia, LibraryMovie):
     """Concrete ``LibraryMovie`` wrapper for python-plexapi ``Movie`` objects."""

@@ -97,6 +97,11 @@ class LibraryMedia(LibraryEntity, Protocol):
         ...
 
     @property
+    def poster_image(self) -> str | None:
+        """Primary poster or cover image for the media item if available."""
+        ...
+
+    @property
     def user_rating(self) -> int | None:
         """Get the user rating for the media item.
 
@@ -247,7 +252,7 @@ class LibraryEpisode(LibraryMedia, Protocol):
         """Return a string representation of the library entity."""
         return (
             f"<{self.__class__.__name__}:{self.key}:{self.show().title[:32]}:"
-            f"S{self.index:02d}E{self.season_index:02d}>"
+            f"S{self.season_index:02d}E{self.index:02d}>"
         )
 
 

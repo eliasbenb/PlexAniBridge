@@ -62,6 +62,14 @@ class AniListListMedia(ListMedia):
             return 1
         return None
 
+    @property
+    def poster_image(self) -> str | None:
+        """Return the best available cover image URL for the media."""
+        image = self._media.cover_image
+        if image is None:
+            return None
+        return image.extra_large or image.large or image.medium or image.color
+
     def provider(self) -> AniListListProvider:
         """Get the list provider associated with the media.
 

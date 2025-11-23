@@ -1,4 +1,7 @@
-"""API routes for managing AniList field pins."""
+"""API routes for managing field pins across list providers."""
+
+from collections.abc import Iterable, Sequence
+from typing import TYPE_CHECKING
 
 from aiohttp import ClientError
 from fastapi.exceptions import HTTPException
@@ -7,7 +10,7 @@ from fastapi.routing import APIRouter
 from pydantic import BaseModel, Field
 
 from src.config.settings import SyncField
-from src.models.schemas.anilist import MediaWithoutList as AniListMetadata
+from src.models.schemas.provider import ProviderMediaMetadata
 from src.web.services.pin_service import (
     PinEntry,
     PinFieldOption,
@@ -15,6 +18,10 @@ from src.web.services.pin_service import (
     get_pin_service,
 )
 from src.web.state import get_app_state
+
+if TYPE_CHECKING:
+    from src.core.bridge import BridgeClient
+    from src.core.providers.list import ListEntry, ListProvider
 
 router = APIRouter()
 
@@ -32,14 +39,14 @@ class PinOptionsResponse(BaseModel):
 
 
 class PinSearchItem(BaseModel):
-    """Search result item combining AniList metadata with existing pin state."""
+    """Search result item combining provider metadata with existing pin state."""
 
-    anilist: AniListMetadata
+    media: ProviderMediaMetadata
     pin: PinEntry | None = None
 
 
 class PinSearchResponse(BaseModel):
-    """Response model for AniList search results within the pin manager."""
+    """Response model for provider search results within the pin manager."""
 
     results: list[PinSearchItem]
 
@@ -66,54 +73,107 @@ class OkResponse(BaseModel):
     ok: bool = True
 
 
+def _get_bridge(profile: str) -> BridgeClient:
+    state = get_app_state()
+    scheduler = state.scheduler
+    if not scheduler:
+        raise HTTPException(503, detail="Scheduler not available")
+    bridge = scheduler.bridge_clients.get(profile)
+    if not bridge:
+        raise HTTPException(status_code=404, detail="Unknown profile")
+    return bridge
+
+
+def _list_identifiers(entries: Iterable[PinEntry]) -> list[tuple[str, str]]:
+    identifiers: list[tuple[str, str]] = []
+    for entry in entries:
+        if entry.list_media_key:
+            identifiers.append((entry.list_namespace, entry.list_media_key))
+    return identifiers
+
+
+async def _fetch_list_metadata(
+    profile: str,
+    identifiers: Sequence[tuple[str, str]],
+) -> dict[tuple[str, str], ProviderMediaMetadata]:
+    if not identifiers:
+        return {}
+
+    bridge = _get_bridge(profile)
+    provider: ListProvider = bridge.list_provider
+    namespace = provider.NAMESPACE
+    scoped = [(ns, key) for ns, key in identifiers if ns == namespace and key]
+    if not scoped:
+        return {}
+
+    keys = [key for _, key in scoped]
+    try:
+        entries = await provider.get_entries_batch(keys)
+    except ClientError as exc:
+        raise HTTPException(502, detail="Failed to fetch provider metadata") from exc
+    except Exception as exc:
+        raise HTTPException(500, detail="Failed to fetch provider metadata") from exc
+
+    metadata: dict[tuple[str, str], ProviderMediaMetadata] = {}
+    for (_namespace, _key), entry in zip(scoped, entries, strict=False):
+        if entry is None:
+            continue
+        media = entry.media()
+        metadata[(namespace, media.key)] = ProviderMediaMetadata(
+            namespace=namespace,
+            key=media.key,
+            title=media.title,
+            poster_url=media.poster_image,
+        )
+    return metadata
+
+
+def _search_result_metadata(namespace: str, entry: ListEntry) -> ProviderMediaMetadata:
+    media = entry.media()
+    title = media.title or entry.title or None
+    poster = getattr(media, "poster_image", None)
+    return ProviderMediaMetadata(
+        namespace=namespace,
+        key=media.key,
+        title=title,
+        poster_url=poster,
+    )
+
+
 @router.get("/fields", response_model=PinOptionsResponse)
 def get_pin_fields() -> PinOptionsResponse:
-    """Return selectable pin field metadata.
-
-    Returns:
-        PinOptionsResponse: Available pin field options.
-    """
+    """Return selectable pin field metadata."""
     service = get_pin_service()
     return PinOptionsResponse(options=service.list_options())
 
 
 @router.get("/{profile}", response_model=PinListResponse)
 async def list_pins(
-    profile: str = Path(..., min_length=1), with_anilist: bool = Query(False)
+    profile: str = Path(..., min_length=1),
+    with_media: bool = Query(False, description="Include provider metadata for pins."),
 ) -> PinListResponse:
-    """List all pinned AniList entries for a profile.
+    """List all pinned list entries for a profile.
 
     Args:
         profile (str): Profile name.
-        with_anilist (bool): Include AniList metadata for each pin when true.
+        with_media (bool): Include media metadata for each pin when true.
 
     Returns:
         PinListResponse: List of pinned entries.
     """
     service = get_pin_service()
     entries = service.list_pins(profile)
-    if with_anilist and entries:
-        try:
-            client = await get_app_state().ensure_public_anilist()
-            media_list = await client.batch_get_anime(
-                [entry.anilist_id for entry in entries]
-            )
-        except ClientError as exc:
-            raise HTTPException(502, detail="Failed to fetch AniList metadata") from exc
-        media_by_id = {
-            int(media.id): AniListMetadata.model_validate(
-                media.model_dump(exclude_none=True)
-            )
-            for media in media_list
-            if getattr(media, "id", None) is not None
-        }
-        entries = [
-            entry.model_copy(update={"anilist": media_by_id.get(entry.anilist_id)})
-            if media_by_id.get(entry.anilist_id)
-            else entry
-            for entry in entries
-        ]
-    return PinListResponse(pins=entries)
+    if not with_media or not entries:
+        return PinListResponse(pins=entries)
+
+    metadata = await _fetch_list_metadata(profile, _list_identifiers(entries))
+    enriched = [
+        entry.model_copy(
+            update={"media": metadata.get((entry.list_namespace, entry.list_media_key))}
+        )
+        for entry in entries
+    ]
+    return PinListResponse(pins=enriched)
 
 
 @router.get("/{profile}/search", response_model=PinSearchResponse)
@@ -122,12 +182,12 @@ async def search_pins(
     q: str | None = Query(None, min_length=1),
     limit: int = Query(10, ge=1, le=50),
 ) -> PinSearchResponse:
-    """Search AniList for entries to manage pins against.
+    """Search list entries to manage pins against.
 
     Args:
         profile (str): Profile name to scope existing pins.
         q (str | None): Text query to search AniList titles.
-        limit: Maximum number of search results to return.
+        limit (int): Maximum number of search results to return.
 
     Returns:
         PinSearchResponse: Matched AniList titles with pin status.
@@ -136,139 +196,109 @@ async def search_pins(
     if not query:
         raise HTTPException(status_code=400, detail="Provide a search query")
 
+    bridge = _get_bridge(profile)
+    provider: ListProvider = bridge.list_provider
+
     service = get_pin_service()
-    existing = {entry.anilist_id: entry for entry in service.list_pins(profile)}
+    existing = {
+        (entry.list_namespace, entry.list_media_key): entry
+        for entry in service.list_pins(profile)
+    }
 
     try:
-        client = await get_app_state().ensure_public_anilist()
+        results = await provider.search(query)
+    except ClientError as exc:
+        raise HTTPException(502, detail="Failed to query list provider") from exc
     except Exception as exc:
-        raise HTTPException(503, detail="AniList client unavailable") from exc
+        raise HTTPException(500, detail="Failed to query list provider") from exc
 
-    results: list[PinSearchItem] = []
-    seen: set[int] = set()
-
-    def add_media(media) -> None:
-        if media is None or getattr(media, "id", None) is None:
-            return
-        aid = int(media.id)
-        if aid in seen:
-            return
-        seen.add(aid)
-        metadata = AniListMetadata.model_validate(media.model_dump(exclude_none=True))
-        pin = existing.get(aid)
+    items: list[PinSearchItem] = []
+    seen: set[tuple[str, str]] = set()
+    for entry in results:
+        identifier = (provider.NAMESPACE, entry.media().key)
+        if identifier in seen:
+            continue
+        seen.add(identifier)
+        metadata = _search_result_metadata(provider.NAMESPACE, entry)
+        pin = existing.get(identifier)
         if pin is not None:
-            pin = pin.model_copy(update={"anilist": metadata})
-        results.append(PinSearchItem(anilist=metadata, pin=pin))
+            pin = pin.model_copy(update={"media": metadata})
+        items.append(PinSearchItem(media=metadata, pin=pin))
+        if len(items) >= limit:
+            break
 
-    try:
-        if query:
-            try:
-                count = 0
-                async for media in client.search_anime(
-                    query, is_movie=None, episodes=None, limit=limit
-                ):
-                    add_media(media)
-                    count += 1
-                    if count >= limit:
-                        break
-            except ClientError as exc:
-                raise HTTPException(502, detail="Failed to query AniList") from exc
-    except HTTPException:
-        raise
-    except Exception as exc:
-        raise HTTPException(
-            500, detail="Unexpected error during AniList search"
-        ) from exc
-
-    return PinSearchResponse(results=results)
+    return PinSearchResponse(results=items)
 
 
-@router.get("/{profile}/{anilist_id}", response_model=PinEntry)
+@router.get("/{profile}/{namespace}/{media_key}", response_model=PinEntry)
 async def get_pin(
     profile: str = Path(..., min_length=1),
-    anilist_id: int = Path(..., ge=1),
-    with_anilist: bool = Query(False),
+    namespace: str = Path(..., min_length=1),
+    media_key: str = Path(..., min_length=1),
+    with_media: bool = Query(False),
 ) -> PinEntry:
-    """Retrieve pin configuration for a specific AniList entry.
+    """Retrieve pin configuration for a specific list entry.
 
     Args:
         profile (str): Profile name.
-        anilist_id (int): AniList ID.
-        with_anilist (bool): Include AniList metadata for the pin when true.
+        namespace (str): List namespace.
+        media_key (str): Media key.
+        with_media (bool): Include media metadata for the pin when true.
 
     Returns:
         PinEntry: Pin configuration.
     """
     service = get_pin_service()
-    entry = service.get_pin(profile, anilist_id)
+    entry = service.get_pin(profile, namespace, media_key)
     if not entry:
         raise HTTPException(status_code=404, detail="Pin not found")
 
-    if with_anilist:
-        try:
-            client = await get_app_state().ensure_public_anilist()
-            media = await client.get_anime(anilist_id)
-            metadata = AniListMetadata.model_validate(
-                media.model_dump(exclude_none=True)
-            )
-            return entry.model_copy(update={"anilist": metadata})
-        except ClientError:
-            pass
+    if not with_media:
+        return entry
 
-    return entry
+    metadata = await _fetch_list_metadata(profile, [(namespace, media_key)])
+    return entry.model_copy(update={"media": metadata.get((namespace, media_key))})
 
 
-@router.put("/{profile}/{anilist_id}", response_model=PinEntry)
+@router.put("/{profile}/{namespace}/{media_key}", response_model=PinEntry)
 async def upsert_pin(
     request: UpdatePinRequest,
     profile: str = Path(..., min_length=1),
-    anilist_id: int = Path(..., ge=1),
-    with_anilist: bool = Query(False),
+    namespace: str = Path(..., min_length=1),
+    media_key: str = Path(..., min_length=1),
+    with_media: bool = Query(False),
 ) -> PinEntry:
-    """Create or update pin fields for an AniList entry.
-
-    Args:
-        request (UpdatePinRequest): Request body with fields to pin.
-        profile (str): Profile name.
-        anilist_id (int): AniList ID.
-        with_anilist (bool): Include AniList metadata for the pin when true.
-
-    Returns:
-        PinEntry: Updated pin configuration.
-    """
+    """Create or update pin fields for a media item."""
     payload = request.to_payload()
     try:
-        entry = get_pin_service().upsert_pin(profile, anilist_id, payload.normalized())
+        entry = get_pin_service().upsert_pin(
+            profile, namespace, media_key, payload.normalized()
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    if with_anilist:
-        try:
-            client = await get_app_state().ensure_public_anilist()
-            media = await client.get_anime(anilist_id)
-            metadata = AniListMetadata.model_validate(
-                media.model_dump(exclude_none=True)
-            )
-            return entry.model_copy(update={"anilist": metadata})
-        except ClientError:
-            # Don't fail the save if AniList lookup fails; return bare entry
-            pass
+    if not with_media:
+        return entry
 
-    return entry
+    metadata = await _fetch_list_metadata(profile, [(namespace, media_key)])
+    return entry.model_copy(update={"media": metadata.get((namespace, media_key))})
 
 
-@router.delete("/{profile}/{anilist_id}", response_model=OkResponse)
+@router.delete("/{profile}/{namespace}/{media_key}", response_model=OkResponse)
 def delete_pin(
-    profile: str = Path(..., min_length=1), anilist_id: int = Path(..., ge=1)
+    profile: str = Path(..., min_length=1),
+    namespace: str = Path(..., min_length=1),
+    media_key: str = Path(..., min_length=1),
 ) -> OkResponse:
-    """Delete pin configuration for an AniList entry.
+    """Delete pin configuration for an list entry.
 
     Args:
         profile (str): Profile name.
-        anilist_id (int): AniList ID.
+        namespace (str): List namespace.
+        media_key (str): Media key.
 
     Returns:
         OkResponse: Confirmation of successful deletion.
     """
-    get_pin_service().delete_pin(profile, anilist_id)
+    get_pin_service().delete_pin(profile, namespace, media_key)
     return OkResponse()
