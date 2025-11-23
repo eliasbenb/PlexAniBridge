@@ -17,8 +17,12 @@ class Pin(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     profile_name: Mapped[str] = mapped_column(String, index=True)
-    anilist_id: Mapped[int] = mapped_column(Integer, index=True)
+
+    list_namespace: Mapped[str] = mapped_column(String, index=True)
+    list_media_key: Mapped[str] = mapped_column(String, index=True)
+
     fields: Mapped[list[str]] = mapped_column(JSON, default=list)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )
@@ -29,5 +33,11 @@ class Pin(Base):
     )
 
     __table_args__ = (
-        Index("ix_pin_profile_anilist", "profile_name", "anilist_id", unique=True),
+        Index(
+            "ix_pin_profile_list_keys",
+            "profile_name",
+            "list_namespace",
+            "list_media_key",
+            unique=True,
+        ),
     )
