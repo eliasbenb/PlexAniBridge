@@ -54,12 +54,7 @@ class AppState:
             AniListClient: A tokenless AniList client suitable for public queries.
         """
         if self.public_anilist is None:
-            self.public_anilist = AniListClient(
-                anilist_token=None,
-                backup_dir=None,
-                dry_run=False,
-                profile_name="public",
-            )
+            self.public_anilist = AniListClient(anilist_token=None)
             await self.public_anilist.initialize()
         return self.public_anilist
 

@@ -193,9 +193,7 @@ _DB_FIELDS: tuple[QueryFieldSpec, ...] = (
     ),
 )
 try:
-    _anilist_client = AniListClient(
-        anilist_token=None, backup_dir=None, dry_run=False, profile_name=None
-    )
+    _anilist_client = AniListClient(anilist_token=None)
     _anilist_genres = _anilist_client.available_genres
     _anilist_tags = _anilist_client.available_tags
 except Exception:  # This is an import-time operation; can't afford to fail
