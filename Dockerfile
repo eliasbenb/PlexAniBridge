@@ -1,19 +1,20 @@
-FROM python:3.13-alpine AS python-builder
+FROM alpine:3.22 AS python-builder
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-ENV UV_LINK_MODE=copy \
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
     UV_PROJECT_ENVIRONMENT=/opt/venv \
-    UV_PYTHON_DOWNLOADS=never
+    UV_PYTHON_INSTALL_DIR=/python \
+    UV_PYTHON_PREFERENCE=only-managed \
+    VIRTUAL_ENV=/opt/venv
 
-RUN apk add --no-cache git
+WORKDIR /app
 
-WORKDIR /tmp
-
-RUN --mount=type=bind,source=uv.lock,target=/tmp/uv.lock,ro \
-    --mount=type=bind,source=pyproject.toml,target=/tmp/pyproject.toml,ro \
-    --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev --no-install-project
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    uv sync --frozen --no-install-project --no-dev
 
 FROM node:25-alpine AS node-builder
 
@@ -35,7 +36,7 @@ COPY ./frontend /app
 
 RUN pnpm build
 
-FROM python:3.13-alpine
+FROM alpine:3.22
 
 RUN apk add --no-cache shadow su-exec
 
@@ -48,7 +49,7 @@ LABEL maintainer="Elias Benbourenane <eliasbenbourenane@gmail.com>" \
     org.opencontainers.image.source="https://github.com/eliasbenb/PlexAniBridge" \
     org.opencontainers.image.licenses="MIT"
 
-ENV PYTHONPATH=/opt/venv/lib/python3.13/site-packages \
+ENV PATH=/opt/venv/bin:$PATH \
     PYTHONUNBUFFERED=1 \
     PYTHON_JIT=1 \
     PUID=1000 \
@@ -64,6 +65,7 @@ COPY ./scripts/docker_init.sh /init
 RUN rm -rf /app/frontend && \
     mkdir -p /config
 
+COPY --from=python-builder /python /python
 COPY --from=python-builder /opt/venv /opt/venv
 COPY --from=node-builder /app/build /app/frontend/build
 
