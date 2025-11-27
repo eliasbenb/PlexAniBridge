@@ -33,7 +33,7 @@
 # mappings_url: "https://raw.githubusercontent.com/eliasbenb/PlexAniBridge-Mappings/v2/mappings.json"
 # provider_modules: []
 # web:
-#     enabled: false
+#     enabled: true
 #     host: "0.0.0.0"
 #     port: 4848
 #     basic_auth:

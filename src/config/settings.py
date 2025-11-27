@@ -174,7 +174,7 @@ class BasicAuthConfig(BaseModel):
 class WebConfig(BaseModel):
     """Configuration for the embedded web server."""
 
-    enabled: bool = Field(default=False, description="Enable the AniBridge web server")
+    enabled: bool = Field(default=True, description="Enable the AniBridge web server")
     host: str = Field(default="0.0.0.0", description="Host for the web server")
     port: int = Field(default=4848, description="Port for the web server")
     basic_auth: BasicAuthConfig = Field(
