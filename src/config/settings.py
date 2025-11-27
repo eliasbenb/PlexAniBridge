@@ -9,6 +9,7 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
+    PrivateAttr,
     SecretStr,
     field_validator,
     model_validator,
@@ -25,7 +26,6 @@ from pydantic_settings import (
 
 from src.exceptions import (
     InvalidMappingsURLError,
-    NoProfilesConfiguredError,
     ProfileConfigError,
     ProfileNotFoundError,
 )
@@ -35,7 +35,6 @@ __all__ = [
     "AniBridgeConfig",
     "AniBridgeProfileConfig",
     "LogLevel",
-    "PlexMetadataSource",
     "SyncField",
     "SyncMode",
     "get_config",
@@ -91,13 +90,6 @@ class BaseStrEnum(StrEnum):
     def __str__(self) -> str:
         """Return the string representation of the enum member."""
         return repr(self)
-
-
-class PlexMetadataSource(BaseStrEnum):
-    """Defines the source of metadata for Plex media items."""
-
-    LOCAL = "local"  # Metadata is sourced from the local Plex server
-    ONLINE = "online"  # Metadata is sourced from Plex's online services
 
 
 class LogLevel(BaseStrEnum):
@@ -163,19 +155,32 @@ class SyncMode(BaseStrEnum):
     WEBHOOK = "webhook"
 
 
-def _apply_deprecations(data: dict) -> dict:
-    """Translate deprecated/legacy configuration fields in-place.
+class BasicAuthConfig(BaseModel):
+    """Configuration for authentication settings."""
 
-    Central location for all migrations of removed/renamed settings so the
-    logic does not become duplicated across validators / constructors.
+    username: str | None = Field(
+        default=None, description="Username for authentication"
+    )
+    password: SecretStr | None = Field(
+        default=None, description="Password for authentication"
+    )
+    htpasswd_path: Path | None = Field(
+        default=None, description="Path to an htpasswd file for authentication"
+    )
+    realm: str = Field(
+        default="AniBridge", description="Realm for HTTP Basic Authentication"
+    )
 
-    Args:
-        data: Raw configuration mapping
 
-    Returns:
-        dict: Same mapping
-    """
-    return data
+class WebConfig(BaseModel):
+    """Configuration for the embedded web server."""
+
+    enabled: bool = Field(default=False, description="Enable the AniBridge web server")
+    host: str = Field(default="0.0.0.0", description="Host for the web server")
+    port: int = Field(default=4848, description="Port for the web server")
+    basic_auth: BasicAuthConfig = Field(
+        default_factory=BasicAuthConfig, description="Authentication settings"
+    )
 
 
 class AniBridgeProfileConfig(BaseModel):
@@ -184,22 +189,20 @@ class AniBridgeProfileConfig(BaseModel):
     Represents one sync profile with one Plex user and one AniList account.
     """
 
-    anilist_token: SecretStr = Field(
-        ..., description="AniList API token for authentication"
+    library_provider: str = Field(
+        default="plex",
+        description="Namespace of the library provider to use",
     )
-    plex_token: SecretStr = Field(..., description="Plex API token for authentication")
-    plex_user: str = Field(..., description="Plex username of target user")
-    plex_url: str = Field(default=..., description="Plex server URL")
-    plex_sections: list[str] = Field(
-        default_factory=list, description="Library sections to sync (empty = all)"
+    list_provider: str = Field(
+        default="anilist",
+        description="Namespace of the list provider to use",
     )
-    plex_genres: list[str] = Field(
-        default_factory=list, description="Genre filter (empty = all)"
+    providers: dict[str, dict] = Field(
+        default_factory=dict,
+        exclude=True,
+        description="Provider configuration by namespace",
     )
-    plex_metadata_source: PlexMetadataSource = Field(
-        default=PlexMetadataSource.LOCAL,
-        description="Source of metadata for Plex media items",
-    )
+
     sync_interval: int = Field(
         default=86400, ge=0, description="Sync interval in seconds"
     )
@@ -263,12 +266,6 @@ class AniBridgeProfileConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    @model_validator(mode="before")
-    @classmethod
-    def _translate_deprecated(cls, values):
-        """Apply centralized deprecated field translations for profile configs."""
-        return _apply_deprecations(values)
-
 
 class AniBridgeConfig(BaseSettings):
     """Multi-configuration manager for AniBridge application.
@@ -280,47 +277,28 @@ class AniBridgeConfig(BaseSettings):
 
     Global settings are shared across all profiles, while profile-specific settings
     override global defaults.
-
-    Environment Variable Format:
-        Global settings:
-            AB_DATA_PATH: Application data directory
-            AB_LOG_LEVEL: Logging level
-
-        Profile settings:
-            AB_PROFILES__${PROFILE_NAME}__ANILIST_TOKEN: AniList token
-            AB_PROFILES__${PROFILE_NAME}__PLEX_TOKEN: Plex token
-            AB_PROFILES__${PROFILE_NAME}__PLEX_USER: Plex username
-            AB_PROFILES__${PROFILE_NAME}__PLEX_URL: Plex server URL
-            ... (all other AniBridgeConfig settings)
-
-    Example:
-        AB_DATA_PATH=/app/data
-        AB_LOG_LEVEL=INFO
-        AB_PROFILES__personal__ANILIST_TOKEN=token1
-        AB_PROFILES__personal__PLEX_TOKEN=plex_token1
-        AB_PROFILES__personal__PLEX_USER=user1
-        AB_PROFILES__personal__PLEX_URL=http://plex_url1
-        AB_PROFILES__family__ANILIST_TOKEN=token2
-        AB_PROFILES__family__PLEX_TOKEN=plex_token2
-        AB_PROFILES__family__PLEX_USER=user2
-        AB_PROFILES__family__PLEX_URL=http://plex_url2
     """
 
-    def __init__(self, **data) -> None:
-        """Initialize the configuration with provided data."""
-        _apply_deprecations(data)
-        super().__init__(**data)
-        self._apply_global_defaults()
-
-    # Store raw profile data until after global defaults are applied
-    raw_profiles: dict[str, dict] = Field(
-        default_factory=dict,
-        description="Raw profile data before instantiation",
-        exclude=True,
-    )
-
+    # Raw profile data, processed into actual models after global defaults are applied
+    _raw_profiles: dict[str, dict] = PrivateAttr(default_factory=dict)
     profiles: dict[str, AniBridgeProfileConfig] = Field(
         default_factory=dict, description="AniBridge profile configurations"
+    )
+
+    library_provider: str = Field(
+        default="plex", description="Namespace of the library provider to use"
+    )
+    list_provider: str = Field(
+        default="anilist", description="Namespace of the list provider to use"
+    )
+    provider_modules: list[str] | None = Field(
+        default=None,
+        description="Additional module paths to load provider implementations from",
+    )
+    providers: dict[str, dict] = Field(
+        default_factory=dict,
+        exclude=True,
+        description="Provider configuration by namespace",
     )
 
     data_path: Path = Field(
@@ -336,46 +314,10 @@ class AniBridgeConfig(BaseSettings):
             "If not set, no upstream mappings will be used."
         ),
     )
-    web_enabled: bool = Field(
-        default=True, description="Enable embedded FastAPI web UI server"
-    )
-    web_host: str = Field(default="0.0.0.0", description="Web server listen host")
-    web_port: int = Field(default=4848, description="Web server listen port")
-    web_basic_auth_username: str | None = Field(
-        default=None, description="Username for HTTP Basic Auth on the web UI"
-    )
-    web_basic_auth_password: SecretStr | None = Field(
-        default=None, description="Password for HTTP Basic Auth on the web UI"
-    )
-    web_basic_auth_realm: str = Field(
-        default="AniBridge", description="Realm for HTTP Basic Auth on the web UI"
-    )
-    web_basic_auth_htpasswd_path: Path | None = Field(
-        default=None,
-        description="Path to an htpasswd file for HTTP Basic Auth on the web UI",
+    web: WebConfig = Field(
+        default_factory=WebConfig, description="Embedded web server configuration"
     )
 
-    anilist_token: SecretStr | None = Field(
-        default=None, description="Global default AniList API token"
-    )
-    plex_token: SecretStr | None = Field(
-        default=None, description="Global default Plex API token"
-    )
-    plex_user: str | None = Field(
-        default=None, description="Global default Plex username"
-    )
-    plex_url: str | None = Field(
-        default=None, description="Global default Plex server URL"
-    )
-    plex_sections: list[str] | None = Field(
-        default=None, description="Global default library sections to sync"
-    )
-    plex_genres: list[str] | None = Field(
-        default=None, description="Global default genre filter"
-    )
-    plex_metadata_source: PlexMetadataSource | None = Field(
-        default=None, description="Global default metadata source"
-    )
     sync_interval: int | None = Field(
         default=None, ge=0, description="Global default sync interval in seconds"
     )
@@ -421,22 +363,46 @@ class AniBridgeConfig(BaseSettings):
     def _apply_global_defaults(self) -> None:
         """Apply global defaults and instantiate profile configs from raw profiles."""
         shared_fields = self._shared_profile_fields()
-        for profile_name, raw_config in self.raw_profiles.items():
-            config_data = _apply_deprecations(raw_config.copy())
+        for profile_name, raw_config in self._raw_profiles.items():
+            config_data = raw_config.copy()
             for field_name in shared_fields:
-                if field_name not in config_data:
-                    global_value = getattr(self, field_name)
-                    if global_value is not None:
-                        config_data[field_name] = global_value
+                # Special-case merging for nested provider settings: we want to
+                # preserve per-profile overrides while inheriting unspecified
+                # values from global provider definitions.
+                if field_name == "providers":
+                    global_value = getattr(self, field_name) or {}
+                    profile_value = config_data.get(field_name) or {}
+                    merged_providers = {}
+                    # start with global providers
+                    for ns, cfg in (global_value or {}).items():
+                        merged_providers[ns] = (
+                            cfg.copy() if isinstance(cfg, dict) else cfg
+                        )
+                    # merge profile providers, overriding global keys
+                    for ns, cfg in (profile_value or {}).items():
+                        existing = merged_providers.get(ns, {})
+                        if isinstance(existing, dict) and isinstance(cfg, dict):
+                            merged = existing.copy()
+                            merged.update(cfg)
+                            merged_providers[ns] = merged
+                        else:
+                            merged_providers[ns] = cfg
+                    if merged_providers:
+                        config_data[field_name] = merged_providers
+                else:
+                    if field_name not in config_data:
+                        global_value = getattr(self, field_name)
+                        if global_value is not None:
+                            config_data[field_name] = global_value
             try:
                 profile = AniBridgeProfileConfig(**config_data)
                 profile._parent = self
                 self.profiles[profile_name] = profile
-            except Exception as e:
-                _log.error(f"Failed to create profile $$'{profile_name}'$$: {e}")
+            except Exception as exc:
+                _log.error(f"Failed to create profile '{profile_name}': {exc}")
                 raise ProfileConfigError(
-                    f"Invalid configuration for profile '{profile_name}': {e}"
-                ) from e
+                    f"Invalid configuration for profile '{profile_name}': {exc}"
+                ) from exc
 
     @field_validator("mappings_url")
     @classmethod
@@ -468,12 +434,11 @@ class AniBridgeConfig(BaseSettings):
     @classmethod
     def extract_raw_profiles(cls, values):
         """Extract raw profile data before main validation."""
-        values = _apply_deprecations(values)
         if isinstance(values, dict) and "profiles" in values:
             raw_profiles = values.get("profiles", {})
             if isinstance(raw_profiles, dict):
                 # Store raw profile data and clear the profiles field
-                values["raw_profiles"] = raw_profiles
+                values["_raw_profiles"] = raw_profiles
                 values["profiles"] = {}
         return values
 
@@ -490,43 +455,36 @@ class AniBridgeConfig(BaseSettings):
         self.data_path = Path(self.data_path).resolve()
 
         # If there are no explicit profiles, attempt to bootstrap a default from globals
-        if not self.raw_profiles and not self.profiles:
-            if self.anilist_token and self.plex_token and self.plex_user:
-                _log.info(
-                    "No profiles configured; "
-                    "creating implicit 'default' profile from globals"
-                )
-                default_config = {}
-                for field_name in self._shared_profile_fields():
-                    value = getattr(self, field_name)
-                    if value is not None:
-                        default_config[field_name] = value
-                self.raw_profiles["default"] = default_config
-            else:
-                raise NoProfilesConfiguredError(
-                    "No sufficiently populated sync profiles are configured. Either "
-                    "define at least one profile via AB_PROFILES__${PROFILE}__* or "
-                    "set global AB_ANILIST_TOKEN, AB_PLEX_TOKEN, AB_PLEX_USER, and "
-                    "AB_PLEX_URL."
-                )
+        if not self._raw_profiles and not self.profiles:
+            _log.info(
+                "No profiles configured; creating implicit 'default' profile from "
+                "globals"
+            )
+            default_config = {}
+            for field_name in self._shared_profile_fields():
+                value = getattr(self, field_name)
+                if value is not None:
+                    default_config[field_name] = value
+            self._raw_profiles["default"] = default_config
 
-        if (not self.web_basic_auth_username) != (not self.web_basic_auth_password):
+        if (not self.web.basic_auth.username) != (not self.web.basic_auth.password):
             _log.warning(
-                "Both web_basic_auth_username and web_basic_auth_password must be set "
+                "Both web.basic_auth.username and web.basic_auth.password must be set "
                 "to enable static HTTP Basic Authentication credentials; ignoring "
                 "partial values"
             )
-            self.web_basic_auth_username = None
-            self.web_basic_auth_password = None
+            self.web.basic_auth.username = None
+            self.web.basic_auth.password = None
 
         if (
-            self.web_basic_auth_htpasswd_path
-            and not self.web_basic_auth_htpasswd_path.is_file()
+            self.web.basic_auth.htpasswd_path
+            and not self.web.basic_auth.htpasswd_path.is_file()
         ):
             raise ValueError(
-                "web_basic_auth_htpasswd_path must point to an existing file"
+                "web.basic_auth.htpasswd_path must point to an existing file"
             )
 
+        self._apply_global_defaults()
         return self
 
     def get_profile(self, name: str) -> AniBridgeProfileConfig:
@@ -595,7 +553,7 @@ class AniBridgeConfig(BaseSettings):
             YamlConfigSettingsSource(settings_cls, yaml_file=find_yaml_config_file()),
         )
 
-    model_config = SettingsConfigDict(case_sensitive=False, extra="forbid")
+    model_config = SettingsConfigDict(case_sensitive=False, extra="ignore")
 
 
 @lru_cache(maxsize=1)
