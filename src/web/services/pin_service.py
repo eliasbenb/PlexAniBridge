@@ -23,12 +23,12 @@ __all__ = [
 
 _PIN_LABELS: dict[str, str] = {
     SyncField.STATUS.value: "Status",
-    SyncField.SCORE.value: "Score",
+    SyncField.USER_RATING.value: "User Rating",
     SyncField.PROGRESS.value: "Progress",
-    SyncField.REPEAT.value: "Rewatch Count",
-    SyncField.NOTES.value: "Notes",
+    SyncField.REVIEW.value: "Review",
+    SyncField.REPEATS.value: "Rewatch Count",
     SyncField.STARTED_AT.value: "Started Date",
-    SyncField.COMPLETED_AT.value: "Completed Date",
+    SyncField.FINISHED_AT.value: "Finished Date",
 }
 
 

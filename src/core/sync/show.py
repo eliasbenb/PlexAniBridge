@@ -234,7 +234,7 @@ class ShowSyncClient(BaseSyncClient[LibraryShow, LibrarySeason, LibraryEpisode])
 
         return None
 
-    async def _calculate_score(
+    async def _calculate_user_rating(
         self,
         *,
         item: LibraryShow,
@@ -297,7 +297,7 @@ class ShowSyncClient(BaseSyncClient[LibraryShow, LibrarySeason, LibraryEpisode])
             return None
         return min(record.viewed_at for record in history)
 
-    async def _calculate_completed_at(
+    async def _calculate_finished_at(
         self,
         *,
         item: LibraryShow,
@@ -311,7 +311,7 @@ class ShowSyncClient(BaseSyncClient[LibraryShow, LibrarySeason, LibraryEpisode])
             return None
         return max(record.viewed_at for record in history)
 
-    async def _calculate_notes(
+    async def _calculate_review(
         self,
         *,
         item: LibraryShow,

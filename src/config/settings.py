@@ -126,12 +126,12 @@ class SyncField(BaseStrEnum):
     """
 
     STATUS = "status"  # Watch status (watching, completed, etc.)
-    SCORE = "score"  # User rating (0-100 or 0-10 depending on user settings)
     PROGRESS = "progress"  # Number of episodes/movies watched
-    REPEAT = "repeat"  # Number of times rewatched
-    NOTES = "notes"  # User's notes/comments
+    REPEATS = "repeats"  # Number of times rewatched
+    REVIEW = "review"  # User's review/comments (text)
+    USER_RATING = "user_rating"  # User's rating/score
     STARTED_AT = "started_at"  # When the user started watching (date)
-    COMPLETED_AT = "completed_at"  # When the user finished watching (date)
+    FINISHED_AT = "finished_at"  # When the user finished watching (date)
 
     def to_camel(self) -> str:
         """Convert the field name to camelCase for AniList API compatibility.
@@ -212,17 +212,17 @@ class AniBridgeProfileConfig(BaseModel):
     )
     destructive_sync: bool = Field(
         default=False,
-        description="Allow decreasing watch progress and removing items from AniList",
+        description="Allow decreasing watch progress and removing list entries",
     )
     excluded_sync_fields: list[SyncField] = Field(
-        default_factory=lambda: [SyncField.NOTES, SyncField.SCORE],
-        description="AniList fields to exclude from synchronization",
+        default_factory=lambda: [SyncField.REVIEW, SyncField.USER_RATING],
+        description="Fields to exclude from synchronization",
     )
     dry_run: bool = Field(
         default=False, description="Log changes without applying them"
     )
     batch_requests: bool = Field(
-        default=False, description="Batch AniList API requests for better performance"
+        default=False, description="Batch API requests for better performance"
     )
     search_fallback_threshold: int = Field(
         default=-1, ge=-1, le=100, description="Fuzzy search threshold"
@@ -230,9 +230,7 @@ class AniBridgeProfileConfig(BaseModel):
     backup_retention_days: int = Field(
         default=30,
         ge=0,
-        description=(
-            "Days to retain AniList backups before cleanup (0 disables cleanup)"
-        ),
+        description=("Days to retain list backups before cleanup (0 disables cleanup)"),
     )
 
     _parent: AniBridgeConfig | None = None
