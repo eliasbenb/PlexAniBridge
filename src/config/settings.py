@@ -9,7 +9,6 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
-    PrivateAttr,
     SecretStr,
     field_validator,
     model_validator,
@@ -280,7 +279,7 @@ class AniBridgeConfig(BaseSettings):
     """
 
     # Raw profile data, processed into actual models after global defaults are applied
-    _raw_profiles: dict[str, dict] = PrivateAttr(default_factory=dict)
+    raw_profiles: dict[str, dict] = Field(default_factory=dict, exclude=True)
     profiles: dict[str, AniBridgeProfileConfig] = Field(
         default_factory=dict, description="AniBridge profile configurations"
     )
@@ -363,7 +362,7 @@ class AniBridgeConfig(BaseSettings):
     def _apply_global_defaults(self) -> None:
         """Apply global defaults and instantiate profile configs from raw profiles."""
         shared_fields = self._shared_profile_fields()
-        for profile_name, raw_config in self._raw_profiles.items():
+        for profile_name, raw_config in self.raw_profiles.items():
             config_data = raw_config.copy()
             for field_name in shared_fields:
                 # Special-case merging for nested provider settings: we want to
@@ -438,7 +437,7 @@ class AniBridgeConfig(BaseSettings):
             raw_profiles = values.get("profiles", {})
             if isinstance(raw_profiles, dict):
                 # Store raw profile data and clear the profiles field
-                values["_raw_profiles"] = raw_profiles
+                values["raw_profiles"] = raw_profiles
                 values["profiles"] = {}
         return values
 
@@ -455,7 +454,7 @@ class AniBridgeConfig(BaseSettings):
         self.data_path = Path(self.data_path).resolve()
 
         # If there are no explicit profiles, attempt to bootstrap a default from globals
-        if not self._raw_profiles and not self.profiles:
+        if not self.raw_profiles and not self.profiles:
             _log.info(
                 "No profiles configured; creating implicit 'default' profile from "
                 "globals"
@@ -465,7 +464,7 @@ class AniBridgeConfig(BaseSettings):
                 value = getattr(self, field_name)
                 if value is not None:
                     default_config[field_name] = value
-            self._raw_profiles["default"] = default_config
+            self.raw_profiles["default"] = default_config
 
         if (not self.web.basic_auth.username) != (not self.web.basic_auth.password):
             _log.warning(
