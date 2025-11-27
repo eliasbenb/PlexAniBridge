@@ -199,6 +199,7 @@ class AniBridgeProfileConfig(BaseModel):
     providers: dict[str, dict] = Field(
         default_factory=dict,
         exclude=True,
+        repr=False,
         description="Provider configuration by namespace",
     )
 
@@ -297,6 +298,7 @@ class AniBridgeConfig(BaseSettings):
     providers: dict[str, dict] = Field(
         default_factory=dict,
         exclude=True,
+        repr=False,
         description="Provider configuration by namespace",
     )
 
