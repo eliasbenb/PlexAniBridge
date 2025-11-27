@@ -3,7 +3,7 @@
 from datetime import UTC, datetime
 from typing import Any
 
-from anibridge_providers.library import MediaKind
+from anibridge.library import MediaKind
 from sqlalchemy import JSON, DateTime, Enum, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 

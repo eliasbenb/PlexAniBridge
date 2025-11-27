@@ -33,8 +33,9 @@ classifiers = [
 ]
 dependencies = [
     "anibridge-anilist-provider @ git+https://github.com/anibridge/anibridge-anilist-provider.git",
+    "anibridge-list-interface @ git+https://github.com/anibridge/anibridge-list-interface.git",
+    "anibridge-library-interface @ git+https://github.com/anibridge/anibridge-library-interface.git",
     "anibridge-plex-provider @ git+https://github.com/anibridge/anibridge-plex-provider.git",
-    "anibridge-providers @ git+https://github.com/anibridge/anibridge-providers.git",
     "aiocache>=0.12.3",
     "aiohttp>=3.13.2",
     "alembic>=1.17.1",
@@ -52,7 +53,6 @@ dependencies = [
     "requests>=2.32.5",
     "ruamel-yaml>=0.18.16",
     "sqlalchemy>=2.0.44",
-    "tzlocal>=5.3.1",
     "bcrypt>=5.0.0",
 ]
 

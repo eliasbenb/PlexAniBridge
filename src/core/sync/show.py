@@ -5,13 +5,13 @@ from collections import Counter
 from collections.abc import AsyncIterator, Sequence
 from datetime import datetime
 
-from anibridge_providers.library import (
+from anibridge.library import (
     HistoryEntry,
     LibraryEpisode,
     LibrarySeason,
     LibraryShow,
 )
-from anibridge_providers.list import ListEntry, ListMediaType, ListStatus
+from anibridge.list import ListEntry, ListMediaType, ListStatus
 
 from src.core.sync.base import BaseSyncClient
 from src.core.sync.stats import ItemIdentifier, SyncOutcome

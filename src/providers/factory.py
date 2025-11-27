@@ -1,9 +1,9 @@
 """Provider factory helpers."""
 
+from anibridge.library import LibraryProvider
+from anibridge.list import ListProvider
 from anibridge_anilist_provider.list import AniListListProvider
 from anibridge_plex_provider.library import PlexLibraryProvider
-from anibridge_providers.library import LibraryProvider
-from anibridge_providers.list import ListProvider
 
 from src.config.settings import AniBridgeProfileConfig
 

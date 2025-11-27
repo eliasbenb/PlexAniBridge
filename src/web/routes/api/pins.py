@@ -20,7 +20,7 @@ from src.web.services.pin_service import (
 from src.web.state import get_app_state
 
 if TYPE_CHECKING:
-    from anibridge_providers.list import ListEntry, ListProvider
+    from anibridge.list import ListEntry, ListProvider
 
     from src.core.bridge import BridgeClient
 

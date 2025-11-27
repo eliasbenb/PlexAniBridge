@@ -24,8 +24,8 @@ from src.models.schemas.provider import ProviderMediaMetadata
 from src.web.state import get_app_state
 
 if TYPE_CHECKING:
-    from anibridge_providers.library import LibraryProvider, LibrarySection
-    from anibridge_providers.list import ListProvider
+    from anibridge.library import LibraryProvider, LibrarySection
+    from anibridge.list import ListProvider
 
     from src.core.bridge import BridgeClient
 

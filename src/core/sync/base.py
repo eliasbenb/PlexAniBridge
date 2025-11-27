@@ -6,8 +6,8 @@ from collections.abc import AsyncIterator, Callable, Sequence
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, ClassVar
 
-from anibridge_providers.library import ExternalId, LibraryMedia, LibraryProvider
-from anibridge_providers.list import ListEntry, ListProvider, ListStatus
+from anibridge.library import ExternalId, LibraryMedia, LibraryProvider
+from anibridge.list import ListEntry, ListProvider, ListStatus
 from rapidfuzz import fuzz
 
 from src import log

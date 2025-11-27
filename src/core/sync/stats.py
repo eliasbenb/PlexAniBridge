@@ -6,13 +6,13 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any, Literal
 
-from anibridge_providers.library import (
+from anibridge.library import (
     LibraryEpisode,
     LibraryMedia,
     LibrarySeason,
     MediaKind,
 )
-from anibridge_providers.list import ListEntry, ListStatus
+from anibridge.list import ListEntry, ListStatus
 from pydantic import BaseModel
 
 from src.exceptions import UnsupportedMediaTypeError

@@ -4,14 +4,14 @@ import contextlib
 from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 
-from anibridge_providers.library import (
+from anibridge.library import (
     ExternalId,
     LibraryMedia,
     LibraryProvider,
     LibrarySection,
     MediaKind,
 )
-from anibridge_providers.list import ListProvider
+from anibridge.list import ListProvider
 from starlette.requests import Request
 
 from src import log
