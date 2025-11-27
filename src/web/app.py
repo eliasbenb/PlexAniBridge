@@ -90,16 +90,16 @@ def create_app(scheduler: SchedulerClient | None = None) -> FastAPI:
 
     # Add basic auth middleware if configured
     if (
-        config.web_basic_auth_username and config.web_basic_auth_password
-    ) or config.web_basic_auth_htpasswd_path:
+        config.web.basic_auth.username and config.web.basic_auth.password
+    ) or config.web.basic_auth.htpasswd_path:
         app.add_middleware(
             BasicAuthMiddleware,
-            username=config.web_basic_auth_username,
-            password=config.web_basic_auth_password.get_secret_value()
-            if config.web_basic_auth_password
+            username=config.web.basic_auth.username,
+            password=config.web.basic_auth.password.get_secret_value()
+            if config.web.basic_auth.password
             else None,
-            htpasswd_path=config.web_basic_auth_htpasswd_path,
-            realm=config.web_basic_auth_realm,
+            htpasswd_path=config.web.basic_auth.htpasswd_path,
+            realm=config.web.basic_auth.realm,
         )
         log.info("Web: HTTP Basic Authentication enabled for web UI")
 

@@ -18,10 +18,10 @@ from src import log
 from src.config.database import db
 from src.config.settings import AniBridgeConfig, AniBridgeProfileConfig
 from src.core.animap import AniMapClient
+from src.core.providers import build_library_provider, build_list_provider
 from src.core.sync import BaseSyncClient, MovieSyncClient, ShowSyncClient
 from src.core.sync.stats import SyncOutcome, SyncProgress, SyncStats
 from src.models.db.housekeeping import Housekeeping
-from src.providers.factory import build_library_provider, build_list_provider
 
 __all__ = ["BridgeClient"]
 
@@ -50,9 +50,7 @@ class BridgeClient:
         self.animap_client = shared_animap_client
 
         self.library_provider: LibraryProvider = build_library_provider(profile_config)
-        self.list_provider: ListProvider = build_list_provider(
-            profile_name, profile_config
-        )
+        self.list_provider: ListProvider = build_list_provider(profile_config)
 
         self.last_synced = self._get_last_synced()
         self.current_sync: SyncProgress | None = None
