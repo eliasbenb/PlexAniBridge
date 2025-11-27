@@ -35,104 +35,27 @@ Settings are applied in the following order:
 
 For example, if `AB_SYNC_INTERVAL=900` is set globally and `AB_PROFILES__personal__SYNC_INTERVAL=1800` is set for a specific profile, the profile named 'personal' will use 1800 seconds as the sync interval while other profiles will use 900 seconds. If `AB_PROFILES__personal__SYNC_INTERVAL` is unset it falls back to the application's built-in default of 86400 seconds (24 hours).
 
-## Configuration Options
+## Shared Settings
 
-### `ANILIST_TOKEN`
+These settings can be defined globally or overridden on a per-profile basis.
 
-`str` (Required)
+### `LIBRARY_PROVIDER`
 
-AniList API access token for this profile.
+`str` (default: `plex`)
 
-[:simple-anilist: Generate AniList Token](https://anilist.co/login?apiVersion=v2&client_id=23079&response_type=token){: .md-button style="background-color: #02a9ff; color: white;"}
+Specifies the media library provider to use. Currently, `plex` is the only built-in option.
 
----
-
-### `PLEX_TOKEN`
-
-`str` (Required)
-
-Plex API access token (`X-Plex-Token`) belonging to the **admin user** of the server.
-
-[:material-plex: Finding the Plex Token](https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/){: .md-button style="background-color: #e5a00d; color: white;"}
+Load third-party providers via the [`PROVIDER_MODULES`](#provider_modules) setting.
 
 ---
 
-### `PLEX_USER`
+### `LIST_PROVIDER`
 
-`str` (Required)
+`str` (default: `anilist`)
 
-Plex user to sync for this profile. Can be identified by:
+Specifies the list provider to use. Currently, `anilist` is the only built-in option.
 
-- Plex account username: `"username"`
-- Plex account email: `"user@email.com"`
-- Plex Home user name: `"Home User"`
-
-??? note "Admin User Limitations"
-
-    Due to limitations in the Plex API, only the **admin user** can sync reviews and watch lists. All other features are available for all users.
-
----
-
-### `PLEX_URL`
-
-`str` (Required)
-
-URL to your Plex server that the AniBridge host can access.
-
----
-
-### `PLEX_SECTIONS`
-
-`list[str]` (Optional, default: `[]`)
-
-An optional list of Plex library sections to filter by. If specified, only items in these sections will be scanned.
-
-```python
-["Anime", "Anime Movies"]
-```
-
----
-
-### `PLEX_GENRES`
-
-`list[str]` (Optional, default: `[]`)
-
-An optional list of Plex genres to filter by. If specified, only items with these genres will be scanned.
-
-```python
-["Anime", "Animation"]
-```
-
-This is useful for scanning for only Anime content in a mixed library.
-
-!!! question "How to Find Plex Genres"
-
-    Genres are sourced from the media item's source metadata agent (typically TheMovieDB or TheTVDB). You can find some of the common genres here:
-
-    - [TheTVDB Genres](https://thetvdb.com/genres)
-    - [TheMovieDB Genres](https://www.themoviedb.org/talk/644a4b69f794ad04fe3cf1b9)
-
----
-
-### `PLEX_METADATA_SOURCE`
-
-`Enum("local", "online")` (Optional, default: `"local"`)
-
-Determines the source of Plex metadata to use when syncing:
-
-- `local`: Use metadata stored locally on the Plex server.
-- `online`: Fetch metadata from Plex's servers using the [Plex Metadata](https://metadata.provider.plex.tv) provider.
-
-!!! warning "Online Metadata Advantages and Limitations"
-
-    Online metadata can provide a more complete library (including seasons/episodes not present locally) and records activity across Plex servers, allowing syncs for content from multiple or previously deleted servers.
-
-    Limitations:
-
-    - Susceptible to outages and rate limits, which can greatly slow syncs.
-    - Requires [Plex Sync](https://support.plex.tv/articles/sync-watch-state-and-ratings/) to be enabled for the online API to function.
-    - May be less up-to-date than the local server if Plex Sync fails.
-    - The online API is available only to the Plex admin user..
+Load third-party providers via the [`PROVIDER_MODULES`](#provider_modules) setting.
 
 ---
 
@@ -152,26 +75,17 @@ Determines the triggers for scanning:
 
 - `periodic`: Scan all items at the specified [sync interval](#sync_interval).
 - `poll`: Poll for changes every 30 seconds, making incremental updates.
-- `webhook`: Trigger syncs via Plex [webhook payloads](https://support.plex.tv/articles/115002267687-webhooks/).
+- `webhook`: Trigger syncs via [webhook payloads](https://support.plex.tv/articles/115002267687-webhooks/).
 
 Setting `SYNC_MODES` to `None` or an empty list will cause the application to perform a single scan on startup and then exit.
 
 By default, all three modes are enabled, allowing for instant, incremental updates via polling and webhooks, as well as a full periodic scan every [`SYNC_INTERVAL`](#sync_interval) seconds (default: 24 hours) to catch any failed/missed updates.
 
-!!! info "Plex Webhooks"
+!!! info "Webhooks"
 
-    To use Plex Webhooks, you must:
+    Using the webhooks sync mode will require configuring your library provider (e.g., Plex) to send webhook payloads to AniBridge. Refer to the documentation of your library provider for instructions on setting up webhooks.
 
-    1. Have [`AB_WEB_ENABLED`](#ab_web_enabled) set to `True` (the default).
-    2. Include `webhook` in the enabled [`SYNC_MODES`](#sync_modes).
-    3. [Configure the Plex server](https://support.plex.tv/articles/115002267687-webhooks/) to send webhook payloads to `http://<your-server-host>:<port>/webhook/plex`.
-    4. Ensure AniBridge is accessible to Plex over the network.
-
-    Example webhook URL: `http://127.0.0.1:4848/webhook/plex`
-
-    _Note: If you have enabled HTTP Basic Authentication for the web UI, make sure to include the credentials in the webhook URL: `http://username:password@<your-server-host>:<port>/webhook/plex`._
-
-    Once webhooks are set up, it is recommended to disable `poll` mode since it is redundant.
+    _Note: not all library providers may support webhooks._
 
 ### `FULL_SCAN`
 
@@ -208,17 +122,17 @@ Allows regressive updates and deletions, which **can cause data loss**.
 
 ### `EXCLUDED_SYNC_FIELDS`
 
-`list[Enum("status", "score", "progress", "repeat", "notes", "started_at", "completed_at")]` (Optional, default: `["notes", "score"]`)
+`list[Enum("status", "progress", "repeats", "review", "user_rating", "started_at", "finished_at")]` (Optional, default: `["review", "user_rating"]`)
 
 Specifies which fields should **not** be synced. Available fields:
 
-- `status` (planning, current, completed, dropped, paused)
-- `score` (rating on a normalized scale)
-- `progress` (episodes watched)
-- `repeat` (rewatch count)
-- `notes` (text reviews)
-- `started_at` (start date)
-- `completed_at` (completion date)
+- `status` Watch status (watching, completed, etc.)
+- `progress` Number of episodes/movies watched
+- `repeats` Number of times rewatched
+- `review` User's review/comments (text)
+- `user_rating` User's rating/score
+- `started_at` When the user started watching (date)
+- `finished_at` When the user finished watching (date)
 
 !!! tip "Allowing All Fields"
 
@@ -280,11 +194,39 @@ The default behavior is to disable searching completely and only rely on the [co
 
 The higher the value, the more strict the title matching. A value of `100` requires an exact match, while `0` will match the first result returned by AniList, regardless of similarity.
 
-## Global Configuration Options
+## Provider Settings
+
+Providers may consume additional configuration options. Refer to the documentation of each provider for details. Here are sample configuration options for the built-in providers:
+
+### LIBRARY_PROVIDER: `plex`
+
+Documentation: [anibridge/anibridge-plex-provider](https://github.com/anibridge/anibridge-plex-provider)
+
+```yaml
+providers:
+    plex:
+        url: ...
+        token: ...
+        user: ...
+        sections: []
+        genres: []
+```
+
+### LIST_PROVIDER: `anilist`
+
+Documentation: [anibridge/anibridge-anilist-provider](https://github.com/anibridge/anibridge-anilist-provider)
+
+```yaml
+providers:
+    anilist:
+        token: ...
+```
+
+## Global Settings
 
 These global settings cannot be overridden on the profile level and apply to all profiles.
 
-### `AB_DATA_PATH`
+### `DATA_PATH`
 
 `str` (Optional, default: `./data`)
 
@@ -292,7 +234,7 @@ Path to store the database, backups, and custom mappings. This is shared across 
 
 ---
 
-### `AB_LOG_LEVEL`
+### `LOG_LEVEL`
 
 `Enum("DEBUG", "INFO", "SUCCESS", "WARNING", "ERROR", "CRITICAL")` (Optional, default: `INFO`)
 
@@ -308,7 +250,7 @@ Sets logging verbosity for the entire application.
 
 ---
 
-### `AB_MAPPINGS_URL`
+### `MAPPINGS_URL`
 
 `str` (Optional, default: `https://raw.githubusercontent.com/eliasbenb/PlexAniBridge-Mappings/v2/mappings.json`)
 
@@ -326,7 +268,7 @@ This option is only intended for advanced users who want to use their own upstre
 
 ---
 
-### `AB_WEB_ENABLED`
+### `WEB__ENABLED`
 
 `bool` (Optional, default: `True`)
 
@@ -334,7 +276,7 @@ When enabled, the [web interface](./web/screenshots.md) is accessible.
 
 ---
 
-### `AB_WEB_HOST`
+### `WEB__HOST`
 
 `str` (Optional, default: `0.0.0.0`)
 
@@ -342,7 +284,7 @@ The host address for the web interface.
 
 ---
 
-### `AB_WEB_PORT`
+### `AB__WEB__PORT`
 
 `int` (Optional, default: `4848`)
 
@@ -350,7 +292,7 @@ The port for the web interface.
 
 ---
 
-### `AB_WEB_BASIC_AUTH_USERNAME`
+### `AB__WEB__BASIC_AUTH__USERNAME`
 
 `str` (Optional, default: `None`)
 
@@ -358,7 +300,7 @@ HTTP Basic Authentication username for the web UI. Basic Auth is enabled only wh
 
 ---
 
-### `AB_WEB_BASIC_AUTH_PASSWORD`
+### `AB__WEB__BASIC_AUTH__PASSWORD`
 
 `str` (Optional, default: `None`)
 
@@ -366,7 +308,7 @@ HTTP Basic Authentication password for the web UI. Basic Auth is enabled only wh
 
 ---
 
-### `AB_WEB_BASIC_AUTH_HTPASSWD_PATH`
+### `AB__WEB__BASIC_AUTH__HTPASSWD_PATH`
 
 `str` (Optional, default: `None`)
 
@@ -399,7 +341,7 @@ Providing an `htpasswd` file allows you to manage multiple users and rotate pass
 
 ---
 
-### `AB_WEB_BASIC_AUTH_REALM`
+### `AB__WEB__BASIC_AUTH__REALM`
 
 `str` (Optional, default: `AniBridge`)
 
@@ -413,24 +355,26 @@ This example demonstrates configuring three distinct profiles, each with their o
 
 ```dosini
 # Global defaults shared by all profiles
-AB_PLEX_TOKEN=admin_plex_token
-AB_PLEX_URL=http://localhost:32400
+AB_LIBRARY_PROVIDER=plex
+AB_LIST_PROVIDER=anilist
+AB_PROVIDERS__PLEX__TOKEN=admin_plex_token
+AB_PROVIDERS__PLEX__URL=http://localhost:32400
 AB_SYNC_MODES=["periodic"]
 
 # Admin user - aggressive sync with full features
-AB_PROFILES__admin__ANILIST_TOKEN=admin_anilist_token
-AB_PROFILES__admin__PLEX_USER=admin_plex_user
+AB_PROFILES__admin__PROVIDERS__ANILIST__TOKEN=admin_anilist_token
+AB_PROFILES__admin__PROVIDERS__PLEX__USER=admin_plex_user
 AB_PROFILES__admin__DESTRUCTIVE_SYNC=True
 AB_PROFILES__admin__EXCLUDED_SYNC_FIELDS=[]
 
 # Family member - typical sync
-AB_PROFILES__family__ANILIST_TOKEN=family_anilist_token
-AB_PROFILES__family__PLEX_USER=family_plex_user
+AB_PROFILES__family__PROVIDERS__ANILIST__TOKEN=family_anilist_token
+AB_PROFILES__family__PROVIDERS__PLEX__USER=family_plex_user
 
 # Guest user - minimal sync
-AB_PROFILES__guest__ANILIST_TOKEN=guest_anilist_token
-AB_PROFILES__guest__PLEX_USER=guest_plex_user
-AB_PROFILES__guest__EXCLUDED_SYNC_FIELDS=["notes", "score", "repeat", "started_at", "completed_at"]
+AB_PROFILES__guest__PROVIDERS__ANILIST__TOKEN=guest_anilist_token
+AB_PROFILES__guest__PROVIDERS__PLEX__USER=guest_plex_user
+AB_PROFILES__guest__EXCLUDED_SYNC_FIELDS=["notes", "score", "repeats", "started_at", "finished_at"]
 ```
 
 ### Per-Library Profiles
@@ -439,18 +383,20 @@ This example shows how to create separate profiles for different Plex libraries,
 
 ```dosini
 # Global defaults shared by all profiles
-AB_ANILIST_TOKEN=global_anilist_token
-AB_PLEX_TOKEN=admin_plex_token
-AB_PLEX_USER=admin_plex_user
-AB_PLEX_URL=http://localhost:32400
+AB_LIBRARY_PROVIDER=plex
+AB_LIST_PROVIDER=anilist
+AB_PROVIDERS__ANILIST__TOKEN=global_anilist_token
+AB_PROVIDERS__PLEX__TOKEN=admin_plex_token
+AB_PROVIDERS__PLEX__USER=admin_plex_user
+AB_PROVIDERS__PLEX__URL=http://localhost:32400
 
 # Movies library - aggressive sync with full features
-AB_PROFILES__movies__PLEX_SECTIONS=["Anime Movies"]
+AB_PROFILES__movies__PROVIDERS__PLEX__SECTIONS=["Anime Movies"]
 AB_PROFILES__movies__FULL_SCAN=True
 AB_PROFILES__movies__SYNC_INTERVAL=1800
 AB_PROFILES__movies__EXCLUDED_SYNC_FIELDS=[]
 
 # TV Shows library - more conservative with updates
-AB_PROFILES__tvshows__PLEX_SECTIONS=["Anime"]
+AB_PROFILES__tvshows__PROVIDERS__PLEX__SECTIONS=["Anime"]
 AB_PROFILES__tvshows__SYNC_MODES=["periodic"]
 ```

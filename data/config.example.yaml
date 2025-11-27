@@ -1,4 +1,6 @@
 #== Shared Settings ==#
+# list_provider: anilist
+# library_provider: plex
 # sync_interval: 86400
 # sync_modes: ["periodic", "poll", "webhook"]
 # full_scan: false
@@ -10,16 +12,13 @@
 # search_fallback_threshold: -1
 
 #== Provider Settings ==#
-# list_provider: anilist
-# library_provider: plex
-
 # providers:
 #     anilist:
-#         token: "..."
+#         token: ...
 #     plex:
-#         url: "..."
-#         token: "..."
-#         user: "..."
+#         url: ...
+#         token: ...
+#         user: ...
 #         sections: []
 #         genres: []
 
