@@ -7,7 +7,6 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from cachetools.func import lru_cache
-from tzlocal import get_localzone
 
 from src import log
 from src.config.settings import AniBridgeConfig, SyncMode
@@ -137,7 +136,7 @@ class ProfileScheduler:
                 next_sync = datetime.now(UTC) + timedelta(seconds=self.sync_interval)
                 log.info(
                     f"[{self.profile_name}] Next periodic "
-                    f"sync scheduled for: {next_sync.astimezone(get_localzone())}"
+                    f"sync scheduled for: {next_sync.astimezone()}"
                 )
 
                 with contextlib.suppress(asyncio.TimeoutError):
@@ -273,7 +272,7 @@ class SchedulerClient:
                     SyncMode.PERIODIC in profile_config.sync_modes
                     and profile_config.sync_interval > 0
                 ):
-                    next_sync = datetime.now(UTC).astimezone(get_localzone())
+                    next_sync = datetime.now(UTC).astimezone()
                     next_sync_time = f"at {next_sync.strftime('%Y-%m-%d %H:%M:%S')}"
 
                 log.info(
@@ -466,7 +465,7 @@ class SchedulerClient:
 
                 log.info(
                     f"Next database sync scheduled for: "
-                    f"{next_sync_time.astimezone(get_localzone())} "
+                    f"{next_sync_time.astimezone()} "
                     f"(in {sleep_duration / 3600:.1f} hours)"
                 )
 
