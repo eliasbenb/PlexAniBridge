@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 
 import pytest
-from pydantic import SecretStr, ValidationError
+from pydantic import SecretStr
 
 from src.config.settings import (
     AniBridgeConfig,
@@ -61,10 +61,14 @@ def test_find_yaml_config_file_falls_back_to_cwd(
 def test_profile_parent_requires_assignment() -> None:
     """Test that accessing parent on unassigned profile raises ProfileConfigError."""
     profile = AniBridgeProfileConfig(
-        anilist_token=SecretStr("anilist-token"),
-        plex_token=SecretStr("plex-token"),
-        plex_user="eliasbenb",
-        plex_url="http://plex:32400",
+        providers={
+            "anilist": {"token": SecretStr("anilist-token")},
+            "plex": {
+                "token": SecretStr("plex-token"),
+                "user": "eliasbenb",
+                "url": "http://plex:32400",
+            },
+        }
     )
 
     with pytest.raises(ProfileConfigError):
@@ -72,11 +76,14 @@ def test_profile_parent_requires_assignment() -> None:
 
 
 def test_config_requires_profile_or_globals(tmp_path: Path) -> None:
-    """Test that AniBridgeConfig requires one valid profile or global settings."""
-    with pytest.raises(ValidationError) as exc:
-        AniBridgeConfig(data_path=tmp_path)
+    """Test AniBridgeConfig bootstraps a default profile when no explicit provider.
 
-    assert "No sufficiently populated sync profiles" in str(exc.value)
+    configs are provided.
+    """
+    config = AniBridgeConfig(data_path=tmp_path)
+    # Default profile should be created implicitly and accessible
+    profile = config.get_profile("default")
+    assert profile is not None
 
 
 def test_config_creates_default_profile_from_globals(
@@ -84,22 +91,22 @@ def test_config_creates_default_profile_from_globals(
 ) -> None:
     """Test that AniBridgeConfig creates a default profile from global settings."""
     monkeypatch.setenv("AB_DATA_PATH", str(tmp_path))
-    monkeypatch.setenv("AB_ANILIST_TOKEN", "anilist-token")
-    monkeypatch.setenv("AB_PLEX_TOKEN", "plex-token")
-    monkeypatch.setenv("AB_PLEX_USER", "eliasbenb")
-    monkeypatch.setenv("AB_PLEX_URL", "http://plex:32400")
-    monkeypatch.setenv("AB_PLEX_SECTIONS", '["Anime"]')
+    monkeypatch.setenv("AB_PROVIDERS__ANILIST__TOKEN", "anilist-token")
+    monkeypatch.setenv("AB_PROVIDERS__PLEX__TOKEN", "plex-token")
+    monkeypatch.setenv("AB_PROVIDERS__PLEX__USER", "eliasbenb")
+    monkeypatch.setenv("AB_PROVIDERS__PLEX__URL", "http://plex:32400")
+    monkeypatch.setenv("AB_PROVIDERS__PLEX__SECTIONS", '["Anime"]')
 
     config = AniBridgeConfig()
 
     profile = config.get_profile("default")
 
     assert profile.parent is config
-    assert profile.anilist_token.get_secret_value() == "anilist-token"
-    assert profile.plex_token.get_secret_value() == "plex-token"
-    assert profile.plex_user == "eliasbenb"
-    assert profile.plex_url == "http://plex:32400"
-    assert profile.plex_sections == ["Anime"]
+    assert profile.providers["anilist"]["token"] == "anilist-token"
+    assert profile.providers["plex"]["token"] == "plex-token"
+    assert profile.providers["plex"]["user"] == "eliasbenb"
+    assert profile.providers["plex"]["url"] == "http://plex:32400"
+    assert profile.providers["plex"]["sections"] == ["Anime"]
 
 
 def test_config_profile_inherits_global_values(
@@ -107,16 +114,18 @@ def test_config_profile_inherits_global_values(
 ) -> None:
     """Test that a profile inherits global settings from AniBridgeConfig."""
     monkeypatch.setenv("AB_DATA_PATH", str(tmp_path))
-    monkeypatch.setenv("AB_PLEX_URL", "http://global")
-    monkeypatch.setenv("AB_PROFILES__primary__ANILIST_TOKEN", "anilist-token")
-    monkeypatch.setenv("AB_PROFILES__primary__PLEX_TOKEN", "plex-token")
-    monkeypatch.setenv("AB_PROFILES__primary__PLEX_USER", "eliasbenb")
+    monkeypatch.setenv("AB_PROVIDERS__PLEX__URL", "http://global")
+    monkeypatch.setenv(
+        "AB_PROFILES__primary__PROVIDERS__ANILIST__TOKEN", "anilist-token"
+    )
+    monkeypatch.setenv("AB_PROFILES__primary__PROVIDERS__PLEX__TOKEN", "plex-token")
+    monkeypatch.setenv("AB_PROFILES__primary__PROVIDERS__PLEX__USER", "eliasbenb")
 
     config = AniBridgeConfig()
 
     profile = config.get_profile("primary")
 
-    assert profile.plex_url == "http://global"
+    assert profile.providers["plex"]["url"] == "http://global"
 
 
 def test_get_profile_raises_for_unknown_name(
