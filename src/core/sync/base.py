@@ -55,21 +55,21 @@ class BaseSyncClient[
     _ENTRY_FIELD_MAP: ClassVar[dict[SyncField, str]] = {
         SyncField.STATUS: "status",
         SyncField.PROGRESS: "progress",
-        SyncField.REPEAT: "repeats",
-        SyncField.SCORE: "user_rating",
-        SyncField.NOTES: "review",
+        SyncField.REPEATS: "repeats",
+        SyncField.REVIEW: "review",
+        SyncField.USER_RATING: "user_rating",
         SyncField.STARTED_AT: "started_at",
-        SyncField.COMPLETED_AT: "finished_at",
+        SyncField.FINISHED_AT: "finished_at",
     }
 
     _COMPARISON_RULES: ClassVar[dict[SyncField, str]] = {
         SyncField.STATUS: "gte",
         SyncField.PROGRESS: "gt",
-        SyncField.REPEAT: "gt",
-        SyncField.SCORE: "ne",
-        SyncField.NOTES: "ne",
+        SyncField.REPEATS: "gt",
+        SyncField.REVIEW: "ne",
+        SyncField.USER_RATING: "ne",
         SyncField.STARTED_AT: "lt",
-        SyncField.COMPLETED_AT: "lt",
+        SyncField.FINISHED_AT: "lt",
     }
 
     def __init__(
@@ -109,11 +109,11 @@ class BaseSyncClient[
         ] = {
             SyncField.STATUS: self._calculate_status,
             SyncField.PROGRESS: self._calculate_progress,
-            SyncField.REPEAT: self._calculate_repeats,
-            SyncField.SCORE: self._calculate_score,
-            SyncField.NOTES: self._calculate_notes,
+            SyncField.REPEATS: self._calculate_repeats,
+            SyncField.REVIEW: self._calculate_review,
+            SyncField.USER_RATING: self._calculate_user_rating,
             SyncField.STARTED_AT: self._calculate_started_at,
-            SyncField.COMPLETED_AT: self._calculate_completed_at,
+            SyncField.FINISHED_AT: self._calculate_finished_at,
         }
 
     def clear_cache(self) -> None:
@@ -369,11 +369,11 @@ class BaseSyncClient[
 
         for field in (
             SyncField.PROGRESS,
-            SyncField.REPEAT,
-            SyncField.SCORE,
-            SyncField.NOTES,
+            SyncField.REPEATS,
+            SyncField.REVIEW,
+            SyncField.USER_RATING,
             SyncField.STARTED_AT,
-            SyncField.COMPLETED_AT,
+            SyncField.FINISHED_AT,
         ):
             attr_name = self._ENTRY_FIELD_MAP[field]
             if field.value in skip_fields:
@@ -381,7 +381,8 @@ class BaseSyncClient[
             if final_status is None:
                 continue
             if (
-                field in (SyncField.SCORE, SyncField.REPEAT, SyncField.COMPLETED_AT)
+                field
+                in (SyncField.USER_RATING, SyncField.REPEATS, SyncField.FINISHED_AT)
                 and final_status < ListStatus.COMPLETED
             ):
                 continue
@@ -773,7 +774,7 @@ class BaseSyncClient[
         """Calculate the desired status for the list entry."""
 
     @abstractmethod
-    async def _calculate_score(
+    async def _calculate_user_rating(
         self,
         *,
         item: ParentMediaT,
@@ -821,7 +822,7 @@ class BaseSyncClient[
         """Calculate the desired start date for the list entry."""
 
     @abstractmethod
-    async def _calculate_completed_at(
+    async def _calculate_finished_at(
         self,
         *,
         item: ParentMediaT,
@@ -833,7 +834,7 @@ class BaseSyncClient[
         """Calculate the desired completion date for the list entry."""
 
     @abstractmethod
-    async def _calculate_notes(
+    async def _calculate_review(
         self,
         *,
         item: ParentMediaT,

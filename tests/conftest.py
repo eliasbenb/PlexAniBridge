@@ -9,10 +9,10 @@ from pathlib import Path
 _TEST_DATA_DIR = Path(tempfile.mkdtemp(prefix="ab-tests-"))
 
 os.environ.setdefault("AB_DATA_PATH", str(_TEST_DATA_DIR))
-os.environ.setdefault("AB_ANILIST_TOKEN", "anilist-token")
-os.environ.setdefault("AB_PLEX_TOKEN", "plex-token")
-os.environ.setdefault("AB_PLEX_USER", "eliasbenb")
-os.environ.setdefault("AB_PLEX_URL", "http://plex:32400")
+os.environ.setdefault("AB_PROVIDERS__ANILIST__TOKEN", "anilist-token")
+os.environ.setdefault("AB_PROVIDERS__PLEX__TOKEN", "plex-token")
+os.environ.setdefault("AB_PROVIDERS__PLEX__USER", "eliasbenb")
+os.environ.setdefault("AB_PROVIDERS__PLEX__URL", "http://plex:32400")
 
 
 @atexit.register

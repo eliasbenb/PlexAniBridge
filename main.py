@@ -121,12 +121,12 @@ async def run() -> int:
 
         _setup_signal_handlers_for_scheduler(app_scheduler)
 
-        if config.web_enabled:
+        if config.web.enabled:
             app = create_app(app_scheduler)
             uv_config = uvicorn.Config(
                 app,
-                host=config.web_host,
-                port=config.web_port,
+                host=config.web.host,
+                port=config.web.port,
                 log_config=None,
                 loop="asyncio",
                 proxy_headers=True,
@@ -139,7 +139,7 @@ async def run() -> int:
 
             log.success(
                 "AniBridge: Web UI started at "
-                f"\033[92mhttp://{config.web_host}:{config.web_port} "
+                f"\033[92mhttp://{config.web.host}:{config.web.port} "
                 "(ctrl+c to stop)\033[0m"
             )
 

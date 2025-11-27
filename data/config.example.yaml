@@ -1,22 +1,28 @@
-#== Global Defaults ==#
-anilist_token: ...
-plex_token: ...
-plex_user: ...
-plex_url: ...
-# plex_sections: []
-# plex_genres: []
-# plex_metadata_source: "local"
+#== Shared Settings ==#
+# list_provider: anilist
+# library_provider: plex
 # sync_interval: 86400
 # sync_modes: ["periodic", "poll", "webhook"]
 # full_scan: false
 # destructive_sync: false
-# excluded_sync_fields: ["notes", "score"]
+# excluded_sync_fields: ["review", "user_rating"]
 # dry_run: false
 # backup_retention_days: 30
 # batch_requests: false
 # search_fallback_threshold: -1
 
-#== Profile Overrides ==#
+#== Provider Settings ==#
+# providers:
+#     anilist:
+#         token: ...
+#     plex:
+#         url: ...
+#         token: ...
+#         user: ...
+#         sections: []
+#         genres: []
+
+#== Profile Settings ==#
 # profiles:
 #     example:
 #         $field: $value
@@ -25,10 +31,13 @@ plex_url: ...
 # data_path: "./data"
 # log_level: "INFO"
 # mappings_url: "https://raw.githubusercontent.com/eliasbenb/PlexAniBridge-Mappings/v2/mappings.json"
-# web_enabled: true
-# web_host: "0.0.0.0"
-# web_port: 4848
-# web_basic_auth_username: null
-# web_basic_auth_password: null
-# web_basic_auth_htpasswd_path: null
-# web_basic_auth_realm: "AniBridge"
+# provider_modules: []
+# web:
+#     enabled: false
+#     host: "0.0.0.0"
+#     port: 4848
+#     basic_auth:
+#         username: null
+#         password: null
+#         htpasswd_path: null
+#         realm: "AniBridge"

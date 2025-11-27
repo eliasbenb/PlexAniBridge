@@ -128,10 +128,14 @@ def test_create_app_registers_basic_auth_middleware_when_configured(
 ) -> None:
     """create_app should attach BasicAuthMiddleware when credentials are configured."""
     test_config = SimpleNamespace(
-        web_basic_auth_username="admin",
-        web_basic_auth_password=SecretStr("secret"),
-        web_basic_auth_realm="Realm",
-        web_basic_auth_htpasswd_path=None,
+        web=SimpleNamespace(
+            basic_auth=SimpleNamespace(
+                username="admin",
+                password=SecretStr("secret"),
+                htpasswd_path=None,
+                realm="Realm",
+            )
+        )
     )
     monkeypatch.setattr(app_module, "config", test_config, raising=False)
 
@@ -151,10 +155,14 @@ def test_create_app_skips_basic_auth_without_complete_credentials(
 ) -> None:
     """create_app should skip BasicAuthMiddleware if either credential is missing."""
     incomplete_config = SimpleNamespace(
-        web_basic_auth_username="admin",
-        web_basic_auth_password=None,
-        web_basic_auth_realm="Realm",
-        web_basic_auth_htpasswd_path=None,
+        web=SimpleNamespace(
+            basic_auth=SimpleNamespace(
+                username="admin",
+                password=None,
+                htpasswd_path=None,
+                realm="Realm",
+            )
+        )
     )
     monkeypatch.setattr(app_module, "config", incomplete_config, raising=False)
 
@@ -179,10 +187,14 @@ def test_create_app_registers_basic_auth_middleware_with_htpasswd(
     )  # bcrypt hash for "test"
 
     test_config = SimpleNamespace(
-        web_basic_auth_username=None,
-        web_basic_auth_password=None,
-        web_basic_auth_htpasswd_path=htpasswd_file,
-        web_basic_auth_realm="Realm",
+        web=SimpleNamespace(
+            basic_auth=SimpleNamespace(
+                username=None,
+                password=None,
+                htpasswd_path=htpasswd_file,
+                realm="Realm",
+            )
+        )
     )
     monkeypatch.setattr(app_module, "config", test_config, raising=False)
 
