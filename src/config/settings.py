@@ -16,10 +16,7 @@ from pydantic import (
 from pydantic.alias_generators import to_camel
 from pydantic_settings import (
     BaseSettings,
-    DotEnvSettingsSource,
-    EnvSettingsSource,
     PydanticBaseSettingsSource,
-    SettingsConfigDict,
     YamlConfigSettingsSource,
 )
 
@@ -42,7 +39,7 @@ __all__ = [
 _log = _get_logger(__name__)
 
 
-def find_yaml_config_file() -> Path | None:
+def find_yaml_config_file() -> Path:
     """Find the YAML configuration file in the data path.
 
     Returns:
@@ -50,13 +47,12 @@ def find_yaml_config_file() -> Path | None:
     """
     data_path = Path(os.getenv("AB_DATA_PATH", "./data")).resolve()
 
-    for location in [data_path, Path(".")]:
-        for ext in ["yaml", "yml"]:
-            yaml_file = location / f"config.{ext}"
-            if yaml_file.exists():
-                _log.debug(f"Using YAML config file: {yaml_file.resolve()}")
-                return yaml_file.resolve()
-    return None
+    for ext in ("yaml", "yml"):
+        yaml_file = data_path / f"config.{ext}"
+        if yaml_file.exists():
+            _log.debug(f"Using YAML config file: {yaml_file.resolve()}")
+            return yaml_file.resolve()
+    return data_path / "config.yaml"
 
 
 class BaseStrEnum(StrEnum):
@@ -270,13 +266,9 @@ class AniBridgeProfileConfig(BaseModel):
 class AniBridgeConfig(BaseSettings):
     """Multi-configuration manager for AniBridge application.
 
-    Supports loading multiple AniBridge configurations from environment variables
-    variables using nested delimiters. Automatically parses
-    AB_PROFILES__${PROFILE_NAME}__${SETTING} format into individual profile
-    configurations.
-
-    Global settings are shared across all profiles, while profile-specific settings
-    override global defaults.
+    Configuration is sourced from a YAML file (optionally combined with
+    parameters passed directly to the model). Global settings are shared across
+    all profiles, while profile-specific settings override those defaults.
     """
 
     # Raw profile data, processed into actual models after global defaults are applied
@@ -302,9 +294,7 @@ class AniBridgeConfig(BaseSettings):
         description="Provider configuration by namespace",
     )
 
-    data_path: Path = Field(
-        default=Path("./data"), description="Directory for application data"
-    )
+    data_path: Path = Path(os.getenv("AB_DATA_PATH", "./data"))
     log_level: LogLevel = Field(
         default=LogLevel.INFO, description="Logging level for the application"
     )
@@ -530,31 +520,11 @@ class AniBridgeConfig(BaseSettings):
         dotenv_settings: PydanticBaseSettingsSource,
         file_secret_settings: PydanticBaseSettingsSource,
     ) -> tuple[PydanticBaseSettingsSource, ...]:
-        """Customizes the settings sources for the configuration.
-
-        Order of precedence:
-        1. Environment variables
-        2. .env file in the CWD
-        3. YAML configuration file in the data path
-        """
+        """Customize the order of configuration sources."""
         return (
-            EnvSettingsSource(
-                settings_cls,
-                env_prefix="AB_",
-                env_nested_delimiter="__",
-                env_parse_none_str="null",
-            ),
-            DotEnvSettingsSource(
-                settings_cls,
-                env_file=".env",
-                env_prefix="AB_",
-                env_nested_delimiter="__",
-                env_parse_none_str="null",
-            ),
+            init_settings,
             YamlConfigSettingsSource(settings_cls, yaml_file=find_yaml_config_file()),
         )
-
-    model_config = SettingsConfigDict(case_sensitive=False, extra="ignore")
 
 
 @lru_cache(maxsize=1)
