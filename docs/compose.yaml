@@ -6,41 +6,6 @@ services:
             PGID: 1000
             UMASK: 022
             TZ: "Etc/UTC"
-            #== Shared Settings ==#
-            # AB_SYNC_INTERVAL=86400
-            # AB_SYNC_MODES=["periodic", "poll", "webhook"]
-            # AB_FULL_SCAN=false
-            # AB_DESTRUCTIVE_SYNC=false
-            # AB_EXCLUDED_SYNC_FIELDS=["review", "user_rating"]
-            # AB_DRY_RUN=false
-            # AB_BACKUP_RETENTION_DAYS=30
-            # AB_BATCH_REQUESTS=false
-            # AB_SEARCH_FALLBACK_THRESHOLD=-1
-            #== Provider Settings ==#
-            #=== AniList ===#
-            # AB_LIST_PROVIDER=anilist
-            # AB_PROVIDERS__ANILIST__TOKEN=...
-            #=== Plex ===#
-            # AB_LIBRARY_PROVIDER=plex
-            # AB_PROVIDERS__PLEX__URL=...
-            # AB_PROVIDERS__PLEX__TOKEN=...
-            # AB_PROVIDERS__PLEX__USER=...
-            # AB_PROVIDERS__PLEX__SECTIONS=[]
-            # AB_PROVIDERS__PLEX__GENRES=[]
-            #== Profile Settings ==#
-            # AB_PROFILES__example__$FIELD=$VALUE
-            #== Global Settings ==#
-            # AB_DATA_PATH="./data"
-            # AB_LOG_LEVEL="INFO"
-            # AB_MAPPINGS_URL="https://raw.githubusercontent.com/eliasbenb/PlexAniBridge-Mappings/v2/mappings.json"
-            # AB_PROVIDER_MODULES=[]
-            # AB_WEB__ENABLED=true
-            # AB_WEB__HOST="0.0.0.0"
-            # AB_WEB__PORT=4848
-            # AB_WEB__BASIC_AUTH__USERNAME=null
-            # AB_WEB__BASIC_AUTH__PASSWORD=null
-            # AB_WEB__BASIC_AUTH__HTPASSWD_PATH=null
-            # AB_WEB__BASIC_AUTH__REALM="AniBridge"
         volumes:
             - /path/to/anibridge/data:/config
         ports:

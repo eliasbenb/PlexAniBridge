@@ -7,7 +7,6 @@ on:
             - "data/mappings.example.*"
             - "docs/**"
             - "mkdocs.yml"
-            - ".env.example"
     workflow_dispatch:
 
 concurrency:

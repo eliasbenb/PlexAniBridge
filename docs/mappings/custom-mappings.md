@@ -36,7 +36,7 @@ Below is an example mappings file. You can use [the JSON schema](https://github.
 
 ## Local Custom Mappings
 
-AniBridge will look for a custom mappings file with the name `mappings.custom.(json|yaml|yml)` in the `AB_DATA_PATH` directory. The file extension determines the format of the file (YAML or JSON).
+AniBridge looks for a custom mappings file named `mappings.custom.(json|yaml|yml)` inside the data directory. The file extension determines the format of the file (YAML or JSON).
 
 ## Community Custom Mappings
 
