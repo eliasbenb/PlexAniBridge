@@ -5,26 +5,16 @@ from enum import StrEnum
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import (
-    BaseModel,
-    ConfigDict,
-    Field,
-    SecretStr,
-    field_validator,
-    model_validator,
-)
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
 from pydantic.alias_generators import to_camel
 from pydantic_settings import (
     BaseSettings,
     PydanticBaseSettingsSource,
+    SettingsConfigDict,
     YamlConfigSettingsSource,
 )
 
-from src.exceptions import (
-    InvalidMappingsURLError,
-    ProfileConfigError,
-    ProfileNotFoundError,
-)
+from src.exceptions import ProfileConfigError, ProfileNotFoundError
 from src.utils.logging import _get_logger
 
 __all__ = [
@@ -260,7 +250,7 @@ class AniBridgeProfileConfig(BaseModel):
         """Get the global log level from parent config."""
         return self.parent.log_level
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
 
 class AniBridgeConfig(BaseSettings):
@@ -395,32 +385,6 @@ class AniBridgeConfig(BaseSettings):
                     f"Invalid configuration for profile '{profile_name}': {exc}"
                 ) from exc
 
-    @field_validator("mappings_url")
-    @classmethod
-    def validate_mappings_url(cls, v: str | None) -> str | None:
-        """Validate the mappings_url field format."""
-        if not v:
-            return None
-        if not (v.startswith("http://") or v.startswith("https://")):
-            raise InvalidMappingsURLError(
-                "mappings_url must start with http:// or https://"
-            )
-        if not (v.endswith(".json") or v.endswith(".yaml") or v.endswith(".yml")):
-            raise InvalidMappingsURLError(
-                "mappings_url must point to a .json, .yaml, or .yml file"
-            )
-        return v
-
-    @field_validator("profiles", mode="before")
-    @classmethod
-    def validate_profiles(cls, v, values=None):
-        """Store raw profile data for later instantiation."""
-        if isinstance(v, dict):
-            # Don't create instances yet, just store the raw data
-            # This will be processed in _apply_global_defaults
-            return {}  # Return empty dict, we'll populate it later
-        return v
-
     @model_validator(mode="before")
     @classmethod
     def extract_raw_profiles(cls, values):
@@ -525,6 +489,8 @@ class AniBridgeConfig(BaseSettings):
             init_settings,
             YamlConfigSettingsSource(settings_cls, yaml_file=find_yaml_config_file()),
         )
+
+    model_config = SettingsConfigDict(extra="ignore")
 
 
 @lru_cache(maxsize=1)
