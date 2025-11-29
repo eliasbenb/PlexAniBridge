@@ -352,8 +352,8 @@
                                 </td>
                                 <td class="px-4 py-3">
                                     <div class="flex flex-wrap gap-1">
-                                        {#if profile.config?.sync_modes?.length}
-                                            {#each profile.config.sync_modes as mode (mode)}
+                                        {#if profile.config?.scan_modes?.length}
+                                            {#each profile.config.scan_modes as mode (mode)}
                                                 <span
                                                     class="rounded-md bg-slate-800/80 px-2 py-0.5 text-[10px] font-medium tracking-wide text-slate-200 uppercase">
                                                     {formatMode(mode)}

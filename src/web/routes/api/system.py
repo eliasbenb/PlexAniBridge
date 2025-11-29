@@ -197,7 +197,7 @@ async def api_about() -> AboutResponse:
         if current_sync is not None:
             syncing_profiles += 1
 
-        for mode in converted[name].config.sync_modes:
+        for mode in converted[name].config.scan_modes:
             sync_mode_counts[mode] = sync_mode_counts.get(mode, 0) + 1
 
         last_synced = converted[name].status.last_synced

@@ -319,15 +319,15 @@
                     </div>
                 {/if}
                 <div class="mt-3 flex flex-wrap gap-2 text-xs">
-                    {#if p.config.sync_modes?.includes("periodic")}<span
+                    {#if p.config.scan_modes?.includes("periodic")}<span
                             class="rounded-md bg-slate-800/80 px-2 py-1 text-blue-200"
                             >Periodic Sync</span
                         >{/if}
-                    {#if p.config.sync_modes?.includes("poll")}<span
+                    {#if p.config.scan_modes?.includes("poll")}<span
                             class="rounded-md bg-slate-800/80 px-2 py-1 text-blue-200"
                             >Poll Sync</span
                         >{/if}
-                    {#if p.config.sync_modes?.includes("webhook")}<span
+                    {#if p.config.scan_modes?.includes("webhook")}<span
                             class="rounded-md bg-slate-800/80 px-2 py-1 text-blue-200"
                             >Webhook Sync</span
                         >{/if}

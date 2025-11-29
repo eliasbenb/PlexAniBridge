@@ -20,8 +20,8 @@ __all__ = [
     "AniBridgeConfig",
     "AniBridgeProfileConfig",
     "LogLevel",
+    "ScanMode",
     "SyncField",
-    "SyncMode",
     "get_config",
 ]
 
@@ -110,12 +110,12 @@ class SyncField(BaseStrEnum):
     FINISHED_AT = "finished_at"  # When the user finished watching (date)
 
 
-class SyncMode(BaseStrEnum):
+class ScanMode(BaseStrEnum):
     """Synchronization execution modes.
 
     Multiple modes can be enabled simultaneously by specifying a list.
 
-    periodic: Periodic scans every `sync_interval` seconds
+    periodic: Periodic scans every `scan_interval` seconds
     poll: Poll for incremental changes every 30 seconds
     webhook: External webhook-triggered syncs, dependent on `ab_web_enabled`
     """
@@ -171,12 +171,12 @@ class AniBridgeProfileConfig(BaseModel):
         description="Provider configuration by namespace",
     )
 
-    sync_interval: int = Field(
-        default=86400, ge=0, description="Sync interval in seconds"
+    scan_interval: int = Field(
+        default=86400, ge=0, description="Scan interval in seconds"
     )
-    sync_modes: list[SyncMode] = Field(
-        default_factory=lambda: [SyncMode.PERIODIC, SyncMode.POLL, SyncMode.WEBHOOK],
-        description="List of enabled sync modes (periodic, poll, webhook)",
+    scan_modes: list[ScanMode] = Field(
+        default_factory=lambda: [ScanMode.PERIODIC, ScanMode.POLL, ScanMode.WEBHOOK],
+        description="List of enabled scan modes (periodic, poll, webhook)",
     )
     full_scan: bool = Field(
         default=False, description="Perform full library scans, even on unwatched items"

@@ -9,7 +9,7 @@ from typing import Any
 from cachetools.func import lru_cache
 
 from src import log
-from src.config.settings import AniBridgeConfig, SyncMode
+from src.config.settings import AniBridgeConfig, ScanMode
 from src.core.animap import AniMapClient
 from src.core.bridge import BridgeClient
 from src.exceptions import ProfileNotFoundError
@@ -28,8 +28,8 @@ class ProfileScheduler:
         self,
         profile_name: str,
         bridge_client: BridgeClient,
-        sync_interval: int,
-        sync_modes: list[SyncMode],
+        scan_interval: int,
+        scan_modes: list[ScanMode],
         poll_interval: int = 30,
         stop_event: asyncio.Event | None = None,
     ):
@@ -38,15 +38,15 @@ class ProfileScheduler:
         Args:
             profile_name: Name of the profile
             bridge_client: Bridge client for this profile
-            sync_interval: Sync interval in seconds
-            sync_modes: List of sync modes enabled for this profile
+            scan_interval: Sync interval in seconds
+            scan_modes: List of sync modes enabled for this profile
             poll_interval: Polling interval in seconds
             stop_event: Event to signal shutdown
         """
         self.profile_name = profile_name
         self.bridge_client = bridge_client
-        self.sync_interval = sync_interval
-        self.sync_modes = sync_modes
+        self.scan_interval = scan_interval
+        self.scan_modes = scan_modes
         self.poll_interval = poll_interval
         self.stop_event = stop_event or asyncio.Event()
 
@@ -88,7 +88,7 @@ class ProfileScheduler:
         if self._running:
             return
 
-        if not self.sync_modes:
+        if not self.scan_modes:
             log.debug(
                 f"[{self.profile_name}] No sync modes "
                 f"configured, triggering single run before exiting"
@@ -98,16 +98,16 @@ class ProfileScheduler:
 
         self._running = True
 
-        if SyncMode.PERIODIC in self.sync_modes:
+        if ScanMode.PERIODIC in self.scan_modes:
             log.debug(
                 f"[{self.profile_name}] Starting periodic "
-                f"sync every {self.sync_interval}s"
+                f"sync every {self.scan_interval}s"
             )
             task = asyncio.create_task(self._periodic_loop())
             self._tasks.add(task)
             task.add_done_callback(self._tasks.discard)
 
-        if SyncMode.POLL in self.sync_modes:
+        if ScanMode.POLL in self.scan_modes:
             log.debug(
                 f"[{self.profile_name}] Starting polling "
                 f"sync every {self.poll_interval}s"
@@ -133,14 +133,14 @@ class ProfileScheduler:
             try:
                 await self.sync()
 
-                next_sync = datetime.now(UTC) + timedelta(seconds=self.sync_interval)
+                next_sync = datetime.now(UTC) + timedelta(seconds=self.scan_interval)
                 log.info(
                     f"[{self.profile_name}] Next periodic "
                     f"sync scheduled for: {next_sync.astimezone()}"
                 )
 
                 with contextlib.suppress(asyncio.TimeoutError):
-                    await asyncio.wait_for(self.stop_event.wait(), self.sync_interval)
+                    await asyncio.wait_for(self.stop_event.wait(), self.scan_interval)
             except asyncio.CancelledError:
                 log.debug(f"[{self.profile_name}] Periodic sync cancelled")
                 break
@@ -249,8 +249,8 @@ class SchedulerClient:
 
             log.info(
                 f"[{profile_name}] Starting scheduler: "
-                f"interval={profile_config.sync_interval}s, "
-                f"modes={profile_config.sync_modes}, "
+                f"interval={profile_config.scan_interval}s, "
+                f"modes={profile_config.scan_modes}, "
                 f"full_scan={'enabled' if profile_config.full_scan else 'disabled'}, "
                 f"destructive={
                     'enabled' if profile_config.destructive_sync else 'disabled'
@@ -260,8 +260,8 @@ class SchedulerClient:
             scheduler = ProfileScheduler(
                 profile_name=profile_name,
                 bridge_client=bridge_client,
-                sync_interval=profile_config.sync_interval,
-                sync_modes=profile_config.sync_modes,
+                scan_interval=profile_config.scan_interval,
+                scan_modes=profile_config.scan_modes,
                 poll_interval=30,
                 stop_event=self.stop_event,
             )
@@ -269,11 +269,11 @@ class SchedulerClient:
             self.profile_schedulers[profile_name] = scheduler
             await scheduler.start()
 
-            if profile_config.sync_modes:
+            if profile_config.scan_modes:
                 next_sync_time = "in progress"
                 if (
-                    SyncMode.PERIODIC in profile_config.sync_modes
-                    and profile_config.sync_interval > 0
+                    ScanMode.PERIODIC in profile_config.scan_modes
+                    and profile_config.scan_interval > 0
                 ):
                     next_sync = datetime.now(UTC).astimezone()
                     next_sync_time = f"at {next_sync.strftime('%Y-%m-%d %H:%M:%S')}"
@@ -282,9 +282,9 @@ class SchedulerClient:
                     f"[{profile_name}] Scheduler started, next sync: {next_sync_time}"
                 )
 
-        # If every profile is a single-run profile (no sync_modes), exit
+        # If every profile is a single-run profile (no scan_modes), exit
         if self.profile_schedulers and all(
-            not self.global_config.get_profile(name).sync_modes
+            not self.global_config.get_profile(name).scan_modes
             for name in self.profile_schedulers
         ):
             log.info("All profiles are single-run, stopping application")
@@ -419,8 +419,8 @@ class SchedulerClient:
                     "list_namespace": list_namespace,
                     "library_user": library_user_title,
                     "list_user": list_user_title,
-                    "sync_interval": profile_config.sync_interval,
-                    "sync_modes": [m.value for m in profile_config.sync_modes],
+                    "scan_interval": profile_config.scan_interval,
+                    "scan_modes": [m.value for m in profile_config.scan_modes],
                     "full_scan": profile_config.full_scan,
                     "destructive_sync": profile_config.destructive_sync,
                 },
