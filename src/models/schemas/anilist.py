@@ -1,10 +1,10 @@
 """AniList Models Module."""
 
 from collections.abc import Iterable
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 from functools import cache
-from typing import Annotated, Any, ClassVar, get_args, get_origin
+from typing import Annotated, ClassVar, get_args, get_origin
 
 from pydantic import AfterValidator, BaseModel, ConfigDict
 from pydantic.alias_generators import to_camel
@@ -104,86 +104,12 @@ class MediaSort(AniListBaseEnum):
 class MediaListStatus(AniListBaseEnum):
     """Enum representing status of a media list entry (CURRENT, COMPLETED, etc)."""
 
-    _ignore_ = ["__priority"]  # noqa: RUF012
-
     CURRENT = "CURRENT"
     PLANNING = "PLANNING"
     COMPLETED = "COMPLETED"
     DROPPED = "DROPPED"
     PAUSED = "PAUSED"
     REPEATING = "REPEATING"
-
-    __priority: ClassVar[dict[str, int]] = {
-        "PLANNING": 1,
-        "CURRENT": 2,
-        "PAUSED": 2,
-        "DROPPED": 2,
-        "COMPLETED": 3,
-        "REPEATING": 3,
-    }
-
-    def __eq__(self, other: object) -> bool:
-        """Check equality with another MediaListStatus."""
-        if not isinstance(other, MediaListStatus):
-            return NotImplemented
-        return self.value == other.value
-
-    def __ne__(self, other: object) -> bool:
-        """Check inequality with another MediaListStatus."""
-        if not isinstance(other, MediaListStatus):
-            return NotImplemented
-        return self.value != other.value
-
-    def __lt__(self, other: object) -> bool:
-        """Check if status is less than another based on priority."""
-        if not isinstance(other, MediaListStatus):
-            return NotImplemented
-        return (
-            self.value != other.value
-            and self.__priority[self.value] < self.__priority[other.value]
-        )
-
-    def __le__(self, other: object) -> bool:
-        """Check if status is less than or equal to another based on priority."""
-        if not isinstance(other, MediaListStatus):
-            return NotImplemented
-        return self.__priority[self.value] <= self.__priority[other.value]
-
-    def __gt__(self, other: object) -> bool:
-        """Check if status is greater than another based on priority."""
-        if not isinstance(other, MediaListStatus):
-            return NotImplemented
-        return (
-            self.value != other.value
-            and self.__priority[self.value] > self.__priority[other.value]
-        )
-
-    def __ge__(self, other: object) -> bool:
-        """Check if status is greater than or equal to another based on priority."""
-        if not isinstance(other, MediaListStatus):
-            return NotImplemented
-        return self.__priority[self.value] >= self.__priority[other.value]
-
-
-class ScoreFormat(AniListBaseEnum):
-    """Enum representing score formats for media list entries."""
-
-    POINT_100 = "POINT_100"
-    POINT_10_DECIMAL = "POINT_10_DECIMAL"
-    POINT_10 = "POINT_10"
-    POINT_5 = "POINT_5"
-    POINT_3 = "POINT_3"
-
-
-class UserTitleLanguage(AniListBaseEnum):
-    """Enum representing user title language preferences."""
-
-    ROMAJI = "ROMAJI"
-    ENGLISH = "ENGLISH"
-    NATIVE = "NATIVE"
-    ROMAJI_STYLISED = "ROMAJI_STYLISED"
-    ENGLISH_STYLISED = "ENGLISH_STYLISED"
-    NATIVE_STYLISED = "NATIVE_STYLISED"
 
 
 class AniListBaseModel(BaseModel):
@@ -271,29 +197,6 @@ class AniListBaseModel(BaseModel):
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
 
-class UserOptions(AniListBaseModel):
-    """Model representing user options/preferences."""
-
-    title_language: UserTitleLanguage | None = None
-    timezone: str | None = None
-
-
-class MediaListOptions(AniListBaseModel):
-    """Model representing media list options for a user."""
-
-    score_format: ScoreFormat | None = None
-    row_order: str | None = None
-
-
-class User(AniListBaseModel):
-    """Model representing an AniList user."""
-
-    id: int
-    name: str
-    options: UserOptions | None = None
-    media_list_options: MediaListOptions | None = None
-
-
 class PageInfo(AniListBaseModel):
     """Model representing pagination info for AniList queries."""
 
@@ -336,92 +239,6 @@ class FuzzyDate(AniListBaseModel):
     month: int | None = None
     day: int | None = None
 
-    @staticmethod
-    def from_date(d: date | datetime | None) -> FuzzyDate | None:
-        """Create a FuzzyDate from a date or datetime object.
-
-        Args:
-            d (date | datetime | None): A date or datetime object.
-
-        Returns:
-            FuzzyDate | None: An equivalent FuzzyDate object or None.
-        """
-        if d is None:
-            return None
-        return FuzzyDate(year=d.year, month=d.month, day=d.day)
-
-    def to_datetime(self) -> datetime | None:
-        """Convert the FuzzyDate to a datetime object.
-
-        Returns:
-            datetime | None: A datetime object or None if the FuzzyDate is incomplete.
-        """
-        if not self.year:
-            return None
-        return datetime(year=self.year, month=self.month or 1, day=self.day or 1)
-
-    def __bool__(self) -> bool:
-        """Return True if the date has a year, else False."""
-        return self.year is not None
-
-    def __eq__(self, other: Any) -> bool:
-        """Check equality with another FuzzyDate."""
-        if not isinstance(other, FuzzyDate):
-            return False
-        return (
-            self.year == other.year
-            and self.month == other.month
-            and self.day == other.day
-        )
-
-    def __lt__(self, other: Any) -> bool:
-        """Check if this date is less than another."""
-        if not isinstance(other, FuzzyDate):
-            return NotImplemented
-        if not self.year or not other.year:
-            return True
-        return ((self.year), (self.month or 1), (self.day or 1)) < (
-            (other.year),
-            (other.month or 1),
-            (other.day or 1),
-        )
-
-    def __le__(self, other: Any) -> bool:
-        """Check if this date is less than or equal to another."""
-        if not isinstance(other, FuzzyDate):
-            return NotImplemented
-        if not self.year or not other.year:
-            return True
-        return ((self.year), (self.month or 1), (self.day or 1)) <= (
-            (other.year),
-            (other.month or 1),
-            (other.day or 1),
-        )
-
-    def __gt__(self, other: Any) -> bool:
-        """Check if this date is greater than another."""
-        if not isinstance(other, FuzzyDate):
-            return NotImplemented
-        if not self.year or not other.year:
-            return True
-        return ((self.year), (self.month or 1), (self.day or 1)) > (
-            (other.year),
-            (other.month or 1),
-            (other.day or 1),
-        )
-
-    def __ge__(self, other: Any) -> bool:
-        """Check if this date is greater than or equal to another."""
-        if not isinstance(other, FuzzyDate):
-            return NotImplemented
-        if not self.year or not other.year:
-            return True
-        return ((self.year), (self.month or 1), (self.day or 1)) >= (
-            (other.year),
-            (other.month or 1),
-            (other.day or 1),
-        )
-
     def __str__(self) -> str:
         """Return string representation of the FuzzyDate."""
         return self.__repr__()
@@ -433,81 +250,6 @@ class FuzzyDate(AniListBaseModel):
             f"{str(self.month).zfill(2) if self.month else '??'}-"
             f"{str(self.day).zfill(2) if self.day else '??'}"
         )
-
-
-class MediaList(AniListBaseModel):
-    """Model representing a media list entry in AniList."""
-
-    id: int
-    user_id: int
-    media_id: int
-    status: MediaListStatus | None = None
-    score: float | None = None
-    progress: int | None = None
-    repeat: int | None = None
-    notes: str | None = None
-    started_at: FuzzyDate | None = None
-    completed_at: FuzzyDate | None = None
-    created_at: UTCDateTime | None = None
-    updated_at: UTCDateTime | None = None
-
-    @staticmethod
-    def diff(old: MediaList | None, new: MediaList) -> str:
-        """Generate a diff string between two MediaList objects.
-
-        Args:
-            old (MediaList | None): The old MediaList object.
-            new (MediaList): The new MediaList object.
-
-        Returns:
-            str: A diff string between the two objects.
-        """
-        if old is None:
-            old = MediaList(id=new.id, user_id=new.user_id, media_id=new.media_id)
-
-        diff_parts = []
-        for field, _ in old.__class__.model_fields.items():
-            old_value = getattr(old, field)
-            new_value = getattr(new, field)
-
-            if old_value != new_value:
-                if field == "notes":
-                    if old_value:
-                        old_value = old_value[:50].replace("\n", "  ") + "..."
-                    if new_value:
-                        new_value = new_value[:50].replace("\n", "  ") + "..."
-                diff_parts.append(f"{field}: {old_value} -> {new_value}")
-        return "(" + ", ".join(diff_parts) + ")"
-
-    def __str__(self) -> str:
-        """Return string representation of the MediaList entry."""
-        notes_truncated = None
-        if self.notes:
-            notes_truncated = self.notes[:50].replace("\n", "  ") + "..."
-
-        return (
-            f"(status={self.status}, score={self.score}, progress={self.progress}, "
-            f"repeat={self.repeat}, notes={notes_truncated}, started_at="
-            f"{self.started_at}, completed_at={self.completed_at})"
-        )
-
-
-class MediaListGroup[EntryType: MediaList](AniListBaseModel):
-    """Model representing a group of media list entries."""
-
-    entries: list[EntryType] = []
-    name: str | None = None
-    is_custom_list: bool | None = None
-    is_split_completed_list: bool | None = None
-    status: MediaListStatus | None = None
-
-
-class MediaListCollection[GroupType: MediaListGroup](AniListBaseModel):
-    """Model representing a collection of media list groups for a user."""
-
-    user: User | None = None
-    lists: list[GroupType] = []
-    has_next_chunk: bool | None = None
 
 
 class MediaCoverImage(AniListBaseModel):
@@ -529,8 +271,8 @@ class AiringSchedule(AniListBaseModel):
     media_id: int
 
 
-class MediaWithoutList(AniListBaseModel):
-    """Model representing a media entry without list information."""
+class Media(AniListBaseModel):
+    """Model representing a media entry."""
 
     id: int
     # id_mal: int | None = None
@@ -550,34 +292,3 @@ class MediaWithoutList(AniListBaseModel):
     # start_date: FuzzyDate | None = None
     # end_date: FuzzyDate | None = None
     # next_airing_episode: AiringSchedule | None = None
-
-
-class Media(MediaWithoutList):
-    """Model representing a media entry with list information."""
-
-    media_list_entry: MediaList | None = None
-
-
-class MediaListWithMedia(MediaList):
-    """Model representing a media list entry with attached media info."""
-
-    media: MediaWithoutList | None = None
-
-
-class MediaListGroupWithMedia(MediaListGroup[MediaListWithMedia]):
-    """Model representing a group of media list entries with media info."""
-
-    pass
-
-
-class MediaListCollectionWithMedia(MediaListCollection[MediaListGroupWithMedia]):
-    """Model representing a collection of media list groups with media info."""
-
-    pass
-
-
-class MediaConnection(AniListBaseModel):
-    """Model representing a paginated connection of media entries."""
-
-    nodes: list[Media]
-    pageInfo: PageInfo = PageInfo()

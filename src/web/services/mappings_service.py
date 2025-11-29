@@ -25,7 +25,7 @@ from src.exceptions import (
 )
 from src.models.db.animap import AniMap
 from src.models.db.provenance import AniMapProvenance
-from src.models.schemas.anilist import MediaWithoutList as AniListMetadata
+from src.models.schemas.anilist import Media as AniListMetadata
 from src.utils.booru_query import (
     And,
     KeyTerm,

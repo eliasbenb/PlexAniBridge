@@ -35,7 +35,7 @@ export interface MediaCoverImage {
     color?: string | null;
 }
 
-export interface MediaWithoutList {
+export interface Media {
     id: number;
     // id_mal?: number | null;
     // type?: MediaType | null;
@@ -54,8 +54,4 @@ export interface MediaWithoutList {
     // startDate?: FuzzyDate | null;
     // endDate?: FuzzyDate | null;
     // nextAiringEpisode?: AiringSchedule | null;
-}
-
-export interface Media extends MediaWithoutList {
-    media_list_entry?: { id: number };
 }

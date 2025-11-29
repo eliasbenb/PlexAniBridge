@@ -12,7 +12,7 @@ from fastapi.routing import APIRouter
 from pydantic import BaseModel, model_validator
 
 from src.exceptions import MappingIdMismatchError
-from src.models.schemas.anilist import MediaWithoutList
+from src.models.schemas.anilist import Media
 from src.web.services.mapping_overrides_service import (
     get_mapping_overrides_service,
 )
@@ -39,7 +39,7 @@ class MappingItemModel(BaseModel):
     tvdb_id: int | None = None
     tmdb_mappings: dict[str, str] | None = None
     tvdb_mappings: dict[str, str] | None = None
-    anilist: MediaWithoutList | None = None
+    anilist: Media | None = None
     custom: bool = False
     sources: list[str] = []
 
