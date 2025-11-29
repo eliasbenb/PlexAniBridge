@@ -1,5 +1,3 @@
-import type * as Monaco from "monaco-editor";
-
 import type { MappingOverrideMode } from "$lib/types/api";
 
 export interface SeasonRow {
@@ -132,7 +130,7 @@ export const defaultColumns: ColumnConfig[] = [
     },
 ];
 
-export const mappingSchema: Monaco.languages.json.JSONSchema = {
+export const mappingSchema = {
     title: "AniBridge Mapping Override",
     type: "object",
     required: ["anilist_id"],
