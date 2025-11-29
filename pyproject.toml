@@ -116,6 +116,10 @@ convention = "google"
 pythonpath = ["src"]
 testpaths = ["tests"]
 addopts = "--cov=src"
+filterwarnings = [
+    "ignore:'asyncio.iscoroutinefunction' is deprecated.*:DeprecationWarning:limiter.limiter",
+    "ignore:'asyncio.iscoroutinefunction' is deprecated.*:DeprecationWarning:async_lru",
+]
 
 [tool.uv.workspace]
 members = ["docs"]
