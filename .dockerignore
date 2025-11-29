@@ -10,10 +10,6 @@
 pip-log.txt
 pip-delete-this-directory.txt
 
-# Docs
-/docs
-/mkdocs.yml
-
 # Environments
 .env
 .venv
@@ -39,7 +35,15 @@ venv.bak/
 /.github
 
 # Ruff
-/.ruff_cache
+.ruff_cache
+
+# Pytest
+.pytest_cache
+.coverage
+/tests
+
+# py-spy
+*.pyspy
 
 # Python
 __pycache__
