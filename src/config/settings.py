@@ -5,7 +5,7 @@ from enum import StrEnum
 from functools import cached_property, lru_cache
 from pathlib import Path
 
-from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
+from pydantic import BaseModel, Field, SecretStr, model_validator
 from pydantic_settings import (
     BaseSettings,
     PydanticBaseSettingsSource,
@@ -204,7 +204,6 @@ class AniBridgeProfileConfig(BaseModel):
         description=("Days to retain list backups before cleanup (0 disables cleanup)"),
     )
 
-    _original_data: dict | None = None
     _parent: AniBridgeConfig | None = None
 
     @property
@@ -222,12 +221,6 @@ class AniBridgeProfileConfig(BaseModel):
                 "This configuration is not part of a multi-config instance"
             )
         return self._parent
-
-    @model_validator(mode="before")
-    def _store_original_data(cls, data: dict) -> dict:
-        """Store the original input data for reference."""
-        data["_original_data"] = data.copy()
-        return data
 
     def _merge_globals(self) -> AniBridgeProfileConfig:
         """Merge global settings from the parent config into this profile config."""
@@ -247,8 +240,6 @@ class AniBridgeProfileConfig(BaseModel):
                 global_value = getattr(self._parent.global_config, field)
                 setattr(self, field, global_value)
         return self
-
-    model_config = ConfigDict(extra="ignore")
 
 
 class AniBridgeConfig(BaseSettings):
