@@ -1,16 +1,28 @@
 """Sync History Database Model."""
 
 from datetime import UTC, datetime
+from enum import StrEnum
 from typing import Any
 
 from anibridge.library import MediaKind
 from sqlalchemy import JSON, DateTime, Enum, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
-from src.core.sync.stats import SyncOutcome
 from src.models.db.base import Base
 
 __all__ = ["SyncHistory", "SyncOutcome"]
+
+
+class SyncOutcome(StrEnum):
+    """Enumeration of possible synchronization outcomes for media items."""
+
+    SYNCED = "synced"
+    SKIPPED = "skipped"
+    FAILED = "failed"
+    NOT_FOUND = "not_found"
+    DELETED = "deleted"
+    PENDING = "pending"
+    UNDONE = "undone"
 
 
 class SyncHistory(Base):

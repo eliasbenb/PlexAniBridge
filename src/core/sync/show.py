@@ -14,9 +14,12 @@ from anibridge.library import (
 from anibridge.list import ListEntry, ListMediaType, ListStatus
 
 from src.core.sync.base import BaseSyncClient
-from src.core.sync.stats import ItemIdentifier, SyncOutcome
+from src.core.sync.stats import ItemIdentifier
 from src.models.db.animap import AniMap, EpisodeMapping
+from src.models.db.sync_history import SyncOutcome
 from src.utils.cache import gattl_cache, glru_cache
+
+__all__ = ["ShowSyncClient"]
 
 
 class ShowSyncClient(BaseSyncClient[LibraryShow, LibrarySeason, LibraryEpisode]):

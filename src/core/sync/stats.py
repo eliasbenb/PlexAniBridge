@@ -3,7 +3,6 @@
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from enum import StrEnum
 from typing import Any, Literal
 
 from anibridge.library import (
@@ -17,12 +16,12 @@ from pydantic import BaseModel
 
 from src.exceptions import UnsupportedMediaTypeError
 from src.models.db.animap import AniMap
+from src.models.db.sync_history import SyncOutcome
 
 __all__ = [
     "BatchUpdate",
     "EntrySnapshot",
     "ItemIdentifier",
-    "SyncOutcome",
     "SyncProgress",
     "SyncStats",
 ]
@@ -102,18 +101,6 @@ class ItemIdentifier(BaseModel):
         if self.repr:
             return self.repr
         return super().__repr__()
-
-
-class SyncOutcome(StrEnum):
-    """Enumeration of possible synchronization outcomes for media items."""
-
-    SYNCED = "synced"
-    SKIPPED = "skipped"
-    FAILED = "failed"
-    NOT_FOUND = "not_found"
-    DELETED = "deleted"
-    PENDING = "pending"
-    UNDONE = "undone"
 
 
 class SyncStats(BaseModel):

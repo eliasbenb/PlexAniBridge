@@ -20,8 +20,9 @@ from src.config.settings import AniBridgeConfig, AniBridgeProfileConfig
 from src.core.animap import AniMapClient
 from src.core.providers import build_library_provider, build_list_provider
 from src.core.sync import BaseSyncClient, MovieSyncClient, ShowSyncClient
-from src.core.sync.stats import SyncOutcome, SyncProgress, SyncStats
+from src.core.sync.stats import SyncProgress, SyncStats
 from src.models.db.housekeeping import Housekeeping
+from src.models.db.sync_history import SyncOutcome
 
 __all__ = ["BridgeClient"]
 

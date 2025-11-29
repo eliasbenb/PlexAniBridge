@@ -17,11 +17,11 @@ from src.core.sync.stats import (
     BatchUpdate,
     EntrySnapshot,
     ItemIdentifier,
-    SyncOutcome,
     SyncStats,
 )
 from src.models.db.animap import AniMap
 from src.models.db.pin import Pin
+from src.models.db.sync_history import SyncOutcome
 from src.utils.types import Comparable
 
 if TYPE_CHECKING:

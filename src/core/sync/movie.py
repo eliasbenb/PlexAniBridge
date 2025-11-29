@@ -10,6 +10,8 @@ from src.core.sync.base import BaseSyncClient
 from src.core.sync.stats import ItemIdentifier
 from src.models.db.animap import AniMap
 
+__all__ = ["MovieSyncClient"]
+
 
 class MovieSyncClient(BaseSyncClient[LibraryMovie, LibraryMovie, LibraryMovie]):
     """Synchronize movie items between a library provider and a list provider."""
