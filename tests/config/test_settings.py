@@ -52,17 +52,6 @@ def test_profile_parent_requires_assignment() -> None:
         _ = profile.parent
 
 
-def test_config_requires_profile_or_globals(tmp_path: Path) -> None:
-    """Test AniBridgeConfig bootstraps a default profile when no explicit provider.
-
-    configs are provided.
-    """
-    config = AniBridgeConfig()
-    # Default profile should be created implicitly and accessible
-    profile = config.get_profile("default")
-    assert profile is not None
-
-
 def test_config_creates_default_profile_from_globals() -> None:
     """Test that AniBridgeConfig creates a default profile from global settings."""
     config = AniBridgeConfig(

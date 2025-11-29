@@ -213,17 +213,20 @@ class SchedulerClient:
         for profile_name, profile_config in self.global_config.profiles.items():
             log.info(f"[{profile_name}] Setting up bridge client")
 
-            bridge_client = BridgeClient(
-                profile_name=profile_name,
-                profile_config=profile_config,
-                global_config=self.global_config,
-                shared_animap_client=self.shared_animap_client,
-            )
+            try:
+                bridge_client = BridgeClient(
+                    profile_name=profile_name,
+                    profile_config=profile_config,
+                    global_config=self.global_config,
+                    shared_animap_client=self.shared_animap_client,
+                )
 
-            await bridge_client.initialize()
-            self.bridge_clients[profile_name] = bridge_client
+                await bridge_client.initialize()
+                self.bridge_clients[profile_name] = bridge_client
 
-            log.info(f"[{profile_name}] Bridge client ready")
+                log.info(f"[{profile_name}] Bridge client ready")
+            except Exception:
+                log.error(f"[{profile_name}] Bridge client setup failed", exc_info=True)
 
         log.info(
             f"Application scheduler initialized with "

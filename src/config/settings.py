@@ -295,7 +295,7 @@ class AniBridgeConfig(BaseSettings):
             ValueError: If required global settings are missing or invalid.
         """
         # If there are no explicit profiles, attempt to bootstrap a default from globals
-        if not self.profiles:
+        if not self.profiles and self.global_config.model_fields_set:
             _log.info(
                 "No profiles configured; creating implicit 'default' profile from "
                 "globals"
