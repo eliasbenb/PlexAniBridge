@@ -1,9 +1,22 @@
 <script lang="ts">
     import { onMount } from "svelte";
 
-    import { Languages, Settings, User } from "@lucide/svelte";
+    import {
+        Info,
+        Languages,
+        LoaderCircle,
+        RefreshCw,
+        Save,
+        Settings as SettingsIcon,
+        TriangleAlert,
+    } from "@lucide/svelte";
 
-    import type { SettingsResponse } from "$lib/types/api";
+    import CodeEditor from "$lib/components/code-editor.svelte";
+    import type {
+        ConfigDocumentResponse,
+        ConfigDocumentUpdateRequest,
+        ConfigUpdateResponse,
+    } from "$lib/types/api";
     import {
         anilistTitleLang,
         setAniListTitleLang,
@@ -12,9 +25,76 @@
     import { apiJson } from "$lib/utils/api";
     import { toast } from "$lib/utils/notify";
 
-    let data: SettingsResponse = $state({ global_config: {}, profiles: [] });
     let loading = $state(true);
-    let error: string | null = $state(null);
+    let saving = $state(false);
+    let loadError: string | null = $state(null);
+    let saveError: string | null = $state(null);
+    let configPath = $state("");
+    let fileExists = $state(false);
+    let editorValue = $state("");
+    let initialValue = $state("");
+    let mtime: number | null = null;
+
+    const hasChanges = $derived(editorValue !== initialValue);
+
+    onMount(loadConfig);
+
+    async function loadConfig() {
+        loading = true;
+        loadError = null;
+        saveError = null;
+        try {
+            const payload = await apiJson<ConfigDocumentResponse>("/api/config");
+            configPath = payload.config_path;
+            fileExists = payload.file_exists;
+            editorValue = payload.content ?? "";
+            initialValue = editorValue;
+            mtime = payload.mtime ?? null;
+        } catch (error) {
+            loadError = formatError(error);
+        } finally {
+            loading = false;
+        }
+    }
+
+    async function saveConfig() {
+        if (saving || loading) return;
+        saveError = null;
+
+        const payload: ConfigDocumentUpdateRequest = {
+            content: editorValue,
+            expected_mtime: mtime ?? undefined,
+        };
+
+        saving = true;
+        try {
+            await apiJson<ConfigUpdateResponse>("/api/config", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            });
+            toast(
+                "Configuration saved. Restart AniBridge to apply changes.",
+                "success",
+            );
+            await loadConfig();
+        } catch (error) {
+            saveError = formatError(error);
+        } finally {
+            saving = false;
+        }
+    }
+
+    function revertChanges() {
+        editorValue = initialValue;
+        saveError = null;
+    }
+
+    function formatError(error: unknown): string {
+        if (error instanceof Error) return error.message;
+        if (typeof error === "string") return error;
+        return "Unexpected error";
+    }
 
     const LANG_OPTS: TitleLanguage[] = ["romaji", "english", "native"];
 
@@ -22,135 +102,130 @@
         setAniListTitleLang(v);
         toast(`AniList title language set to ${v}`, "success");
     }
-
-    async function load() {
-        loading = true;
-        error = null;
-        try {
-            data = await apiJson<SettingsResponse>("/api/system/settings");
-        } catch (e: unknown) {
-            if (e instanceof Error) error = e.message;
-            else error = String(e);
-        } finally {
-            loading = false;
-        }
-    }
-
-    onMount(() => {
-        load();
-    });
 </script>
 
-<div class="space-y-8">
-    <div class="flex items-center gap-2">
-        <Settings class="inline h-4 w-4 text-slate-300" />
-        <h2 class="text-lg font-semibold">Settings</h2>
+<div class="space-y-6">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-2 text-slate-200">
+            <SettingsIcon class="h-5 w-5 text-slate-400" />
+            <div>
+                <h2 class="text-base font-semibold">Configuration</h2>
+                <p class="text-xs text-slate-500">
+                    Edit the raw AniBridge YAML file directly.
+                </p>
+            </div>
+        </div>
+        <div class="flex flex-wrap gap-2 text-xs">
+            <button
+                type="button"
+                class="inline-flex items-center gap-1 rounded border border-slate-700 bg-slate-900/60 px-3 py-1 text-slate-100 hover:bg-slate-800/60"
+                onclick={loadConfig}
+                disabled={loading || saving}>
+                <RefreshCw class="h-3.5 w-3.5" /> Reload
+            </button>
+            <button
+                type="button"
+                class="inline-flex items-center gap-1 rounded border border-slate-700 bg-slate-900/60 px-3 py-1 text-slate-100 hover:bg-slate-800/60 disabled:opacity-50"
+                onclick={revertChanges}
+                disabled={loading || saving || !hasChanges}>
+                Revert
+            </button>
+            <button
+                type="button"
+                class="inline-flex items-center gap-1 rounded border border-blue-500 bg-blue-600 px-4 py-1 font-semibold text-white hover:bg-blue-500 disabled:opacity-50"
+                onclick={saveConfig}
+                disabled={loading || saving || !hasChanges}>
+                <Save class="h-3.5 w-3.5" />
+                {saving ? "Saving…" : "Save"}
+            </button>
+        </div>
     </div>
-    <p class="max-w-prose text-xs text-slate-400">
-        Read-only view of the currently loaded configuration. To change settings, edit
-        your environment variables or configuration file and restart the application.
-    </p>
-    {#if error}<p class="text-sm text-rose-400">Failed: {error}</p>{/if}
-    <div class="grid gap-6 md:grid-cols-3">
-        <div class="space-y-8 md:col-span-1">
-            <div class="space-y-2">
-                <h4 class="text-sm font-medium tracking-wide text-slate-200">Global</h4>
-                {#if loading}<p class="text-[11px] text-slate-500">Loading…</p>{/if}
-                <ul
-                    class="space-y-1 rounded-md border border-slate-800 bg-slate-900/50 p-4 text-[11px]"
-                    class:hidden={loading}>
-                    {#each Object.entries(data.global_config) as [k, v] (k)}
-                        <li class="flex gap-2">
-                            <span class="min-w-40 break-all text-slate-500">{k}</span>
-                            <span class="break-all text-slate-300">
-                                {#if v == null}
-                                    <span class="text-slate-600 italic">(unset)</span>
-                                {:else if typeof v === "string"}
-                                    {v}
-                                {:else}
-                                    {JSON.stringify(v)}
-                                {/if}
-                            </span>
-                        </li>
-                    {/each}
-                    {#if !Object.keys(data.global_config).length && !loading}<li
-                            class="text-slate-500">
-                            Empty
-                        </li>{/if}
-                </ul>
-            </div>
-            <div class="space-y-2">
-                <h4
-                    class="flex items-center gap-2 text-sm font-medium tracking-wide text-slate-200">
-                    <Languages class="inline h-4 w-4 text-slate-400" /> AniList Title Language
-                </h4>
-                <p class="text-[11px] leading-relaxed text-slate-500">
-                    Choose which title language to prefer. Stored only in this browser.
-                </p>
-                <div class="flex flex-wrap gap-2">
-                    {#each LANG_OPTS as opt (opt)}
-                        <button
-                            type="button"
-                            onclick={() => setLang(opt)}
-                            class={`rounded-md border px-3 py-1.5 text-[11px] font-medium ${$anilistTitleLang === opt ? "border-blue-500 bg-blue-600 text-white" : "border-slate-700 bg-slate-800/60 text-slate-300 hover:bg-slate-700/60"}`}
-                            >{opt[0].toUpperCase() + opt.slice(1)}</button>
-                    {/each}
+
+    <div
+        class="rounded border border-slate-800 bg-slate-950/60 p-4 text-xs text-slate-300">
+        <p>
+            <span class="font-semibold text-slate-100">Configuration file:</span>
+            <code
+                class="ml-2 rounded bg-slate-900 px-1 py-0.5 text-[11px] text-slate-200">
+                {configPath || "(not set)"}
+            </code>
+        </p>
+        <p class="mt-1 text-slate-500">
+            {#if fileExists}
+                The existing file will be overwritten when you save.
+            {:else}
+                A new configuration file will be created when you save.
+            {/if}
+        </p>
+    </div>
+
+    {#if loadError}
+        <div
+            class="flex items-center gap-2 rounded border border-rose-900/60 bg-rose-950/60 px-3 py-2 text-xs text-rose-100">
+            <TriangleAlert class="h-3.5 w-3.5" /> Failed to load configuration: {loadError}
+        </div>
+    {/if}
+
+    {#if saveError}
+        <div
+            class="flex items-center gap-2 rounded border border-rose-900/60 bg-rose-950/60 px-3 py-2 text-xs text-rose-100">
+            <TriangleAlert class="h-3.5 w-3.5" />
+            {saveError}
+        </div>
+    {/if}
+
+    <div class="space-y-2">
+        <div class="flex items-center gap-2 text-slate-300">
+            <Info class="h-4 w-4 text-slate-500" />
+            <p class="text-xs text-slate-400">
+                Paste or edit the YAML content below. Saving replaces the existing file
+                and requires restarting AniBridge to apply changes.
+            </p>
+        </div>
+        <div class="rounded bg-slate-950/80 p-2">
+            {#if loading}
+                <div
+                    class="flex items-center justify-center gap-2 py-32 text-xs text-slate-400">
+                    <LoaderCircle class="h-4 w-4 animate-spin" /> Loading configuration…
                 </div>
-                <p class="text-[10px] text-slate-500">
-                    Current preference:
-                    <span class="font-medium text-slate-300">
-                        {$anilistTitleLang === "userPreferred"
-                            ? "AniList Preferred"
-                            : $anilistTitleLang}
-                    </span>
-                </p>
-            </div>
+            {:else}
+                <CodeEditor
+                    class="h-196"
+                    bind:content={editorValue}
+                    language="yaml" />
+            {/if}
         </div>
-        <div class="space-y-4 md:col-span-2">
-            <div class="flex items-center gap-2">
-                <h3 class="text-sm font-medium tracking-wide text-slate-200">
-                    Profiles
-                </h3>
-                <span class="text-[11px] text-slate-500">({data.profiles.length})</span>
-            </div>
-            {#if loading}<p class="text-[11px] text-slate-500">Loading…</p>{/if}
-            <div
-                class="space-y-6"
-                class:hidden={loading}>
-                {#each data.profiles as p (p.name)}
-                    <div class="rounded-md border border-slate-800 bg-slate-900/50">
-                        <div
-                            class="flex items-center gap-2 border-b border-slate-800 px-4 py-2">
-                            <User class="inline h-4 w-4 text-slate-400" />
-                            <span class="font-medium text-slate-200">{p.name}</span>
-                        </div>
-                        <div class="p-4">
-                            <ul class="space-y-1 text-[11px]">
-                                {#each Object.entries(p.settings) as [k, v] (`${p.name}-${k}`)}
-                                    <li class="flex gap-2">
-                                        <span class="min-w-40 break-all text-slate-500"
-                                            >{k}</span>
-                                        <span class="break-all text-slate-300">
-                                            {#if v == null}
-                                                <span class="text-slate-600 italic"
-                                                    >(unset)</span>
-                                            {:else if typeof v === "string"}
-                                                {v}
-                                            {:else}
-                                                {JSON.stringify(v)}
-                                            {/if}
-                                        </span>
-                                    </li>
-                                {/each}
-                            </ul>
-                        </div>
-                    </div>
-                {/each}
-                {#if !data.profiles.length && !loading}<p
-                        class="text-xs text-slate-500">
-                        No profiles loaded.
-                    </p>{/if}
-            </div>
+        {#if hasChanges}
+            <p class="text-[11px] text-slate-400">
+                Unsaved changes detected. Save to persist updates.
+            </p>
+        {/if}
+    </div>
+
+    <div class="space-y-2">
+        <h4
+            class="flex items-center gap-2 text-sm font-medium tracking-wide text-slate-200">
+            <Languages class="inline h-4 w-4 text-slate-400" /> AniList Title Language
+        </h4>
+        <p class="text-[11px] leading-relaxed text-slate-500">
+            Choose which title language to prefer. Stored only in this browser.
+        </p>
+        <div class="flex flex-wrap gap-2">
+            {#each LANG_OPTS as opt (opt)}
+                <button
+                    type="button"
+                    onclick={() => setLang(opt)}
+                    class={`rounded-md border px-3 py-1.5 text-[11px] font-medium ${$anilistTitleLang === opt ? "border-blue-500 bg-blue-600 text-white" : "border-slate-700 bg-slate-800/60 text-slate-300 hover:bg-slate-700/60"}`}
+                    >{opt[0].toUpperCase() + opt.slice(1)}</button>
+            {/each}
         </div>
+        <p class="text-[10px] text-slate-500">
+            Current preference:
+            <span class="font-medium text-slate-300">
+                {$anilistTitleLang === "userPreferred"
+                    ? "AniList Preferred"
+                    : $anilistTitleLang}
+            </span>
+        </p>
     </div>
 </div>

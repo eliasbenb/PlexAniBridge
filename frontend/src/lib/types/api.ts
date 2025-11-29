@@ -138,6 +138,25 @@ export interface SettingsResponse {
     profiles: SettingsProfile[];
 }
 
+export interface ConfigDocumentResponse {
+    config_path: string;
+    file_exists: boolean;
+    content: string;
+    mtime?: number | null;
+}
+
+export interface ConfigDocumentUpdateRequest {
+    content: string;
+    expected_mtime?: number | null;
+}
+
+export interface ConfigUpdateResponse {
+    ok: boolean;
+    profiles: string[];
+    requires_restart: boolean;
+    mtime?: number | null;
+}
+
 export interface AboutInfo {
     version: string;
     git_hash: string;
