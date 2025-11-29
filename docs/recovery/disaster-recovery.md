@@ -11,7 +11,7 @@ Given that software will always be susceptible to bugs, AniBridge offers multipl
 
 ## Backups
 
-AniBridge creates a JSON snapshot of the current AniList list data on startup and on a daily schedule. These backups are stored under the data folder (defined in `AB_DATA_PATH`) in the `backups` directory as JSON files named like:
+AniBridge creates a JSON snapshot of the current AniList list data on startup and on a daily schedule. These backups are stored under the data folder in the `backups` directory as JSON files named like:
 
 ```
 anibridge-<PROFILE_NAME>.<YYYYMMDDHHMMSS>.json

@@ -748,9 +748,11 @@
                 </Tabs.Content>
                 <Tabs.Content value="json">
                     <CodeEditor
-                        bind:value={rawJson}
-                        jsonSchema={mappingSchema}
-                        performanceMode={true} />
+                        bind:content={rawJson}
+                        language="json"
+                        schemas={[
+                            { uri: "", schema: mappingSchema, fileMatch: ["*"] },
+                        ]} />
                     {#if jsonError}
                         <p class="mt-2 text-xs text-rose-300">{jsonError}</p>
                     {/if}

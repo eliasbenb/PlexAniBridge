@@ -20,8 +20,8 @@ class ProfileConfigModel(BaseModel):
     list_namespace: str
     library_user: str | None = None
     list_user: str | None = None
-    sync_interval: int | None = None
-    sync_modes: list[str] = []
+    scan_interval: int | None = None
+    scan_modes: list[str] = []
     full_scan: bool | None = None
     destructive_sync: bool | None = None
 

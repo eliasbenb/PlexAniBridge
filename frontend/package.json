@@ -43,6 +43,7 @@
         "@lucide/svelte": "^0.552.0",
         "bits-ui": "^2.14.4",
         "monaco-editor": "^0.54.0",
+        "monaco-yaml": "^5.4.0",
         "tailwind-merge": "^3.4.0"
     },
     "pnpm": {

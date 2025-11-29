@@ -95,8 +95,8 @@ export interface ProfileConfig {
     list_namespace?: string;
     library_user?: string | null;
     list_user?: string | null;
-    sync_interval?: number | null;
-    sync_modes?: string[];
+    scan_interval?: number | null;
+    scan_modes?: string[];
     full_scan?: boolean | null;
     destructive_sync?: boolean | null;
     batch_requests?: boolean | null;
@@ -136,6 +136,25 @@ export interface SettingsProfile {
 export interface SettingsResponse {
     global_config: Record<string, unknown>;
     profiles: SettingsProfile[];
+}
+
+export interface ConfigDocumentResponse {
+    config_path: string;
+    file_exists: boolean;
+    content: string;
+    mtime?: number | null;
+}
+
+export interface ConfigDocumentUpdateRequest {
+    content: string;
+    expected_mtime?: number | null;
+}
+
+export interface ConfigUpdateResponse {
+    ok: boolean;
+    profiles: string[];
+    requires_restart: boolean;
+    mtime?: number | null;
 }
 
 export interface AboutInfo {

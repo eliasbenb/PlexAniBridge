@@ -62,7 +62,7 @@ class BackupService:
     def _backup_dir(self, profile: str) -> Path:
         """Get the backup directory for a profile."""
         bridge = self._get_profile_bridge(profile)
-        return bridge.profile_config.data_path / "backups"
+        return bridge.global_config.data_path / "backups"
 
     def list_backups(self, profile: str) -> list[BackupMeta]:
         """Enumerate available backups for a profile.

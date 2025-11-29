@@ -47,14 +47,11 @@ def validate_configuration():
     """
     config = get_config()
     try:
-        profile_count = len(config.profiles)
-        profile_names = list(config.profiles.keys())
+        if len(config.profiles) == 0:
+            log.warning("AniBridge: No sync profiles configured")
+            return True
 
-        if profile_count == 0:
-            log.error("AniBridge: No sync profiles configured")
-            return False
-
-        for profile_name in profile_names:
+        for profile_name in config.profiles:
             try:
                 profile_config = config.get_profile(profile_name)
                 log.info(f"AniBridge: Profile $$'{profile_name}'$$: {profile_config!s}")

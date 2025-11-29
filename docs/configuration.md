@@ -5,61 +5,55 @@ icon: material/cog
 
 ## Example
 
-Below is an example `.env` file for AniBridge:
+AniBridge reads configuration from a YAML file named `config.yaml` that lives
+inside the data directory `$AB_DATA_PATH` (defaults to `./data` or `/config` when
+using the official Docker image).
 
-```dosini title=".env"
---8<-- ".env.example"
+A config editor is also available through the web UI.
+
+```yaml title="config.yaml"
+--8<-- "data/config.example.yaml"
 ```
-
-??? tip "YAML Configuration"
-
-    If you prefer YAML configuration, you can create a `config.yaml` file in the data directory. The settings will be automatically loaded from there. Example:
-
-    ```yaml title="config.yaml"
-    --8<-- "data/config.example.yaml"
-    ```
-
-    The order of precedence when loading settings is:
-
-    1. Environment variables
-    2. `.env` file in the current working directory
-    3. `config.yaml` file in the data directory
 
 ## Configuration Hierarchy
 
 Settings are applied in the following order:
 
 1. **Profile-specific settings** (highest priority)
-2. **Global default settings** (medium priority)
+2. **Global shared settings** (medium priority)
 3. **Built-in defaults** (lowest priority)
 
-For example, if `AB_SYNC_INTERVAL=900` is set globally and `AB_PROFILES__personal__SYNC_INTERVAL=1800` is set for a specific profile, the profile named 'personal' will use 1800 seconds as the sync interval while other profiles will use 900 seconds. If `AB_PROFILES__personal__SYNC_INTERVAL` is unset it falls back to the application's built-in default of 86400 seconds (24 hours).
+For example, if `sync_interval: 900` is defined globally and
+`profiles.personal.sync_interval: 1800` overrides it for a specific profile, the
+profile named `personal` will use `1800` seconds while other profiles keep the
+global value of `900`. If `profiles.personal.sync_interval` is omitted it falls
+back to the application's built-in default of `86400` seconds (24 hours).
 
 ## Shared Settings
 
 These settings can be defined globally or overridden on a per-profile basis.
 
-### `LIBRARY_PROVIDER`
+### `library_provider`
 
 `str` (default: `plex`)
 
 Specifies the media library provider to use. Currently, `plex` is the only built-in option.
 
-Load third-party providers via the [`PROVIDER_MODULES`](#provider_modules) setting.
+Load third-party providers via the [`provider_modules`](#provider_modules) setting.
 
 ---
 
-### `LIST_PROVIDER`
+### `list_provider`
 
 `str` (default: `anilist`)
 
 Specifies the list provider to use. Currently, `anilist` is the only built-in option.
 
-Load third-party providers via the [`PROVIDER_MODULES`](#provider_modules) setting.
+Load third-party providers via the [`provider_modules`](#provider_modules) setting.
 
 ---
 
-### `SYNC_INTERVAL`
+### `sync_interval`
 
 `int` (Optional, default: `86400`)
 
@@ -67,7 +61,7 @@ Interval in seconds to sync when using the `periodic` [sync mode](#sync_modes)
 
 ---
 
-### `SYNC_MODES`
+### `sync_modes`
 
 `list[Enum("periodic", "poll", "webhook")]` (Optional, default: `["periodic", "poll", "webhook"]`)
 
@@ -77,9 +71,9 @@ Determines the triggers for scanning:
 - `poll`: Poll for changes every 30 seconds, making incremental updates.
 - `webhook`: Trigger syncs via [webhook payloads](https://support.plex.tv/articles/115002267687-webhooks/).
 
-Setting `SYNC_MODES` to `None` or an empty list will cause the application to perform a single scan on startup and then exit.
+Setting `sync_modes` to `None` or an empty list will cause the application to perform a single scan on startup and then exit.
 
-By default, all three modes are enabled, allowing for instant, incremental updates via polling and webhooks, as well as a full periodic scan every [`SYNC_INTERVAL`](#sync_interval) seconds (default: 24 hours) to catch any failed/missed updates.
+By default, all three modes are enabled, allowing for instant, incremental updates via polling and webhooks, as well as a full periodic scan every [`sync_interval`](#sync_interval) seconds (default: 24 hours) to catch any failed/missed updates.
 
 !!! info "Webhooks"
 
@@ -87,7 +81,7 @@ By default, all three modes are enabled, allowing for instant, incremental updat
 
     _Note: not all library providers may support webhooks._
 
-### `FULL_SCAN`
+### `full_scan`
 
 `bool` (Optional, default: `False`)
 
@@ -95,13 +89,13 @@ When enabled, the scan process will include all items, regardless of watch activ
 
 !!! warning "Recommended Usage"
 
-    Full scans are generally **not recommended** unless combined with [`DESTRUCTIVE_SYNC`](#destructive_sync) to delete AniList entries for unwatched Plex content.
+    Full scans are generally **not recommended** unless combined with [`destructive_sync`](#destructive_sync) to delete AniList entries for unwatched Plex content.
 
-    Enabling `FULL_SCAN` can lead to **excessive API usage** and **longer processing times**.
+    Enabling `full_scan` can lead to **excessive API usage** and **longer processing times**.
 
 ---
 
-### `DESTRUCTIVE_SYNC`
+### `destructive_sync`
 
 `bool` (Optional, default: `False`)
 
@@ -120,7 +114,7 @@ Allows regressive updates and deletions, which **can cause data loss**.
 
 ---
 
-### `EXCLUDED_SYNC_FIELDS`
+### `excluded_sync_fields`
 
 `list[Enum("status", "progress", "repeats", "review", "user_rating", "started_at", "finished_at")]` (Optional, default: `["review", "user_rating"]`)
 
@@ -140,7 +134,7 @@ Specifies which fields should **not** be synced. Available fields:
 
 ---
 
-### `DRY_RUN`
+### `dry_run`
 
 `bool` (Optional, default: `False`)
 
@@ -151,11 +145,11 @@ When enabled:
 
 !!! success "First Run"
 
-    Run with `DRY_RUN` enabled on first launch to preview changes without modifying your AniList data.
+    Run with `dry_run` enabled on first launch to preview changes without modifying your AniList data.
 
 ---
 
-### `BACKUP_RETENTION_DAYS`
+### `backup_retention_days`
 
 `int` (Optional, default: `30`)
 
@@ -163,7 +157,7 @@ Controls how many days AniBridge keeps AniList backup snapshots before pruning o
 
 ---
 
-### `BATCH_REQUESTS`
+### `batch_requests`
 
 `bool` (Optional, default: `False`)
 
@@ -174,7 +168,7 @@ When enabled, AniList API requests are made in batches:
 
 This can significantly reduce rate limiting, but at the cost of atomicity. If any request in the batch fails, the entire batch will fail.
 
-For example, if a sync job finds 10 items to update with `BATCH_REQUESTS` enabled, all 10 requests will be sent at once. If any of the requests fail, all 10 updates will fail.
+For example, if a sync job finds 10 items to update with `batch_requests` enabled, all 10 requests will be sent at once. If any of the requests fail, all 10 updates will fail.
 
 !!! success "First Run"
 
@@ -184,7 +178,7 @@ For example, if a sync job finds 10 items to update with `BATCH_REQUESTS` enable
 
 ---
 
-### `SEARCH_FALLBACK_THRESHOLD`
+### `search_fallback_threshold`
 
 `int` (Optional, default: `-1`)
 
@@ -198,7 +192,7 @@ The higher the value, the more strict the title matching. A value of `100` requi
 
 Providers may consume additional configuration options. Refer to the documentation of each provider for details. Here are sample configuration options for the built-in providers:
 
-### LIBRARY_PROVIDER: `plex`
+### library_provider: `plex`
 
 Documentation: [anibridge/anibridge-plex-provider](https://github.com/anibridge/anibridge-plex-provider)
 
@@ -212,7 +206,7 @@ providers:
         genres: []
 ```
 
-### LIST_PROVIDER: `anilist`
+### list_provider: `anilist`
 
 Documentation: [anibridge/anibridge-anilist-provider](https://github.com/anibridge/anibridge-anilist-provider)
 
@@ -226,15 +220,7 @@ providers:
 
 These global settings cannot be overridden on the profile level and apply to all profiles.
 
-### `DATA_PATH`
-
-`str` (Optional, default: `./data`)
-
-Path to store the database, backups, and custom mappings. This is shared across all profiles.
-
----
-
-### `LOG_LEVEL`
+### `log_level`
 
 `Enum("DEBUG", "INFO", "SUCCESS", "WARNING", "ERROR", "CRITICAL")` (Optional, default: `INFO`)
 
@@ -250,7 +236,7 @@ Sets logging verbosity for the entire application.
 
 ---
 
-### `MAPPINGS_URL`
+### `mappings_url`
 
 `str` (Optional, default: `https://raw.githubusercontent.com/eliasbenb/PlexAniBridge-Mappings/v2/mappings.json`)
 
@@ -268,7 +254,7 @@ This option is only intended for advanced users who want to use their own upstre
 
 ---
 
-### `WEB__ENABLED`
+### `web.enabled`
 
 `bool` (Optional, default: `True`)
 
@@ -276,7 +262,7 @@ When enabled, the [web interface](./web/screenshots.md) is accessible.
 
 ---
 
-### `WEB__HOST`
+### `web.host`
 
 `str` (Optional, default: `0.0.0.0`)
 
@@ -284,7 +270,7 @@ The host address for the web interface.
 
 ---
 
-### `AB__WEB__PORT`
+### `web.port`
 
 `int` (Optional, default: `4848`)
 
@@ -292,7 +278,7 @@ The port for the web interface.
 
 ---
 
-### `AB__WEB__BASIC_AUTH__USERNAME`
+### `web.basic_auth.username`
 
 `str` (Optional, default: `None`)
 
@@ -300,7 +286,7 @@ HTTP Basic Authentication username for the web UI. Basic Auth is enabled only wh
 
 ---
 
-### `AB__WEB__BASIC_AUTH__PASSWORD`
+### `web.basic_auth.password`
 
 `str` (Optional, default: `None`)
 
@@ -308,13 +294,13 @@ HTTP Basic Authentication password for the web UI. Basic Auth is enabled only wh
 
 ---
 
-### `AB__WEB__BASIC_AUTH__HTPASSWD_PATH`
+### `web.basic_auth.htpasswd_path`
 
 `str` (Optional, default: `None`)
 
 Path to an [Apache `htpasswd`](https://httpd.apache.org/docs/current/programs/htpasswd.html) file containing user credentials for HTTP Basic Authentication. When set, the web UI validates requests against this file. Only **bcrypt** (recommended) and **SHA1** hashed passwords are supported.
 
-Providing an `htpasswd` file allows you to manage multiple users and rotate passwords without exposing plaintext credentials in the configuration. You may still set `AB_WEB_BASIC_AUTH_USERNAME` and `AB_WEB_BASIC_AUTH_PASSWORD`; both authentication methods will be accepted.
+Providing an `htpasswd` file allows you to manage multiple users and rotate passwords without exposing plaintext credentials in the configuration.
 
 !!! tip "Generate htpasswd entries"
 
@@ -341,7 +327,7 @@ Providing an `htpasswd` file allows you to manage multiple users and rotate pass
 
 ---
 
-### `AB__WEB__BASIC_AUTH__REALM`
+### `web.basic_auth.realm`
 
 `str` (Optional, default: `AniBridge`)
 
@@ -353,28 +339,43 @@ Realm label presented in the browser Basic Auth prompt and `WWW-Authenticate` re
 
 This example demonstrates configuring three distinct profiles, each with their own AniList accounts, Plex users, and customized sync preferences.
 
-```dosini
+```yaml
 # Global defaults shared by all profiles
-AB_LIBRARY_PROVIDER=plex
-AB_LIST_PROVIDER=anilist
-AB_PROVIDERS__PLEX__TOKEN=admin_plex_token
-AB_PROVIDERS__PLEX__URL=http://localhost:32400
-AB_SYNC_MODES=["periodic"]
+library_provider: plex
+list_provider: anilist
+providers:
+    plex:
+        token: admin_plex_token
+        url: http://localhost:32400
+sync_modes: ["periodic"]
 
-# Admin user - aggressive sync with full features
-AB_PROFILES__admin__PROVIDERS__ANILIST__TOKEN=admin_anilist_token
-AB_PROFILES__admin__PROVIDERS__PLEX__USER=admin_plex_user
-AB_PROFILES__admin__DESTRUCTIVE_SYNC=True
-AB_PROFILES__admin__EXCLUDED_SYNC_FIELDS=[]
-
-# Family member - typical sync
-AB_PROFILES__family__PROVIDERS__ANILIST__TOKEN=family_anilist_token
-AB_PROFILES__family__PROVIDERS__PLEX__USER=family_plex_user
-
-# Guest user - minimal sync
-AB_PROFILES__guest__PROVIDERS__ANILIST__TOKEN=guest_anilist_token
-AB_PROFILES__guest__PROVIDERS__PLEX__USER=guest_plex_user
-AB_PROFILES__guest__EXCLUDED_SYNC_FIELDS=["notes", "score", "repeats", "started_at", "finished_at"]
+profiles:
+    admin:
+        providers:
+            anilist:
+                token: admin_anilist_token
+            plex:
+                user: admin_plex_user
+        destructive_sync: true
+        excluded_sync_fields: []
+    family:
+        providers:
+            anilist:
+                token: family_anilist_token
+            plex:
+                user: family_plex_user
+    guest:
+        providers:
+            anilist:
+                token: guest_anilist_token
+            plex:
+                user: guest_plex_user
+        excluded_sync_fields:
+            - notes
+            - score
+            - repeats
+            - started_at
+            - finished_at
 ```
 
 ### Per-Library Profiles
@@ -383,20 +384,27 @@ This example shows how to create separate profiles for different Plex libraries,
 
 ```dosini
 # Global defaults shared by all profiles
-AB_LIBRARY_PROVIDER=plex
-AB_LIST_PROVIDER=anilist
-AB_PROVIDERS__ANILIST__TOKEN=global_anilist_token
-AB_PROVIDERS__PLEX__TOKEN=admin_plex_token
-AB_PROVIDERS__PLEX__USER=admin_plex_user
-AB_PROVIDERS__PLEX__URL=http://localhost:32400
+library_provider: plex
+list_provider: anilist
+providers:
+    anilist:
+        token: global_anilist_token
+    plex:
+        token: admin_plex_token
+        user: admin_plex_user
+        url: http://localhost:32400
 
-# Movies library - aggressive sync with full features
-AB_PROFILES__movies__PROVIDERS__PLEX__SECTIONS=["Anime Movies"]
-AB_PROFILES__movies__FULL_SCAN=True
-AB_PROFILES__movies__SYNC_INTERVAL=1800
-AB_PROFILES__movies__EXCLUDED_SYNC_FIELDS=[]
-
-# TV Shows library - more conservative with updates
-AB_PROFILES__tvshows__PROVIDERS__PLEX__SECTIONS=["Anime"]
-AB_PROFILES__tvshows__SYNC_MODES=["periodic"]
+profiles:
+    movies:
+        providers:
+            plex:
+                sections: ["Anime Movies"]
+        full_scan: true
+        sync_interval: 1800
+        excluded_sync_fields: []
+    tvshows:
+        providers:
+            plex:
+                sections: ["Anime"]
+        sync_modes: ["periodic"]
 ```

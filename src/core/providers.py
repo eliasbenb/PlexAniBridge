@@ -53,7 +53,7 @@ def build_library_provider(profile: AniBridgeProfileConfig) -> LibraryProvider:
     _import_modules(_collect_module_overrides(profile.parent))
 
     namespace = profile.library_provider
-    config = profile.providers.get(namespace)
+    config = profile.provider_config.get(namespace)
 
     try:
         return library_registry.create(namespace, config=config)
@@ -77,7 +77,7 @@ def build_list_provider(profile: AniBridgeProfileConfig) -> ListProvider:
     _import_modules(_collect_module_overrides(profile.parent))
 
     namespace = profile.list_provider
-    config = profile.providers.get(namespace)
+    config = profile.provider_config.get(namespace)
 
     try:
         return list_registry.create(namespace, config=config)

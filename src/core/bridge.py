@@ -145,7 +145,7 @@ class BridgeClient:
             f"{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}.json"
         )
         target_path = (
-            self.profile_config.data_path / "backups" / self.profile_name / target_fname
+            self.global_config.data_path / "backups" / self.profile_name / target_fname
         )
 
         try:

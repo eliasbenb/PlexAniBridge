@@ -3,6 +3,7 @@
 from fastapi.routing import APIRouter
 
 from src.web.routes.api.backups import router as backups_router
+from src.web.routes.api.config import router as config_router
 from src.web.routes.api.history import router as history_router
 from src.web.routes.api.logs import router as logs_history_router
 from src.web.routes.api.mappings import router as mappings_router
@@ -24,3 +25,4 @@ router.include_router(logs_history_router, prefix="/logs", tags=["logs"])
 router.include_router(status_router, prefix="/status", tags=["status"])
 router.include_router(sync_router, prefix="/sync", tags=["sync"])
 router.include_router(system_router, prefix="/system", tags=["system"])
+router.include_router(config_router, prefix="/config", tags=["config"])

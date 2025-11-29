@@ -71,10 +71,6 @@ docker run \
     -e PGID=1000 \
     -e UMASK=022 \
     -e TZ=Etc/UTC \
-    -e AB_ANILIST_TOKEN=... \
-    -e AB_PLEX_TOKEN=... \
-    -e AB_PLEX_USER=... \
-    -e AB_PLEX_URL=... \
     -p 4848:4848 \
     -v /path/to/anibridge/data:/config \
     ghcr.io/eliasbenb/plexanibridge:v1
