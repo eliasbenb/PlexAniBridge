@@ -1,34 +1,35 @@
 #== Shared Settings ==#
-# list_provider: anilist
-# library_provider: plex
-# sync_interval: 86400
-# sync_modes: ["periodic", "poll", "webhook"]
-# full_scan: false
-# destructive_sync: false
-# excluded_sync_fields: ["review", "user_rating"]
-# dry_run: false
-# backup_retention_days: 30
-# batch_requests: false
-# search_fallback_threshold: -1
+# global_config:
+    # list_provider: anilist
+    # library_provider: plex
 
-#== Provider Settings ==#
-# providers:
-#     anilist:
-#         token: ...
-#     plex:
-#         url: ...
-#         token: ...
-#         user: ...
-#         sections: []
-#         genres: []
+    # scan_interval: 86400
+    # scan_modes: ["periodic", "poll", "webhook"]
+    # full_scan: false
+    # destructive_sync: false
+    # excluded_sync_fields: ["review", "user_rating"]
+    # dry_run: false
+    # backup_retention_days: 30
+    # batch_requests: false
+    # search_fallback_threshold: -1
+
+    #== Provider Settings ==#
+    # provider_config:
+    #     anilist:
+    #         token: ...
+    #     plex:
+    #         url: ...
+    #         token: ...
+    #         user: ...
+    #         sections: []
+    #         genres: []
 
 #== Profile Settings ==#
 # profiles:
 #     example:
 #         $field: $value
 
-#== Global Settings ==#
-# data_path: "./data"
+#== App Settings ==#
 # log_level: "INFO"
 # mappings_url: "https://raw.githubusercontent.com/eliasbenb/PlexAniBridge-Mappings/v2/mappings.json"
 # provider_modules: []
