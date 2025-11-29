@@ -1,8 +1,5 @@
 """AniBridge Initialization Module."""
 
-import os
-import uuid
-
 from src.config.settings import get_config
 from src.utils.logging import get_logger
 from src.utils.terminal import supports_utf8
@@ -52,16 +49,3 @@ else:
 |                                                                               |
 +-------------------------------------------------------------------------------+
     """.strip()
-
-# The below environment variables are consumed by the python-plexapi library
-# and are used to identify the client making the requests to the Plex server.
-# Having a consistent identifier is important so that the server doesn't think
-# the client is a new one every time it starts (which causes "New Device"
-# notifications)
-os.environ["PLEXAPI_HEADER_IDENTIFIER"] = uuid.uuid3(
-    uuid.NAMESPACE_DNS, "AniBridge"
-).hex
-os.environ["PLEXAPI_HEADER_DEVICE_NAME"] = "AniBridge"
-os.environ["PLEXAPI_HEADER_VERSION"] = __version__
-os.environ["PLEXAPI_HEADER_PROVIDES"] = ""
-os.environ["PLEXAPI_PLEXAPI_AUTORELOAD"] = "0"

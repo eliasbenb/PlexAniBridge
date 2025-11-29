@@ -521,8 +521,8 @@
                                     meta={PINNED_META}
                                     displayTitle={timelineDisplayTitle}
                                     coverImage={timelineCoverImage}
-                                    anilistUrl={timelineListUrl}
-                                    plexUrl={timelineLibraryUrl}
+                                    listUrl={timelineListUrl}
+                                    libraryUrl={timelineLibraryUrl}
                                     hasPins={true}
                                     togglePins={() => toggleRow(rowKey)}
                                     openPins={expanded[rowKey] || false}
@@ -596,8 +596,8 @@
                                     {meta}
                                     displayTitle={timelineDisplayTitle}
                                     coverImage={timelineCoverImage}
-                                    anilistUrl={timelineListUrl}
-                                    plexUrl={timelineLibraryUrl}
+                                    listUrl={timelineListUrl}
+                                    libraryUrl={timelineLibraryUrl}
                                     hasPins={true}
                                     togglePins={() => toggleRow(rowKey)}
                                     openPins={expanded[rowKey] || false}

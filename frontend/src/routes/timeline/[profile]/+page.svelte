@@ -127,11 +127,11 @@
         return item.list_media?.poster_url ?? item.library_media?.poster_url ?? null;
     }
 
-    function anilistUrl(item: HistoryItem) {
+    function listUrl(item: HistoryItem) {
         return item.list_media?.external_url ?? null;
     }
 
-    function plexUrl(item: HistoryItem) {
+    function libraryUrl(item: HistoryItem) {
         return item.library_media?.external_url ?? null;
     }
 
@@ -456,8 +456,8 @@
                 {isProfileRunning}
                 {displayTitle}
                 {coverImage}
-                {anilistUrl}
-                {plexUrl}
+                {listUrl}
+                {libraryUrl}
                 {canRetry}
                 {retryHistory}
                 retryLoading={retryLoading[item.id] || false}

@@ -15,8 +15,6 @@ from src.core.anilist import AniListClient
 __all__ = ["AppState", "get_app_state"]
 
 if TYPE_CHECKING:
-    from plexapi.server import PlexServer
-
     from src.core.sched import SchedulerClient
 
 
@@ -25,7 +23,6 @@ class AppState:
 
     def __init__(self) -> None:
         """Initialize empty state containers and record process start time."""
-        self.plex: PlexServer | None = None
         self.scheduler: SchedulerClient | None = None
         self.public_anilist: AniListClient | None = None
         self.on_shutdown_callbacks: list[Callable[[], Any]] = []

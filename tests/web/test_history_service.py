@@ -84,7 +84,7 @@ class DummyLibrarySection:
 class DummyLibraryProvider:
     """Library provider double that scopes to a single section."""
 
-    NAMESPACE = "plex"
+    NAMESPACE = "_dummy-library"
 
     def __init__(self) -> None:
         """Initialize the provider with one default section."""
@@ -135,7 +135,7 @@ def _seed_history_row(*, clear: bool = True, **overrides) -> int:
             ctx.session.commit()
         payload = {
             "profile_name": "profile",
-            "library_namespace": "plex",
+            "library_namespace": "_dummy-library",
             "library_section_key": "1",
             "library_media_key": "lib1",
             "list_namespace": "alist",
@@ -291,7 +291,7 @@ async def test_history_service_fetch_helpers_handle_mismatches(history_env):
     assert list_result == {}
 
     library_result = await service._fetch_library_metadata_batch(
-        "profile", "plex", "missing", ("lib1",)
+        "profile", "_dummy-library", "missing", ("lib1",)
     )
     assert library_result == {}
 

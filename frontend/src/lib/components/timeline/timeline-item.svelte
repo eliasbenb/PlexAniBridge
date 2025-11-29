@@ -36,8 +36,8 @@
         meta: OutcomeMeta;
         displayTitle: (item: HistoryItem) => string | null;
         coverImage: (item: HistoryItem) => string | null;
-        anilistUrl?: (item: HistoryItem) => string | null;
-        plexUrl?: (item: HistoryItem) => string | null;
+        listUrl?: (item: HistoryItem) => string | null;
+        libraryUrl?: (item: HistoryItem) => string | null;
         canRetry?: (item: HistoryItem) => boolean;
         retryHistory?: (item: HistoryItem) => void;
         retryLoading?: boolean;
@@ -70,8 +70,8 @@
         meta,
         displayTitle,
         coverImage,
-        anilistUrl = () => null,
-        plexUrl = () => null,
+        listUrl = () => null,
+        libraryUrl = () => null,
         canRetry = () => false,
         retryHistory = () => undefined,
         retryLoading = false,
@@ -112,7 +112,7 @@
             new SvelteURLSearchParams({ q: `anilist:${id}` }).toString()
         );
     }
-    const coverHref = anilistUrl(item);
+    const coverHref = listUrl(item);
 
     const fallbackDiffUi: ItemDiffUi = {
         tab: "changes",
@@ -208,32 +208,32 @@
                     <div
                         class="chip-scroll space-y-1 overflow-x-auto mask-[linear-gradient(to_right,black,black_calc(100%-10px),transparent)] whitespace-nowrap">
                         <div class="flex items-center gap-1 text-[10px] text-slate-300">
-                            {#if anilistUrl(item)}
+                            {#if listUrl(item)}
                                 <!-- eslint-disable svelte/no-navigation-without-resolve -->
                                 <a
-                                    href={anilistUrl(item)!}
+                                    href={listUrl(item)!}
                                     target="_blank"
                                     rel="noopener"
                                     class="inline-flex items-center gap-1 rounded-md border border-sky-600/60 bg-sky-700/50 px-1.5 py-0.5 text-[10px] font-semibold text-sky-100 hover:bg-sky-600/60"
-                                    title="Open in AniList">
+                                    title="Open in List">
                                     <ExternalLink
                                         class="inline h-3.5 w-3.5 text-[11px]" />
-                                    AniList
+                                    {item.list_namespace || "List"}
                                 </a>
                                 <!-- eslint-enable svelte/no-navigation-without-resolve -->
                             {/if}
 
-                            {#if plexUrl(item)}
+                            {#if libraryUrl(item)}
                                 <!-- eslint-disable svelte/no-navigation-without-resolve -->
                                 <a
-                                    href={plexUrl(item)!}
+                                    href={libraryUrl(item)!}
                                     target="_blank"
                                     rel="noopener"
                                     class="inline-flex items-center gap-1 rounded-md border border-amber-600 bg-amber-700/60 px-1.5 py-0.5 text-[10px] text-amber-100 transition-colors hover:bg-amber-600/60"
-                                    title="Open in Plex">
+                                    title="Open in Library">
                                     <ExternalLink
                                         class="inline h-3.5 w-3.5 text-[11px]" />
-                                    Plex
+                                    {item.library_namespace || "Library"}
                                 </a>
                                 <!-- eslint-enable svelte/no-navigation-without-resolve -->
                             {/if}
@@ -261,18 +261,6 @@
                                 <span
                                     class="inline-flex items-center rounded bg-slate-800/70 px-1.5 py-0.5 tracking-wide text-slate-400 uppercase">
                                     {item.media_kind}
-                                </span>
-                            {/if}
-                            {#if item.list_namespace}
-                                <span
-                                    class="inline-flex items-center rounded bg-slate-800/70 px-1.5 py-0.5 text-slate-400 uppercase">
-                                    LIST: {item.list_namespace}
-                                </span>
-                            {/if}
-                            {#if item.library_namespace}
-                                <span
-                                    class="inline-flex items-center rounded bg-slate-800/70 px-1.5 py-0.5 text-slate-400 uppercase">
-                                    LIB: {item.library_namespace}
                                 </span>
                             {/if}
                         </div>

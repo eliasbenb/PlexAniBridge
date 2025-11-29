@@ -66,7 +66,7 @@ class MediaTypeError(AniBridgeError):
 
 
 class UnsupportedMediaTypeError(MediaTypeError, ValueError):
-    """A media object or enum is not one of the supported Plex types."""
+    """A media object or enum is not one of the supported library media types."""
 
     status_code = 400
 
@@ -76,12 +76,6 @@ class AniListError(AniBridgeError):
     """Base class for AniList-related failures."""
 
     status_code = 500
-
-
-class AniListTokenRequiredError(AniListError, RuntimeError):
-    """Operation requires an authenticated AniList client (token)."""
-
-    status_code = 401
 
 
 class AniListQueryError(AniListError):
@@ -100,31 +94,6 @@ class AniListSearchError(AniListQueryError):
     """AniList search failed or returned an unexpected response."""
 
     status_code = 502
-
-
-# Plex client errors
-class PlexError(AniBridgeError):
-    """Base class for Plex-related failures."""
-
-    status_code = 500
-
-
-class PlexUserNotFoundError(PlexError, ValueError):
-    """Unable to resolve the target Plex user among available users."""
-
-    status_code = 404
-
-
-class PlexClientNotInitializedError(PlexError, RuntimeError):
-    """Operations requiring a Plex user/admin client were attempted too early."""
-
-    status_code = 503
-
-
-class InvalidGuidError(PlexError, ValueError):
-    """A required Plex GUID was missing or empty."""
-
-    status_code = 400
 
 
 # Scheduler errors

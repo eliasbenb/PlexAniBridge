@@ -74,7 +74,7 @@ class ItemIdentifier(BaseModel):
 
     @classmethod
     def from_items(cls, items: Sequence[LibraryMedia]) -> Sequence[ItemIdentifier]:
-        """Create ItemIdentifiers from a list of Plex media objects.
+        """Create ItemIdentifiers from a sequence of library media objects.
 
         Args:
             items (Sequence[LibraryMedia]): List of library media objects

@@ -2,9 +2,9 @@
 
 from fastapi.routing import APIRouter
 
-from .provider import router as provider_router
+from src.web.routes.webhook.provider import router as provider_router
 
 __all__ = ["router"]
 
 router = APIRouter()
-router.include_router(provider_router, prefix="", tags=["plex"])
+router.include_router(provider_router, prefix="")
