@@ -132,12 +132,11 @@ async def _fetch_list_metadata(
 def _search_result_metadata(namespace: str, entry: ListEntry) -> ProviderMediaMetadata:
     media = entry.media()
     title = media.title or entry.title or None
-    poster = getattr(media, "poster_image", None)
     return ProviderMediaMetadata(
         namespace=namespace,
         key=media.key,
         title=title,
-        poster_url=poster,
+        poster_url=media.poster_image,
     )
 
 

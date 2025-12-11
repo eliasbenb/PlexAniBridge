@@ -1,8 +1,6 @@
 """Sync history service with TTL caching."""
 
-import logging
 from collections import defaultdict
-from collections.abc import Sequence
 from functools import lru_cache
 from typing import TYPE_CHECKING, Any
 
@@ -30,8 +28,6 @@ if TYPE_CHECKING:
     from src.core.bridge import BridgeClient
 
 __all__ = ["HistoryService", "get_history_service"]
-
-logger = logging.getLogger(__name__)
 
 
 class HistoryItem(BaseModel):
@@ -121,7 +117,7 @@ class HistoryService:
         if namespace != provider.NAMESPACE:
             return {}
 
-        sections: Sequence[LibrarySection] = await provider.get_sections()
+        sections = await provider.get_sections()
         target_sections: list[LibrarySection]
         if section_key is None:
             target_sections = list(sections)
@@ -162,7 +158,6 @@ class HistoryService:
                 .all()
             )
             stats = {str(outcome): count for outcome, count in stats_rows}
-            logger.debug(f"Stats for profile {profile}: {stats}")
             return stats
 
     async def get_page(
@@ -191,12 +186,6 @@ class HistoryService:
             SchedulerNotInitializedError: If the scheduler is not running.
             ProfileNotFoundError: If the profile is unknown.
         """
-        logger.debug(
-            f"get_page(profile={profile}, page={page}, "
-            f"per_page={per_page}, outcome={outcome}, include_list_media="
-            f"{include_list_media}, include_library_media={include_library_media})"
-        )
-
         base_filters = [SyncHistory.profile_name == profile]
         if outcome:
             base_filters.append(SyncHistory.outcome == outcome)
@@ -319,9 +308,6 @@ class HistoryService:
             pages=(total + per_page - 1) // per_page,
             stats=stats,
         )
-        logger.debug(
-            f"Returning {len(dto_items)} items (total={total}, pages={page_obj.pages})"
-        )
         return page_obj
 
     async def delete_item(self, profile: str, item_id: int) -> None:
@@ -334,7 +320,7 @@ class HistoryService:
         Raises:
             HistoryItemNotFoundError: If the item does not exist.
         """
-        logger.info(f"Deleting history item id={item_id} for profile {profile}")
+        log.info(f"Deleting history item id={item_id} for profile {profile}")
         with db() as ctx:
             row = (
                 ctx.session.query(SyncHistory)
@@ -364,7 +350,7 @@ class HistoryService:
             ProfileNotFoundError: If the profile is unknown.
             HistoryItemNotFoundError: If the specified item does not exist.
         """
-        logger.info(f"Undoing history item id={item_id} for profile {profile}")
+        log.info(f"Undoing history item id={item_id} for profile {profile}")
         bridge = self._get_bridge(profile)
         list_provider = bridge.list_provider
 

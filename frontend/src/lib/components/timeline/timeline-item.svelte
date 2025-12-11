@@ -190,7 +190,7 @@
                 No Art
             </div>
         {/if}
-        <div class="flex max-h-[78px] min-w-0 flex-1 flex-col overflow-hidden">
+        <div class="flex max-h-19.5 min-w-0 flex-1 flex-col overflow-hidden">
             <header class="flex items-start gap-2">
                 <div class="min-w-0 flex-1 space-y-1.5">
                     <div class="flex items-center gap-x-2 gap-y-1 whitespace-nowrap">

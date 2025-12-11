@@ -334,22 +334,22 @@ class AniMapClient:
 
     def get_mappings(
         self,
-        imdb: str | list[str] | None = None,
-        tmdb: int | list[int] | None = None,
-        tvdb: int | list[int] | None = None,
         anidb: int | list[int] | None = None,
         anilist: int | list[int] | None = None,
+        imdb: str | list[str] | None = None,
         mal: int | list[int] | None = None,
+        tmdb: int | list[int] | None = None,
+        tvdb: int | list[int] | None = None,
     ) -> Iterator[AniMap]:
         """Retrieve anime ID mappings based on provided criteria.
 
         Args:
-            imdb (str | list[str] | None): IMDB ID(s) to search for
-            tmdb (int | list[int] | None): TMDB ID(s) to search for
-            tvdb (int | list[int] | None): TVDB ID(s) to search for
             anidb (int | list[int] | None): AniDB ID(s) to search for
             anilist (int | list[int] | None): AniList ID(s) to search for
+            imdb (str | list[str] | None): IMDB ID(s) to search for
             mal (int | list[int] | None): MyAnimeList ID(s) to search for
+            tmdb (int | list[int] | None): TMDB ID(s) to search for
+            tvdb (int | list[int] | None): TVDB ID(s) to search for
 
         Yields:
             AniMap: Matching AniMap entries
@@ -372,12 +372,12 @@ class AniMapClient:
                     seq = [value]
             return list(dict.fromkeys(seq))
 
-        imdb_list = _normalize_ids(imdb, is_str=True)
-        tmdb_list = _normalize_ids(tmdb)
-        tvdb_list = _normalize_ids(tvdb)
         anidb_list = _normalize_ids(anidb)
         anilist_list = _normalize_ids(anilist)
+        imdb_list = _normalize_ids(imdb, is_str=True)
         mal_list = _normalize_ids(mal)
+        tmdb_list = _normalize_ids(tmdb)
+        tvdb_list = _normalize_ids(tvdb)
 
         if not (
             imdb_list
@@ -391,26 +391,26 @@ class AniMapClient:
             return
 
         ids_string = (
-            f"imdb={imdb_list}, tmdb={tmdb_list}, tvdb={tvdb_list}, "
-            f"anidb={anidb_list}, anilist={anilist_list}, mal={mal_list}"
+            f"anidb={anidb_list}, anilist={anilist_list}, imdb={imdb_list}, "
+            f"mal={mal_list}, tmdb={tmdb_list}, tvdb={tvdb_list}"
         )
         log.debug(f"Querying mapping database with provided IDs: {ids_string}")
 
         or_conditions: list[ColumnElement] = []
 
+        if anidb_list:
+            or_conditions.append(AniMap.anidb_id.in_(anidb_list))
+        if anilist_list:
+            or_conditions.append(AniMap.anilist_id.in_(anilist_list))
         if imdb_list:
             or_conditions.append(json_array_contains(AniMap.imdb_id, imdb_list))
+        if mal_list:
+            or_conditions.append(json_array_contains(AniMap.mal_id, mal_list))
         if tmdb_list:
             or_conditions.append(json_array_contains(AniMap.tmdb_movie_id, tmdb_list))
             or_conditions.append(AniMap.tmdb_show_id.in_(tmdb_list))
         if tvdb_list:
             or_conditions.append(AniMap.tvdb_id.in_(tvdb_list))
-        if anidb_list:
-            or_conditions.append(AniMap.anidb_id.in_(anidb_list))
-        if anilist_list:
-            or_conditions.append(AniMap.anilist_id.in_(anilist_list))
-        if mal_list:
-            or_conditions.append(json_array_contains(AniMap.mal_id, mal_list))
         if not or_conditions:
             return
 
