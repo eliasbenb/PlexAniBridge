@@ -1,5 +1,5 @@
 {
-    "name": "AniBridge",
+    "name": "anibridge",
     "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
     "features": {
         "ghcr.io/devcontainers/features/node:1": {
@@ -40,7 +40,7 @@
             "onAutoForward": "notify"
         }
     },
-    "postCreateCommand": "uv run ab-deps-install",
+    "postCreateCommand": "CI=1 uv run ab-deps-install",
     "containerEnv": {
         "PYTHON_JIT": "1",
         "UV_LINK_MODE": "copy"
