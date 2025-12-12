@@ -1,130 +1,164 @@
-"""AniMap Client."""
+"""Animap client for v3 provider-range mappings."""
 
 import json
-from collections.abc import Iterable, Iterator
+import re
+from dataclasses import dataclass
 from hashlib import md5
 from itertools import batched
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import NamedTuple
 
-from pydantic import ValidationError
-from sqlalchemy.sql import delete, or_, select
+from sqlalchemy.orm import Session
+from sqlalchemy.sql import delete, select, tuple_
 
 from src import log
 from src.config.database import db
 from src.core.mappings import MappingsClient
-from src.models.db.animap import AniMap
+from src.models.db.animap import AnimapEntry, AnimapMapping, AnimapProvenance
 from src.models.db.housekeeping import Housekeeping
-from src.models.db.provenance import AniMapProvenance
-from src.utils.sql import json_array_contains
 
-__all__ = ["AniMapClient"]
+__all__ = ["AnimapClient", "AnimapEdge", "MappingDescriptor", "MappingGraph"]
 
 
-if TYPE_CHECKING:
-    from sqlalchemy.orm import Session
-    from sqlalchemy.sql.elements import ColumnElement
+class AnimapEdge(NamedTuple):
+    """Directed mapping between two provider entries with episode ranges."""
+
+    source: MappingDescriptor
+    destination: MappingDescriptor
+    source_range: str
+    destination_range: str | None
 
 
-class AniMapClient:
-    """Client for managing the AniMap database.
+@dataclass(frozen=True, slots=True)
+class MappingGraph:
+    """Subset of the mapping graph relevant to a lookup request."""
 
-    This client manages a local SQLite database that maps anime IDs between different
-    services (AniList, TVDB, IMDB, etc.). It handles synchronization with the mapping
-    source and provides query capabilities for ID mapping lookups.
+    edges: tuple[AnimapEdge, ...]
 
-    The database is automatically synchronized on client initialization and maintains
-    a hash of the CDN data to minimize unnecessary updates.
+    def descriptors(self) -> tuple[MappingDescriptor, ...]:
+        """Return unique descriptors referenced by the edges.
 
-    Mapping Source:
-        https://github.com/eliasbenb/PlexAniBridge-Mappings
-    """
+        Returns:
+            tuple[MappingDescriptor, ...]: Ordered unique descriptors.
+        """
+        seen: set[str] = set()
+        ordered: list[MappingDescriptor] = []
+        for edge in self.edges:
+            for descriptor in (edge.source, edge.destination):
+                key = descriptor.key()
+                if key in seen:
+                    continue
+                seen.add(key)
+                ordered.append(descriptor)
+        return tuple(ordered)
+
+
+@dataclass(frozen=True, slots=True)
+class MappingDescriptor:
+    """Provider/entry/scope descriptor (e.g., anilist:849:s1)."""
+
+    provider: str
+    entry_id: str
+    scope: str
+
+    _PATTERN = re.compile(
+        r"^(?P<provider>[A-Za-z_][A-Za-z0-9_]*):(?P<entry>[^:]+):(?P<scope>s[0-9]+|movie)$"
+    )
+
+    @classmethod
+    def parse(cls, raw: str) -> MappingDescriptor:
+        """Parse a descriptor string into its components.
+
+        Args:
+            raw (str): Raw descriptor string.
+
+        Returns:
+            MappingDescriptor: Parsed descriptor object.
+        """
+        match = cls._PATTERN.match(raw)
+        if not match:
+            raise ValueError("Invalid mapping descriptor")
+        return cls(
+            provider=match.group("provider"),
+            entry_id=match.group("entry"),
+            scope=match.group("scope"),
+        )
+
+    def key(self) -> str:
+        """Return the canonical descriptor key string."""
+        return f"{self.provider}:{self.entry_id}:{self.scope}"
+
+    def __str__(self) -> str:
+        """Human-readable representation used in logs."""
+        return self.key()
+
+
+class AnimapClient:
+    """Client for managing Animap data using the v3 range-based schema."""
 
     _SQLITE_SAFE_VARIABLES = 900
 
     def __init__(self, data_path: Path, upstream_url: str | None) -> None:
-        """Initializes the AniMapClient.
-
-        Args:
-            data_path (Path): Path to the data directory for storing mappings and cache
-                              files.
-            upstream_url (str | None): URL to the upstream mappings source JSON or YAML
-                                    file. If None, no upstream mappings will be used.
-        """
+        """Create a new Animap client."""
         self.data_path = data_path
         self.upstream_url = upstream_url
         self.mappings_client = MappingsClient(data_path, upstream_url)
+        self._edge_cache: tuple[AnimapEdge, ...] = tuple()
+        self._adjacency: dict[tuple[str, str], tuple[int, ...]] = {}
+        self._lookup_cache: dict[frozenset[tuple[str, str]], MappingGraph] = {}
+        self._cache_version: str | None = None
 
     async def initialize(self) -> None:
-        """Initialize the client by syncing the database.
-
-        This should be called after creating the client instance.
-
-        Raises:
-            Exception: If database synchronization fails during initialization.
-        """
+        """Initialize and immediately sync the local database."""
         try:
             await self.sync_db()
-        except Exception as e:
-            log.error(f"Failed to sync database: {e}", exc_info=True)
+        except Exception as exc:
+            log.error(f"Failed to sync database: {exc}", exc_info=True)
             raise
 
     async def close(self) -> None:
-        """Close the mappings client."""
+        """Close the underlying mappings client session."""
         await self.mappings_client.close()
 
     async def __aenter__(self):
-        """Context manager enter method."""
+        """Enter async context manager."""
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        """Context manager exit method.
-
-        Args:
-            exc_type: Exception type if an exception occurred.
-            exc_val: Exception value if an exception occurred.
-            exc_tb: Traceback object if an exception occurred.
-        """
+        """Exit async context manager and close resources."""
         await self.close()
 
     def _sync_provenance_rows(
-        self,
-        session: Session,
-        provenance_map: dict[int, list[str]],
-        anilist_ids: Iterable[int],
+        self, session: Session, desired: dict[int, list[str]]
     ) -> None:
-        """Ensure provenance rows match the sources observed during load."""
-        target_ids = [
-            anilist_id for anilist_id in anilist_ids if anilist_id in provenance_map
-        ]
-
-        if not target_ids:
+        """Ensure provenance rows align with the desired mapping sources."""
+        mapping_ids = list(desired.keys())
+        if not mapping_ids:
             return
 
         existing: dict[int, list[str]] = {}
-        for chunk in batched(target_ids, self._SQLITE_SAFE_VARIABLES, strict=False):
+        for chunk in batched(mapping_ids, self._SQLITE_SAFE_VARIABLES, strict=False):
             rows = (
                 session.execute(
-                    select(AniMapProvenance)
-                    .where(AniMapProvenance.anilist_id.in_(chunk))
-                    .order_by(AniMapProvenance.anilist_id, AniMapProvenance.n)
+                    select(AnimapProvenance)
+                    .where(AnimapProvenance.mapping_id.in_(chunk))
+                    .order_by(AnimapProvenance.mapping_id, AnimapProvenance.n)
                 )
                 .scalars()
                 .all()
             )
             for row in rows:
-                existing.setdefault(row.anilist_id, []).append(row.source)
+                existing.setdefault(row.mapping_id, []).append(row.source)
 
         ids_to_refresh: list[int] = []
-        rows_to_insert: list[AniMapProvenance] = []
+        rows_to_insert: list[AnimapProvenance] = []
 
-        for anilist_id in target_ids:
-            desired = provenance_map.get(anilist_id, [])
-            if desired != existing.get(anilist_id, []):
-                ids_to_refresh.append(anilist_id)
+        for mapping_id, sources in desired.items():
+            if sources != existing.get(mapping_id, []):
+                ids_to_refresh.append(mapping_id)
                 rows_to_insert.extend(
-                    AniMapProvenance(anilist_id=anilist_id, n=i, source=source)
-                    for i, source in enumerate(desired)
+                    AnimapProvenance(mapping_id=mapping_id, n=i, source=source)
+                    for i, source in enumerate(sources)
                 )
 
         if not ids_to_refresh:
@@ -132,197 +166,357 @@ class AniMapClient:
 
         for chunk in batched(ids_to_refresh, self._SQLITE_SAFE_VARIABLES, strict=False):
             session.execute(
-                delete(AniMapProvenance).where(AniMapProvenance.anilist_id.in_(chunk))
+                delete(AnimapProvenance).where(AnimapProvenance.mapping_id.in_(chunk))
             )
 
         if rows_to_insert:
             session.add_all(rows_to_insert)
 
-    def _entries_are_equal(self, existing_entry: AniMap, new_entry: AniMap) -> bool:
-        """Compare two AniMap entries for equality.
+    def _build_edges(
+        self,
+        mappings: dict,
+        provenance_by_descriptor: dict[str, list[str]],
+    ) -> tuple[
+        dict[str, MappingDescriptor],
+        dict[tuple[str, str, str, str | None], AnimapEdge],
+        dict[tuple[str, str, str, str | None], list[str]],
+        int,
+    ]:
+        """Convert raw mappings into descriptor pairs and edges."""
+        descriptors: dict[str, MappingDescriptor] = {}
+        edges: dict[tuple[str, str, str, str | None], AnimapEdge] = {}
+        provenance: dict[tuple[str, str, str, str | None], list[str]] = {}
+        invalid_count = 0
 
-        Args:
-            existing_entry (AniMap): Existing database entry
-            new_entry (AniMap): New entry to compare
+        for raw_source, targets in mappings.items():
+            try:
+                source_desc = MappingDescriptor.parse(raw_source)
+            except ValueError:
+                log.warning("Invalid mapping descriptor $$'%s'$$; skipped", raw_source)
+                invalid_count += 1
+                continue
 
-        Returns:
-            bool: True if entries are equal, False otherwise
-        """
-        for column_attr in AniMap.__table__.columns:
-            field_name = column_attr.name
-            existing_value = getattr(existing_entry, field_name)
-            new_value = getattr(new_entry, field_name)
-            if existing_value != new_value:
-                return False
-        return True
+            descriptors[source_desc.key()] = source_desc
 
-    async def sync_db(self) -> None:
-        """Synchronizes the local database with the mapping source."""
+            if not isinstance(targets, dict):
+                log.warning(
+                    "Descriptor $$'%s'$$ has non-object target payload; skipped",
+                    raw_source,
+                )
+                invalid_count += 1
+                continue
 
-        def single_val_to_list(value: Any) -> list[Any] | None:
-            """Converts a single value to a list if not already a list.
-
-            Args:
-                value (Any): Value to convert
-
-            Returns:
-                list[int | str]: Converted value
-            """
-            if value is None:
-                return None
-            return [value] if not isinstance(value, list) else value
-
-        with db() as ctx:
-            last_mappings_hash = ctx.session.get(Housekeeping, "animap_mappings_hash")
-
-            animap_defaults = {column.name: None for column in AniMap.__table__.columns}
-            valid_count = 0
-            invalid_count = 0
-
-            mappings = await self.mappings_client.load_mappings()
-            provenance_map = self.mappings_client.get_provenance()
-            tmp_mappings = mappings.copy()
-
-            for key, entry in tmp_mappings.items():
+            for raw_target, ranges in targets.items():
                 try:
-                    anilist_id = int(key)
+                    target_desc = MappingDescriptor.parse(raw_target)
                 except ValueError:
-                    invalid_count += 1
-                    continue
-
-                if entry is None:
-                    # Null override entries clear all fields for the given AniList ID
-                    mappings[key] = {}
-                    valid_count += 1
-                    continue
-
-                if not isinstance(entry, dict):
                     log.warning(
-                        "Found an invalid mapping entry "
-                        f"$${{anilist_id: {anilist_id}}}$$: expected an object"
+                        "Invalid target descriptor $$'%s'$$ under $$'%s'$$; skipped",
+                        raw_target,
+                        raw_source,
                     )
-                    mappings.pop(key)
                     invalid_count += 1
                     continue
 
-                try:
-                    AniMap(
-                        **{
-                            **animap_defaults,
-                            "anilist_id": anilist_id,
-                            **entry,
-                        }
-                    )
-                    valid_count += 1
-                except (ValueError, ValidationError, TypeError) as e:
+                descriptors[target_desc.key()] = target_desc
+
+                if not isinstance(ranges, dict):
                     log.warning(
-                        f"Found an invalid mapping entry "
-                        f"$${{anilist_id: {anilist_id}}}$$: {e}"
+                        "Descriptor $$'%s'$$ → $$'%s'$$ has non-object ranges; skipped",
+                        raw_source,
+                        raw_target,
                     )
-                    mappings.pop(key)
                     invalid_count += 1
+                    continue
 
-            curr_mappings_hash = md5(
-                json.dumps(mappings, sort_keys=True).encode()
-            ).hexdigest()
+                for source_range, destination_range in ranges.items():
+                    if not isinstance(source_range, str) or not source_range:
+                        invalid_count += 1
+                        continue
+                    if destination_range is not None and not isinstance(
+                        destination_range, str
+                    ):
+                        invalid_count += 1
+                        continue
 
-            if last_mappings_hash and last_mappings_hash.value == curr_mappings_hash:
-                log.debug(
-                    "Cache is still valid, refreshing provenance and skipping sync"
-                )
-                existing_ids = set(
-                    ctx.session.execute(select(AniMap.anilist_id)).scalars().all()
-                )
-                provenance_scope = existing_ids & set(provenance_map.keys())
-                self._sync_provenance_rows(
-                    ctx.session, provenance_map, provenance_scope
-                )
-                if provenance_scope:
-                    ctx.session.commit()
-                return
+                    key = (
+                        source_desc.key(),
+                        target_desc.key(),
+                        source_range,
+                        destination_range,
+                    )
+                    if key not in edges:
+                        edges[key] = AnimapEdge(
+                            source=source_desc,
+                            destination=target_desc,
+                            source_range=source_range,
+                            destination_range=destination_range,
+                        )
+                    provenance.setdefault(key, []).extend(
+                        provenance_by_descriptor.get(raw_source, [])
+                    )
 
-            log.debug(
-                f"Anime mapping changes detected, syncing "
-                f"database.  Validated {valid_count} entries, removed {invalid_count} "
-                f"invalid entries"
+                    if destination_range is None:
+                        continue
+
+                    reverse_key = (
+                        target_desc.key(),
+                        source_desc.key(),
+                        destination_range,
+                        source_range,
+                    )
+                    if reverse_key not in edges:
+                        edges[reverse_key] = AnimapEdge(
+                            source=target_desc,
+                            destination=source_desc,
+                            source_range=destination_range,
+                            destination_range=source_range,
+                        )
+                    provenance.setdefault(reverse_key, []).extend(
+                        provenance_by_descriptor.get(raw_source, [])
+                    )
+
+        # Deduplicate provenance lists while preserving order
+        for key, values in provenance.items():
+            seen: set[str] = set()
+            deduped: list[str] = []
+            for value in values:
+                if value in seen:
+                    continue
+                seen.add(value)
+                deduped.append(value)
+            provenance[key] = deduped
+
+        return descriptors, edges, provenance, invalid_count
+
+    def _build_cache_from_edges(
+        self, edges: tuple[AnimapEdge, ...], version: str
+    ) -> None:
+        """Populate in-memory adjacency for fast lookups."""
+        adjacency: dict[tuple[str, str], list[int]] = {}
+        for idx, edge in enumerate(edges):
+            for descriptor in (edge.source, edge.destination):
+                adjacency.setdefault(
+                    (descriptor.provider, descriptor.entry_id), []
+                ).append(idx)
+
+        self._edge_cache = edges
+        self._adjacency = {key: tuple(ids) for key, ids in adjacency.items()}
+        self._lookup_cache.clear()
+        self._cache_version = version
+
+    def _build_cache_from_db(self) -> None:
+        """Rebuild the in-memory graph cache from the SQLite tables."""
+        with db() as ctx:
+            entries = {
+                entry.id: entry
+                for entry in ctx.session.execute(select(AnimapEntry)).scalars().all()
+            }
+            mappings = ctx.session.execute(select(AnimapMapping)).scalars().all()
+
+        edges: list[AnimapEdge] = []
+
+        for mapping in mappings:
+            src_entry = entries.get(mapping.source_entry_id)
+            dst_entry = entries.get(mapping.destination_entry_id)
+            if not src_entry or not dst_entry:
+                continue
+
+            edges.append(
+                AnimapEdge(
+                    source=MappingDescriptor(
+                        provider=src_entry.provider,
+                        entry_id=src_entry.entry_id,
+                        scope=src_entry.entry_scope,
+                    ),
+                    destination=MappingDescriptor(
+                        provider=dst_entry.provider,
+                        entry_id=dst_entry.entry_id,
+                        scope=dst_entry.entry_scope,
+                    ),
+                    source_range=mapping.source_range,
+                    destination_range=mapping.destination_range,
+                )
             )
 
-            existing_entries_query = ctx.session.execute(select(AniMap))
+        self._build_cache_from_edges(tuple(edges), self._cache_version or "db")
+
+    def _ensure_cache(self) -> None:
+        if not self._edge_cache:
+            self._build_cache_from_db()
+
+    def get_graph_for_ids(self, external_ids: dict[str, str]) -> MappingGraph:
+        """Return all edges touching the supplied external identifiers.
+
+        Args:
+            external_ids (dict[str, str]): Mapping of provider names to entry IDs.
+
+        Returns:
+            MappingGraph: Subgraph containing all relevant edges.
+        """
+        self._ensure_cache()
+
+        if not external_ids:
+            return MappingGraph(edges=tuple())
+
+        cache_key = frozenset(external_ids.items())
+        if self._cache_version is not None and cache_key in self._lookup_cache:
+            return self._lookup_cache[cache_key]
+
+        edge_indexes: set[int] = set()
+        for provider, entry_id in external_ids.items():
+            edge_indexes.update(self._adjacency.get((provider, entry_id), ()))
+
+        if not edge_indexes:
+            graph = MappingGraph(edges=tuple())
+        else:
+            graph = MappingGraph(edges=tuple(self._edge_cache[i] for i in edge_indexes))
+
+        if self._cache_version is not None:
+            self._lookup_cache[cache_key] = graph
+
+        return graph
+
+    async def sync_db(self) -> None:
+        """Synchronize the local database with the upstream mappings."""
+        self._edge_cache = tuple()
+        self._adjacency = {}
+        self._lookup_cache.clear()
+        self._cache_version = None
+
+        mappings = await self.mappings_client.load_mappings()
+        provenance_by_descriptor = self.mappings_client.get_provenance()
+
+        descriptors, edges, provenance, invalid_count = self._build_edges(
+            mappings, provenance_by_descriptor
+        )
+        edge_list = tuple(edges.values())
+
+        curr_mappings_hash = md5(
+            json.dumps(mappings, sort_keys=True).encode()
+        ).hexdigest()
+
+        with db() as ctx:
             existing_entries = {
-                entry.anilist_id: entry
-                for entry in existing_entries_query.scalars().all()
+                f"{entry.provider}:{entry.entry_id}:{entry.entry_scope}": entry
+                for entry in ctx.session.execute(select(AnimapEntry)).scalars().all()
             }
 
-            new_data = {}
-            for key, entry in mappings.items():
-                anilist_id = int(key)
-                # Start from the column defaults so omitted fields become None
-                # and will overwrite existing DB values on update
-                processed_entry: dict[str, Any] = {
-                    **animap_defaults,
-                    "anilist_id": anilist_id,
-                }
+            new_entry_keys = set(descriptors.keys())
+            existing_entry_keys = set(existing_entries.keys())
 
-                for column in AniMap.__table__.columns:
-                    field_name = column.name
-                    if field_name in entry:
-                        processed_entry[field_name] = entry[field_name]
+            to_delete_entries = existing_entry_keys - new_entry_keys
+            to_insert_entries = new_entry_keys - existing_entry_keys
 
-                for attr in ("mal_id", "imdb_id", "tmdb_movie_id"):
-                    if attr in processed_entry:
-                        processed_entry[attr] = single_val_to_list(
-                            processed_entry[attr]
-                        )
-
-                new_data[anilist_id] = processed_entry
-
-            existing_ids = set(existing_entries.keys())
-            new_ids = set(new_data.keys())
-
-            to_delete = existing_ids - new_ids
-            to_insert = new_ids - existing_ids
-            to_check_update = existing_ids & new_ids
-
-            to_update = []
-            for anilist_id in to_check_update:
-                existing_entry = existing_entries[anilist_id]
-                new_entry_data = new_data[anilist_id]
-                new_entry = AniMap(**new_entry_data)
-
-                if not self._entries_are_equal(existing_entry, new_entry):
-                    to_update.append(new_entry)
-
-            operations_count = len(to_delete) + len(to_insert) + len(to_update)
-
-            if operations_count == 0:
-                log.debug("No database changes needed")
-            else:
-                log.debug(
-                    f"Syncing database with upstream: "
-                    f"{len(to_delete)} deletions, {len(to_insert)} insertions, "
-                    f"{len(to_update)} updates"
-                )
-
-            if to_delete:
+            if to_delete_entries:
                 for chunk in batched(
-                    to_delete, self._SQLITE_SAFE_VARIABLES, strict=False
+                    [existing_entries[k].id for k in to_delete_entries],
+                    self._SQLITE_SAFE_VARIABLES,
+                    strict=False,
                 ):
                     ctx.session.execute(
-                        delete(AniMap).where(AniMap.anilist_id.in_(chunk))
+                        delete(AnimapEntry).where(AnimapEntry.id.in_(chunk))
                     )
 
-            if to_insert:
-                new_entries = [
-                    AniMap(**new_data[anilist_id]) for anilist_id in to_insert
-                ]
+            new_entries = [
+                AnimapEntry(
+                    provider=descriptors[key].provider,
+                    entry_id=descriptors[key].entry_id,
+                    entry_scope=descriptors[key].scope,
+                )
+                for key in to_insert_entries
+            ]
+            if new_entries:
                 ctx.session.add_all(new_entries)
+                ctx.session.flush()
 
-            if to_update:
-                for entry in to_update:
-                    ctx.session.merge(entry)
+            # Refresh entry map after inserts
+            existing_entries = {
+                f"{entry.provider}:{entry.entry_id}:{entry.entry_scope}": entry
+                for entry in ctx.session.execute(select(AnimapEntry)).scalars().all()
+            }
 
-            provenance_scope = new_ids & set(provenance_map.keys())
-            self._sync_provenance_rows(ctx.session, provenance_map, provenance_scope)
+            # Translate edge keys to entry-id keyed tuples
+            edge_key_to_ids: dict[tuple[int, int, str, str | None], AnimapEdge] = {}
+            provenance_by_id_key: dict[tuple[int, int, str, str | None], list[str]] = {}
+            for key, edge in edges.items():
+                src_key, dst_key, source_range, destination_range = key
+                src_entry = existing_entries.get(src_key)
+                dst_entry = existing_entries.get(dst_key)
+                if not src_entry or not dst_entry:
+                    continue
+                id_key = (src_entry.id, dst_entry.id, source_range, destination_range)
+                edge_key_to_ids[id_key] = edge
+                provenance_by_id_key[id_key] = provenance.get(key, [])
+
+            existing_mappings: dict[tuple[int, int, str, str | None], AnimapMapping] = {
+                (
+                    mapping.source_entry_id,
+                    mapping.destination_entry_id,
+                    mapping.source_range,
+                    mapping.destination_range,
+                ): mapping
+                for mapping in ctx.session.execute(select(AnimapMapping))
+                .scalars()
+                .all()
+            }
+
+            new_keys = set(edge_key_to_ids.keys())
+            existing_keys = set(existing_mappings.keys())
+
+            to_delete_mappings = existing_keys - new_keys
+            to_insert_mappings = new_keys - existing_keys
+
+            if to_delete_mappings:
+                for chunk in batched(
+                    list(to_delete_mappings),
+                    self._SQLITE_SAFE_VARIABLES,
+                    strict=False,
+                ):
+                    ctx.session.execute(
+                        delete(AnimapMapping).where(
+                            tuple_(
+                                AnimapMapping.source_entry_id,
+                                AnimapMapping.destination_entry_id,
+                                AnimapMapping.source_range,
+                                AnimapMapping.destination_range,
+                            ).in_(chunk)
+                        )
+                    )
+
+            new_mapping_rows = [
+                AnimapMapping(
+                    source_entry_id=key[0],
+                    destination_entry_id=key[1],
+                    source_range=key[2],
+                    destination_range=key[3],
+                )
+                for key in to_insert_mappings
+            ]
+            if new_mapping_rows:
+                ctx.session.add_all(new_mapping_rows)
+                ctx.session.flush()
+
+            # Refresh mapping map to include newly inserted rows (ids now populated)
+            existing_mappings = {
+                (
+                    mapping.source_entry_id,
+                    mapping.destination_entry_id,
+                    mapping.source_range,
+                    mapping.destination_range,
+                ): mapping
+                for mapping in ctx.session.execute(select(AnimapMapping))
+                .scalars()
+                .all()
+            }
+
+            desired_provenance: dict[int, list[str]] = {}
+            for key, sources in provenance_by_id_key.items():
+                mapping = existing_mappings.get(key)
+                if mapping:
+                    desired_provenance[mapping.id] = sources
+
+            self._sync_provenance_rows(ctx.session, desired_provenance)
 
             ctx.session.merge(
                 Housekeeping(key="animap_mappings_hash", value=curr_mappings_hash)
@@ -330,91 +524,12 @@ class AniMapClient:
 
             ctx.session.commit()
 
-            log.debug("Database sync complete")
+            self._build_cache_from_edges(edge_list, curr_mappings_hash)
 
-    def get_mappings(
-        self,
-        anidb: int | list[int] | None = None,
-        anilist: int | list[int] | None = None,
-        imdb: str | list[str] | None = None,
-        mal: int | list[int] | None = None,
-        tmdb: int | list[int] | None = None,
-        tvdb: int | list[int] | None = None,
-    ) -> Iterator[AniMap]:
-        """Retrieve anime ID mappings based on provided criteria.
-
-        Args:
-            anidb (int | list[int] | None): AniDB ID(s) to search for
-            anilist (int | list[int] | None): AniList ID(s) to search for
-            imdb (str | list[str] | None): IMDB ID(s) to search for
-            mal (int | list[int] | None): MyAnimeList ID(s) to search for
-            tmdb (int | list[int] | None): TMDB ID(s) to search for
-            tvdb (int | list[int] | None): TVDB ID(s) to search for
-
-        Yields:
-            AniMap: Matching AniMap entries
-        """
-
-        def _normalize_ids(value, *, is_str: bool = False) -> list:
-            """Normalize input into a deduplicated list."""
-            if value is None:
-                return []
-            if is_str:
-                seq = [value] if isinstance(value, str) else list(value)
-            else:
-                if isinstance(value, int):
-                    seq = [value]
-                elif isinstance(value, Iterable) and not isinstance(
-                    value, (str, bytes)
-                ):
-                    seq = list(value)
-                else:
-                    seq = [value]
-            return list(dict.fromkeys(seq))
-
-        anidb_list = _normalize_ids(anidb)
-        anilist_list = _normalize_ids(anilist)
-        imdb_list = _normalize_ids(imdb, is_str=True)
-        mal_list = _normalize_ids(mal)
-        tmdb_list = _normalize_ids(tmdb)
-        tvdb_list = _normalize_ids(tvdb)
-
-        if not (
-            imdb_list
-            or tmdb_list
-            or tvdb_list
-            or anidb_list
-            or anilist_list
-            or mal_list
-        ):
-            log.debug("No IDs provided to query AniMap, returning no results")
-            return
-
-        ids_string = (
-            f"anidb={anidb_list}, anilist={anilist_list}, imdb={imdb_list}, "
-            f"mal={mal_list}, tmdb={tmdb_list}, tvdb={tvdb_list}"
-        )
-        log.debug(f"Querying mapping database with provided IDs: {ids_string}")
-
-        or_conditions: list[ColumnElement] = []
-
-        if anidb_list:
-            or_conditions.append(AniMap.anidb_id.in_(anidb_list))
-        if anilist_list:
-            or_conditions.append(AniMap.anilist_id.in_(anilist_list))
-        if imdb_list:
-            or_conditions.append(json_array_contains(AniMap.imdb_id, imdb_list))
-        if mal_list:
-            or_conditions.append(json_array_contains(AniMap.mal_id, mal_list))
-        if tmdb_list:
-            or_conditions.append(json_array_contains(AniMap.tmdb_movie_id, tmdb_list))
-            or_conditions.append(AniMap.tmdb_show_id.in_(tmdb_list))
-        if tvdb_list:
-            or_conditions.append(AniMap.tvdb_id.in_(tvdb_list))
-        if not or_conditions:
-            return
-
-        query = select(AniMap).where(or_(*or_conditions))
-
-        with db() as ctx:
-            yield from ctx.session.scalars(query)
+            log.success(
+                "Database sync complete: "
+                f"{len(to_delete_entries)} entries removed, "
+                f"{len(to_delete_mappings)} mappings removed, "
+                f"{invalid_count} invalid, "
+                f"{len(to_insert_entries)} inserted"
+            )

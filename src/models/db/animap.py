@@ -1,273 +1,74 @@
-"""AniMap Model."""
+"""Models for provider-range mapping graph."""
 
-import re
-from functools import cached_property
-from typing import Literal
-
-from pydantic import BaseModel, Field
-from sqlalchemy import JSON, Index, Integer
+from sqlalchemy import ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.models.db.base import Base
 
-__all__ = ["AniMap", "EpisodeMapping"]
-
-_MAPPING_PATTERN = re.compile(
-    r"""
-            (?:^|,)
-            (?:
-                (?P<is_ep_range>                # Episode range (e.g. e1-e4)
-                    e(?P<range_start>\d+)
-                    -
-                    e(?P<range_end>\d+)
-                )
-                |
-                (?P<is_open_ep_range_after>     # Open range after (e.g. e1-)
-                    e(?P<after_start>\d+)-(?=\||$|,)
-                )
-                |
-                (?P<is_single_ep>               # Single episode (e.g. e2)
-                    e(?P<single_ep>\d+)(?!-)
-                )
-                |
-                (?P<is_open_ep_range_before>    # Open range before (e.g. -e5)
-                    -e(?P<before_end>\d+)
-                )
-            )
-            (?:\|(?P<ratio>-?\d+))?            # Optional ratio for each range
-            """,
-    re.VERBOSE,
-)
+__all__ = ["AnimapEntry", "AnimapMapping", "AnimapProvenance"]
 
 
-class EpisodeMapping(BaseModel):
-    """Model for parsing and validating episode mapping patterns.
+class AnimapEntry(Base):
+    """Model representing a unique entry from a provider."""
 
-    Handles conversion between string patterns and episode mapping objects.
-    """
+    __tablename__ = "animap_entry"
 
-    service: Literal["tmdb", "tvdb", ""] = Field(default="")
-    season: int = Field(ge=0)
-    start: int = Field(default=1, gt=0)
-    end: int | None = Field(default=None, gt=0)
-    ratio: int = Field(default=1)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
 
-    @property
-    def length(self) -> int:
-        """Calculate the number of episodes in the range.
+    provider: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    entry_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    entry_scope: Mapped[str] = mapped_column(String, nullable=False, index=True)
 
-        Returns:
-            int: Number of episodes in the range or -1 if the end is not specified
-        """
-        return self.end - self.start + 1 if self.end else -1
-
-    @classmethod
-    def from_string(
-        cls, season: int, s: str, service: Literal["tmdb", "tvdb", ""] = ""
-    ) -> list[EpisodeMapping]:
-        """Parse a string pattern into a EpisodeMapping instance.
-
-        Args:
-            season (int): Season number
-            s (str): Pattern string in format
-                    'e{start}-e{end}|{ratio},e{start2}-e{end2}|{ratio2}'
-                    Examples:
-                    - 'e1-e12|2'
-                    - 'e12-,e2'
-                    - 'e1-e5,e8-e10'
-                    - '' (empty string for full season)
-            service (Literal["tmdb", "tvdb", ""]): Service identifier for the mapping
-
-        Returns:
-            EpisodeMapping | None: New EpisodeMapping instance if pattern is valid, None
-                                otherwise
-        """
-        service = service or ""
-
-        if not s:
-            return [cls(season=season, service=service)]
-
-        range_matches = list(_MAPPING_PATTERN.finditer(s))
-
-        episode_ranges = []
-        for match in range_matches:
-            groups = match.groupdict()
-            ratio = int(groups["ratio"]) if groups["ratio"] else 1
-
-            # Explicit start and end episode range
-            if groups["is_ep_range"]:
-                start = int(groups["range_start"])
-                end = int(groups["range_end"])
-            # Single episode
-            elif groups["is_single_ep"]:
-                start = end = int(groups["single_ep"])
-            # Open range with unknown start and explicit end
-            elif groups["is_open_ep_range_before"]:
-                start = 1
-                end = int(groups["before_end"])
-            # Open range with explicit start and unknown end
-            elif groups["is_open_ep_range_after"]:
-                start = int(groups["after_start"])
-                end = None
-            else:
-                continue
-
-            episode_ranges.append(
-                cls(season=season, start=start, end=end, ratio=ratio, service=service)
-            )
-
-        return episode_ranges
-
-    def __str__(self) -> str:
-        """Generate a string representation of the EpisodeMapping instance.
-
-        Returns:
-            str: String representation in format 'S{season}E{start}-{end}|{ratio}'
-        """
-        season = f"S{self.season:02d}"
-        if self.start == 1 and self.end is None:
-            return season
-        result = f"{season}E{self.start:02d}"
-        return result + (
-            "+"
-            if self.end is None and self.start != 1
-            else f"-E{self.end:02d}"
-            if self.end and self.end != self.start
-            else ""
-        )
-
-    def __hash__(self) -> int:
-        """Generate a hash for the EpisodeMapping instance.
-
-        Returns:
-            int: Hash value of the instance
-        """
-        return hash(repr(self))
+    __table_args__ = (UniqueConstraint("provider", "entry_id", "entry_scope"),)
 
 
-class AniMap(Base):
-    """Model for the animap table."""
+class AnimapMapping(Base):
+    """Model representing a mapping between two provider entries."""
 
-    __tablename__ = "animap"
+    __tablename__ = "animap_mapping"
 
-    anilist_id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    anidb_id: Mapped[int | None] = mapped_column(
-        Integer, index=False, nullable=True, default=None
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+
+    source_entry_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("animap_entry.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
     )
-    imdb_id: Mapped[list[str] | None] = mapped_column(
-        JSON, index=True, nullable=True, default=None
-    )
-    mal_id: Mapped[list[int] | None] = mapped_column(
-        JSON, index=False, nullable=True, default=None
-    )
-    tmdb_movie_id: Mapped[list[int] | None] = mapped_column(
-        JSON, index=True, nullable=True, default=None
-    )
-    tmdb_show_id: Mapped[int | None] = mapped_column(
-        Integer, index=True, nullable=True, default=None
-    )
-    tvdb_id: Mapped[int | None] = mapped_column(
-        Integer, index=True, nullable=True, default=None
+    destination_entry_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("animap_entry.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
     )
 
-    tmdb_mappings: Mapped[dict[str, str] | None] = mapped_column(
-        JSON, index=True, nullable=True, default=None
-    )
-    tvdb_mappings: Mapped[dict[str, str] | None] = mapped_column(
-        JSON, index=True, nullable=True, default=None
-    )
+    source_range: Mapped[str] = mapped_column(String, nullable=False)
+    destination_range: Mapped[str] = mapped_column(String, nullable=True)
 
     __table_args__ = (
-        Index("idx_all_ids", imdb_id, tmdb_movie_id, anidb_id, anilist_id, tvdb_id),
+        UniqueConstraint(
+            "source_entry_id",
+            "destination_entry_id",
+            "source_range",
+            "destination_range",
+        ),
     )
 
-    def __init__(self, **kwargs) -> None:
-        """Initialize AniMap with data validation."""
-        # Convert single values to lists for specific fields
-        for field in ("imdb_id", "mal_id", "tmdb_movie_id"):
-            if field in kwargs:
-                kwargs[field] = self._convert_to_list(kwargs[field])
 
-        super().__init__(**kwargs)
+class AnimapProvenance(Base):
+    """Tracks the provenance (source paths/URLs) for each Animap row.
 
-    @staticmethod
-    def _convert_to_list(v) -> list | None:
-        """Convert single values to lists.
+    Stores one row per source with an order column ``n`` to preserve the
+    original order of sources for a given entry.
+    """
 
-        Args:
-            v: Value to convert
+    __tablename__ = "animap_provenance"
 
-        Returns:
-            list | None: List of values
-        """
-        if v is None:
-            return v
-        if not isinstance(v, list):
-            return [v]
-        return v
-
-    @cached_property
-    def parsed_tvdb_mappings(self) -> list[EpisodeMapping]:
-        """Parse TVDB mappings into a list of EpisodeMapping objects.
-
-        Returns:
-            list[EpisodeMapping]: List of parsed EpisodeMapping objects
-        """
-        res: list[EpisodeMapping] = []
-
-        if not self.tvdb_mappings:
-            return res
-
-        for season, s in self.tvdb_mappings.items():
-            try:
-                parsed = EpisodeMapping.from_string(
-                    int(season.lstrip("s")), s, service="tvdb"
-                )
-                res.extend(parsed)
-            except ValueError:
-                continue
-        return res
-
-    @cached_property
-    def parsed_tmdb_mappings(self) -> list[EpisodeMapping]:
-        """Parse TMDB mappings into a list of EpisodeMapping objects.
-
-        Returns:
-            list[EpisodeMapping]: List of parsed EpisodeMapping objects
-        """
-        res: list[EpisodeMapping] = []
-
-        if not self.tmdb_mappings:
-            return res
-
-        for season, s in self.tmdb_mappings.items():
-            try:
-                parsed = EpisodeMapping.from_string(
-                    int(season.lstrip("s")), s, service="tmdb"
-                )
-                res.extend(parsed)
-            except ValueError:
-                continue
-        return res
-
-    def __hash__(self) -> int:
-        """Generate a hash for the AniMap instance.
-
-        Returns:
-            int: Hash value of the instance
-        """
-        return hash(self.__repr__())
-
-    def __repr__(self):
-        """Generate a string representation of the AniMap instance.
-
-        Returns:
-            str: String representation of the instance
-        """
-        return f"<{
-            ':'.join(
-                f'{k}={v}'
-                for k, v in self.__dict__.items()
-                if v is not None and not k.startswith('_')
-            )
-        }>"
+    mapping_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("animap_mapping.id", ondelete="CASCADE"),
+        primary_key=True,
+        index=True,
+    )
+    n: Mapped[int] = mapped_column(Integer, primary_key=True)
+    source: Mapped[str] = mapped_column(String, nullable=False)

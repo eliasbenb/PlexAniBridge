@@ -1,10 +1,11 @@
-"""Tests for the AniMap client."""
+"""Tests for the Animap client (descriptor graph)."""
 
 import asyncio
 import importlib
 import json
 from hashlib import md5
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, cast
 
 import pytest
@@ -12,12 +13,11 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
 from src.config.database import AniBridgeDB
-from src.core.animap import AniMapClient
+from src.core.animap import AnimapClient, AnimapEdge, MappingDescriptor
 from src.core.mappings import MappingsClient
-from src.models.db.animap import AniMap
+from src.models.db.animap import AnimapEntry, AnimapMapping, AnimapProvenance
 from src.models.db.base import Base
 from src.models.db.housekeeping import Housekeeping
-from src.models.db.provenance import AniMapProvenance
 
 
 class FakeMappingsClient:
@@ -26,24 +26,24 @@ class FakeMappingsClient:
     def __init__(
         self,
         mappings: dict[str, Any],
-        provenance: dict[int, list[str]],
+        provenance: dict[str, list[str]],
     ) -> None:
-        """Store static mappings and provenance data for reuse across syncs."""
+        """Initialize the fake client with predefined mappings and provenance."""
         self.mappings = mappings
         self.provenance = provenance
         self.load_calls = 0
 
     async def load_mappings(self) -> dict[str, Any]:
-        """Return the preconfigured mappings without hitting the filesystem."""
+        """Return the predefined mappings."""
         self.load_calls += 1
         return self.mappings
 
-    def get_provenance(self) -> dict[int, list[str]]:
-        """Return the captured provenance map for the stubbed mappings."""
+    def get_provenance(self) -> dict[str, list[str]]:
+        """Return the predefined provenance."""
         return self.provenance
 
     async def close(self) -> None:
-        """Mirror the async close contract of the real client."""
+        """No-op for closing the fake client."""
         return None
 
 
@@ -100,9 +100,9 @@ def in_memory_db(monkeypatch: pytest.MonkeyPatch):
 @pytest.fixture
 def animap_client(
     tmp_path: Path, in_memory_db: AniBridgeDB, request: pytest.FixtureRequest
-) -> AniMapClient:
-    """Provide an AniMapClient instance for testing."""
-    client = AniMapClient(data_path=tmp_path, upstream_url=None)
+) -> AnimapClient:
+    """Provide an AnimapClient instance for testing."""
+    client = AnimapClient(data_path=tmp_path, upstream_url=None)
 
     def _finalize() -> None:
         asyncio.run(client.close())
@@ -111,166 +111,169 @@ def animap_client(
     return client
 
 
-def test_sync_db_creates_rows_and_provenance(
-    animap_client: AniMapClient, tmp_path: Path, in_memory_db: AniBridgeDB
-):
-    """Test that sync_db creates AniMap and provenance rows correctly."""
-    mapping_data = {
-        "1": {
-            "imdb_id": "tt12345",
-            "tmdb_movie_id": 54321,
-        },
-        "2": {
-            "tvdb_id": 777,
-            "tmdb_show_id": 678,
-            "tmdb_mappings": {"s1": "e1-e12"},
-        },
+def _mapping_data():
+    return {
+        "anilist:1:movie": {"tmdb:10:movie": {"1": None}},
+        "anilist:2:s1": {"tvdb:20:s1": {"s1": "e1-e12"}},
     }
 
-    mappings_path = tmp_path / "mappings.custom.json"
-    mappings_path.write_text(json.dumps(mapping_data), encoding="utf-8")
+
+def _write_mapping_file(base: Path, data: dict) -> Path:
+    mappings_path = base / "mappings.json"
+    mappings_path.write_text(json.dumps(data), encoding="utf-8")
+    return mappings_path
+
+
+def _fetch_edges(ctx) -> list[AnimapEdge]:
+    entries = {
+        entry.id: entry for entry in ctx.session.execute(select(AnimapEntry)).scalars()
+    }
+    mappings = ctx.session.execute(select(AnimapMapping)).scalars().all()
+    edges: list[AnimapEdge] = []
+    for mapping in mappings:
+        src = entries[mapping.source_entry_id]
+        dst = entries[mapping.destination_entry_id]
+        edges.append(
+            AnimapEdge(
+                source=cast(
+                    MappingDescriptor,
+                    SimpleNamespace(
+                        provider=src.provider,
+                        entry_id=src.entry_id,
+                        scope=src.entry_scope,
+                    ),
+                ),
+                destination=cast(
+                    MappingDescriptor,
+                    SimpleNamespace(
+                        provider=dst.provider,
+                        entry_id=dst.entry_id,
+                        scope=dst.entry_scope,
+                    ),
+                ),
+                source_range=mapping.source_range,
+                destination_range=mapping.destination_range,
+            )
+        )
+    return edges
+
+
+def test_sync_db_creates_entries_mappings_and_provenance(
+    animap_client: AnimapClient, tmp_path: Path, in_memory_db: AniBridgeDB
+) -> None:
+    """Syncing the database creates entries, mappings, and provenance rows."""
+    mapping_data = _mapping_data()
+    mappings_path = _write_mapping_file(tmp_path, mapping_data)
 
     asyncio.run(animap_client.sync_db())
 
     expected_hash = md5(json.dumps(mapping_data, sort_keys=True).encode()).hexdigest()
 
     with in_memory_db as ctx:
-        rows = (
-            ctx.session.execute(select(AniMap).order_by(AniMap.anilist_id))
+        entries = (
+            ctx.session.execute(
+                select(AnimapEntry).order_by(AnimapEntry.provider, AnimapEntry.entry_id)
+            )
             .scalars()
             .all()
         )
         provenance_rows = (
             ctx.session.execute(
-                select(AniMapProvenance).order_by(
-                    AniMapProvenance.anilist_id, AniMapProvenance.n
+                select(AnimapProvenance).order_by(
+                    AnimapProvenance.mapping_id, AnimapProvenance.n
                 )
             )
             .scalars()
             .all()
         )
         hash_entry = ctx.session.get(Housekeeping, "animap_mappings_hash")
+        edges = _fetch_edges(ctx)
 
     assert hash_entry is not None
     assert hash_entry.value == expected_hash
 
-    assert [row.anilist_id for row in rows] == [1, 2]
-    assert rows[0].imdb_id == ["tt12345"]
-    assert rows[0].tmdb_movie_id == [54321]
-    assert rows[1].tvdb_id == 777
-    assert rows[1].tmdb_show_id == 678
-    assert rows[1].tmdb_mappings == {"s1": "e1-e12"}
-
-    sources = [row.source for row in provenance_rows]
-    expected_source = str(mappings_path.resolve())
-    assert sources == [expected_source, expected_source]
-    assert [row.n for row in provenance_rows] == [0, 0]
-
-
-def test_get_mappings_filters_by_identifiers(
-    animap_client: AniMapClient, tmp_path: Path, in_memory_db: AniBridgeDB
-):
-    """Test that get_mappings filters AniMap rows by provided identifiers."""
-    mapping_data = {
-        "10": {
-            "imdb_id": ["tt99999", "tt11111"],
-            "tmdb_movie_id": [111, 222],
-        },
-        "20": {
-            "imdb_id": "tt22222",
-            "tmdb_show_id": 333,
-            "tvdb_id": 444,
-        },
+    assert {(e.provider, e.entry_id, e.entry_scope) for e in entries} == {
+        ("anilist", "1", "movie"),
+        ("tmdb", "10", "movie"),
+        ("anilist", "2", "s1"),
+        ("tvdb", "20", "s1"),
     }
 
-    (tmp_path / "mappings.custom.json").write_text(
-        json.dumps(mapping_data),
-        encoding="utf-8",
-    )
+    edge_keys = {
+        (
+            edge.source.provider,
+            edge.source.entry_id,
+            edge.source.scope,
+            edge.destination.provider,
+            edge.destination.entry_id,
+            edge.destination.scope,
+            edge.source_range,
+            edge.destination_range,
+        )
+        for edge in edges
+    }
+    assert edge_keys == {
+        ("anilist", "1", "movie", "tmdb", "10", "movie", "1", None),
+        ("anilist", "2", "s1", "tvdb", "20", "s1", "s1", "e1-e12"),
+        ("tvdb", "20", "s1", "anilist", "2", "s1", "e1-e12", "s1"),
+    }
 
+    expected_source = str(mappings_path.resolve())
+    assert [row.source for row in provenance_rows] == [
+        expected_source,
+        expected_source,
+        expected_source,
+    ]
+    assert [row.n for row in provenance_rows] == [0, 0, 0]
+
+
+def test_get_graph_for_ids_returns_edges_for_providers(
+    animap_client: AnimapClient, tmp_path: Path, in_memory_db: AniBridgeDB
+) -> None:
+    """Getting the mapping graph for IDs returns the correct edges."""
+    _write_mapping_file(tmp_path, _mapping_data())
     asyncio.run(animap_client.sync_db())
 
-    movie_matches = list(animap_client.get_mappings(imdb="tt99999"))
-    tmdb_matches = list(animap_client.get_mappings(tmdb=222))
-    tvdb_matches = list(animap_client.get_mappings(tvdb=444))
-    tmdb_show_matches = list(animap_client.get_mappings(tmdb=[999, 333]))
-    empty_matches = list(animap_client.get_mappings())
+    edges = animap_client.get_graph_for_ids({"anilist": "1"}).edges
+    assert len(edges) == 1
+    assert edges[0].source.provider == "anilist"
+    assert edges[0].destination.provider == "tmdb"
 
-    assert {row.anilist_id for row in movie_matches} == {10}
-    assert {row.anilist_id for row in tmdb_matches} == {10}
-    assert movie_matches[0].imdb_id == ["tt99999", "tt11111"]
-
-    assert {row.anilist_id for row in tvdb_matches} == {20}
-    assert {row.anilist_id for row in tmdb_show_matches} == {20}
-    assert empty_matches == []
-
-
-def test_get_mappings_returns_empty_when_no_identifiers(
-    animap_client: AniMapClient,
-):
-    """Ensure get_mappings short-circuits when no identifiers are provided."""
-    assert list(animap_client.get_mappings()) == []
-
-
-def test_sync_db_filters_invalid_entries(
-    animap_client: AniMapClient, in_memory_db: AniBridgeDB
-):
-    """Invalid mapping entries are ignored while null overrides are preserved."""
-    fake_client = FakeMappingsClient(
-        mappings={
-            "1": {"imdb_id": "ttvalid"},
-            "2": "not-a-dict",
-            "3": None,
-        },
-        provenance={1: ["/source.json"], 3: ["/source.json"]},
-    )
-    animap_client.mappings_client = cast(MappingsClient, fake_client)
-    asyncio.run(animap_client.sync_db())
-
-    with in_memory_db as ctx:
-        rows = (
-            ctx.session.execute(select(AniMap).order_by(AniMap.anilist_id))
-            .scalars()
-            .all()
+    tvdb_edges = animap_client.get_graph_for_ids({"tvdb": "20"}).edges
+    assert {
+        (
+            e.source.provider,
+            e.destination.provider,
+            e.source_range,
+            e.destination_range,
         )
-        ids = [row.anilist_id for row in rows]
-        assert ids == [1, 3]
-        assert rows[0].imdb_id == ["ttvalid"]
-        assert rows[1].imdb_id is None
-
-        provenance_rows = (
-            ctx.session.execute(
-                select(AniMapProvenance).order_by(
-                    AniMapProvenance.anilist_id, AniMapProvenance.n
-                )
-            )
-            .scalars()
-            .all()
-        )
-
-    assert [row.source for row in provenance_rows] == ["/source.json", "/source.json"]
-    assert [row.anilist_id for row in provenance_rows] == [1, 3]
+        for e in tvdb_edges
+    } == {
+        ("tvdb", "anilist", "e1-e12", "s1"),
+        ("anilist", "tvdb", "s1", "e1-e12"),
+    }
 
 
 def test_sync_db_refreshes_provenance_when_hash_matches(
-    animap_client: AniMapClient, in_memory_db: AniBridgeDB
-):
-    """When hashes match, the sync still refreshes provenance rows."""
+    animap_client: AnimapClient, in_memory_db: AniBridgeDB
+) -> None:
+    """Syncing the database again with the same mappings refreshes provenance."""
+    base_mappings = {"anilist:1:movie": {"tmdb:1:movie": {"1": None}}}
     fake_client = FakeMappingsClient(
-        mappings={"1": {"imdb_id": "tt001"}},
-        provenance={1: ["/initial.json"]},
+        mappings=base_mappings,
+        provenance={"anilist:1:movie": ["/initial.json"]},
     )
     animap_client.mappings_client = cast(MappingsClient, fake_client)
     asyncio.run(animap_client.sync_db())
 
-    fake_client.provenance = {1: ["/updated.json", "/extra.json"]}
+    fake_client.provenance = {"anilist:1:movie": ["/updated.json", "/extra.json"]}
     asyncio.run(animap_client.sync_db())
 
     with in_memory_db as ctx:
         provenance_rows = (
             ctx.session.execute(
-                select(AniMapProvenance).order_by(
-                    AniMapProvenance.anilist_id, AniMapProvenance.n
+                select(AnimapProvenance).order_by(
+                    AnimapProvenance.mapping_id, AnimapProvenance.n
                 )
             )
             .scalars()

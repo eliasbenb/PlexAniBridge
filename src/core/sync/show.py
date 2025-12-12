@@ -1,7 +1,5 @@
 """Sync client for episodic shows using provider abstractions."""
 
-import contextlib
-from collections import Counter
 from collections.abc import AsyncIterator, Sequence
 from datetime import datetime
 
@@ -13,10 +11,9 @@ from anibridge.library import (
 )
 from anibridge.list import ListEntry, ListMediaType, ListStatus
 
+from src.core.animap import MappingGraph
 from src.core.sync.base import BaseSyncClient
 from src.core.sync.stats import ItemIdentifier
-from src.models.db.animap import AniMap, EpisodeMapping
-from src.models.db.sync_history import SyncOutcome
 from src.utils.cache import gattl_cache, glru_cache
 
 __all__ = ["ShowSyncClient"]
@@ -28,7 +25,13 @@ class ShowSyncClient(BaseSyncClient[LibraryShow, LibrarySeason, LibraryEpisode])
     async def map_media(
         self, item: LibraryShow
     ) -> AsyncIterator[
-        tuple[LibrarySeason, Sequence[LibraryEpisode], AniMap | None, ListEntry | None]
+        tuple[
+            LibrarySeason,
+            Sequence[LibraryEpisode],
+            MappingGraph | None,
+            ListEntry | None,
+            str | None,
+        ]
     ]:
         """Yield mapping candidates for the provided show item."""
         seasons = self.__get_wanted_seasons(item)
@@ -42,132 +45,43 @@ class ShowSyncClient(BaseSyncClient[LibraryShow, LibrarySeason, LibraryEpisode])
             if episode.season_index in episodes_by_season:
                 episodes_by_season[episode.season_index].append(episode)
 
-        imdb_ids, tmdb_ids, tvdb_ids, anidb_ids, anilist_ids, mal_ids = (
-            self._extract_external_ids(item)
-        )
-        ordering = self._get_effective_show_ordering(item, tmdb_ids, tvdb_ids)
+        mapping_graph = self.animap_client.get_graph_for_ids(item.ids())
 
-        mappings = list(
-            self.animap_client.get_mappings(
-                imdb=imdb_ids or None,
-                tmdb=tmdb_ids or None,
-                tvdb=tvdb_ids or None,
-                anidb=anidb_ids or None,
-                anilist=anilist_ids or None,
-                mal=mal_ids or None,
-            )
-        )
+        for season_index, season in seasons.items():
+            scope = f"s{season_index}"
+            list_media_key: str | None = None
 
-        processed_seasons: set[int] = set()
+            resolver = getattr(self.list_provider, "resolve_mappings", None)
+            if callable(resolver):
+                try:
+                    resolved = resolver(mapping_graph, scope=scope)
+                    if resolved is not None:
+                        list_media_key = str(resolved)
+                except Exception:
+                    list_media_key = None
 
-        for animapping in mappings:
-            parsed_mappings = self._get_effective_mappings(item, animapping)
-            # A season is only relevant if it has at least one mapping.
-            # Special seasons are more strict and must match the show's ordering.
-            relevant_seasons = {
-                mapping.season: seasons[mapping.season]
-                for mapping in parsed_mappings
-                if mapping.season in seasons
-                and (mapping.season != 0 or mapping.service in {ordering, ""})
-            }
-            if not relevant_seasons:
-                continue
+            if list_media_key is None:
+                list_media_key = self._resolve_list_media_key(
+                    mapping=mapping_graph, media_key=None, scope=scope
+                )
 
-            # To continue with this mapping, there must be at least one episode in the
-            # mapping range with some user activity, or we must be doing a full scan
-            # or destructive sync.
-            if not (self.destructive_sync or self.full_scan or item.on_watchlist):
-                mapping_candidates: list[LibraryEpisode] = []
-                any_relevant = False
-                for mapping in parsed_mappings:
-                    season_episodes = episodes_by_season.get(mapping.season, [])
-                    selected = [
-                        episode
-                        for episode in season_episodes
-                        if episode.index >= mapping.start
-                        and (mapping.end is None or episode.index <= mapping.end)
-                    ]
-                    if any(
-                        episode.view_count or episode.user_rating is not None
-                        for episode in selected
-                    ):
-                        any_relevant = True
-                    mapping_candidates.extend(selected)
-                if not any_relevant:
-                    if mapping_candidates:
-                        # These range-mapped episodes have no activity, so treat them
-                        # as intentionally skipped instead of leaving them pending.
-                        self.sync_stats.track_items(
-                            ItemIdentifier.from_items(mapping_candidates),
-                            SyncOutcome.SKIPPED,
-                        )
+            if list_media_key:
+                try:
+                    entry = await self.list_provider.get_entry(list_media_key)
+                except Exception:
+                    entry = None
+                episodes = episodes_by_season.get(season_index, [])
+                if episodes:
+                    yield season, tuple(episodes), mapping_graph, entry, list_media_key
                     continue
 
-            episodes: list[LibraryEpisode] = []
-            episode_counts: Counter[int] = Counter()
-
-            for mapping in parsed_mappings:
-                season_index = mapping.season
-                if season_index not in relevant_seasons:
-                    continue
-
-                season_episodes = episodes_by_season.get(season_index, [])
-                filtered = [
-                    episode
-                    for episode in season_episodes
-                    if episode.index >= mapping.start
-                    and (mapping.end is None or episode.index <= mapping.end)
-                ]
-
-                if mapping.ratio < 0:
-                    filtered = [
-                        episode for episode in filtered for _ in range(-mapping.ratio)
-                    ]
-                elif mapping.ratio > 0 and filtered:
-                    included: list[LibraryEpisode] = []
-                    suppressed: list[LibraryEpisode] = []
-                    for idx, episode in enumerate(filtered):
-                        if idx % mapping.ratio == 0:
-                            included.append(episode)
-                        else:
-                            suppressed.append(episode)
-                    if suppressed:
-                        with contextlib.suppress(Exception):
-                            self.sync_stats.track_items(
-                                ItemIdentifier.from_items(suppressed),
-                                SyncOutcome.SKIPPED,
-                            )
-                    filtered = included
-
-                episodes.extend(filtered)
-                episode_counts.update({season_index: len(filtered)})
-
-            if not episodes:
-                continue
-
-            try:
-                entry = await self.list_provider.get_entry(str(animapping.anilist_id))
-            except Exception:
-                continue
-
-            processed_seasons.update(episode_counts.keys())
-            primary_season_index = episode_counts.most_common(1)[0][0]
-            primary_season = relevant_seasons[primary_season_index]
-
-            yield primary_season, tuple(episodes), animapping, entry
-
-        remaining_seasons = sorted(set(seasons) - processed_seasons)
-        for season_index in remaining_seasons:
-            if season_index < 1:
-                continue
-            season = seasons[season_index]
             entry = await self.search_media(item, season)
             if entry is None:
                 continue
             episodes = list(episodes_by_season.get(season_index, []))
             if not episodes:
                 continue
-            yield season, episodes, None, entry
+            yield season, episodes, None, entry, entry.media().key
 
     async def search_media(
         self, item: LibraryShow, child_item: LibrarySeason
@@ -203,7 +117,7 @@ class ShowSyncClient(BaseSyncClient[LibraryShow, LibrarySeason, LibraryEpisode])
         child_item: LibrarySeason,
         grandchild_items: Sequence[LibraryEpisode],
         entry: ListEntry,
-        animapping: AniMap | None,
+        mapping: MappingGraph | None,
     ) -> ListStatus | None:
         watched_count = len(
             [episode for episode in grandchild_items if episode.view_count]
@@ -214,10 +128,10 @@ class ShowSyncClient(BaseSyncClient[LibraryShow, LibrarySeason, LibraryEpisode])
         )
         on_watching = item.on_watching and any(
             episode.on_watching for episode in grandchild_items
-        )  # Check item.on_watching first to pre-filter unwatched shows (perf)
+        )
         is_finished = (
             entry.total_units is not None and watched_count >= entry.total_units
-        )
+        ) or (entry.total_units is None and watched_count >= len(grandchild_items))
 
         if is_finished:
             if on_watching and min_view_count >= 1:
@@ -244,7 +158,7 @@ class ShowSyncClient(BaseSyncClient[LibraryShow, LibrarySeason, LibraryEpisode])
         child_item: LibrarySeason,
         grandchild_items: Sequence[LibraryEpisode],
         entry: ListEntry,
-        animapping: AniMap | None,
+        mapping: MappingGraph | None,
     ) -> int | None:
         scores = [
             episode.user_rating for episode in grandchild_items if episode.user_rating
@@ -264,7 +178,7 @@ class ShowSyncClient(BaseSyncClient[LibraryShow, LibrarySeason, LibraryEpisode])
         child_item: LibrarySeason,
         grandchild_items: Sequence[LibraryEpisode],
         entry: ListEntry,
-        animapping: AniMap | None,
+        mapping: MappingGraph | None,
     ) -> int | None:
         watched = len([episode for episode in grandchild_items if episode.view_count])
         total_units = entry.total_units or len(grandchild_items)
@@ -279,7 +193,7 @@ class ShowSyncClient(BaseSyncClient[LibraryShow, LibrarySeason, LibraryEpisode])
         child_item: LibrarySeason,
         grandchild_items: Sequence[LibraryEpisode],
         entry: ListEntry,
-        animapping: AniMap | None,
+        mapping: MappingGraph | None,
     ) -> int | None:
         view_counts = [
             episode.view_count for episode in grandchild_items if episode.view_count
@@ -293,7 +207,7 @@ class ShowSyncClient(BaseSyncClient[LibraryShow, LibrarySeason, LibraryEpisode])
         child_item: LibrarySeason,
         grandchild_items: Sequence[LibraryEpisode],
         entry: ListEntry,
-        animapping: AniMap | None,
+        mapping: MappingGraph | None,
     ) -> datetime | None:
         history = await self._filter_history_by_episodes(item, grandchild_items)
         if not history:
@@ -307,7 +221,7 @@ class ShowSyncClient(BaseSyncClient[LibraryShow, LibrarySeason, LibraryEpisode])
         child_item: LibrarySeason,
         grandchild_items: Sequence[LibraryEpisode],
         entry: ListEntry,
-        animapping: AniMap | None,
+        mapping: MappingGraph | None,
     ) -> datetime | None:
         history = await self._filter_history_by_episodes(item, grandchild_items)
         if not history:
@@ -321,24 +235,20 @@ class ShowSyncClient(BaseSyncClient[LibraryShow, LibrarySeason, LibraryEpisode])
         child_item: LibrarySeason,
         grandchild_items: Sequence[LibraryEpisode],
         entry: ListEntry,
-        animapping: AniMap | None,
+        mapping: MappingGraph | None,
     ) -> str | None:
-        # If this is a single-episode entry, prefer the episode's review first.
         if entry.total_units == 1 and len(grandchild_items) == 1:
             review = await grandchild_items[0].review()
             if review:
                 return review
-        # Otherwise, prefer the season's review before the show's review.
         return await child_item.review() or await item.review()
 
     def _debug_log_title(
-        self, item: LibraryShow, animapping: AniMap | None = None
+        self,
+        item: LibraryShow,
+        mapping: MappingGraph | None = None,
+        media_key: str | None = None,
     ) -> str:
-        if animapping:
-            mappings = self._get_effective_mappings(item, animapping)
-            mapping_str = ", ".join(str(mapping) for mapping in mappings)
-            if mapping_str:
-                return f"$$'{item.title} ({mapping_str})'$$"
         return f"$$'{item.title}'$$"
 
     def _debug_log_ids(
@@ -347,20 +257,20 @@ class ShowSyncClient(BaseSyncClient[LibraryShow, LibrarySeason, LibraryEpisode])
         item: LibraryShow,
         child_item: LibrarySeason,
         entry: ListEntry | None,
-        animapping: AniMap | None,
+        mapping: MappingGraph | None,
+        media_key: str | None,
     ) -> str:
-        ids = ", ".join(repr(external) for external in item.ids())
-        ids = ids or "none"
-        media_key = self._resolve_list_media_key(
-            animapping, entry.media().key if entry else None
+        media_key = (
+            media_key
+            or self._resolve_list_media_key(
+                mapping=mapping,
+                media_key=entry.media().key if entry else None,
+                scope="movie",
+            )
+            or "unknown"
         )
-        media_key = media_key or "unknown"
-        return (
-            f"$${{library_key: {child_item.key}, media_key: {media_key}"
-            + f", {ids}}}$$"
-            if ids
-            else ""
-        )
+        ids = {"library_key": child_item.key, "list_key": media_key, **item.ids()}
+        return self._format_external_ids(ids)
 
     @glru_cache(maxsize=32, key=lambda self, item: item)
     def __get_wanted_seasons(self, item: LibraryShow) -> dict[int, LibrarySeason]:
@@ -395,29 +305,3 @@ class ShowSyncClient(BaseSyncClient[LibraryShow, LibrarySeason, LibraryEpisode])
         filtered = [entry for entry in history if entry.library_key in episode_keys]
         filtered.sort(key=lambda record: record.viewed_at)
         return filtered
-
-    @glru_cache(maxsize=32, key=lambda self, item, tmdb_ids, tvdb_ids: item)
-    def _get_effective_show_ordering(
-        self,
-        item: LibraryShow,
-        tmdb_ids: Sequence[int],
-        tvdb_ids: Sequence[int],
-    ) -> str:
-        if item.ordering == "tvdb" and tvdb_ids:
-            return "tvdb"
-        if item.ordering == "tmdb" and tmdb_ids:
-            return "tmdb"
-        if tvdb_ids:
-            return "tvdb"
-        if tmdb_ids:
-            return "tmdb"
-        return ""
-
-    def _get_effective_mappings(
-        self, item: LibraryShow, animapping: AniMap
-    ) -> list[EpisodeMapping]:
-        if item.ordering == "tmdb" and animapping.parsed_tmdb_mappings:
-            return animapping.parsed_tmdb_mappings
-        if item.ordering == "tvdb" and animapping.parsed_tvdb_mappings:
-            return animapping.parsed_tvdb_mappings
-        return animapping.parsed_tmdb_mappings or animapping.parsed_tvdb_mappings

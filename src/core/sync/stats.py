@@ -14,8 +14,8 @@ from anibridge.library import (
 from anibridge.list import ListEntry, ListStatus
 from pydantic import BaseModel
 
+from src.core.animap import MappingGraph
 from src.exceptions import UnsupportedMediaTypeError
-from src.models.db.animap import AniMap
 from src.models.db.sync_history import SyncOutcome
 
 __all__ = [
@@ -392,7 +392,7 @@ class BatchUpdate[ParentMediaT: LibraryMedia, ChildMediaT: LibraryMedia]:
     item: ParentMediaT
     child: ChildMediaT
     grandchildren: Sequence[LibraryMedia]
-    mapping: AniMap | None
+    mapping: MappingGraph | None
     before: EntrySnapshot | None
     after: EntrySnapshot
     entry: ListEntry

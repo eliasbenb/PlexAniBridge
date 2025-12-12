@@ -11,18 +11,18 @@ import yaml
 
 from src import __version__, log
 
-__all__ = ["AniMapDict", "MappingsClient"]
+__all__ = ["AnimapDict", "MappingsClient"]
 
-type AniMapDict = dict[str, dict[str, Any]]
+type AnimapDict = dict[str, dict[str, Any]]
 
 
 class MappingsClient:
     """Load mappings from files or URLs and merge them together."""
 
     MAPPING_FILES: ClassVar[list[str]] = [
-        "mappings.custom.yaml",
-        "mappings.custom.yml",
-        "mappings.custom.json",
+        "mappings.yaml",
+        "mappings.yml",
+        "mappings.json",
     ]
 
     def __init__(self, data_path: Path, upstream_url: str | None) -> None:
@@ -148,7 +148,7 @@ class MappingsClient:
 
     async def _load_includes(
         self, includes: list[str], loaded_chain: set[str], parent: str
-    ) -> AniMapDict:
+    ) -> AnimapDict:
         """Load mappings from included files or URLs.
 
         Args:
@@ -158,7 +158,7 @@ class MappingsClient:
             parent (str): Parent path or URL to resolve relative paths against
 
         Returns:
-            AniMapDict: Merged mappings from all included files
+            AnimapDict: Merged mappings from all included files
         """
         mappings: dict[str, dict[str, Any]] = {}
         for include in includes:
@@ -183,7 +183,7 @@ class MappingsClient:
 
     async def _load_mappings_file(
         self, file: str, loaded_chain: set[str]
-    ) -> AniMapDict:
+    ) -> AnimapDict:
         """Load mappings from a file.
 
         Args:
@@ -192,9 +192,9 @@ class MappingsClient:
                                      includes
 
         Returns:
-            AniMapDict: Mappings loaded from the file
+            AnimapDict: Mappings loaded from the file
         """
-        mappings: AniMapDict = {}
+        mappings: AnimapDict = {}
         file_path = Path(file)
 
         try:
@@ -247,7 +247,7 @@ class MappingsClient:
 
     async def _load_mappings_url(
         self, url: str, loaded_chain: set[str], retry_count: int = 0
-    ) -> AniMapDict:
+    ) -> AnimapDict:
         """Load mappings from a URL.
 
         Args:
@@ -257,9 +257,9 @@ class MappingsClient:
             retry_count (int): Number of retries to attempt (default: 0)
 
         Returns:
-            AniMapDict: Mappings loaded from the URL
+            AnimapDict: Mappings loaded from the URL
         """
-        mappings: AniMapDict = {}
+        mappings: AnimapDict = {}
         mappings_raw: str = ""
         session = await self._get_session()
 
@@ -329,7 +329,7 @@ class MappingsClient:
 
     async def _load_mappings(
         self, src: str, loaded_chain: set[str] | None = None
-    ) -> AniMapDict:
+    ) -> AnimapDict:
         """Load mappings from a file or URL.
 
         Args:
@@ -338,7 +338,7 @@ class MappingsClient:
                                      circular includes (default: empty set)
 
         Returns:
-            AniMapDict: Mappings loaded from the file or URL
+            AnimapDict: Mappings loaded from the file or URL
         """
         if loaded_chain is None:
             loaded_chain = set()
@@ -354,31 +354,23 @@ class MappingsClient:
             log.warning(f"Invalid mappings source: $$'{src}'$$, skipping")
             return {}
 
-    def _deep_merge(self, d1: AniMapDict, d2: AniMapDict) -> AniMapDict:
-        """Recursively merge two dictionaries.
-
-        Special handling for episode mapping keys to prevent overwriting.
-
-        Args:
-            d1 (AniMapDict): First dictionary
-            d2 (AniMapDict): Second dictionary
-
-        Returns:
-            AniMapDict: Merged dictionary
-        """
+    def _deep_merge(self, d1: AnimapDict, d2: AnimapDict) -> AnimapDict:
+        """Recursively merge two dictionaries with last-write-wins semantics."""
         result = d1.copy()
 
         for key, value in d2.items():
-            if key in ("tmdb_mappings", "tvdb_mappings") or key not in result:
+            if key not in result:
                 result[key] = value
-            elif isinstance(result[key], dict) and isinstance(value, dict):
+                continue
+
+            if isinstance(result[key], dict) and isinstance(value, dict):
                 result[key] = self._deep_merge(result[key], value)
             else:
                 result[key] = value
 
         return result
 
-    async def load_mappings(self) -> AniMapDict:
+    async def load_mappings(self) -> AnimapDict:
         """Load mappings from files and URLs and merge them together.
 
         Loads custom mappings from local files (if they exist) and default mappings
@@ -386,7 +378,7 @@ class MappingsClient:
         Filters out any keys starting with '$' from the final result.
 
         Returns:
-            AniMapDict: Merged mappings with system keys removed
+            AnimapDict: Merged mappings with system keys removed
         """
         self._loaded_sources = set()
         self._provenance = {}
@@ -422,19 +414,6 @@ class MappingsClient:
 
         return {k: v for k, v in merged_mappings.items() if not k.startswith("$")}
 
-    def get_provenance(self) -> dict[int, list[str]]:
-        """Return a copy of the provenance map collected during the last load.
-
-        Returns:
-            dict[int, list[str]]: Mapping of anilist_id to list of unique sources
-        """
-        result: dict[int, list[str]] = {}
-        for k, sources in self._provenance.items():
-            try:
-                anilist_id = int(k)
-            except ValueError:
-                log.warning(f"Skipping invalid anilist_id in provenance: $$'{k}'$$")
-                continue
-            result[anilist_id] = [str(s) for s in sources]
-
-        return result
+    def get_provenance(self) -> dict[str, list[str]]:
+        """Return a copy of the provenance map collected during the last load."""
+        return {str(k): list(v) for k, v in self._provenance.items()}

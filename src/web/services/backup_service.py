@@ -177,8 +177,14 @@ class BackupService:
         except json.JSONDecodeError as exc:
             raise BackupParseError("Backup file is not valid JSON") from exc
 
+        deserialize = getattr(bridge.list_provider, "deserialize_backup_entries", None)
+        if deserialize is None:
+            raise BackupParseError(
+                "List provider does not support backup deserialization"
+            )
+
         try:
-            parsed = bridge.list_provider.deserialize_backup_entries(raw_payload)
+            parsed = deserialize(raw_payload)
         except NotImplementedError as exc:
             raise BackupParseError(
                 "List provider does not support backup deserialization"
@@ -196,21 +202,31 @@ class BackupService:
             len(entries),
             parsed.user or "unknown",
         )
-        try:
-            await list_provider.restore_entries(entries)
-            restored = len(entries)
-        except Exception as e:
+        restore_entries = getattr(list_provider, "restore_entries", None)
+        if restore_entries is None:
             errors.append(
                 {
                     "index_start": 0,
                     "count": len(entries),
-                    "error": str(e),
+                    "error": "List provider does not support restoring backups",
                 }
             )
-            log.error(
-                f"Error restoring backup entries: {e}",
-                exc_info=True,
-            )
+        else:
+            try:
+                await restore_entries(entries)
+                restored = len(entries)
+            except Exception as e:
+                errors.append(
+                    {
+                        "index_start": 0,
+                        "count": len(entries),
+                        "error": str(e),
+                    }
+                )
+                log.error(
+                    f"Error restoring backup entries: {e}",
+                    exc_info=True,
+                )
         elapsed = perf_counter() - start
         log.info(
             f"Restore completed for profile "

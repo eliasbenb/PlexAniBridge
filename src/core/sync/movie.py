@@ -6,9 +6,9 @@ from datetime import datetime
 from anibridge.library import LibraryMovie
 from anibridge.list import ListEntry, ListMediaType, ListStatus
 
+from src.core.animap import MappingGraph
 from src.core.sync.base import BaseSyncClient
 from src.core.sync.stats import ItemIdentifier
-from src.models.db.animap import AniMap
 
 __all__ = ["MovieSyncClient"]
 
@@ -19,35 +19,40 @@ class MovieSyncClient(BaseSyncClient[LibraryMovie, LibraryMovie, LibraryMovie]):
     async def map_media(
         self, item: LibraryMovie
     ) -> AsyncIterator[
-        tuple[LibraryMovie, Sequence[LibraryMovie], AniMap | None, ListEntry | None]
+        tuple[
+            LibraryMovie,
+            Sequence[LibraryMovie],
+            MappingGraph | None,
+            ListEntry | None,
+            str | None,
+        ]
     ]:
         """Map a library movie to its corresponding list entry."""
-        imdb_ids, tmdb_ids, tvdb_ids, anidb_ids, anilist_ids, mal_ids = (
-            self._extract_external_ids(item)
-        )
-        mappings = list(
-            self.animap_client.get_mappings(
-                imdb=imdb_ids or None,
-                tmdb=tmdb_ids or None,
-                tvdb=tvdb_ids or None,
-                anidb=anidb_ids or None,
-                anilist=anilist_ids or None,
-                mal=mal_ids or None,
-            )
-        )
+        mapping_graph = self.animap_client.get_graph_for_ids(item.ids())
+        list_media_key: str | None = None
 
-        for mapping in mappings:
+        resolver = getattr(self.list_provider, "resolve_mappings", None)
+        if callable(resolver):
             try:
-                entry = await self.list_provider.get_entry(str(mapping.anilist_id))
+                resolved = resolver(mapping_graph, scope="movie")
+                if resolved is not None:
+                    list_media_key = str(resolved)
             except Exception:
-                continue
+                list_media_key = None
 
-            yield item, (item,), mapping, entry
+        if list_media_key is None:
+            list_media_key = self._resolve_list_media_key(
+                mapping=mapping_graph, media_key=None, scope="movie"
+            )
+
+        if list_media_key is not None:
+            entry = await self.list_provider.get_entry(str(list_media_key))
+            yield item, (item,), mapping_graph, entry, str(list_media_key)
             return
 
         entry = await self.search_media(item, item)
         if entry is not None:
-            yield item, (item,), None, entry
+            yield item, (item,), None, entry, entry.media().key
 
     async def search_media(
         self, item: LibraryMovie, child_item: LibraryMovie
@@ -76,7 +81,7 @@ class MovieSyncClient(BaseSyncClient[LibraryMovie, LibraryMovie, LibraryMovie]):
         child_item: LibraryMovie,
         grandchild_items: Sequence[LibraryMovie],
         entry: ListEntry,
-        animapping: AniMap | None,
+        mapping: MappingGraph | None,
     ) -> ListStatus | None:
         has_views = item.view_count > 0
         history = await item.history()
@@ -101,7 +106,7 @@ class MovieSyncClient(BaseSyncClient[LibraryMovie, LibraryMovie, LibraryMovie]):
         child_item: LibraryMovie,
         grandchild_items: Sequence[LibraryMovie],
         entry: ListEntry,
-        animapping: AniMap | None,
+        mapping: MappingGraph | None,
     ) -> int | None:
         return item.user_rating
 
@@ -112,7 +117,7 @@ class MovieSyncClient(BaseSyncClient[LibraryMovie, LibraryMovie, LibraryMovie]):
         child_item: LibraryMovie,
         grandchild_items: Sequence[LibraryMovie],
         entry: ListEntry,
-        animapping: AniMap | None,
+        mapping: MappingGraph | None,
     ) -> int | None:
         total_units = entry.total_units or len(grandchild_items) or 1
         return total_units if item.view_count > 0 else None
@@ -124,7 +129,7 @@ class MovieSyncClient(BaseSyncClient[LibraryMovie, LibraryMovie, LibraryMovie]):
         child_item: LibraryMovie,
         grandchild_items: Sequence[LibraryMovie],
         entry: ListEntry,
-        animapping: AniMap | None,
+        mapping: MappingGraph | None,
     ) -> int | None:
         return item.view_count - 1 if item.view_count > 0 else None
 
@@ -135,7 +140,7 @@ class MovieSyncClient(BaseSyncClient[LibraryMovie, LibraryMovie, LibraryMovie]):
         child_item: LibraryMovie,
         grandchild_items: Sequence[LibraryMovie],
         entry: ListEntry,
-        animapping: AniMap | None,
+        mapping: MappingGraph | None,
     ) -> datetime | None:
         history = await item.history()
         if not history:
@@ -149,7 +154,7 @@ class MovieSyncClient(BaseSyncClient[LibraryMovie, LibraryMovie, LibraryMovie]):
         child_item: LibraryMovie,
         grandchild_items: Sequence[LibraryMovie],
         entry: ListEntry,
-        animapping: AniMap | None,
+        mapping: MappingGraph | None,
     ) -> datetime | None:
         history = await item.history()
         if not history:
@@ -163,12 +168,15 @@ class MovieSyncClient(BaseSyncClient[LibraryMovie, LibraryMovie, LibraryMovie]):
         child_item: LibraryMovie,
         grandchild_items: Sequence[LibraryMovie],
         entry: ListEntry,
-        animapping: AniMap | None,
+        mapping: MappingGraph | None,
     ) -> str | None:
         return await item.review()
 
     def _debug_log_title(
-        self, item: LibraryMovie, animapping: AniMap | None = None
+        self,
+        item: LibraryMovie,
+        mapping: MappingGraph | None = None,
+        media_key: str | None = None,
     ) -> str:
         return f"$$'{item.title}'$$"
 
@@ -178,17 +186,17 @@ class MovieSyncClient(BaseSyncClient[LibraryMovie, LibraryMovie, LibraryMovie]):
         item: LibraryMovie,
         child_item: LibraryMovie,
         entry: ListEntry | None,
-        animapping: AniMap | None,
+        mapping: MappingGraph | None,
+        media_key: str | None,
     ) -> str:
-        ids = ", ".join(repr(external) for external in item.ids())
-        ids = ids or "none"
-        media_key = self._resolve_list_media_key(
-            animapping, entry.media().key if entry else None
+        media_key = (
+            media_key
+            or self._resolve_list_media_key(
+                mapping=mapping,
+                media_key=entry.media().key if entry else None,
+                scope="movie",
+            )
+            or "unknown"
         )
-        media_key = media_key or "unknown"
-        return (
-            f"$${{library_key: {child_item.key}, media_key: {media_key}"
-            + f", {ids}}}$$"
-            if ids
-            else ""
-        )
+        ids = {"library_key": child_item.key, "list_key": media_key, **item.ids()}
+        return self._format_external_ids(ids)
