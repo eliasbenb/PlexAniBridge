@@ -10,7 +10,7 @@ The smart way to keep your AniList profile perfectly synchronized with your Plex
 ## Key Features
 
 - **🔄 Comprehensive Synchronization**: Automatically syncs watch status, progress, ratings, reviews, and start/completion dates between Plex and AniList.
-- **🎯 Smart Content Matching**: Uses a [curated mappings database](https://github.com/eliasbenb/PlexAniBridge-Mappings) with fuzzy title search fallback and support for custom mapping overrides.
+- **🎯 Smart Content Matching**: Uses a [curated mappings database](https://github.com/anibridge/anibridge-mappings) with fuzzy title search fallback and support for custom mapping overrides.
 - **⚡ Optimized Performance**: Intelligent batch processing, rate limiting, and caching to minimize API usage while maximizing sync speed.
 - **👥 Multi-User & Multi-Profile**: Supports multiple Plex users (including Home users) with individual AniList accounts and configurable sync profiles.
 - **🖥️ Web Dashboard**: Intuitive web interface with a real-time sync timeline, profile management, custom mapping editor, and log viewer.

@@ -265,7 +265,7 @@ class AniBridgeConfig(BaseSettings):
         default=LogLevel.INFO, description="Logging level for the application"
     )
     mappings_url: str | None = Field(
-        default="https://raw.githubusercontent.com/eliasbenb/PlexAniBridge-Mappings/v2/mappings.json",
+        default="https://raw.githubusercontent.com/anibridge/anibridge-mappings-staging/v3/mappings.json",
         description=(
             "URL to JSON or YAML file to use as the upstream mappings source. "
             "If not set, no upstream mappings will be used."

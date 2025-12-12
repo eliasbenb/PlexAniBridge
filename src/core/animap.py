@@ -37,7 +37,7 @@ class AniMapClient:
     a hash of the CDN data to minimize unnecessary updates.
 
     Mapping Source:
-        https://github.com/eliasbenb/PlexAniBridge-Mappings
+        https://github.com/anibridge/anibridge-mappings
     """
 
     _SQLITE_SAFE_VARIABLES = 900
