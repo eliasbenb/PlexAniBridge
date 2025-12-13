@@ -3,13 +3,14 @@
 
     import { Check, Eye, List, RefreshCcw } from "@lucide/svelte";
     import { Checkbox, Popover } from "bits-ui";
-    import { SvelteURLSearchParams } from "svelte/reactivity";
+    import { SvelteSet, SvelteURLSearchParams } from "svelte/reactivity";
 
     import { browser } from "$app/environment";
     import { goto } from "$app/navigation";
     import { resolve } from "$app/paths";
     import {
-        defaultColumns,
+        STATIC_COLUMNS,
+        COLUMNS_STORAGE_KEY,
         type ColumnConfig,
     } from "$lib/components/mappings/columns";
     import EditModal from "$lib/components/mappings/edit-modal.svelte";
@@ -78,16 +79,14 @@
             });
             if (query) p.set("q", query);
             if (customOnly) p.set("custom_only", "true");
-            const titleVisible = columns.some(
-                (column) => column.id === "title" && column.visible,
-            );
-            if (titleVisible) p.set("with_anilist", "true");
+            p.set("with_anilist", "true");
             const r = await apiFetch("/api/mappings?" + p.toString(), {
                 signal: controller.signal,
             });
             if (!r.ok) throw new Error("HTTP " + r.status);
             const d = await r.json();
             items = d.items || [];
+            columns = buildColumnsFromItems(items, columns);
             total = d.total || 0;
             pages = d.pages || 1;
             page = d.page || page;
@@ -135,28 +134,15 @@
         editorOpen = true;
     }
 
-    async function handleDelete({
-        mapping,
-        kind,
-    }: {
-        mapping: Mapping;
-        kind: "custom" | "full";
-    }) {
+    async function handleDelete({ mapping }: { mapping: Mapping }) {
         const message =
-            kind === "full"
-                ? "Are you sure you want to force all fields to null for this mapping?"
-                : "Reset custom override for this mapping and fall back to upstream?";
+            "Are you sure you want to remove this custom override and revert to upstream?";
         if (!confirm(message)) return;
 
         const res = await apiFetch(
-            `/api/mappings/${mapping.anilist_id}?kind=${kind}`,
+            `/api/mappings/${encodeURIComponent(mapping.descriptor)}`,
             { method: "DELETE" },
-            {
-                successMessage:
-                    kind === "full"
-                        ? "Mapping explicitly set to null"
-                        : "Override removed",
-            },
+            { successMessage: "Override removed" },
         );
 
         if (res.ok) {
@@ -170,23 +156,57 @@
     }
 
     let columns = $state<ColumnConfig[]>(restoreColumns());
-    let previousTitleVisible: boolean | null = $state(null); // when title visible changes, refetch with toggled `with_anilist`
 
     function restoreColumns(): ColumnConfig[] {
         try {
-            const raw = localStorage.getItem("mappings.columns.v1");
+            const raw = localStorage.getItem(COLUMNS_STORAGE_KEY);
             if (raw) {
                 const parsed = JSON.parse(raw);
                 if (Array.isArray(parsed)) {
-                    const map = new Map(parsed.map((c: ColumnConfig) => [c.id, c]));
-                    return defaultColumns.map((d) => ({
-                        ...d,
-                        ...(map.get(d.id) || {}),
-                    }));
+                    return parsed as ColumnConfig[];
                 }
             }
         } catch {}
-        return [...defaultColumns];
+        return [...STATIC_COLUMNS];
+    }
+
+    function collectProviders(list: Mapping[]): string[] {
+        const providers = new SvelteSet<string>();
+        for (const item of list) {
+            if (item.provider) providers.add(item.provider);
+            for (const edge of item.edges || []) {
+                providers.add(edge.target_provider);
+            }
+        }
+        return Array.from(providers).sort();
+    }
+
+    function buildColumnsFromItems(
+        list: Mapping[],
+        existing: ColumnConfig[],
+    ): ColumnConfig[] {
+        const stored = new Map(existing.map((c) => [c.id, c]));
+        const providers = collectProviders(list);
+
+        const dynamic = providers.map((p) => ({
+            id: `provider:${p}`,
+            title: p.toUpperCase(),
+            visible: true,
+            width: 140,
+            minWidth: 120,
+            resizable: true,
+        } satisfies ColumnConfig));
+
+        const ordered = [
+            STATIC_COLUMNS[0],
+            STATIC_COLUMNS[1],
+            STATIC_COLUMNS[2],
+            ...dynamic,
+            STATIC_COLUMNS[3],
+            STATIC_COLUMNS[4],
+        ];
+
+        return ordered.map((col) => ({ ...col, ...(stored.get(col.id) || {}) }));
     }
 
     function hideAllColumns() {
@@ -198,27 +218,13 @@
     }
 
     function resetColumns() {
-        columns = [...defaultColumns];
+        columns = buildColumnsFromItems(items, STATIC_COLUMNS);
     }
 
     $effect(() => {
         try {
-            localStorage.setItem("mappings.columns.v1", JSON.stringify(columns));
+            localStorage.setItem(COLUMNS_STORAGE_KEY, JSON.stringify(columns));
         } catch {}
-    });
-
-    $effect(() => {
-        const current = columns.some(
-            (column) => column.id === "title" && column.visible,
-        );
-        if (previousTitleVisible === null) {
-            previousTitleVisible = current;
-            return;
-        }
-        if (current !== previousTitleVisible) {
-            previousTitleVisible = current;
-            load();
-        }
     });
 
     onMount(() => {

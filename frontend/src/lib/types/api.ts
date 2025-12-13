@@ -16,36 +16,33 @@ export interface ProviderMediaMetadata {
 }
 
 // --- Mappings API ---
-export interface Mapping {
-    anilist_id: number;
-    anidb_id?: number | null;
-    imdb_id?: string[] | null;
-    mal_id?: number[] | null;
-    tmdb_movie_id?: number[] | null;
-    tmdb_show_id?: number | null;
-    tvdb_id?: number | null;
-    tmdb_mappings?: Record<string, string> | null;
-    tvdb_mappings?: Record<string, string> | null;
-    anilist?: AniListMedia | null;
-    custom?: boolean;
+export interface MappingEdge {
+    target_provider: string;
+    target_entry_id: string;
+    target_scope: string;
+    source_range: string;
+    destination_range?: string | null;
     sources?: string[];
 }
 
-export type MappingOverrideMode = "omit" | "null" | "value";
-
-export interface MappingOverrideFieldInput {
-    mode: MappingOverrideMode;
-    value?: unknown;
+export interface Mapping {
+    descriptor: string;
+    provider: string;
+    entry_id: string;
+    scope: string;
+    edges: MappingEdge[];
+    custom?: boolean;
+    sources?: string[];
+    anilist?: AniListMedia | null;
 }
 
 export interface MappingOverridePayload {
-    anilist_id: number;
-    fields?: Record<string, MappingOverrideFieldInput> | null;
-    raw?: Record<string, unknown> | null;
+    descriptor: string;
+    targets: Record<string, Record<string, string | null>>;
 }
 
 export interface MappingDetail extends Mapping {
-    override?: Record<string, unknown> | null;
+    override?: Record<string, Record<string, string | null>> | null;
 }
 
 export interface ListMappingsResponse {
