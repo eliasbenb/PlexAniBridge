@@ -8,9 +8,8 @@ from itertools import batched
 from pathlib import Path
 from typing import NamedTuple
 
-from sqlalchemy import and_, select, tuple_
 from sqlalchemy.orm import Session
-from sqlalchemy.sql import delete, or_
+from sqlalchemy.sql import delete, select, tuple_
 
 from src import log
 from src.config.database import db
@@ -39,8 +38,8 @@ class MappingGraph:
     def descriptors(self) -> tuple[MappingDescriptor, ...]:
         """Return unique descriptors referenced by the edges.
 
-        AniList's provider resolver expects this helper to enumerate all
-        descriptors when a direct scoped match is unavailable.
+        Returns:
+            tuple[MappingDescriptor, ...]: Ordered unique descriptors.
         """
         seen: set[str] = set()
         ordered: list[MappingDescriptor] = []
@@ -68,7 +67,14 @@ class MappingDescriptor:
 
     @classmethod
     def parse(cls, raw: str) -> MappingDescriptor:
-        """Parse a descriptor string into its components."""
+        """Parse a descriptor string into its components.
+
+        Args:
+            raw (str): Raw descriptor string.
+
+        Returns:
+            MappingDescriptor: Parsed descriptor object.
+        """
         match = cls._PATTERN.match(raw)
         if not match:
             raise ValueError("Invalid mapping descriptor")
@@ -97,6 +103,10 @@ class AnimapClient:
         self.data_path = data_path
         self.upstream_url = upstream_url
         self.mappings_client = MappingsClient(data_path, upstream_url)
+        self._edge_cache: tuple[AnimapEdge, ...] = tuple()
+        self._adjacency: dict[tuple[str, str], tuple[int, ...]] = {}
+        self._lookup_cache: dict[frozenset[tuple[str, str]], MappingGraph] = {}
+        self._cache_version: str | None = None
 
     async def initialize(self) -> None:
         """Initialize and immediately sync the local database."""
@@ -279,107 +289,108 @@ class AnimapClient:
 
         return descriptors, edges, provenance, invalid_count
 
+    def _build_cache_from_edges(
+        self, edges: tuple[AnimapEdge, ...], version: str
+    ) -> None:
+        """Populate in-memory adjacency for fast lookups."""
+        adjacency: dict[tuple[str, str], list[int]] = {}
+        for idx, edge in enumerate(edges):
+            for descriptor in (edge.source, edge.destination):
+                adjacency.setdefault(
+                    (descriptor.provider, descriptor.entry_id), []
+                ).append(idx)
+
+        self._edge_cache = edges
+        self._adjacency = {key: tuple(ids) for key, ids in adjacency.items()}
+        self._lookup_cache.clear()
+        self._cache_version = version
+
+    def _build_cache_from_db(self) -> None:
+        """Rebuild the in-memory graph cache from the SQLite tables."""
+        with db() as ctx:
+            entries = {
+                entry.id: entry
+                for entry in ctx.session.execute(select(AnimapEntry)).scalars().all()
+            }
+            mappings = ctx.session.execute(select(AnimapMapping)).scalars().all()
+
+        edges: list[AnimapEdge] = []
+
+        for mapping in mappings:
+            src_entry = entries.get(mapping.source_entry_id)
+            dst_entry = entries.get(mapping.destination_entry_id)
+            if not src_entry or not dst_entry:
+                continue
+
+            edges.append(
+                AnimapEdge(
+                    source=MappingDescriptor(
+                        provider=src_entry.provider,
+                        entry_id=src_entry.entry_id,
+                        scope=src_entry.entry_scope,
+                    ),
+                    destination=MappingDescriptor(
+                        provider=dst_entry.provider,
+                        entry_id=dst_entry.entry_id,
+                        scope=dst_entry.entry_scope,
+                    ),
+                    source_range=mapping.source_range,
+                    destination_range=mapping.destination_range,
+                )
+            )
+
+        self._build_cache_from_edges(tuple(edges), self._cache_version or "db")
+
+    def _ensure_cache(self) -> None:
+        if not self._edge_cache:
+            self._build_cache_from_db()
+
     def get_graph_for_ids(self, external_ids: dict[str, str]) -> MappingGraph:
         """Return all edges touching the supplied external identifiers.
-
-        The mapping provider namespace may not match the calling provider's
-        namespace; callers receive the full set of related edges and can pick
-        whichever descriptors they understand.
 
         Args:
             external_ids (dict[str, str]): Mapping of provider names to entry IDs.
 
         Returns:
-            MappingGraph: Graph of all edges touching the provided external IDs.
+            MappingGraph: Subgraph containing all relevant edges.
         """
-        with db() as ctx:
-            # Fetch entries matching any provided external id
-            candidate_entries = (
-                ctx.session.query(AnimapEntry)
-                .filter(
-                    or_(
-                        *(
-                            and_(
-                                AnimapEntry.provider == provider,
-                                AnimapEntry.entry_id == entry_id,
-                            )
-                            for provider, entry_id in external_ids.items()
-                        )
-                    )
-                )
-                .all()
-            )
+        self._ensure_cache()
 
-            candidate_entry_ids = {entry.id for entry in candidate_entries}
-            if not candidate_entry_ids:
-                return MappingGraph(edges=tuple())
+        if not external_ids:
+            return MappingGraph(edges=tuple())
 
-            # Retrieve any mapping where either side references the candidate set
-            mappings = (
-                ctx.session.query(AnimapMapping)
-                .filter(
-                    (AnimapMapping.source_entry_id.in_(candidate_entry_ids))
-                    | (AnimapMapping.destination_entry_id.in_(candidate_entry_ids))
-                )
-                .all()
-            )
+        cache_key = frozenset(external_ids.items())
+        if self._cache_version is not None and cache_key in self._lookup_cache:
+            return self._lookup_cache[cache_key]
 
-            # Ensure we have descriptors for all involved entries, including
-            # those not directly matched by the external ids (destinations).
-            related_entry_ids = {
-                entry_id
-                for mapping in mappings
-                for entry_id in (mapping.source_entry_id, mapping.destination_entry_id)
-            }
+        edge_indexes: set[int] = set()
+        for provider, entry_id in external_ids.items():
+            edge_indexes.update(self._adjacency.get((provider, entry_id), ()))
 
-            if related_entry_ids:
-                related_entries = (
-                    ctx.session.query(AnimapEntry)
-                    .filter(AnimapEntry.id.in_(related_entry_ids))
-                    .all()
-                )
-            else:
-                related_entries = []
+        if not edge_indexes:
+            graph = MappingGraph(edges=tuple())
+        else:
+            graph = MappingGraph(edges=tuple(self._edge_cache[i] for i in edge_indexes))
 
-            entry_by_id = {entry.id: entry for entry in related_entries}
-            edges: list[AnimapEdge] = []
+        if self._cache_version is not None:
+            self._lookup_cache[cache_key] = graph
 
-            for mapping in mappings:
-                src_entry = entry_by_id.get(mapping.source_entry_id)
-                dst_entry = entry_by_id.get(mapping.destination_entry_id)
-                if not src_entry or not dst_entry:
-                    continue
-
-                source_desc = MappingDescriptor(
-                    provider=src_entry.provider,
-                    entry_id=src_entry.entry_id,
-                    scope=src_entry.entry_scope,
-                )
-                dest_desc = MappingDescriptor(
-                    provider=dst_entry.provider,
-                    entry_id=dst_entry.entry_id,
-                    scope=dst_entry.entry_scope,
-                )
-
-                edges.append(
-                    AnimapEdge(
-                        source=source_desc,
-                        destination=dest_desc,
-                        source_range=mapping.source_range,
-                        destination_range=mapping.destination_range,
-                    )
-                )
-
-        return MappingGraph(edges=tuple(edges))
+        return graph
 
     async def sync_db(self) -> None:
         """Synchronize the local database with the upstream mappings."""
+        self._edge_cache = tuple()
+        self._adjacency = {}
+        self._lookup_cache.clear()
+        self._cache_version = None
+
         mappings = await self.mappings_client.load_mappings()
         provenance_by_descriptor = self.mappings_client.get_provenance()
 
         descriptors, edges, provenance, invalid_count = self._build_edges(
             mappings, provenance_by_descriptor
         )
+        edge_list = tuple(edges.values())
 
         curr_mappings_hash = md5(
             json.dumps(mappings, sort_keys=True).encode()
@@ -513,7 +524,9 @@ class AnimapClient:
 
             ctx.session.commit()
 
-            log.debug(
+            self._build_cache_from_edges(edge_list, curr_mappings_hash)
+
+            log.success(
                 "Database sync complete: "
                 f"{len(to_delete_entries)} entries removed, "
                 f"{len(to_delete_mappings)} mappings removed, "
