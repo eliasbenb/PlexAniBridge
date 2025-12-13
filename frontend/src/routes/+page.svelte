@@ -171,7 +171,7 @@
                         ? "A sync is currently running. Please wait."
                         : "Trigger a full sync for all profiles"}>
                     <RefreshCcw class="inline h-3 w-3 sm:h-4 sm:w-4" />
-                    <span>Full Sync All</span>
+                    <span>Full Scan All</span>
                 </button>
                 <button
                     class="inline-flex items-center gap-1 rounded-md border border-sky-600/60 bg-sky-600/30 px-2 py-1 text-xs font-medium text-sky-200 shadow-sm backdrop-blur-sm transition-colors hover:bg-sky-600/40 focus:ring-2 focus:ring-sky-500/40 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 sm:gap-1 sm:px-3 sm:py-1.5 sm:text-sm"
@@ -181,7 +181,7 @@
                         ? "A sync is currently running. Please wait."
                         : "Trigger a poll sync for all profiles"}>
                     <CloudDownload class="inline h-3 w-3 sm:h-4 sm:w-4" />
-                    <span>Poll Sync All</span>
+                    <span>Poll Scan All</span>
                 </button>
             </div>
         </div>
@@ -321,15 +321,15 @@
                 <div class="mt-3 flex flex-wrap gap-2 text-xs">
                     {#if p.config.scan_modes?.includes("periodic")}<span
                             class="rounded-md bg-slate-800/80 px-2 py-1 text-blue-200"
-                            >Periodic Sync</span
+                            >Periodic Scan</span
                         >{/if}
                     {#if p.config.scan_modes?.includes("poll")}<span
                             class="rounded-md bg-slate-800/80 px-2 py-1 text-blue-200"
-                            >Poll Sync</span
+                            >Poll Scan</span
                         >{/if}
                     {#if p.config.scan_modes?.includes("webhook")}<span
                             class="rounded-md bg-slate-800/80 px-2 py-1 text-blue-200"
-                            >Webhook Sync</span
+                            >Webhook Scan</span
                         >{/if}
                     {#if p.config.full_scan}<span
                             class="rounded-md bg-slate-800/80 px-2 py-1 text-blue-200"
