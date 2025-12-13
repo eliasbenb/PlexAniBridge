@@ -13,11 +13,11 @@
         STATIC_COLUMNS,
         type ColumnConfig,
     } from "$lib/components/mappings/columns";
-    import EditModal from "$lib/components/mappings/edit-modal.svelte";
+    import EditorPanel from "$lib/components/mappings/editor-panel.svelte";
     import MappingsTable from "$lib/components/mappings/mappings-table.svelte";
     import SearchBar from "$lib/components/mappings/tool-bar.svelte";
     import Pagination from "$lib/components/pagination.svelte";
-    import type { Mapping } from "$lib/types/api";
+    import type { Mapping, MappingDetail } from "$lib/types/api";
     import { apiFetch, isAbortError } from "$lib/utils/api";
     import { toast } from "$lib/utils/notify";
 
@@ -32,9 +32,8 @@
 
     let currentAbort: AbortController | null = null;
 
-    let editorOpen = $state(false);
     let editorMode = $state<"create" | "edit">("create");
-    let editorTarget = $state<Mapping | null>(null);
+    let selectedMapping = $state<Mapping | null>(null);
 
     let pendingReplaceState: boolean | null = null;
 
@@ -90,6 +89,7 @@
             total = d.total || 0;
             pages = d.pages || 1;
             page = d.page || page;
+            syncSelected(items);
         } catch (e) {
             if (isAbortError(e)) return;
             console.error("load mappings failed", e);
@@ -124,14 +124,12 @@
 
     function openCreateEditor() {
         editorMode = "create";
-        editorTarget = null;
-        editorOpen = true;
+        selectedMapping = null;
     }
 
     function handleEdit({ mapping }: { mapping: Mapping }) {
         editorMode = "edit";
-        editorTarget = mapping;
-        editorOpen = true;
+        selectedMapping = mapping;
     }
 
     async function handleDelete({ mapping }: { mapping: Mapping }) {
@@ -146,13 +144,21 @@
         );
 
         if (res.ok) {
+            if (selectedMapping?.descriptor === mapping.descriptor) {
+                selectedMapping = null;
+                editorMode = "create";
+            }
             await load();
         }
     }
 
-    async function handleSaved() {
-        editorOpen = false;
+    async function handleSaved(detail: MappingDetail) {
         await load();
+        const found = items.find((m) => m.descriptor === detail.descriptor);
+        if (found) {
+            selectedMapping = found;
+            editorMode = "edit";
+        }
     }
 
     let columns = $state<ColumnConfig[]>(restoreColumns());
@@ -198,8 +204,8 @@
                     id: `provider:${p}`,
                     title: normalizeColumnTitle(p),
                     visible: true,
-                    width: 140,
-                    minWidth: 120,
+                    width: 160,
+                    minWidth: 80,
                     resizable: true,
                 }) satisfies ColumnConfig,
         );
@@ -224,6 +230,22 @@
 
     function resetColumns() {
         columns = buildColumnsFromItems(items, STATIC_COLUMNS);
+    }
+
+    function syncSelected(list: Mapping[]) {
+        if (!selectedMapping) return;
+        const found = list.find((m) => m.descriptor === selectedMapping?.descriptor);
+        if (!found) {
+            selectedMapping = null;
+            editorMode = "create";
+        } else {
+            selectedMapping = found;
+        }
+    }
+
+    function handleSelect({ mapping }: { mapping: Mapping }) {
+        selectedMapping = mapping;
+        editorMode = "edit";
     }
 
     $effect(() => {
@@ -268,104 +290,117 @@
             onCreate={openCreateEditor}
             onSubmit={handleSearchSubmit} />
     </div>
-    <div
-        class="relative flex h-[70vh] flex-col overflow-hidden rounded-md border border-slate-800/70 bg-slate-900/40 backdrop-blur-sm">
-        <div
-            class="flex items-center gap-4 border-b border-slate-800/60 bg-slate-950/50 px-3 py-2 text-[11px]">
-            <span class="text-slate-400"
-                >Showing <span class="font-medium text-slate-200">{items.length}</span
-                >/<span class="text-slate-500">{total}</span></span>
-            {#if pages > 1}<span class="text-slate-500">Page {page} / {pages}</span
-                >{/if}
-            {#if customOnly}<span class="text-emerald-400">Custom overrides only</span
-                >{/if}
-            <span class="flex-1"></span>
-            <button
-                onclick={load}
-                class="-mr-2 inline-flex h-6 w-6 items-center justify-center rounded bg-slate-800/50 text-slate-400 transition-colors hover:bg-slate-700 hover:text-slate-200"
-                title="Refresh"
-                aria-label="Refresh">
-                <RefreshCcw class="h-4 w-4" />
-            </button>
-            <!-- Column settings popover -->
-            <Popover.Root>
-                <Popover.Trigger
-                    class="inline-flex h-6 w-6 items-center justify-center rounded bg-slate-800/50 text-slate-400 transition-colors hover:bg-slate-700 hover:text-slate-200"
-                    title="Column settings"
-                    aria-label="Column settings">
-                    <Eye class="h-4 w-4" />
-                </Popover.Trigger>
-                <Popover.Content
-                    class="z-50 w-64 rounded-md border border-slate-700 bg-slate-900 p-3 shadow-lg"
-                    side="bottom"
-                    align="end"
-                    sideOffset={4}>
-                    <div class="flex items-center justify-between">
-                        <h3 class="text-sm font-medium text-slate-200">
-                            Column Visibility
-                        </h3>
-                        {#if columns.some((c) => !c.visible)}<button
-                                onclick={showAllColumns}
-                                class="text-xs text-slate-400 hover:text-slate-200"
-                                >Show All</button>
-                        {:else}
-                            <button
-                                onclick={hideAllColumns}
-                                class="text-xs text-slate-400 hover:text-slate-200"
-                                >Hide All</button>
-                        {/if}
-                    </div>
-                    <div>
-                        <button
-                            onclick={resetColumns}
-                            class="muted mb-3 text-xs text-slate-400 italic hover:text-slate-200">
-                            (reset)
-                        </button>
-                    </div>
-                    <div class="space-y-2">
-                        {#each columns as column (column.id)}
-                            <div class="flex items-center gap-2">
-                                <label
-                                    class="flex cursor-pointer items-center gap-2 text-xs text-slate-300">
-                                    <Checkbox.Root
-                                        bind:checked={column.visible}
-                                        class="flex h-4 w-4 items-center justify-center rounded border border-slate-600 bg-slate-800 data-[state=checked]:border-emerald-600 data-[state=checked]:bg-emerald-600">
-                                        {#snippet children({ checked, indeterminate })}
-                                            {#if indeterminate}
-                                                <div
-                                                    class="h-2 w-2 rounded-sm bg-white">
-                                                </div>
-                                            {:else if checked}
-                                                <Check class="h-3 w-3 text-white" />
-                                            {/if}
-                                        {/snippet}
-                                    </Checkbox.Root>
-                                    <span class="truncate select-none uppercase"
-                                        >{column.title}</span>
-                                </label>
+    <div class="grid gap-4 xl:grid-cols-[2fr,1fr]">
+        <div class="space-y-3">
+            <div
+                class="relative flex h-[70vh] flex-col overflow-hidden rounded-md border border-slate-800/70 bg-slate-900/40 backdrop-blur-sm">
+                <div
+                    class="flex items-center gap-4 border-b border-slate-800/60 bg-slate-950/50 px-3 py-2 text-[11px]">
+                    <span class="text-slate-400"
+                        >Showing <span class="font-medium text-slate-200"
+                            >{items.length}</span
+                        >/<span class="text-slate-500">{total}</span></span>
+                    {#if pages > 1}<span class="text-slate-500"
+                            >Page {page} / {pages}</span
+                        >{/if}
+                    {#if customOnly}<span class="text-emerald-400"
+                            >Custom overrides only</span
+                        >{/if}
+                    <span class="flex-1"></span>
+                    <button
+                        onclick={load}
+                        class="-mr-2 inline-flex h-6 w-6 items-center justify-center rounded bg-slate-800/50 text-slate-400 transition-colors hover:bg-slate-700 hover:text-slate-200"
+                        title="Refresh"
+                        aria-label="Refresh">
+                        <RefreshCcw class="h-4 w-4" />
+                    </button>
+                    <!-- Column settings popover -->
+                    <Popover.Root>
+                        <Popover.Trigger
+                            class="inline-flex h-6 w-6 items-center justify-center rounded bg-slate-800/50 text-slate-400 transition-colors hover:bg-slate-700 hover:text-slate-200"
+                            title="Column settings"
+                            aria-label="Column settings">
+                            <Eye class="h-4 w-4" />
+                        </Popover.Trigger>
+                        <Popover.Content
+                            class="z-50 w-64 rounded-md border border-slate-700 bg-slate-900 p-3 shadow-lg"
+                            side="bottom"
+                            align="end"
+                            sideOffset={4}>
+                            <div class="flex items-center justify-between">
+                                <h3 class="text-sm font-medium text-slate-200">
+                                    Column Visibility
+                                </h3>
+                                {#if columns.some((c) => !c.visible)}<button
+                                        onclick={showAllColumns}
+                                        class="text-xs text-slate-400 hover:text-slate-200"
+                                        >Show All</button>
+                                {:else}
+                                    <button
+                                        onclick={hideAllColumns}
+                                        class="text-xs text-slate-400 hover:text-slate-200"
+                                        >Hide All</button>
+                                {/if}
                             </div>
-                        {/each}
-                    </div>
-                </Popover.Content>
-            </Popover.Root>
+                            <div>
+                                <button
+                                    onclick={resetColumns}
+                                    class="muted mb-3 text-xs text-slate-400 italic hover:text-slate-200">
+                                    (reset)
+                                </button>
+                            </div>
+                            <div class="space-y-2">
+                                {#each columns as column (column.id)}
+                                    <div class="flex items-center gap-2">
+                                        <label
+                                            class="flex cursor-pointer items-center gap-2 text-xs text-slate-300">
+                                            <Checkbox.Root
+                                                bind:checked={column.visible}
+                                                class="flex h-4 w-4 items-center justify-center rounded border border-slate-600 bg-slate-800 data-[state=checked]:border-emerald-600 data-[state=checked]:bg-emerald-600">
+                                                {#snippet children({
+                                                    checked,
+                                                    indeterminate,
+                                                })}
+                                                    {#if indeterminate}
+                                                        <div
+                                                            class="h-2 w-2 rounded-sm bg-white">
+                                                        </div>
+                                                    {:else if checked}
+                                                        <Check
+                                                            class="h-3 w-3 text-white" />
+                                                    {/if}
+                                                {/snippet}
+                                            </Checkbox.Root>
+                                            <span class="truncate uppercase select-none"
+                                                >{column.title}</span>
+                                        </label>
+                                    </div>
+                                {/each}
+                            </div>
+                        </Popover.Content>
+                    </Popover.Root>
+                </div>
+                <MappingsTable
+                    {items}
+                    bind:columns
+                    selectedDescriptor={selectedMapping?.descriptor ?? null}
+                    onSelect={handleSelect}
+                    onEdit={handleEdit}
+                    onDelete={handleDelete}
+                    onNavigateToQuery={({ query: next }) => navigateToQuery(next)} />
+            </div>
+            <Pagination
+                class="mt-3"
+                bind:page
+                bind:perPage
+                bind:pages
+                onChange={load} />
         </div>
-        <MappingsTable
-            {items}
-            bind:columns
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-            onNavigateToQuery={({ query: next }) => navigateToQuery(next)} />
-    </div>
-    <Pagination
-        class="mt-3"
-        bind:page
-        bind:perPage
-        bind:pages
-        onChange={load} />
-</div>
 
-<EditModal
-    bind:open={editorOpen}
-    mode={editorMode}
-    mapping={editorTarget}
-    onSaved={handleSaved} />
+        <EditorPanel
+            mapping={editorMode === "edit" ? selectedMapping : null}
+            mode={editorMode}
+            onSaved={handleSaved}
+            onStartNew={openCreateEditor} />
+    </div>
+</div>

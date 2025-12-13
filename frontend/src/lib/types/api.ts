@@ -57,7 +57,7 @@ export interface ListMappingsResponse {
 export type DeleteMappingResponse = OkResponse;
 
 export type FieldType = "int" | "string" | "enum";
-export type FieldOperator = "=" | ">" | ">=" | "<" | "<=" | "*" | "?" | "range";
+export type FieldOperator = "=" | ">" | ">=" | "<" | "<=" | "*" | "?" | "range" | "in";
 
 export interface FieldCapability {
     key: string;

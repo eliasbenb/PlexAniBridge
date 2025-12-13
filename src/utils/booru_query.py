@@ -15,7 +15,7 @@ Supported syntax:
 - Grouping: `(foo | bar) baz` search for `(foo OR bar) AND baz`
 - IN lists: `foo:bar,baz` search for foo matching any value in the list
 - Ranges: `foo:<10 | foo:100..210` search for foo less than 10 or between 100 and 210
-- Presence: `has:foo` search for mappings that have the field `foo`
+- Null literal: `foo:null` matches rows where `foo` is NULL
 """
 
 from collections.abc import Callable

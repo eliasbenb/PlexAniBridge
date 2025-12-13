@@ -7,9 +7,15 @@ from fastapi import Request
 from fastapi.exceptions import HTTPException
 from fastapi.param_functions import Query
 from fastapi.routing import APIRouter
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
-from src.exceptions import MappingIdMismatchError
+from src.exceptions import (
+    AniListFilterError,
+    AniListSearchError,
+    BooruQueryEvaluationError,
+    BooruQuerySyntaxError,
+    MappingIdMismatchError,
+)
 from src.models.schemas.anilist import Media
 from src.web.services.mapping_overrides_service import (
     get_mapping_overrides_service,
@@ -26,7 +32,7 @@ class MappingEdgeModel(BaseModel):
     target_scope: str
     source_range: str
     destination_range: str | None = None
-    sources: list[str] = []
+    sources: list[str] = Field(default_factory=list)
 
 
 class MappingItemModel(BaseModel):
@@ -36,7 +42,7 @@ class MappingItemModel(BaseModel):
     scope: str
     edges: list[MappingEdgeModel]
     custom: bool = False
-    sources: list[str] = []
+    sources: list[str] = Field(default_factory=list)
     anilist: Media | None = None
 
 
@@ -57,13 +63,16 @@ class MappingOverridePayload(BaseModel):
     """Payload for creating or updating a mapping override."""
 
     descriptor: str
-    targets: dict[str, dict[str, str | None]]
+    targets: dict[str, dict[str, str | None]] | None = None
+    edges: list[dict[str, Any]] | None = None
 
     @field_validator("targets")
     @classmethod
     def _ensure_targets(
-        cls, value: dict[str, dict[str, str | None]]
-    ) -> dict[str, dict[str, str | None]]:
+        cls, value: dict[str, dict[str, str | None]] | None
+    ) -> dict[str, dict[str, str | None]] | None:
+        if value is None:
+            return None
         if not isinstance(value, dict):
             raise ValueError("targets must be an object")
         return value
@@ -71,6 +80,7 @@ class MappingOverridePayload(BaseModel):
 
 class MappingDetailModel(MappingItemModel):
     override: dict[str, dict[str, str | None]] | None = None
+    override_edges: list[dict[str, str | None]] = Field(default_factory=list)
 
 
 class OverrideDeleteKind(str):
@@ -82,6 +92,7 @@ def _prepare_override_kwargs(payload: MappingOverridePayload) -> dict[str, Any]:
     return {
         "descriptor": payload.descriptor,
         "targets": payload.targets,
+        "edges": payload.edges,
     }
 
 
@@ -91,7 +102,7 @@ def get_query_capabilities() -> list[QueryFieldSpec]:
 
 class FieldCapabilityModel(BaseModel):
     key: str
-    aliases: list[str] = []
+    aliases: list[str] = Field(default_factory=list)
     type: str
     operators: list[str]
     values: list[str] | None = None
@@ -128,6 +139,14 @@ async def list_mappings(
             with_anilist=with_anilist,
             cancel_check=cancel_check,
         )
+    except (
+        BooruQuerySyntaxError,
+        BooruQueryEvaluationError,
+        AniListFilterError,
+    ) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except AniListSearchError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
     except asyncio.CancelledError as exc:
         raise HTTPException(status_code=499, detail="Client Closed Request") from exc
 

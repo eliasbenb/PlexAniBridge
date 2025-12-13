@@ -74,6 +74,8 @@
         return columnId.startsWith("provider:") ? columnId.slice(9) : null;
     }
 
+    // scope doesn't need to be used for the known providers here
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     function externalUrl(provider: string, entryId: string, scope?: string) {
         if (!entryId) return null;
         switch (provider) {
@@ -83,11 +85,13 @@
                 return `https://anidb.net/anime/${entryId}`;
             case "imdb":
                 return `https://www.imdb.com/title/${entryId}`;
-            case "tmdb":
-                return scope === "movie"
-                    ? `https://www.themoviedb.org/movie/${entryId}`
-                    : `https://www.themoviedb.org/tv/${entryId}`;
-            case "tvdb":
+            case "tmdb_movie":
+                return `https://www.themoviedb.org/movie/${entryId}`;
+            case "tmdb_show":
+                return `https://www.themoviedb.org/tv/${entryId}`;
+            case "tvdb_movie":
+                return `https://www.thetvdb.com/movies/${entryId}`;
+            case "tvdb_show":
                 return `https://www.thetvdb.com/series/${entryId}`;
             case "mal":
             case "myanimelist":
@@ -246,11 +250,11 @@
                                             )}
                                             onNavigate={() =>
                                                 navigate(
-                                                    `provider:${provider} entry_id:${m.entry_id}`,
+                                                    `source.provider:${provider} source.id:${m.entry_id}`,
                                                 )} />
                                     {:else if edges.length}
                                         <div
-                                            class="space-y-2"
+                                            class="flex flex-wrap gap-2"
                                             title={`Targets mapped from ${provider}`}>
                                             {#each edges as edge (edgeKey(edge))}
                                                 <MappingCard
@@ -266,7 +270,7 @@
                                                     ]}
                                                     onNavigate={() =>
                                                         navigate(
-                                                            `provider:${edge.target_provider} entry_id:${edge.target_entry_id}`,
+                                                            `source.provider:${edge.target_provider} source.id:${edge.target_entry_id}`,
                                                         )} />
                                             {/each}
                                         </div>
@@ -277,7 +281,7 @@
                                 {:else if column.id === "sources"}
                                     {#key (m.sources ?? []).join("|") + ":" + String(m.custom)}
                                         {@const total = (m.sources ?? []).length}
-                                        <div class="flex justify-center">
+                                        <div>
                                             {#if total > 0}
                                                 <Tooltip.Root>
                                                     <Tooltip.Trigger>
