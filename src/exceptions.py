@@ -172,6 +172,12 @@ class MissingAnilistIdError(MappingError, ValueError):
     status_code = 422
 
 
+class MissingDescriptorError(MappingError, ValueError):
+    """Operation requires a mapping descriptor but none was provided."""
+
+    status_code = 422
+
+
 class MappingIdMismatchError(MappingError, ValueError):
     """The AniList ID in the URL does not match the request body."""
 

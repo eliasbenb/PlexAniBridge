@@ -10,7 +10,7 @@ from cachetools.func import lru_cache
 
 from src import log
 from src.config.settings import AniBridgeConfig, ScanMode
-from src.core.animap import AniMapClient
+from src.core.animap import AnimapClient
 from src.core.bridge import BridgeClient
 from src.exceptions import ProfileNotFoundError
 
@@ -176,7 +176,7 @@ class SchedulerClient:
             global_config (AniBridgeConfig): Global application configuration.
         """
         self.global_config = global_config
-        self.shared_animap_client = AniMapClient(
+        self.shared_animap_client = AnimapClient(
             global_config.data_path, global_config.mappings_url
         )
         self.bridge_clients: dict[str, BridgeClient] = {}

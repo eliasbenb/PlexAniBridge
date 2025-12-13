@@ -133,6 +133,12 @@ class AniBridgeDB:
             log.error(f"Database migration failed: {e}", exc_info=True)
             raise
 
+        # Ensure ORM metadata tables are present (Alembic is expected to manage
+        # schema migrations for the active models).
+        from src.models.db import Base
+
+        Base.metadata.create_all(self.engine)
+
     def __enter__(self) -> AniBridgeDB:
         """Enters the context manager, returning the database instance."""
         self._session = self._SessionLocal()
