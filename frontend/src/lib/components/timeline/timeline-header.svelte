@@ -49,13 +49,13 @@
             type="button"
             class="inline-flex items-center gap-1 rounded-md border border-emerald-600/60 bg-emerald-600/30 px-2 py-1 font-medium text-emerald-200 hover:bg-emerald-600/40 disabled:cursor-not-allowed disabled:opacity-50"
             disabled={isProfileRunning}
-            ><RefreshCcw class="inline h-4 w-4 text-[14px]" /> Full Sync</button>
+            ><RefreshCcw class="inline h-4 w-4 text-[14px]" /> Full Scan</button>
         <button
             onclick={onPollSync}
             type="button"
             class="inline-flex items-center gap-1 rounded-md border border-sky-600/60 bg-sky-600/30 px-2 py-1 font-medium text-sky-200 hover:bg-sky-600/40 disabled:cursor-not-allowed disabled:opacity-50"
             disabled={isProfileRunning}
-            ><CloudDownload class="inline h-4 w-4 text-[14px]" /> Poll Sync</button>
+            ><CloudDownload class="inline h-4 w-4 text-[14px]" /> Poll Scan</button>
         <button
             onclick={onRefresh}
             type="button"
