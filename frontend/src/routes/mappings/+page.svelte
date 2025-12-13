@@ -9,8 +9,8 @@
     import { goto } from "$app/navigation";
     import { resolve } from "$app/paths";
     import {
-        STATIC_COLUMNS,
         COLUMNS_STORAGE_KEY,
+        STATIC_COLUMNS,
         type ColumnConfig,
     } from "$lib/components/mappings/columns";
     import EditModal from "$lib/components/mappings/edit-modal.svelte";
@@ -181,6 +181,10 @@
         return Array.from(providers).sort();
     }
 
+    function normalizeColumnTitle(t: string): string {
+        return t.toUpperCase().replaceAll("_", " ").trim();
+    }
+
     function buildColumnsFromItems(
         list: Mapping[],
         existing: ColumnConfig[],
@@ -188,22 +192,23 @@
         const stored = new Map(existing.map((c) => [c.id, c]));
         const providers = collectProviders(list);
 
-        const dynamic = providers.map((p) => ({
-            id: `provider:${p}`,
-            title: p.toUpperCase(),
-            visible: true,
-            width: 140,
-            minWidth: 120,
-            resizable: true,
-        } satisfies ColumnConfig));
+        const dynamic = providers.map(
+            (p) =>
+                ({
+                    id: `provider:${p}`,
+                    title: normalizeColumnTitle(p),
+                    visible: true,
+                    width: 140,
+                    minWidth: 120,
+                    resizable: true,
+                }) satisfies ColumnConfig,
+        );
 
         const ordered = [
             STATIC_COLUMNS[0],
-            STATIC_COLUMNS[1],
-            STATIC_COLUMNS[2],
             ...dynamic,
-            STATIC_COLUMNS[3],
-            STATIC_COLUMNS[4],
+            STATIC_COLUMNS[2],
+            STATIC_COLUMNS[1],
         ];
 
         return ordered.map((col) => ({ ...col, ...(stored.get(col.id) || {}) }));
@@ -335,7 +340,7 @@
                                             {/if}
                                         {/snippet}
                                     </Checkbox.Root>
-                                    <span class="truncate select-none"
+                                    <span class="truncate select-none uppercase"
                                         >{column.title}</span>
                                 </label>
                             </div>

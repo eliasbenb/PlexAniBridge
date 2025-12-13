@@ -1,10 +1,10 @@
 <script lang="ts">
-    import { ExternalLink } from "@lucide/svelte";
     import { Popover, Tooltip } from "bits-ui";
 
+    import type { ColumnConfig } from "$lib/components/mappings/columns";
+    import MappingCard from "$lib/components/mappings/mapping-card.svelte";
     import type { Mapping, MappingEdge } from "$lib/types/api";
     import { preferredTitle } from "$lib/utils/anilist";
-    import type { ColumnConfig } from "./columns";
 
     export interface Props {
         items: Mapping[];
@@ -97,11 +97,6 @@
         }
     }
 
-    function openExternal(url: string | null) {
-        if (!url) return;
-        window.open(url, "_blank", "noopener,noreferrer");
-    }
-
     function edgeKey(edge: MappingEdge) {
         return `${edge.target_provider}:${edge.target_entry_id}:${edge.target_scope}:${edge.source_range}:${edge.destination_range ?? "all"}`;
     }
@@ -125,7 +120,7 @@
                             style="width: {column.width}px;">
                             <div class="flex items-center justify-between">
                                 <span
-                                    class="truncate"
+                                    class="truncate uppercase"
                                     title={column.title}>{column.title}</span>
                             </div>
 
@@ -161,11 +156,14 @@
                                                 <div
                                                     class="relative h-16 w-12 overflow-hidden rounded-md ring-1 ring-slate-700/60">
                                                     <img
-                                                        alt={(preferredTitle(m.anilist?.title) || "Cover") + " cover"}
+                                                        alt={(preferredTitle(
+                                                            m.anilist?.title,
+                                                        ) || "Cover") + " cover"}
                                                         loading="lazy"
                                                         src={coverImage}
                                                         class="h-full w-full object-cover"
-                                                        class:blur-sm={m.anilist?.isAdult} />
+                                                        class:blur-sm={m.anilist
+                                                            ?.isAdult} />
                                                 </div>
                                             {:else}
                                                 <div
@@ -179,151 +177,102 @@
                                                 No Art
                                             </div>
                                         {/if}
-                                        <div class="min-w-0 flex-1 space-y-0.5">
+                                        <div class="min-w-0 flex-1 space-y-1">
                                             <div
                                                 class="truncate font-medium text-slate-100"
-                                                title={preferredTitle(m.anilist?.title) || m.descriptor}>
-                                                {#if m?.anilist?.title}{preferredTitle(m.anilist.title)}{:else}{m.descriptor}{/if}
+                                                title={preferredTitle(
+                                                    m.anilist?.title,
+                                                ) || m.descriptor}>
+                                                {#if m?.anilist?.title}{preferredTitle(
+                                                        m.anilist.title,
+                                                    )}{:else}{m.descriptor}{/if}
                                             </div>
-                                            {#if m.anilist && (m.anilist.format || m.anilist.status || m.anilist.episodes)}
-                                                <div class="flex flex-wrap gap-1 overflow-hidden text-[9px] text-slate-400">
-                                                    {#if m.custom}
-                                                        <span
-                                                            class="truncate rounded bg-amber-600/30 px-1 py-0.5 tracking-wide text-amber-100 uppercase"
-                                                            title="Custom Mapping"
-                                                            >Custom</span>
-                                                    {/if}
+                                            <div
+                                                class="flex flex-wrap gap-1 overflow-hidden text-[9px] text-slate-400">
+                                                {#if m.anilist}
                                                     {#if m.anilist.format}<span
                                                             class="truncate rounded bg-slate-800/70 px-1 py-0.5 tracking-wide uppercase"
                                                             title={m.anilist.format}
                                                             >{m.anilist.format}</span>
-                                                        {/if}
+                                                    {/if}
                                                     {#if m.anilist.status}<span
                                                             class="truncate rounded bg-slate-800/70 px-1 py-0.5 tracking-wide uppercase"
                                                             title={m.anilist.status}
                                                             >{m.anilist.status}</span>
-                                                        {/if}
+                                                    {/if}
                                                     {#if m.anilist.season && m.anilist.seasonYear}<span
                                                             class="truncate rounded bg-slate-800/70 px-1 py-0.5 tracking-wide uppercase"
                                                             title={`${m.anilist.season} ${m.anilist.seasonYear}`}
-                                                            >{m.anilist.season} {m.anilist.seasonYear}</span>
-                                                        {/if}
+                                                            >{m.anilist.season}
+                                                            {m.anilist
+                                                                .seasonYear}</span>
+                                                    {/if}
                                                     {#if m.anilist.episodes}<span
                                                             class="truncate rounded bg-slate-800/70 px-1 py-0.5"
                                                             title={`${m.anilist.episodes} episodes`}
-                                                            >EP {m.anilist.episodes}</span>
-                                                        {/if}
+                                                            >EP {m.anilist
+                                                                .episodes}</span>
+                                                    {/if}
                                                     {#if m.anilist?.isAdult}
                                                         <span
                                                             class="rounded bg-rose-800 px-1 py-0.5"
                                                             title="Adult content"
                                                             >ADULT</span>
                                                     {/if}
-                                                </div>
-                                            {:else if m.custom}
-                                                <span class="rounded bg-amber-600/30 px-1 py-0.5 text-[10px] uppercase text-amber-100">Custom</span>
-                                            {/if}
-                                        </div>
-                                    </div>
-                                {:else if column.id === "descriptor"}
-                                    <div class="space-y-1">
-                                        <div class="flex items-center gap-2 text-sm font-semibold text-slate-100">
-                                            <span class="truncate" title={m.descriptor}>{m.descriptor}</span>
-                                            {#if m.custom}
-                                                <span class="rounded bg-amber-600/30 px-1.5 py-0.5 text-[10px] uppercase text-amber-100 ring-1 ring-amber-700/50"
-                                                    >Custom</span>
-                                            {/if}
-                                        </div>
-                                        {#if m.anilist?.title}
-                                            <div class="truncate text-[11px] text-slate-400" title={preferredTitle(m.anilist?.title) || ""}>
-                                                {preferredTitle(m.anilist?.title) || ""}
-                                            </div>
-                                        {/if}
-                                    </div>
-                                {:else if column.id === "provider"}
-                                    <div class="space-y-1 font-mono text-[11px]">
-                                        <div class="flex items-center gap-2">
-                                            <span class="rounded bg-slate-800 px-1.5 py-0.5 text-slate-100 uppercase">{m.provider}</span>
-                                            <div class="scroll-wrapper">
-                                                <div class="scroll-row">
-                                                    <div class="flex shrink-0 items-center gap-1">
-                                                        <button
-                                                            class="cursor-pointer rounded px-0.5 text-left text-emerald-300 select-text hover:underline focus:outline-none"
-                                                            type="button"
-                                                            title={`Filter by ${m.provider} ${m.entry_id}`}
-                                                            onclick={() => navigate(`provider:${m.provider} entry_id:${m.entry_id}`)}>{m.entry_id}</button>
-                                                        {#if externalUrl(m.provider, m.entry_id, m.scope)}
-                                                            <button
-                                                                type="button"
-                                                                class="text-slate-500 transition-colors hover:text-emerald-300"
-                                                                aria-label={`Open ${m.provider} ${m.entry_id}`}
-                                                                onclick={() => openExternal(externalUrl(m.provider, m.entry_id, m.scope))}>
-                                                                <ExternalLink class="h-3 w-3" />
-                                                            </button>
-                                                        {/if}
-                                                        <span class="rounded bg-slate-700/70 px-1 py-0.5 text-[10px] uppercase text-slate-200">{m.scope}</span>
-                                                    </div>
-                                                </div>
+                                                {/if}
+                                                {#if m.custom}
+                                                    <span
+                                                        class="rounded bg-amber-600/30 px-1 py-0.5 text-[10px] text-amber-100 uppercase ring-1 ring-amber-700/50"
+                                                        >Custom</span>
+                                                {/if}
                                             </div>
                                         </div>
                                     </div>
                                 {:else if providerFromColumn(column.id)}
                                     {@const provider = providerFromColumn(column.id)!}
-                                    {@const edges = m.edges.filter((e) => e.target_provider === provider)}
+                                    {@const edges = m.edges.filter(
+                                        (e) => e.target_provider === provider,
+                                    )}
                                     {#if m.provider === provider}
-                                        <div class="flex items-center gap-1 font-mono text-[11px]">
-                                            <span class="rounded bg-emerald-700/30 px-1 py-0.5 text-emerald-100">source</span>
-                                            <div class="scroll-wrapper">
-                                                <div class="scroll-row">
-                                                    <div class="flex shrink-0 items-center gap-1">
-                                                        <button
-                                                            class="cursor-pointer rounded px-0.5 text-left text-emerald-300 select-text hover:underline focus:outline-none"
-                                                            type="button"
-                                                            title={`Filter by ${provider} ${m.entry_id}`}
-                                                            onclick={() => navigate(`provider:${provider} entry_id:${m.entry_id}`)}>{m.entry_id}</button>
-                                                        {#if externalUrl(provider, m.entry_id, m.scope)}
-                                                            <button
-                                                                type="button"
-                                                                class="text-slate-500 transition-colors hover:text-emerald-300"
-                                                                aria-label={`Open ${provider} ${m.entry_id}`}
-                                                                onclick={() => openExternal(externalUrl(provider, m.entry_id, m.scope))}>
-                                                                <ExternalLink class="h-3 w-3" />
-                                                            </button>
-                                                        {/if}
-                                                        <span class="rounded bg-slate-800 px-1 py-0.5 text-[10px] uppercase text-slate-200">{m.scope}</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
+                                        <MappingCard
+                                            tone="source"
+                                            entryId={m.entry_id}
+                                            scope={m.scope}
+                                            label="Source"
+                                            url={externalUrl(
+                                                provider,
+                                                m.entry_id,
+                                                m.scope,
+                                            )}
+                                            onNavigate={() =>
+                                                navigate(
+                                                    `provider:${provider} entry_id:${m.entry_id}`,
+                                                )} />
                                     {:else if edges.length}
-                                        <div class="scroll-wrapper">
-                                            <div class="scroll-row" title={`Targets mapped from ${provider}`}>
-                                                {#each edges as edge (edgeKey(edge))}
-                                                    <div class="flex items-center gap-1">
-                                                        <span class="rounded bg-slate-800/60 px-1.5 py-0.5 text-[10px] text-slate-200 ring-1 ring-slate-700/50">{edge.source_range}→{edge.destination_range ?? "all"}</span>
-                                                        <div class="flex shrink-0 items-center gap-1">
-                                                            <button
-                                                                class="cursor-pointer rounded px-0.5 text-left text-emerald-300 select-text hover:underline focus:outline-none"
-                                                                type="button"
-                                                                title={`Filter by ${edge.target_provider} ${edge.target_entry_id}`}
-                                                                onclick={() => navigate(`provider:${edge.target_provider} entry_id:${edge.target_entry_id}`)}>{edge.target_entry_id}</button>
-                                                            {#if externalUrl(edge.target_provider, edge.target_entry_id, edge.target_scope)}
-                                                                <button
-                                                                    type="button"
-                                                                    class="text-slate-500 transition-colors hover:text-emerald-300"
-                                                                    aria-label={`Open ${edge.target_provider} ${edge.target_entry_id}`}
-                                                                    onclick={() => openExternal(externalUrl(edge.target_provider, edge.target_entry_id, edge.target_scope))}>
-                                                                    <ExternalLink class="h-3 w-3" />
-                                                                </button>
-                                                            {/if}
-                                                            <span class="rounded bg-slate-800 px-1 py-0.5 text-[10px] uppercase text-slate-200">{edge.target_scope}</span>
-                                                        </div>
-                                                    </div>
-                                                {/each}
-                                            </div>
+                                        <div
+                                            class="space-y-2"
+                                            title={`Targets mapped from ${provider}`}>
+                                            {#each edges as edge (edgeKey(edge))}
+                                                <MappingCard
+                                                    entryId={edge.target_entry_id}
+                                                    scope={edge.target_scope}
+                                                    url={externalUrl(
+                                                        edge.target_provider,
+                                                        edge.target_entry_id,
+                                                        edge.target_scope,
+                                                    )}
+                                                    meta={[
+                                                        `${edge.source_range} → ${edge.destination_range ?? "all"}`,
+                                                    ]}
+                                                    onNavigate={() =>
+                                                        navigate(
+                                                            `provider:${edge.target_provider} entry_id:${edge.target_entry_id}`,
+                                                        )} />
+                                            {/each}
                                         </div>
                                     {:else}
-                                        <span class="text-[10px] text-slate-500">-</span>
+                                        <span class="text-[10px] text-slate-500"
+                                            >-</span>
                                     {/if}
                                 {:else if column.id === "sources"}
                                     {#key (m.sources ?? []).join("|") + ":" + String(m.custom)}
@@ -348,7 +297,8 @@
                                                                         class="flex items-start gap-1 wrap-break-word">
                                                                         <span
                                                                             class="text-slate-500"
-                                                                            >{i + 1}.</span>
+                                                                            >{i +
+                                                                                1}.</span>
                                                                         <span
                                                                             class="text-slate-300"
                                                                             title={s}
@@ -387,7 +337,8 @@
                                                 <div class="space-y-1">
                                                     <Popover.Close
                                                         class="flex w-full items-center justify-start rounded px-2 py-1 text-left text-[11px] text-rose-100 hover:bg-rose-900/60"
-                                                        onclick={() => onDelete?.({ mapping: m })}
+                                                        onclick={() =>
+                                                            onDelete?.({ mapping: m })}
                                                         >Remove override</Popover.Close>
                                                 </div>
                                             </Popover.Content>
@@ -402,8 +353,9 @@
                     <tr>
                         <td
                             colspan={visibleColumns.length}
-                            class="py-8 text-center text-slate-500"
-                            >No mappings found</td>
+                            class="py-8 text-center text-slate-500">
+                            No mappings found
+                        </td>
                     </tr>
                 {/if}
             </tbody>
