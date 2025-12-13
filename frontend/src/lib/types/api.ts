@@ -25,6 +25,12 @@ export interface MappingEdge {
     sources?: string[];
 }
 
+export interface OverrideEdgeInput {
+    target: string;
+    source_range: string;
+    destination_range: string | null;
+}
+
 export interface Mapping {
     descriptor: string;
     provider: string;
@@ -38,11 +44,13 @@ export interface Mapping {
 
 export interface MappingOverridePayload {
     descriptor: string;
-    targets: Record<string, Record<string, string | null>>;
+    targets?: Record<string, Record<string, string | null>>;
+    edges?: OverrideEdgeInput[];
 }
 
 export interface MappingDetail extends Mapping {
     override?: Record<string, Record<string, string | null>> | null;
+    override_edges?: OverrideEdgeInput[];
 }
 
 export interface ListMappingsResponse {

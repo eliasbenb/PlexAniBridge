@@ -55,7 +55,7 @@
         {@const coverImage = resolveCoverImage(detail)}
         <div class="flex min-w-0 items-start gap-3">
             <a
-                href={`https://anilist.co/anime/${detail.anilist_id}`}
+                href={`https://anilist.co/anime/${detail.anilist.id}`}
                 rel="noopener noreferrer"
                 target="_blank"
                 class="group block w-12 shrink-0">
@@ -106,11 +106,11 @@
                         <div
                             class="truncate font-semibold text-slate-100"
                             title={preferredTitle(detail.anilist.title) ||
-                                `AniList ${detail.anilist_id}`}>
+                                `AniList ${detail.anilist.id}`}>
                             {#if detail?.anilist?.title}
                                 {preferredTitle(detail.anilist.title)}
                             {:else}
-                                AniList {detail.anilist_id}
+                                AniList {detail.anilist.id}
                             {/if}
                         </div>
                         <div
