@@ -3,7 +3,7 @@
 import asyncio
 import json
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import Any, ClassVar, cast
 from urllib.parse import urljoin, urlparse
 
 import aiohttp
@@ -26,6 +26,8 @@ class MappingsClient:
         "mappings.yml",
         "mappings.json",
     ]
+
+    _MAX_INCLUDE_CONCURRENCY: ClassVar[int] = 8
 
     def __init__(self, data_path: Path, upstream_url: str | None) -> None:
         """Initialize the MappingsClient with the data path.
@@ -163,6 +165,15 @@ class MappingsClient:
             AnimapDict: Merged mappings from all included files
         """
         mappings: dict[str, dict[str, Any]] = {}
+        semaphore = asyncio.Semaphore(self._MAX_INCLUDE_CONCURRENCY)
+
+        async def _load_one(resolved_include: str) -> AnimapDict:
+            async with semaphore:
+                new_loaded_chain = loaded_chain | {resolved_include}
+                return await self._load_mappings(resolved_include, new_loaded_chain)
+
+        tasks: list[asyncio.Task[AnimapDict]] = []
+
         for include in includes:
             resolved_include = self._resolve_path(include, parent)
 
@@ -176,11 +187,21 @@ class MappingsClient:
                 log.info(f"Skipping already loaded include: $$'{resolved_include}'$$")
                 continue
 
-            new_loaded_chain = loaded_chain | {resolved_include}
-            include_mappings = await self._load_mappings(
-                resolved_include, new_loaded_chain
-            )
-            mappings = self._deep_merge(include_mappings, mappings)
+            tasks.append(asyncio.create_task(_load_one(resolved_include)))
+
+        if not tasks:
+            return mappings
+
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        for result in results:
+            if isinstance(result, Exception):
+                log.error(
+                    "Failed to load include",
+                    exc_info=(type(result), result, result.__traceback__),
+                )
+                continue
+            mappings = self._deep_merge(cast(AnimapDict, result), mappings)
+
         return mappings
 
     async def _load_mappings_file(
