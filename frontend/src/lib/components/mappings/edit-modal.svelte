@@ -1,6 +1,10 @@
 <script lang="ts">
     import CodeEditor from "$lib/components/code-editor.svelte";
-    import type { Mapping, MappingDetail, MappingOverridePayload } from "$lib/types/api";
+    import type {
+        Mapping,
+        MappingDetail,
+        MappingOverridePayload,
+    } from "$lib/types/api";
     import Modal from "$lib/ui/modal.svelte";
     import { apiFetch } from "$lib/utils/api";
     import { toast } from "$lib/utils/notify";
@@ -40,7 +44,9 @@
         loadingDetail = true;
         error = null;
         try {
-            const res = await apiFetch(`/api/mappings/${encodeURIComponent(descriptor)}`);
+            const res = await apiFetch(
+                `/api/mappings/${encodeURIComponent(descriptor)}`,
+            );
             if (!res.ok) {
                 if (res.status !== 404) {
                     toast(`Failed to load mapping (HTTP ${res.status})`, "error");
@@ -75,10 +81,7 @@
             return;
         }
 
-        const payload: MappingOverridePayload = {
-            descriptor,
-            targets: parsed,
-        };
+        const payload: MappingOverridePayload = { descriptor, targets: parsed };
 
         saving = true;
         error = null;
@@ -121,7 +124,7 @@
             return;
         }
 
-        const nextDescriptor = mode === "edit" ? mapping?.descriptor ?? "" : "";
+        const nextDescriptor = mode === "edit" ? (mapping?.descriptor ?? "") : "";
         descriptorInput = nextDescriptor;
         targetsJson = "{}";
         detail = null;
@@ -130,7 +133,13 @@
         }
     });
 
-    function renderEdgeSummary(edge: { target_provider: string; target_entry_id: string; target_scope: string; source_range: string; destination_range?: string | null }) {
+    function renderEdgeSummary(edge: {
+        target_provider: string;
+        target_entry_id: string;
+        target_scope: string;
+        source_range: string;
+        destination_range?: string | null;
+    }) {
         return `${edge.target_provider}:${edge.target_entry_id}:${edge.target_scope} (src ${edge.source_range} → dest ${edge.destination_range ?? "all"})`;
     }
 </script>
@@ -148,8 +157,9 @@
     {/snippet}
 
     <div class="grid gap-4 p-4 md:grid-cols-3">
-        <div class="md:col-span-2 space-y-3">
-            <div class="space-y-2 rounded-lg border border-slate-700/50 bg-slate-900/60 p-3 shadow-inner">
+        <div class="space-y-3 md:col-span-2">
+            <div
+                class="space-y-2 rounded-lg border border-slate-700/50 bg-slate-900/60 p-3 shadow-inner">
                 <label class="text-[12px] font-semibold text-slate-100">
                     Descriptor
                     <input
@@ -169,12 +179,17 @@
                                 class="text-[11px] text-emerald-300 hover:underline"
                                 type="button"
                                 onclick={() =>
-                                    (targetsJson = JSON.stringify(detail?.override ?? {}, null, 2) || "{}")}
-                                >Use loaded override</button>
+                                    (targetsJson =
+                                        JSON.stringify(
+                                            detail?.override ?? {},
+                                            null,
+                                            2,
+                                        ) || "{}")}>Use loaded override</button>
                         {/if}
                     </div>
                     <p class="text-[11px] text-slate-400">
-                        Map destination descriptors to range pairs (e.g. tmdb:10:movie ⇒ movie:null).
+                        Map destination descriptors to range pairs (e.g. tmdb:10:movie ⇒
+                        movie:null).
                     </p>
                 </div>
                 <CodeEditor
@@ -182,16 +197,19 @@
                     class="h-80"
                     bind:content={targetsJson} />
                 {#if error}
-                    <div class="rounded-md border border-rose-700/60 bg-rose-900/40 px-3 py-2 text-[11px] text-rose-100">
+                    <div
+                        class="rounded-md border border-rose-700/60 bg-rose-900/40 px-3 py-2 text-[11px] text-rose-100">
                         {error}
                     </div>
                 {/if}
             </div>
         </div>
         <div class="space-y-3">
-            <div class="rounded-lg border border-slate-700/50 bg-slate-900/70 p-3 text-[11px] text-slate-200">
+            <div
+                class="rounded-lg border border-slate-700/50 bg-slate-900/70 p-3 text-[11px] text-slate-200">
                 <div class="mb-2 flex items-center justify-between">
-                    <span class="text-[12px] font-semibold text-slate-100">Preview</span>
+                    <span class="text-[12px] font-semibold text-slate-100"
+                        >Preview</span>
                     {#if mode === "edit" && mapping?.descriptor}
                         <button
                             class="text-emerald-300 hover:underline"
@@ -206,12 +224,17 @@
                     <div class="text-slate-400">Loading…</div>
                 {:else if detail}
                     <div class="space-y-2">
-                        <div class="text-[12px] font-semibold text-slate-100">{detail.descriptor}</div>
-                        <div class="rounded border border-slate-700/60 bg-slate-900/60 p-2">
+                        <div class="text-[12px] font-semibold text-slate-100">
+                            {detail.descriptor}
+                        </div>
+                        <div
+                            class="rounded border border-slate-700/60 bg-slate-900/60 p-2">
                             {#if detail.edges?.length}
                                 <ul class="space-y-1">
                                     {#each detail.edges as edge (renderEdgeSummary(edge))}
-                                        <li class="text-slate-300">{renderEdgeSummary(edge)}</li>
+                                        <li class="text-slate-300">
+                                            {renderEdgeSummary(edge)}
+                                        </li>
                                     {/each}
                                 </ul>
                             {:else}
@@ -219,7 +242,9 @@
                             {/if}
                         </div>
                         {#if detail.sources?.length}
-                            <div class="text-slate-400">Sources: {detail.sources.join(", ")}</div>
+                            <div class="text-slate-400">
+                                Sources: {detail.sources.join(", ")}
+                            </div>
                         {/if}
                     </div>
                 {:else}
@@ -242,7 +267,11 @@
                 type="button"
                 onclick={handleSave}
                 disabled={saving}>
-                {saving ? "Saving..." : mode === "edit" ? "Save Changes" : "Create Override"}
+                {saving
+                    ? "Saving..."
+                    : mode === "edit"
+                      ? "Save Changes"
+                      : "Create Override"}
             </button>
         </div>
     {/snippet}

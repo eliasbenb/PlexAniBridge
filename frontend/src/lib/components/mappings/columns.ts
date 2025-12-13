@@ -16,27 +16,11 @@ export const STATIC_COLUMNS: ColumnConfig[] = [
         resizable: true,
     },
     {
-        id: "descriptor",
-        title: "Descriptor",
-        visible: true,
-        width: 220,
-        minWidth: 180,
-        resizable: true,
-    },
-    {
-        id: "provider",
-        title: "Provider",
-        visible: true,
-        width: 120,
-        minWidth: 100,
-        resizable: true,
-    },
-    {
         id: "sources",
         title: "Sources",
         visible: true,
-        width: 120,
-        minWidth: 100,
+        width: 110,
+        minWidth: 90,
         resizable: true,
     },
     {
@@ -49,4 +33,4 @@ export const STATIC_COLUMNS: ColumnConfig[] = [
     },
 ];
 
-export const COLUMNS_STORAGE_KEY = "mappings.columns.v3";
+export const COLUMNS_STORAGE_KEY = "mappings.columns.v5";
