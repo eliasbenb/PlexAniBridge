@@ -1,7 +1,5 @@
 """API endpoints for mappings (v3 graph)."""
 
-from __future__ import annotations
-
 import asyncio
 from typing import Any
 
