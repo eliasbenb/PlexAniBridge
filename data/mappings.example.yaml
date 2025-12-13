@@ -1,21 +1,35 @@
-# yaml-language-server: $schema=https://raw.githubusercontent.com/eliasbenb/PlexAniBridge-Mappings/v2/mappings.schema.json
+# yaml-language-server: $schema=https://raw.githubusercontent.com/anibridge/anibridge-mappings-staging/refs/heads/v3/mappings.schema.json
+
+$meta:
+    schema_version: v3
+    description: Example mappings illustrating AniBridge v3 format
 
 $includes:
-    - /path/to/another/mappings.json
-    - https://url.to/another/mappings.json
+    - "/path/to/another/mappings.json"
+    - "https://url.to/another/mappings.json"
 
-99999:
-    anidb_id: 9999
-    imdb_id: tt9999999
-    mal_id: 9999
-    tmdb_show_id: 9999
-    tvdb_id: 9999
-    tvdb_mappings:
-        s0: e1
-        s1: e1-e13
+anidb:99999:s1:
+    anilist:99999:s1:
+        "1-12": "1-12"
+    mal:99999:s1:
+        "1-12": "1-12"
+    tmdb_show:99999:s1:
+        "1-6": "1-6"
+        "7-12": "7-12"
+    tvdb_show:99999:s1:
+        "1-12": "1-12"
 
-99998:
-    anidb_id: 9998
-    imdb_id: tt9999998
-    mal_id: 9998
-    tmdb_movie_id: 9998
+anidb:88888:s0:
+    tvdb_show:88888:s0:
+        "1": "1,3"
+        "2": "2,4"
+    tmdb_show:88800:s0:
+        "1": "1"
+
+anidb:77777:movie:
+    anilist:77777:movie:
+        "1": "1"
+    imdb:tt7777777:movie:
+        "1": "1"
+    tmdb_movie:77777:movie:
+        "1": "1"
