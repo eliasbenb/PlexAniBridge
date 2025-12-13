@@ -3,7 +3,7 @@ name = "AniBridge"
 version = "1.10.1"
 description = "The smart way to keep your AniList profile perfectly synchronized with your Plex library."
 readme = "README.md"
-requires-python = "==3.14.*"
+requires-python = ">=3.14"
 license = { text = "MIT" }
 
 authors = [
@@ -34,26 +34,26 @@ classifiers = [
 dependencies = [
     "aiocache>=0.12.3",
     "aiohttp>=3.13.2",
-    "alembic>=1.17.1",
+    "alembic>=1.17.2",
     "anibridge-anilist-provider @ git+https://github.com/anibridge/anibridge-anilist-provider.git",
     "anibridge-library-interface @ git+https://github.com/anibridge/anibridge-library-interface.git",
     "anibridge-list-interface @ git+https://github.com/anibridge/anibridge-list-interface.git",
     "anibridge-plex-provider @ git+https://github.com/anibridge/anibridge-plex-provider.git",
     "async-lru>=2.0.5",
     "bcrypt>=5.0.0",
-    "cachetools>=6.2.1",
+    "cachetools>=6.2.3",
     "colorama>=0.4.6",
-    "fastapi[all]>=0.121.1",
+    "fastapi[all]>=0.124.4",
     "limiter>=0.5.0",
     "orjson>=3.11.5",
     "pydantic-settings>=2.12.0",
-    "pydantic>=2.12.4",
+    "pydantic>=2.12.5",
     "pyparsing>=3.2.5",
     "pyyaml>=6.0.3",
     "rapidfuzz>=3.14.3",
     "requests>=2.32.5",
     "ruamel-yaml>=0.18.16",
-    "sqlalchemy>=2.0.44",
+    "sqlalchemy>=2.0.45",
 ]
 
 [project.scripts]
