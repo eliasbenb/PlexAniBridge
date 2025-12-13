@@ -189,17 +189,14 @@ class MovieSyncClient(BaseSyncClient[LibraryMovie, LibraryMovie, LibraryMovie]):
         mapping: MappingGraph | None,
         media_key: str | None,
     ) -> str:
-        ids = ", ".join(repr(external) for external in item.ids())
-        ids = ids or "none"
-        media_key = media_key or self._resolve_list_media_key(
-            mapping=mapping,
-            media_key=entry.media().key if entry else None,
-            scope="movie",
+        media_key = (
+            media_key
+            or self._resolve_list_media_key(
+                mapping=mapping,
+                media_key=entry.media().key if entry else None,
+                scope="movie",
+            )
+            or "unknown"
         )
-        media_key = media_key or "unknown"
-        return (
-            f"$${{library_key: {child_item.key}, media_key: {media_key}"
-            + f", {ids}}}$$"
-            if ids
-            else ""
-        )
+        ids = {"library_key": child_item.key, "list_key": media_key, **item.ids()}
+        return self._format_external_ids(ids)

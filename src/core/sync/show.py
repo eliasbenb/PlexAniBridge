@@ -260,20 +260,17 @@ class ShowSyncClient(BaseSyncClient[LibraryShow, LibrarySeason, LibraryEpisode])
         mapping: MappingGraph | None,
         media_key: str | None,
     ) -> str:
-        ids = ", ".join(repr(external) for external in item.ids())
-        ids = ids or "none"
-        media_key = media_key or self._resolve_list_media_key(
-            mapping=mapping,
-            media_key=entry.media().key if entry else None,
-            scope=f"s{child_item.index}",
+        media_key = (
+            media_key
+            or self._resolve_list_media_key(
+                mapping=mapping,
+                media_key=entry.media().key if entry else None,
+                scope="movie",
+            )
+            or "unknown"
         )
-        media_key = media_key or "unknown"
-        return (
-            f"$${{library_key: {child_item.key}, media_key: {media_key}"
-            + f", {ids}}}$$"
-            if ids
-            else ""
-        )
+        ids = {"library_key": child_item.key, "list_key": media_key, **item.ids()}
+        return self._format_external_ids(ids)
 
     @glru_cache(maxsize=32, key=lambda self, item: item)
     def __get_wanted_seasons(self, item: LibraryShow) -> dict[int, LibrarySeason]:

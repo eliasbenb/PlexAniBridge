@@ -754,7 +754,7 @@ class BaseSyncClient[
         """Format external identifiers for debug logging."""
         if not ids:
             return "$${}$$"
-        formatted = ", ".join(f"{key}:{value}" for key, value in ids.items())
+        formatted = ", ".join(f"{key}: {value}" for key, value in ids.items())
         return f"$${{{formatted}}}$$"
 
     def _format_diff(self, diff: dict[str, tuple[Any, Any]]) -> str:
