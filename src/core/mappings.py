@@ -7,7 +7,9 @@ from typing import Any, ClassVar
 from urllib.parse import urljoin, urlparse
 
 import aiohttp
+import orjson
 import yaml
+from yaml import CSafeLoader as YamlLoader
 
 from src import __version__, log
 
@@ -200,11 +202,11 @@ class MappingsClient:
         try:
             match file_path.suffix:
                 case ".json":
-                    with file_path.open() as f:
-                        mappings = json.load(f)
+                    with file_path.open("rb") as f:
+                        mappings = orjson.loads(f.read())
                 case ".yaml" | ".yml":
                     with file_path.open() as f:
-                        mappings = self._dict_str_keys(yaml.safe_load(f))
+                        mappings = self._dict_str_keys(yaml.load(f, Loader=YamlLoader))
         except (json.JSONDecodeError, yaml.YAMLError):
             log.error(
                 f"Error decoding file $$'{file_path.resolve()!s}'$$", exc_info=True
@@ -260,13 +262,13 @@ class MappingsClient:
             AnimapDict: Mappings loaded from the URL
         """
         mappings: AnimapDict = {}
-        mappings_raw: str = ""
+        mappings_raw: bytes = b""
         session = await self._get_session()
 
         try:
             async with session.get(url) as response:
                 response.raise_for_status()
-                mappings_raw = await response.text()
+                mappings_raw = await response.read()
         except (TimeoutError, aiohttp.ClientError):
             if retry_count < 2:
                 log.warning(
@@ -285,15 +287,17 @@ class MappingsClient:
         try:
             match Path(url).suffix:
                 case ".json":
-                    mappings = json.loads(mappings_raw)
+                    mappings = orjson.loads(mappings_raw)
                 case ".yaml" | ".yml":
-                    mappings = self._dict_str_keys(yaml.safe_load(mappings_raw))
+                    mappings = self._dict_str_keys(
+                        yaml.load(mappings_raw.decode(), Loader=YamlLoader)
+                    )
                 case _:
                     log.warning(
                         f"Unknown file type for URL "
                         f"$$'{url}'$$, defaulting to JSON parsing"
                     )
-                    mappings = json.loads(mappings_raw)
+                    mappings = orjson.loads(mappings_raw)
         except (json.JSONDecodeError, yaml.YAMLError):
             log.error(f"Error decoding file $$'{url!s}'$$", exc_info=True)
         except Exception:
