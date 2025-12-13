@@ -113,7 +113,7 @@ def animap_client(
 
 def _mapping_data():
     return {
-        "anilist:1:movie": {"tmdb:10:movie": {"movie": None}},
+        "anilist:1:movie": {"tmdb:10:movie": {"1": None}},
         "anilist:2:s1": {"tvdb:20:s1": {"s1": "e1-e12"}},
     }
 
@@ -213,7 +213,7 @@ def test_sync_db_creates_entries_mappings_and_provenance(
         for edge in edges
     }
     assert edge_keys == {
-        ("anilist", "1", "movie", "tmdb", "10", "movie", "movie", None),
+        ("anilist", "1", "movie", "tmdb", "10", "movie", "1", None),
         ("anilist", "2", "s1", "tvdb", "20", "s1", "s1", "e1-e12"),
         ("tvdb", "20", "s1", "anilist", "2", "s1", "e1-e12", "s1"),
     }
@@ -258,7 +258,7 @@ def test_sync_db_refreshes_provenance_when_hash_matches(
     animap_client: AnimapClient, in_memory_db: AniBridgeDB
 ) -> None:
     """Syncing the database again with the same mappings refreshes provenance."""
-    base_mappings = {"anilist:1:movie": {"tmdb:1:movie": {"movie": None}}}
+    base_mappings = {"anilist:1:movie": {"tmdb:1:movie": {"1": None}}}
     fake_client = FakeMappingsClient(
         mappings=base_mappings,
         provenance={"anilist:1:movie": ["/initial.json"]},

@@ -35,7 +35,7 @@ def _seed_graph():
         mapping = AnimapMapping(
             source_entry_id=a.id,
             destination_entry_id=b.id,
-            source_range="movie",
+            source_range="1",
             destination_range=None,
         )
         ctx.session.add(mapping)
@@ -85,7 +85,7 @@ async def test_custom_only_filters_items() -> None:
             mapping = AnimapMapping(
                 source_entry_id=tmdb_entry.id,
                 destination_entry_id=anilist_entry.id,
-                source_range="movie",
+                source_range="1",
                 destination_range=None,
             )
             ctx.session.add(mapping)

@@ -73,12 +73,12 @@ async def test_save_override_writes_file_and_syncs_db(
 
     result = await service.save_override(
         descriptor="anilist:101:movie",
-        targets={"tmdb:202:movie": {"movie": None}},
+        targets={"tmdb:202:movie": {"1": None}},
     )
     assert result["descriptor"] == "anilist:101:movie"
 
     data = json.loads((tmp_path / "mappings.custom.json").read_text(encoding="utf-8"))
-    assert data["anilist:101:movie"] == {"tmdb:202:movie": {"movie": None}}
+    assert data["anilist:101:movie"] == {"tmdb:202:movie": {"1": None}}
     assert scheduler.synced is True
 
 
@@ -92,7 +92,7 @@ async def test_delete_override_removes_entry(
 
     await service.save_override(
         descriptor="anilist:303:movie",
-        targets={"tmdb:404:movie": {"movie": None}},
+        targets={"tmdb:404:movie": {"1": None}},
     )
     file_path = tmp_path / "mappings.custom.json"
     with db() as ctx:
@@ -103,7 +103,7 @@ async def test_delete_override_removes_entry(
         mapping = AnimapMapping(
             source_entry_id=src.id,
             destination_entry_id=dst.id,
-            source_range="movie",
+            source_range="1",
             destination_range=None,
         )
         ctx.session.add(mapping)
