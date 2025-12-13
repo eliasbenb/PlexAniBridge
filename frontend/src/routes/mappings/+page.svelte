@@ -340,7 +340,7 @@
                                             {/if}
                                         {/snippet}
                                     </Checkbox.Root>
-                                    <span class="truncate select-none"
+                                    <span class="truncate select-none uppercase"
                                         >{column.title}</span>
                                 </label>
                             </div>

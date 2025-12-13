@@ -120,7 +120,7 @@
                             style="width: {column.width}px;">
                             <div class="flex items-center justify-between">
                                 <span
-                                    class="truncate"
+                                    class="truncate uppercase"
                                     title={column.title}>{column.title}</span>
                             </div>
 
