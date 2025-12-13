@@ -52,7 +52,7 @@ class MappingOverridesService:
         """Determine the path and format of the custom mappings override file."""
         candidates = [config.data_path / name for name in MappingsClient.MAPPING_FILES]
         if not candidates or not candidates[0].exists():
-            return config.data_path / "mappings.custom.json", "json"
+            return config.data_path / "mappings.json", "json"
         if candidates[0].suffix.lower() == ".json":
             return candidates[0], "json"
         return candidates[0], "yaml"

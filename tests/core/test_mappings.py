@@ -71,7 +71,7 @@ async def test_get_provenance_preserves_descriptor_keys(tmp_path: Path) -> None:
     data_path = tmp_path / "data"
     data_path.mkdir()
 
-    custom_path = data_path / "mappings.custom.json"
+    custom_path = data_path / "mappings.json"
     custom_path.write_text(
         json.dumps(
             {

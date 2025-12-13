@@ -119,7 +119,7 @@ def _mapping_data():
 
 
 def _write_mapping_file(base: Path, data: dict) -> Path:
-    mappings_path = base / "mappings.custom.json"
+    mappings_path = base / "mappings.json"
     mappings_path.write_text(json.dumps(data), encoding="utf-8")
     return mappings_path
 
