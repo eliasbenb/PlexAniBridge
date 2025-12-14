@@ -198,8 +198,8 @@
                     id: `provider:${p}`,
                     title: normalizeColumnTitle(p),
                     visible: true,
-                    width: 160,
-                    minWidth: 80,
+                    width: 200,
+                    minWidth: 100,
                     resizable: true,
                 }) satisfies ColumnConfig,
         );

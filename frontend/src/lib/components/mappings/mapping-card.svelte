@@ -36,8 +36,8 @@
     const metaChips = $derived((meta || []).filter(Boolean) as string[]);
 </script>
 
-<div class={`inline-flex max-w-full rounded-lg border p-2 shadow-inner ${toneClasses}`}>
-    <div class="flex flex-wrap items-center gap-1 font-mono text-[11px]">
+<div class={`inline-flex rounded-lg border p-2 shadow-inner ${toneClasses}`}>
+    <div class="flex items-center gap-1 font-mono text-[11px]">
         <button
             class={`cursor-pointer rounded px-0.5 text-left ${tone === "source" ? "text-emerald-200" : "text-emerald-300"} select-text hover:underline focus:outline-none`}
             type="button"
