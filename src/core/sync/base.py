@@ -220,6 +220,11 @@ class BaseSyncClient[
                 self.sync_stats.track_item(item_identifier, SyncOutcome.FAILED)
 
         if not found_match:
+            log.warning(
+                f"[{self.profile_name}] No list entries found for "
+                f"{item.media_kind.value} "
+                f"$$'{item.title}'$$ {ids_summary}"
+            )
             await self._create_sync_history(
                 item=item,
                 child_item=None,
