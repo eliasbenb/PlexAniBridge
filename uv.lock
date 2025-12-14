@@ -198,7 +198,7 @@ source = { git = "https://github.com/anibridge/anibridge-list-interface.git#fd67
 [[package]]
 name = "anibridge-plex-provider"
 version = "0.1.0"
-source = { git = "https://github.com/anibridge/anibridge-plex-provider.git#3db9356614c6bdab83446be99dcf44785076ea7a" }
+source = { git = "https://github.com/anibridge/anibridge-plex-provider.git#e9d4b9a7686209a00176d4a0b0fa62c3bbe70747" }
 dependencies = [
     { name = "aiohttp" },
     { name = "anibridge-library-interface" },
