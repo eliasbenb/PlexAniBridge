@@ -120,7 +120,7 @@
                 <tr class="divide-x divide-slate-800/70 whitespace-nowrap">
                     {#each visibleColumns as column, i (column.id)}
                         <th
-                            class="relative px-3 py-2 text-left font-medium"
+                            class="relative overflow-hidden px-3 py-2 text-left font-medium whitespace-nowrap"
                             style="width: {column.width}px;">
                             <div class="flex items-center justify-between">
                                 <span
@@ -146,10 +146,10 @@
                     <tr class="align-top transition-colors hover:bg-slate-800/40">
                         {#each visibleColumns as column (column.id)}
                             <td
-                                class="overflow-hidden px-3 py-2"
+                                class="min-w-0 overflow-hidden px-3 py-2 whitespace-nowrap"
                                 style="width: {column.width}px;">
                                 {#if column.id === "title"}
-                                    <div class="flex min-w-0 items-start gap-2">
+                                    <div class="flex min-w-0 items-center gap-2">
                                         {#if m.anilist}
                                             {@const coverImage =
                                                 m.anilist?.coverImage?.medium ??
@@ -254,7 +254,8 @@
                                                 )} />
                                     {:else if edges.length}
                                         <div
-                                            class="flex flex-wrap gap-2"
+                                            class="flex flex-nowrap items-center gap-2 overflow-x-auto"
+                                            style="white-space: nowrap;"
                                             title={`Targets mapped from ${provider}`}>
                                             {#each edges as edge (edgeKey(edge))}
                                                 <MappingCard

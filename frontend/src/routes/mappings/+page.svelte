@@ -198,8 +198,8 @@
                     id: `provider:${p}`,
                     title: normalizeColumnTitle(p),
                     visible: true,
-                    width: 160,
-                    minWidth: 80,
+                    width: 200,
+                    minWidth: 100,
                     resizable: true,
                 }) satisfies ColumnConfig,
         );
@@ -207,8 +207,8 @@
         const ordered = [
             STATIC_COLUMNS[0],
             ...dynamic,
-            STATIC_COLUMNS[2],
             STATIC_COLUMNS[1],
+            STATIC_COLUMNS[2],
         ];
 
         return ordered.map((col) => ({ ...col, ...(stored.get(col.id) || {}) }));
