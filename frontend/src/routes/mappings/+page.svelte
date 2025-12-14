@@ -207,8 +207,8 @@
         const ordered = [
             STATIC_COLUMNS[0],
             ...dynamic,
-            STATIC_COLUMNS[2],
             STATIC_COLUMNS[1],
+            STATIC_COLUMNS[2],
         ];
 
         return ordered.map((col) => ({ ...col, ...(stored.get(col.id) || {}) }));
