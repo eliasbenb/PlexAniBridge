@@ -389,14 +389,10 @@ class BaseSyncClient[
         considered_attrs.add(self._ENTRY_FIELD_MAP[SyncField.STATUS])
         final_status = entry.status
 
-        for field in (
-            SyncField.PROGRESS,
-            SyncField.REPEATS,
-            SyncField.REVIEW,
-            SyncField.USER_RATING,
-            SyncField.STARTED_AT,
-            SyncField.FINISHED_AT,
-        ):
+        for field in SyncField:
+            if field == SyncField.STATUS:
+                continue
+
             attr_name = self._ENTRY_FIELD_MAP[field]
             if field.value in skip_fields:
                 continue
@@ -408,7 +404,7 @@ class BaseSyncClient[
                 and final_status < ListStatus.COMPLETED
             ):
                 continue
-            if field is SyncField.STARTED_AT and final_status <= ListStatus.PLANNING:
+            if field == SyncField.STARTED_AT and final_status <= ListStatus.PLANNING:
                 continue
 
             value = await self._field_calculators[field](**calc_kwargs)
