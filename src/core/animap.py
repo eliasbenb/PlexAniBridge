@@ -8,6 +8,7 @@ from itertools import batched
 from pathlib import Path
 
 from anibridge.list import MappingDescriptor, MappingEdge, MappingGraph
+from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import delete, select, tuple_
 
@@ -152,26 +153,55 @@ class AnimapClient:
                 existing.setdefault(row.mapping_id, []).append(row.source)
 
         ids_to_refresh: list[int] = []
-        rows_to_insert: list[AnimapProvenance] = []
+        rows_to_upsert: list[dict[str, object]] = []
+        to_delete_pairs: list[tuple[int, int]] = []
 
         for mapping_id, sources in desired.items():
-            if sources != existing.get(mapping_id, []):
+            existing_sources = existing.get(mapping_id, [])
+            if sources != existing_sources:
                 ids_to_refresh.append(mapping_id)
-                rows_to_insert.extend(
-                    AnimapProvenance(mapping_id=mapping_id, n=i, source=source)
-                    for i, source in enumerate(sources)
-                )
+
+                # Prepare upsert rows (mapping_id, n, source)
+                for i, source in enumerate(sources):
+                    rows_to_upsert.append(
+                        {"mapping_id": mapping_id, "n": i, "source": source}
+                    )
+
+                # If existing had extra indices, schedule them for deletion
+                if len(existing_sources) > len(sources):
+                    for i in range(len(sources), len(existing_sources)):
+                        to_delete_pairs.append((mapping_id, i))
 
         if not ids_to_refresh:
             return
 
-        for chunk in batched(ids_to_refresh, self._SQLITE_SAFE_VARIABLES, strict=False):
-            session.execute(
-                delete(AnimapProvenance).where(AnimapProvenance.mapping_id.in_(chunk))
-            )
+        # Perform upsert for desired rows using SQLite ON CONFLICT DO UPDATE
+        if rows_to_upsert:
+            for chunk in batched(
+                rows_to_upsert, self._SQLITE_SAFE_VARIABLES, strict=False
+            ):
+                session.execute(
+                    insert(AnimapProvenance)
+                    .values(chunk)
+                    .on_conflict_do_update(
+                        index_elements=["mapping_id", "n"],
+                        set_={"source": insert(AnimapProvenance).excluded.source},
+                    )
+                )
 
-        if rows_to_insert:
-            session.add_all(rows_to_insert)
+        # Delete any extra provenance rows that are no longer desired
+        if to_delete_pairs:
+            # Delete in chunks to avoid SQLite variable limits
+            for chunk in batched(
+                to_delete_pairs, self._SQLITE_SAFE_VARIABLES, strict=False
+            ):
+                session.execute(
+                    delete(AnimapProvenance).where(
+                        tuple_(AnimapProvenance.mapping_id, AnimapProvenance.n).in_(
+                            chunk
+                        )
+                    )
+                )
 
     def _build_edges(
         self,
@@ -419,16 +449,26 @@ class AnimapClient:
                         delete(AnimapEntry).where(AnimapEntry.id.in_(chunk))
                     )
 
-            new_entries = [
-                AnimapEntry(
-                    provider=descriptors[key].provider,
-                    entry_id=descriptors[key].entry_id,
-                    entry_scope=descriptors[key].scope,
-                )
-                for key in to_insert_entries
-            ]
-            if new_entries:
-                ctx.session.add_all(new_entries)
+            # Upsert new entries using SQLite INSERT ... ON CONFLICT DO NOTHING
+            if to_insert_entries:
+                rows: list[dict[str, object]] = []
+                for key in to_insert_entries:
+                    d = descriptors[key]
+                    rows.append(
+                        {
+                            "provider": d.provider,
+                            "entry_id": d.entry_id,
+                            "entry_scope": d.scope,
+                        }
+                    )
+                for chunk in batched(rows, self._SQLITE_SAFE_VARIABLES, strict=False):
+                    ctx.session.execute(
+                        insert(AnimapEntry)
+                        .values(chunk)
+                        .on_conflict_do_nothing(
+                            index_elements=["provider", "entry_id", "entry_scope"]
+                        )
+                    )
                 ctx.session.flush()
 
             # Refresh entry map after inserts
@@ -485,17 +525,34 @@ class AnimapClient:
                         )
                     )
 
-            new_mapping_rows = [
-                AnimapMapping(
-                    source_entry_id=key[0],
-                    destination_entry_id=key[1],
-                    source_range=key[2],
-                    destination_range=key[3],
-                )
-                for key in to_insert_mappings
-            ]
-            if new_mapping_rows:
-                ctx.session.add_all(new_mapping_rows)
+            # Upsert new mappings using SQLite INSERT ... ON CONFLICT DO NOTHING
+            if to_insert_mappings:
+                mapping_rows: list[dict[str, object]] = []
+                for key in to_insert_mappings:
+                    s_eid, d_eid, s_range, d_range = key
+                    mapping_rows.append(
+                        {
+                            "source_entry_id": s_eid,
+                            "destination_entry_id": d_eid,
+                            "source_range": s_range,
+                            "destination_range": d_range,
+                        }
+                    )
+                for chunk in batched(
+                    mapping_rows, self._SQLITE_SAFE_VARIABLES, strict=False
+                ):
+                    ctx.session.execute(
+                        insert(AnimapMapping)
+                        .values(chunk)
+                        .on_conflict_do_nothing(
+                            index_elements=[
+                                "source_entry_id",
+                                "destination_entry_id",
+                                "source_range",
+                                "destination_range",
+                            ]
+                        )
+                    )
                 ctx.session.flush()
 
             # Refresh mapping map to include newly inserted rows (ids now populated)
