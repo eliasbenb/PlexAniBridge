@@ -97,6 +97,9 @@ class StubSyncClient(BaseSyncClient[Any, Any, Any]):
     async def _calculate_review(self, **kwargs):
         return self._review_override
 
+    def _derive_scope(self, *, item: Any, child_item: Any | None) -> str | None:
+        return None
+
     def _debug_log_title(self, item: Any, mapping=None, media_key=None) -> str:
         return str(item)
 
@@ -277,7 +280,6 @@ async def test_sync_media_updates_entry_and_history(
         grandchild_items=(movie,),
         entry=cast(ListEntryProtocol, entry),
         mapping=None,
-        list_media_key=None,
     )
 
     assert result is SyncOutcome.SYNCED
@@ -313,7 +315,6 @@ async def test_sync_media_skips_when_entry_up_to_date(
         grandchild_items=(movie,),
         entry=cast(ListEntryProtocol, entry),
         mapping=None,
-        list_media_key=None,
     )
 
     assert result is SyncOutcome.SKIPPED
@@ -344,7 +345,6 @@ async def test_sync_media_deletes_when_destructive(
         grandchild_items=(movie,),
         entry=cast(ListEntryProtocol, entry),
         mapping=None,
-        list_media_key=None,
     )
 
     assert result is SyncOutcome.DELETED
@@ -376,7 +376,6 @@ async def test_sync_media_batches_when_enabled(
         grandchild_items=(movie,),
         entry=cast(ListEntryProtocol, entry),
         mapping=None,
-        list_media_key=None,
     )
 
     assert result is SyncOutcome.SYNCED
@@ -404,7 +403,6 @@ async def test_batch_sync_flushes_history(stub_client: StubSyncClient, sync_db) 
         grandchild_items=(movie,),
         entry=cast(ListEntryProtocol, entry),
         mapping=None,
-        list_media_key=None,
     )
 
     await stub_client.batch_sync()

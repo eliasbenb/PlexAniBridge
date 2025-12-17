@@ -299,6 +299,11 @@ class ShowSyncClient(BaseSyncClient[LibraryShow, LibrarySeason, LibraryEpisode])
                 return review
         return await child_item.review() or await item.review()
 
+    def _derive_scope(
+        self, *, item: LibraryShow, child_item: LibrarySeason | None
+    ) -> str | None:
+        return f"s{child_item.index}" if child_item is not None else None
+
     def _debug_log_title(
         self,
         item: LibraryShow,
@@ -316,15 +321,12 @@ class ShowSyncClient(BaseSyncClient[LibraryShow, LibrarySeason, LibraryEpisode])
         mapping: MappingGraph | None,
         media_key: str | None,
     ) -> str:
-        media_key = (
-            media_key
-            or self._resolve_list_media_key(
-                mapping=mapping,
-                media_key=entry.media().key if entry else None,
-                scope="movie",
+        if not media_key and mapping is not None:
+            media_key = self.list_provider.resolve_mappings(
+                mapping, scope=f"s{child_item.index}"
             )
-            or "unknown"
-        )
+        if not media_key and entry is not None:
+            media_key = entry.media().key
         ids = {"library_key": child_item.key, "list_key": media_key, **item.ids()}
         return self._format_external_ids(ids)
 
