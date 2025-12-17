@@ -68,14 +68,13 @@ class SyncHistory(Base):
     )
 
     __table_args__ = (
+        Index("ix_sync_history_profile_timestamp", "profile_name", "timestamp"),
         Index(
-            "ix_sync_history_upsert_keys",
+            "ix_sync_history_profile_library_media_outcome",
             "profile_name",
             "library_namespace",
             "library_section_key",
             "library_media_key",
-            "list_namespace",
-            "list_media_key",
             "outcome",
         ),
     )

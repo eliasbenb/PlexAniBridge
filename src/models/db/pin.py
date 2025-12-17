@@ -3,7 +3,7 @@
 from datetime import UTC, datetime
 
 from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy.schema import Index
+from sqlalchemy.schema import Index, UniqueConstraint
 from sqlalchemy.sql.sqltypes import JSON, DateTime, Integer, String
 
 from src.models.db.base import Base
@@ -34,11 +34,6 @@ class Pin(Base):
     )
 
     __table_args__ = (
-        Index(
-            "ix_pin_profile_list_keys",
-            "profile_name",
-            "list_namespace",
-            "list_media_key",
-            unique=True,
-        ),
+        UniqueConstraint("profile_name", "list_namespace", "list_media_key"),
+        Index("ix_pin_profile_updated_at", "profile_name", "updated_at"),
     )
