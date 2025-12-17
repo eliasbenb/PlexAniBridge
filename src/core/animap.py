@@ -6,8 +6,8 @@ from dataclasses import dataclass
 from hashlib import md5
 from itertools import batched
 from pathlib import Path
-from typing import NamedTuple
 
+from anibridge.list import MappingDescriptor, MappingEdge, MappingGraph
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import delete, select, tuple_
 
@@ -17,10 +17,11 @@ from src.core.mappings import MappingsClient
 from src.models.db.animap import AnimapEntry, AnimapMapping, AnimapProvenance
 from src.models.db.housekeeping import Housekeeping
 
-__all__ = ["AnimapClient", "AnimapEdge", "MappingDescriptor", "MappingGraph"]
+__all__ = ["AnimapClient", "AnimapDescriptor", "AnimapEdge", "AnimapGraph"]
 
 
-class AnimapEdge(NamedTuple):
+@dataclass(frozen=True, slots=True)
+class AnimapEdge(MappingEdge):
     """Directed mapping between two provider entries with episode ranges."""
 
     source: MappingDescriptor
@@ -30,10 +31,10 @@ class AnimapEdge(NamedTuple):
 
 
 @dataclass(frozen=True, slots=True)
-class MappingGraph:
+class AnimapGraph(MappingGraph):
     """Subset of the mapping graph relevant to a lookup request."""
 
-    edges: tuple[AnimapEdge, ...]
+    edges: tuple[MappingEdge, ...]
 
     def descriptors(self) -> tuple[MappingDescriptor, ...]:
         """Return unique descriptors referenced by the edges.
@@ -54,7 +55,7 @@ class MappingGraph:
 
 
 @dataclass(frozen=True, slots=True)
-class MappingDescriptor:
+class AnimapDescriptor(MappingDescriptor):
     """Provider/entry/scope descriptor (e.g., anilist:849:s1)."""
 
     provider: str
@@ -190,7 +191,7 @@ class AnimapClient:
 
         for raw_source, targets in mappings.items():
             try:
-                source_desc = MappingDescriptor.parse(raw_source)
+                source_desc = AnimapDescriptor.parse(raw_source)
             except ValueError:
                 log.warning("Invalid mapping descriptor $$'%s'$$; skipped", raw_source)
                 invalid_count += 1
@@ -208,7 +209,7 @@ class AnimapClient:
 
             for raw_target, ranges in targets.items():
                 try:
-                    target_desc = MappingDescriptor.parse(raw_target)
+                    target_desc = AnimapDescriptor.parse(raw_target)
                 except ValueError:
                     log.warning(
                         "Invalid target descriptor $$'%s'$$ under $$'%s'$$; skipped",
@@ -324,12 +325,12 @@ class AnimapClient:
 
             edges.append(
                 AnimapEdge(
-                    source=MappingDescriptor(
+                    source=AnimapDescriptor(
                         provider=src_entry.provider,
                         entry_id=src_entry.entry_id,
                         scope=src_entry.entry_scope,
                     ),
-                    destination=MappingDescriptor(
+                    destination=AnimapDescriptor(
                         provider=dst_entry.provider,
                         entry_id=dst_entry.entry_id,
                         scope=dst_entry.entry_scope,
@@ -357,7 +358,7 @@ class AnimapClient:
         self._ensure_cache()
 
         if not external_ids:
-            return MappingGraph(edges=tuple())
+            return AnimapGraph(edges=tuple())
 
         cache_key = frozenset(external_ids.items())
         if self._cache_version is not None and cache_key in self._lookup_cache:
@@ -368,9 +369,9 @@ class AnimapClient:
             edge_indexes.update(self._adjacency.get((provider, entry_id), ()))
 
         if not edge_indexes:
-            graph = MappingGraph(edges=tuple())
+            graph = AnimapGraph(edges=tuple())
         else:
-            graph = MappingGraph(edges=tuple(self._edge_cache[i] for i in edge_indexes))
+            graph = AnimapGraph(edges=tuple(self._edge_cache[i] for i in edge_indexes))
 
         if self._cache_version is not None:
             self._lookup_cache[cache_key] = graph

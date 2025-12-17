@@ -29,21 +29,11 @@ class MovieSyncClient(BaseSyncClient[LibraryMovie, LibraryMovie, LibraryMovie]):
     ]:
         """Map a library movie to its corresponding list entry."""
         mapping_graph = self.animap_client.get_graph_for_ids(item.ids())
-        list_media_key: str | None = None
-
-        resolver = getattr(self.list_provider, "resolve_mappings", None)
-        if callable(resolver):
-            try:
-                resolved = resolver(mapping_graph, scope="movie")
-                if resolved is not None:
-                    list_media_key = str(resolved)
-            except Exception:
-                list_media_key = None
-
-        if list_media_key is None:
-            list_media_key = self._resolve_list_media_key(
-                mapping=mapping_graph, media_key=None, scope="movie"
-            )
+        list_media_key = (
+            self.list_provider.resolve_mappings(mapping_graph, scope="movie")
+            if mapping_graph
+            else None
+        )
 
         if list_media_key is not None:
             entry = await self.list_provider.get_entry(str(list_media_key))
@@ -172,6 +162,11 @@ class MovieSyncClient(BaseSyncClient[LibraryMovie, LibraryMovie, LibraryMovie]):
     ) -> str | None:
         return await item.review()
 
+    def _derive_scope(
+        self, *, item: LibraryMovie, child_item: LibraryMovie | None
+    ) -> str | None:
+        return "movie"
+
     def _debug_log_title(
         self,
         item: LibraryMovie,
@@ -189,14 +184,9 @@ class MovieSyncClient(BaseSyncClient[LibraryMovie, LibraryMovie, LibraryMovie]):
         mapping: MappingGraph | None,
         media_key: str | None,
     ) -> str:
-        media_key = (
-            media_key
-            or self._resolve_list_media_key(
-                mapping=mapping,
-                media_key=entry.media().key if entry else None,
-                scope="movie",
-            )
-            or "unknown"
-        )
+        if not media_key and mapping is not None:
+            media_key = self.list_provider.resolve_mappings(mapping, scope="movie")
+        if not media_key and entry is not None:
+            media_key = entry.media().key
         ids = {"library_key": child_item.key, "list_key": media_key, **item.ids()}
         return self._format_external_ids(ids)

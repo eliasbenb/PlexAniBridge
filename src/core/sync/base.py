@@ -6,13 +6,12 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from anibridge.library import LibraryMedia, LibraryProvider
-from anibridge.list import ListEntry, ListProvider, ListStatus
+from anibridge.list import ListEntry, ListProvider, ListStatus, MappingGraph
 from rapidfuzz import fuzz
 
 from src import log
 from src.config.database import db
 from src.config.settings import SyncField
-from src.core.animap import MappingGraph
 from src.core.sync.stats import (
     BatchUpdate,
     EntrySnapshot,
@@ -206,7 +205,6 @@ class BaseSyncClient[
                     grandchild_items=grandchildren,
                     entry=entry,
                     mapping=mapping_graph,
-                    list_media_key=list_media_key,
                 )
                 self.sync_stats.track_items(grandchild_ids, outcome)
                 self.sync_stats.track_item(item_identifier, outcome)
@@ -291,7 +289,6 @@ class BaseSyncClient[
         grandchild_items: Sequence[GrandchildMediaT],
         entry: ListEntry | None,
         mapping: MappingGraph | None,
-        list_media_key: str | None,
     ) -> SyncOutcome:
         """Synchronize a mapped media item with the list provider."""
         entry = await self._ensure_entry(
@@ -300,27 +297,29 @@ class BaseSyncClient[
             grandchild_items=grandchild_items,
             entry=entry,
             mapping=mapping,
-            list_media_key=list_media_key,
+        )
+
+        scope = self._derive_scope(item=item, child_item=child_item)
+        resolved_list_key = (
+            self.list_provider.resolve_mappings(mapping, scope=scope)
+            if mapping
+            else None
         )
 
         debug_title = self._debug_log_title(
-            item=item, mapping=mapping, media_key=list_media_key
+            item=item, mapping=mapping, media_key=resolved_list_key
         )
-        scope = self._derive_scope(item=item, child_item=child_item)
         debug_ids = self._debug_log_ids(
             item=item,
             child_item=child_item,
             entry=entry,
             mapping=mapping,
-            media_key=self._resolve_list_media_key(
-                mapping=mapping, media_key=list_media_key, scope=scope
-            ),
+            media_key=resolved_list_key,
         )
 
         before_snapshot = EntrySnapshot.from_entry(entry)
-        list_media_key = self._resolve_list_media_key(
-            mapping=mapping, media_key=list_media_key, scope=scope
-        )
+
+        list_media_key = resolved_list_key
         if list_media_key is None:
             list_media_key = before_snapshot.media_key
         pinned_fields = self._get_pinned_fields(
@@ -600,8 +599,10 @@ class BaseSyncClient[
                 else None
             )
         scope = self._derive_scope(item=item, child_item=child_item)
-        list_media_key = self._resolve_list_media_key(
-            mapping=mapping, media_key=resolved_media_key, scope=scope
+        list_media_key = (
+            self.list_provider.resolve_mappings(mapping, scope=scope)
+            if mapping
+            else None
         )
 
         library_target: LibraryMedia = child_item if child_item is not None else item
@@ -685,36 +686,14 @@ class BaseSyncClient[
             ctx.session.add(history_record)
             ctx.session.commit()
 
-    def _resolve_list_media_key(
+    @abstractmethod
+    def _derive_scope(
         self,
         *,
-        mapping: MappingGraph | None,
-        media_key: str | None,
-        scope: str | None,
+        item: ParentMediaT,
+        child_item: ChildMediaT | None,
     ) -> str | None:
-        """Let the list provider choose a media key from known candidates."""
-        if media_key is not None:
-            return str(media_key)
-        if mapping is None:
-            return None
-        # TODO: better way of sharing mapping graph class?
-        resolved = self.list_provider.resolve_mappings(mapping, scope=scope)  # type: ignore
-        return str(resolved) if resolved is not None else None
-
-    def _derive_scope(
-        self, *, item: ParentMediaT, child_item: ChildMediaT | None
-    ) -> str | None:
-        """Derive a mapping scope hint for list resolution."""
-        if child_item is not None:
-            index = getattr(child_item, "index", None)
-            if isinstance(index, int) and index > 0:
-                return f"s{index}"
-
-        media_kind = getattr(item, "media_kind", None)
-        if media_kind and getattr(media_kind, "value", None) == "movie":
-            return "movie"
-
-        return None
+        """Derive the mapping scope for the given item."""
 
     def _should_update_field(
         self,
@@ -753,7 +732,7 @@ class BaseSyncClient[
         """Format external identifiers for debug logging."""
         if not ids:
             return "$${}$$"
-        formatted = ", ".join(f"{key}: {value}" for key, value in ids.items())
+        formatted = ", ".join(f"{key}: {value}" for key, value in ids.items() if value)
         return f"$${{{formatted}}}$$"
 
     def _format_diff(self, diff: dict[str, tuple[Any, Any]]) -> str:
@@ -891,14 +870,15 @@ class BaseSyncClient[
         grandchild_items: Sequence[GrandchildMediaT],
         entry: ListEntry | None,
         mapping: MappingGraph | None,
-        list_media_key: str | None,
     ) -> ListEntry:
         """Materialize a list entry for synchronization, constructing when missing."""
         if entry is not None:
             return entry
         scope = self._derive_scope(item=item, child_item=child_item)
-        list_media_key = self._resolve_list_media_key(
-            mapping=mapping, media_key=list_media_key, scope=scope
+        list_media_key = (
+            self.list_provider.resolve_mappings(mapping, scope=scope)
+            if mapping
+            else None
         )
         if list_media_key is None:
             raise ValueError(

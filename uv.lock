@@ -173,7 +173,7 @@ dev = [
 [[package]]
 name = "anibridge-anilist-provider"
 version = "0.1.0"
-source = { git = "https://github.com/anibridge/anibridge-anilist-provider.git#9ca6293566f26fe361eaefc84d372b2ce7ebaada" }
+source = { git = "https://github.com/anibridge/anibridge-anilist-provider.git#938d721c7a2364663ab7ad590316d338cb504fe3" }
 dependencies = [
     { name = "aiohttp" },
     { name = "anibridge-list-interface" },
@@ -185,7 +185,7 @@ dependencies = [
 [[package]]
 name = "anibridge-library-interface"
 version = "0.1.0"
-source = { git = "https://github.com/anibridge/anibridge-library-interface.git#2f07a4177b92b9613fc2aaf05c588ca0212de1ae" }
+source = { git = "https://github.com/anibridge/anibridge-library-interface.git#3d91dc66f405991b741836c40ce4d4e60c387131" }
 dependencies = [
     { name = "starlette" },
 ]
@@ -193,12 +193,12 @@ dependencies = [
 [[package]]
 name = "anibridge-list-interface"
 version = "0.1.0"
-source = { git = "https://github.com/anibridge/anibridge-list-interface.git#3013f1ec0ee4d15af0ebf53ddc58f5d43491c6ca" }
+source = { git = "https://github.com/anibridge/anibridge-list-interface.git#236d377eee3b27ab887e89a3408585e949800238" }
 
 [[package]]
 name = "anibridge-plex-provider"
 version = "0.1.0"
-source = { git = "https://github.com/anibridge/anibridge-plex-provider.git#e9d4b9a7686209a00176d4a0b0fa62c3bbe70747" }
+source = { git = "https://github.com/anibridge/anibridge-plex-provider.git#33d9a9d601c0ece3d5c113c370262ec7e2a3567e" }
 dependencies = [
     { name = "aiohttp" },
     { name = "anibridge-library-interface" },
