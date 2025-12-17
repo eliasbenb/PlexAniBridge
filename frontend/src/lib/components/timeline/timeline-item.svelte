@@ -104,9 +104,7 @@
         return (
             resolve("/mappings") +
             "?" +
-            new SvelteURLSearchParams({
-                q: `id:${item.animap_entry_id}`,
-            }).toString()
+            new SvelteURLSearchParams({ q: `id:${item.animap_entry_id}` }).toString()
         );
     }
 
@@ -256,13 +254,16 @@
 
                             <span
                                 class="inline-flex items-center rounded bg-slate-800/70 px-1.5 py-0.5 tracking-wide text-slate-400 uppercase">
-                                Library Key {item.library_media_key}
+                                {item.library_namespace}
+                                {item.library_media_key}
                             </span>
-                            <span
-                                class="inline-flex items-center rounded bg-slate-800/70 px-1.5 py-0.5 tracking-wide text-slate-400 uppercase">
-                                List Key {item.list_media_key}
-                            </span>
-
+                            {#if item.list_namespace && item.list_media_key}
+                                <span
+                                    class="inline-flex items-center rounded bg-slate-800/70 px-1.5 py-0.5 tracking-wide text-slate-400 uppercase">
+                                    {item.list_namespace}
+                                    {item.list_media_key}
+                                </span>
+                            {/if}
                             {#if item.media_kind}
                                 <span
                                     class="inline-flex items-center rounded bg-slate-800/70 px-1.5 py-0.5 tracking-wide text-slate-400 uppercase">
