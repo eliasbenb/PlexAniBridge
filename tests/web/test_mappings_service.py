@@ -99,3 +99,25 @@ async def test_custom_only_filters_items() -> None:
             page=1, per_page=10, q=None, custom_only=True
         )
         assert all(item["custom"] for item in items)
+
+
+@pytest.mark.asyncio
+async def test_search_by_entry_id() -> None:
+    """Booru query supports filtering by Animap entry ID."""
+    service = MappingsService()
+    with _fresh_tables():
+        _seed_graph()
+        with db() as ctx:
+            entry_id = (
+                ctx.session.query(AnimapEntry.id)
+                .filter(AnimapEntry.provider == "anilist")
+                .scalar()
+            )
+
+        items, total = await service.list_mappings(
+            page=1, per_page=10, q=f"id:{entry_id}", custom_only=False
+        )
+
+        assert total == 1
+        assert len(items) == 1
+        assert items[0]["descriptor"].startswith("anilist:")

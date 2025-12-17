@@ -18,6 +18,7 @@ from src.core.sync.stats import (
     ItemIdentifier,
     SyncStats,
 )
+from src.models.db.animap import AnimapEntry
 from src.models.db.pin import Pin
 from src.models.db.sync_history import SyncHistory, SyncOutcome
 from src.utils.types import Comparable
@@ -610,36 +611,24 @@ class BaseSyncClient[
         )
 
         library_target: LibraryMedia = child_item if child_item is not None else item
-        library_media_key = str(library_target.key)
         library_namespace = self.library_provider.NAMESPACE
+        library_section_key = library_target.section().key
+        library_media_key = str(library_target.key)
         list_namespace = self.list_provider.NAMESPACE
         media_kind = library_target.media_kind
 
-        library_section_key: str | None = None
-        try:
-            section = library_target.section()
-            library_section_key = section.key
-        except Exception:
-            library_section_key = None
-
         with db() as ctx:
             if outcome == SyncOutcome.SYNCED:
+                # Remove any previous NOT_FOUND/FAILED records on successful sync
                 delete_filters = [
                     SyncHistory.profile_name == self.profile_name,
-                    SyncHistory.library_section_key == library_section_key,
                     SyncHistory.library_namespace == library_namespace,
+                    SyncHistory.library_section_key == library_section_key,
                     SyncHistory.library_media_key == library_media_key,
                     SyncHistory.outcome.in_(
                         [SyncOutcome.NOT_FOUND, SyncOutcome.FAILED]
                     ),
                 ]
-                if list_media_key is not None:
-                    delete_filters.extend(
-                        [
-                            SyncHistory.list_namespace == list_namespace,
-                            SyncHistory.list_media_key == list_media_key,
-                        ]
-                    )
                 ctx.session.query(SyncHistory).filter(*delete_filters).delete(
                     synchronize_session=False
                 )
@@ -647,10 +636,28 @@ class BaseSyncClient[
             if outcome == SyncOutcome.SKIPPED:
                 return
 
+            async def get_mapping_entry_id() -> int | None:
+                if resolved_list_descriptor is None:
+                    return None
+                entry = (
+                    ctx.session.query(AnimapEntry)
+                    .filter(
+                        AnimapEntry.provider == resolved_list_descriptor.provider,
+                        AnimapEntry.entry_id == resolved_list_descriptor.entry_id,
+                        AnimapEntry.entry_scope == resolved_list_descriptor.scope,
+                    )
+                    .first()
+                )
+                return entry.id if entry else None
+
+            mapping_entry_id = await get_mapping_entry_id()
+
             if outcome in (SyncOutcome.NOT_FOUND, SyncOutcome.FAILED):
+                # If a not found/failed record already exists, update it
                 filters = [
                     SyncHistory.profile_name == self.profile_name,
                     SyncHistory.library_namespace == library_namespace,
+                    SyncHistory.library_section_key == library_section_key,
                     SyncHistory.library_media_key == library_media_key,
                     SyncHistory.outcome == outcome,
                 ]
@@ -666,11 +673,14 @@ class BaseSyncClient[
                 existing = ctx.session.query(SyncHistory).filter(*filters).first()
                 if existing:
                     if existing.error_message == error_message:
+                        # If we're just seeing the same error, don't bring the record
+                        # forward by updating the timestamp
                         return
                     existing.before_state = before_state
                     existing.after_state = after_state
                     existing.error_message = error_message
                     existing.timestamp = datetime.now(UTC)
+                    existing.animap_entry_id = mapping_entry_id
                     ctx.session.commit()
                     return
 
@@ -681,6 +691,7 @@ class BaseSyncClient[
                 library_media_key=library_media_key,
                 list_namespace=list_namespace,
                 list_media_key=list_media_key,
+                animap_entry_id=mapping_entry_id,
                 media_kind=media_kind,
                 outcome=outcome,
                 before_state=before_state,

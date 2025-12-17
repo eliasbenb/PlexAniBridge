@@ -1,8 +1,8 @@
 """Initial revision
 
-Revision ID: b2b38261fd7f
+Revision ID: a5d877d895e6
 Revises: 
-Create Date: 2025-12-12 22:19:06.932023
+Create Date: 2025-12-17 08:03:50.795388
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = 'b2b38261fd7f'
+revision: str = 'a5d877d895e6'
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -53,34 +53,7 @@ def upgrade() -> None:
         batch_op.create_index(batch_op.f('ix_pin_list_namespace'), ['list_namespace'], unique=False)
         batch_op.create_index('ix_pin_profile_list_keys', ['profile_name', 'list_namespace', 'list_media_key'], unique=True)
         batch_op.create_index(batch_op.f('ix_pin_profile_name'), ['profile_name'], unique=False)
-
-    op.create_table('sync_history',
-    sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('profile_name', sa.String(), nullable=False),
-    sa.Column('library_namespace', sa.String(), nullable=False),
-    sa.Column('library_section_key', sa.String(), nullable=False),
-    sa.Column('library_media_key', sa.String(), nullable=False),
-    sa.Column('list_namespace', sa.String(), nullable=False),
-    sa.Column('list_media_key', sa.String(), nullable=True),
-    sa.Column('media_kind', sa.Enum('MOVIE', 'SHOW', 'SEASON', 'EPISODE', name='mediakind'), nullable=False),
-    sa.Column('outcome', sa.Enum('SYNCED', 'SKIPPED', 'FAILED', 'NOT_FOUND', 'DELETED', 'PENDING', 'UNDONE', name='syncoutcome'), nullable=False),
-    sa.Column('before_state', sa.JSON(), nullable=True),
-    sa.Column('after_state', sa.JSON(), nullable=True),
-    sa.Column('error_message', sa.String(), nullable=True),
-    sa.Column('timestamp', sa.DateTime(), nullable=False),
-    sa.PrimaryKeyConstraint('id')
-    )
-    with op.batch_alter_table('sync_history', schema=None) as batch_op:
-        batch_op.create_index(batch_op.f('ix_sync_history_library_media_key'), ['library_media_key'], unique=False)
-        batch_op.create_index(batch_op.f('ix_sync_history_library_namespace'), ['library_namespace'], unique=False)
-        batch_op.create_index(batch_op.f('ix_sync_history_library_section_key'), ['library_section_key'], unique=False)
-        batch_op.create_index(batch_op.f('ix_sync_history_list_media_key'), ['list_media_key'], unique=False)
-        batch_op.create_index(batch_op.f('ix_sync_history_list_namespace'), ['list_namespace'], unique=False)
-        batch_op.create_index(batch_op.f('ix_sync_history_media_kind'), ['media_kind'], unique=False)
-        batch_op.create_index(batch_op.f('ix_sync_history_outcome'), ['outcome'], unique=False)
-        batch_op.create_index(batch_op.f('ix_sync_history_profile_name'), ['profile_name'], unique=False)
-        batch_op.create_index(batch_op.f('ix_sync_history_timestamp'), ['timestamp'], unique=False)
-        batch_op.create_index('ix_sync_history_upsert_keys', ['profile_name', 'library_namespace', 'library_section_key', 'library_media_key', 'list_namespace', 'list_media_key', 'outcome'], unique=False)
+        batch_op.create_index('ix_pin_profile_updated_at', ['profile_name', 'updated_at'], unique=False)
 
     op.create_table('animap_mapping',
     sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
@@ -95,7 +68,42 @@ def upgrade() -> None:
     )
     with op.batch_alter_table('animap_mapping', schema=None) as batch_op:
         batch_op.create_index(batch_op.f('ix_animap_mapping_destination_entry_id'), ['destination_entry_id'], unique=False)
+        batch_op.create_index('ix_animap_mapping_destination_range', ['destination_range'], unique=False)
         batch_op.create_index(batch_op.f('ix_animap_mapping_source_entry_id'), ['source_entry_id'], unique=False)
+        batch_op.create_index('ix_animap_mapping_source_range', ['source_range'], unique=False)
+
+    op.create_table('sync_history',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('profile_name', sa.String(), nullable=False),
+    sa.Column('library_namespace', sa.String(), nullable=False),
+    sa.Column('library_section_key', sa.String(), nullable=False),
+    sa.Column('library_media_key', sa.String(), nullable=False),
+    sa.Column('list_namespace', sa.String(), nullable=False),
+    sa.Column('list_media_key', sa.String(), nullable=True),
+    sa.Column('animap_entry_id', sa.Integer(), nullable=True),
+    sa.Column('media_kind', sa.Enum('MOVIE', 'SHOW', 'SEASON', 'EPISODE', name='mediakind'), nullable=False),
+    sa.Column('outcome', sa.Enum('SYNCED', 'SKIPPED', 'FAILED', 'NOT_FOUND', 'DELETED', 'PENDING', 'UNDONE', name='syncoutcome'), nullable=False),
+    sa.Column('before_state', sa.JSON(), nullable=True),
+    sa.Column('after_state', sa.JSON(), nullable=True),
+    sa.Column('error_message', sa.String(), nullable=True),
+    sa.Column('timestamp', sa.DateTime(), nullable=False),
+    sa.ForeignKeyConstraint(['animap_entry_id'], ['animap_entry.id'], onupdate='CASCADE', ondelete='SET NULL'),
+    sa.PrimaryKeyConstraint('id')
+    )
+    with op.batch_alter_table('sync_history', schema=None) as batch_op:
+        batch_op.create_index(batch_op.f('ix_sync_history_animap_entry_id'), ['animap_entry_id'], unique=False)
+        batch_op.create_index('ix_sync_history_library_keys_outcome', ['profile_name', 'library_namespace', 'library_section_key', 'library_media_key', 'outcome'], unique=False)
+        batch_op.create_index(batch_op.f('ix_sync_history_library_media_key'), ['library_media_key'], unique=False)
+        batch_op.create_index(batch_op.f('ix_sync_history_library_namespace'), ['library_namespace'], unique=False)
+        batch_op.create_index(batch_op.f('ix_sync_history_library_section_key'), ['library_section_key'], unique=False)
+        batch_op.create_index(batch_op.f('ix_sync_history_list_media_key'), ['list_media_key'], unique=False)
+        batch_op.create_index(batch_op.f('ix_sync_history_list_namespace'), ['list_namespace'], unique=False)
+        batch_op.create_index(batch_op.f('ix_sync_history_media_kind'), ['media_kind'], unique=False)
+        batch_op.create_index(batch_op.f('ix_sync_history_outcome'), ['outcome'], unique=False)
+        batch_op.create_index(batch_op.f('ix_sync_history_profile_name'), ['profile_name'], unique=False)
+        batch_op.create_index('ix_sync_history_profile_outcome_timestamp', ['profile_name', 'outcome', 'timestamp'], unique=False)
+        batch_op.create_index(batch_op.f('ix_sync_history_timestamp'), ['timestamp'], unique=False)
+        batch_op.create_index('ix_sync_history_upsert_keys', ['profile_name', 'library_namespace', 'library_section_key', 'library_media_key', 'list_namespace', 'list_media_key', 'outcome'], unique=False)
 
     op.create_table('animap_provenance',
     sa.Column('mapping_id', sa.Integer(), nullable=False),
@@ -116,14 +124,10 @@ def downgrade() -> None:
         batch_op.drop_index(batch_op.f('ix_animap_provenance_mapping_id'))
 
     op.drop_table('animap_provenance')
-    with op.batch_alter_table('animap_mapping', schema=None) as batch_op:
-        batch_op.drop_index(batch_op.f('ix_animap_mapping_source_entry_id'))
-        batch_op.drop_index(batch_op.f('ix_animap_mapping_destination_entry_id'))
-
-    op.drop_table('animap_mapping')
     with op.batch_alter_table('sync_history', schema=None) as batch_op:
         batch_op.drop_index('ix_sync_history_upsert_keys')
         batch_op.drop_index(batch_op.f('ix_sync_history_timestamp'))
+        batch_op.drop_index('ix_sync_history_profile_outcome_timestamp')
         batch_op.drop_index(batch_op.f('ix_sync_history_profile_name'))
         batch_op.drop_index(batch_op.f('ix_sync_history_outcome'))
         batch_op.drop_index(batch_op.f('ix_sync_history_media_kind'))
@@ -132,9 +136,19 @@ def downgrade() -> None:
         batch_op.drop_index(batch_op.f('ix_sync_history_library_section_key'))
         batch_op.drop_index(batch_op.f('ix_sync_history_library_namespace'))
         batch_op.drop_index(batch_op.f('ix_sync_history_library_media_key'))
+        batch_op.drop_index('ix_sync_history_library_keys_outcome')
+        batch_op.drop_index(batch_op.f('ix_sync_history_animap_entry_id'))
 
     op.drop_table('sync_history')
+    with op.batch_alter_table('animap_mapping', schema=None) as batch_op:
+        batch_op.drop_index('ix_animap_mapping_source_range')
+        batch_op.drop_index(batch_op.f('ix_animap_mapping_source_entry_id'))
+        batch_op.drop_index('ix_animap_mapping_destination_range')
+        batch_op.drop_index(batch_op.f('ix_animap_mapping_destination_entry_id'))
+
+    op.drop_table('animap_mapping')
     with op.batch_alter_table('pin', schema=None) as batch_op:
+        batch_op.drop_index('ix_pin_profile_updated_at')
         batch_op.drop_index(batch_op.f('ix_pin_profile_name'))
         batch_op.drop_index('ix_pin_profile_list_keys')
         batch_op.drop_index(batch_op.f('ix_pin_list_namespace'))

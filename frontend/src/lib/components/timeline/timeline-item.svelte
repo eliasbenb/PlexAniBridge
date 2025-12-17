@@ -100,19 +100,15 @@
     }: Props = $props();
 
     function mappingUrl(item: HistoryItem): string | null {
-        const namespace = item.list_namespace ?? item.list_media?.namespace ?? null;
-        if (namespace !== "anilist") return null;
-        const key = item.list_media_key ?? item.list_media?.key ?? null;
-        if (!key) return null;
-        const id = Number.parseInt(key, 10);
-        if (!Number.isFinite(id)) return null;
+        if (!item.animap_entry_id) return null;
         return (
             resolve("/mappings") +
             "?" +
-            new SvelteURLSearchParams({ q: `anilist:${id}` }).toString()
+            new SvelteURLSearchParams({
+                q: `id:${item.animap_entry_id}`,
+            }).toString()
         );
     }
-    const coverHref = listUrl(item);
 
     const fallbackDiffUi: ItemDiffUi = {
         tab: "changes",
@@ -149,10 +145,10 @@
         aria-hidden="true">
     </div>
     <div class="flex min-w-0 flex-1 items-stretch gap-3">
-        {#if coverHref}
+        {#if listUrl(item)}
             <!-- eslint-disable svelte/no-navigation-without-resolve -->
             <a
-                href={coverHref}
+                href={listUrl(item)}
                 target="_blank"
                 rel="noopener"
                 class="timeline-cover block shrink-0">
@@ -257,6 +253,16 @@
                                     {timestampLabel}
                                 </span>
                             {/if}
+
+                            <span
+                                class="inline-flex items-center rounded bg-slate-800/70 px-1.5 py-0.5 tracking-wide text-slate-400 uppercase">
+                                Library Key {item.library_media_key}
+                            </span>
+                            <span
+                                class="inline-flex items-center rounded bg-slate-800/70 px-1.5 py-0.5 tracking-wide text-slate-400 uppercase">
+                                List Key {item.list_media_key}
+                            </span>
+
                             {#if item.media_kind}
                                 <span
                                     class="inline-flex items-center rounded bg-slate-800/70 px-1.5 py-0.5 tracking-wide text-slate-400 uppercase">
