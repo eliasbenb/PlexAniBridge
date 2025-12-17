@@ -214,6 +214,7 @@ export interface HistoryItem {
     library_media_key?: string | null;
     list_namespace?: string | null;
     list_media_key?: string | null;
+    animap_entry_id?: number | null;
     media_kind?: string | null;
     outcome: string;
     before_state?: Record<string, unknown> | null;

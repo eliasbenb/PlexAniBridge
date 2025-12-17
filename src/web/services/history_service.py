@@ -7,7 +7,8 @@ from typing import TYPE_CHECKING, Any
 from async_lru import alru_cache
 from fastapi.param_functions import Query
 from pydantic import BaseModel
-from sqlalchemy import func, select
+from sqlalchemy.sql import select
+from sqlalchemy.sql.functions import func
 
 from src import log
 from src.config.database import db
@@ -40,6 +41,7 @@ class HistoryItem(BaseModel):
     library_media_key: str | None = None
     list_namespace: str | None = None
     list_media_key: str | None = None
+    animap_entry_id: int | None = None
     media_kind: str | None = None
     outcome: str
     before_state: dict | None = None
@@ -284,6 +286,7 @@ class HistoryService:
                     library_media_key=row.library_media_key,
                     list_namespace=row.list_namespace,
                     list_media_key=row.list_media_key,
+                    animap_entry_id=row.animap_entry_id,
                     media_kind=row.media_kind.value if row.media_kind else None,
                     outcome=str(row.outcome),
                     before_state=row.before_state,

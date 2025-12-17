@@ -6,7 +6,7 @@ from typing import Any
 
 from anibridge.library import MediaKind
 from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy.schema import Index
+from sqlalchemy.schema import ForeignKey, Index
 from sqlalchemy.sql.sqltypes import JSON, DateTime, Enum, Integer, String
 
 from src.models.db.base import Base
@@ -41,6 +41,13 @@ class SyncHistory(Base):
     list_namespace: Mapped[str] = mapped_column(String, index=True)
     list_media_key: Mapped[str | None] = mapped_column(
         String, nullable=True, index=True
+    )
+
+    animap_entry_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("animap_entry.id", ondelete="SET NULL", onupdate="CASCADE"),
+        nullable=True,
+        index=True,
     )
 
     media_kind: Mapped[MediaKind] = mapped_column(Enum(MediaKind), index=True)

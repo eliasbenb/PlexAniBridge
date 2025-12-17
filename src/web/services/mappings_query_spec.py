@@ -88,6 +88,14 @@ _STRING_OPS = (
 
 _DB_FIELDS: tuple[QueryFieldSpec, ...] = (
     QueryFieldSpec(
+        key="id",
+        desc="AniBridge mapping entry ID",
+        kind=QueryFieldKind.DB_SCALAR,
+        type=QueryFieldType.INT,
+        operators=_INT_OPS,
+        column=AnimapEntry.id,
+    ),
+    QueryFieldSpec(
         key="source.provider",
         desc="Source provider",
         kind=QueryFieldKind.DB_SCALAR,
