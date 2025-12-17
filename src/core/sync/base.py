@@ -300,10 +300,13 @@ class BaseSyncClient[
         )
 
         scope = self._derive_scope(item=item, child_item=child_item)
-        resolved_list_key = (
+        resolved_list_descriptor = (
             self.list_provider.resolve_mappings(mapping, scope=scope)
             if mapping
             else None
+        )
+        resolved_list_key = (
+            resolved_list_descriptor.entry_id if resolved_list_descriptor else None
         )
 
         debug_title = self._debug_log_title(
@@ -597,10 +600,13 @@ class BaseSyncClient[
                 else None
             )
         scope = self._derive_scope(item=item, child_item=child_item)
-        list_media_key = (
+        resolved_list_descriptor = (
             self.list_provider.resolve_mappings(mapping, scope=scope)
             if mapping
             else None
+        )
+        list_media_key = (
+            resolved_list_descriptor.entry_id if resolved_list_descriptor else None
         )
 
         library_target: LibraryMedia = child_item if child_item is not None else item
@@ -873,15 +879,15 @@ class BaseSyncClient[
         if entry is not None:
             return entry
         scope = self._derive_scope(item=item, child_item=child_item)
-        list_media_key = (
+        resolved_list_descriptor = (
             self.list_provider.resolve_mappings(mapping, scope=scope)
             if mapping
             else None
         )
-        if list_media_key is None:
+        if resolved_list_descriptor is None:
             raise ValueError(
                 f"Unable to determine list media key for {item.media_kind.value} "
                 f"{self._debug_log_title(item=item, mapping=mapping, media_key=None)}"
             )
 
-        return await self.list_provider.build_entry(list_media_key)
+        return await self.list_provider.build_entry(resolved_list_descriptor.entry_id)

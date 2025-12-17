@@ -173,7 +173,7 @@ dev = [
 [[package]]
 name = "anibridge-anilist-provider"
 version = "0.1.0"
-source = { git = "https://github.com/anibridge/anibridge-anilist-provider.git#938d721c7a2364663ab7ad590316d338cb504fe3" }
+source = { git = "https://github.com/anibridge/anibridge-anilist-provider.git#2a1d7bed281aa4fc2a40a8c70689f7e5e5744bcc" }
 dependencies = [
     { name = "aiohttp" },
     { name = "anibridge-list-interface" },
@@ -193,7 +193,7 @@ dependencies = [
 [[package]]
 name = "anibridge-list-interface"
 version = "0.1.0"
-source = { git = "https://github.com/anibridge/anibridge-list-interface.git#236d377eee3b27ab887e89a3408585e949800238" }
+source = { git = "https://github.com/anibridge/anibridge-list-interface.git#6c525d8dab163a0fe0a2d21441a1ae97189474fa" }
 
 [[package]]
 name = "anibridge-plex-provider"

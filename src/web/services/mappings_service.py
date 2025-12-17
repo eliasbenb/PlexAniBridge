@@ -12,7 +12,7 @@ from sqlalchemy.sql import func, or_, select
 
 from src.config.database import db
 from src.config.settings import get_config
-from src.core.animap import MappingDescriptor
+from src.core.animap import AnimapDescriptor
 from src.exceptions import (
     AniListFilterError,
     AniListSearchError,
@@ -1002,7 +1002,7 @@ class MappingsService:
         Returns:
             dict[str, Any]: The mapping item.
         """
-        parsed = MappingDescriptor.parse(descriptor)
+        parsed = AnimapDescriptor.parse(descriptor)
         with db() as ctx:
             entry = (
                 ctx.session.execute(

@@ -8,7 +8,7 @@ from typing import Any
 from anibridge.library import HistoryEntry, MediaKind
 from anibridge.list import ListMediaType, ListStatus
 
-from src.core.animap import AnimapEdge, MappingDescriptor, MappingGraph
+from src.core.animap import AnimapDescriptor, AnimapEdge, AnimapGraph
 
 
 class FakeLibraryProvider:
@@ -272,16 +272,17 @@ class FakeListProvider:
 
     def resolve_mappings(
         self,
-        mapping: MappingGraph | None,
+        mapping: AnimapGraph | None,
         *,
         scope: str | None = None,
-        candidates: Sequence[str] | None = None,
-    ) -> str | None:
+    ) -> AnimapDescriptor | None:
         """Optionally resolve a media key from a mapping graph."""
         if self.resolved_key is not None:
-            return self.resolved_key
-        if candidates:
-            return next(iter(candidates), None)
+            return AnimapDescriptor(
+                provider=FakeListProvider.NAMESPACE,
+                entry_id=self.resolved_key,
+                scope=scope or "s1",
+            )
         return None
 
 
@@ -417,11 +418,11 @@ class FakeListEntry:
 class FakeAnimapClient:
     """Stub that returns a pre-seeded mapping graph for sync tests."""
 
-    def __init__(self, graph: MappingGraph | None = None) -> None:
+    def __init__(self, graph: AnimapGraph | None = None) -> None:
         """Initialize the fake Animap client with an optional graph."""
-        self.graph = graph or MappingGraph(edges=tuple())
+        self.graph = graph or AnimapGraph(edges=tuple())
 
-    def get_graph_for_ids(self, *_: Any, **__: Any) -> MappingGraph:
+    def get_graph_for_ids(self, *_: Any, **__: Any) -> AnimapGraph:
         """Return the configured mapping graph regardless of inputs."""
         return self.graph
 
@@ -431,15 +432,15 @@ class FakeAnimapClient:
         target: tuple[str, str, str],
         source_range: str = "movie",
         destination_range: str | None = None,
-    ) -> MappingGraph:
+    ) -> AnimapGraph:
         """Helper to build a simple one-edge graph for tests."""
         edge = AnimapEdge(
-            source=MappingDescriptor(*source),
-            destination=MappingDescriptor(*target),
+            source=AnimapDescriptor(*source),
+            destination=AnimapDescriptor(*target),
             source_range=source_range,
             destination_range=destination_range,
         )
-        return MappingGraph(edges=(edge,))
+        return AnimapGraph(edges=(edge,))
 
 
 def make_history_entry(key: str, *, ts: datetime) -> HistoryEntry:

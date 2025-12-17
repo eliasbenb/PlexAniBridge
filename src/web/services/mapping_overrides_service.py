@@ -10,7 +10,7 @@ from typing import Any, ClassVar
 import yaml
 
 from src import config
-from src.core.animap import MappingDescriptor
+from src.core.animap import AnimapDescriptor
 from src.core.mappings import MappingsClient
 from src.exceptions import (
     MappingError,
@@ -127,7 +127,7 @@ class MappingOverridesService:
                 raise MappingError("edge.source_range must be a non-empty string")
             if dst_range is not None and not isinstance(dst_range, str):
                 raise MappingError("edge.destination_range must be a string or null")
-            MappingDescriptor.parse(target)
+            AnimapDescriptor.parse(target)
             normalized.append(
                 StructuredEdge(
                     target=target,
@@ -146,11 +146,11 @@ class MappingOverridesService:
         """Validate and parse an override payload."""
         if not descriptor:
             raise MissingDescriptorError("descriptor is required")
-        MappingDescriptor.parse(descriptor)
+        AnimapDescriptor.parse(descriptor)
 
         parsed_targets: dict[str, dict[str, str | None]] = {}
         for raw_dst, ranges in (targets or {}).items():
-            MappingDescriptor.parse(raw_dst)
+            AnimapDescriptor.parse(raw_dst)
             if not isinstance(ranges, dict):
                 raise MappingError(
                     "targets must be a mapping of destination descriptors to range maps"
@@ -212,7 +212,7 @@ class MappingOverridesService:
         try:
             item = await get_mappings_service().get_mapping(descriptor)
         except MappingNotFoundError:
-            parsed = MappingDescriptor.parse(descriptor)
+            parsed = AnimapDescriptor.parse(descriptor)
             item = {
                 "descriptor": descriptor,
                 "provider": parsed.provider,
@@ -265,7 +265,7 @@ class MappingOverridesService:
         Returns:
             dict[str, Any]: Confirmation of successful deletion.
         """
-        payload = MappingDescriptor.parse(descriptor)
+        payload = AnimapDescriptor.parse(descriptor)
         async with self._lock:
             raw, path, fmt = self._load_raw()
             raw.pop(payload.key(), None)
