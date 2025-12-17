@@ -29,10 +29,9 @@ if supports_utf8():
 ║  Author: {f"{__author__} @{__maintainer__}":<69}║
 ║  License: {__license__:<68}║
 ║  Repository: https://github.com/eliasbenb/PlexAniBridge                       ║
-║  Documentation: https://anibridge.eliasbenb.dev                            ║
+║  Documentation: https://anibridge.eliasbenb.dev                               ║
 ║                                                                               ║
-╚═══════════════════════════════════════════════════════════════════════════════╝
-    """.strip()
+╚═══════════════════════════════════════════════════════════════════════════════╝""".strip()
 else:
     ANIBDRIGE_HEADER = f"""
 +-------------------------------------------------------------------------------+
@@ -45,7 +44,6 @@ else:
 |  Author: {f"{__author__} @{__maintainer__}":<69}|
 |  License: {__license__:<68}|
 |  Repository: https://github.com/eliasbenb/PlexAniBridge                       |
-|  Documentation: https://anibridge.eliasbenb.dev                            |
+|  Documentation: https://anibridge.eliasbenb.dev                               |
 |                                                                               |
-+-------------------------------------------------------------------------------+
-    """.strip()
++-------------------------------------------------------------------------------+""".strip()

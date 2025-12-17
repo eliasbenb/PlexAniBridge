@@ -288,14 +288,3 @@ export interface ListBackupsResponse {
 export interface RawBackup {
     [key: string]: unknown;
 }
-
-export interface RestoreSummary {
-    ok: boolean;
-    filename: string;
-    total_entries: number;
-    processed: number;
-    restored: number;
-    skipped: number;
-    errors: Record<string, unknown>[];
-    elapsed_seconds: number;
-}

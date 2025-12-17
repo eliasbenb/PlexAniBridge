@@ -5,11 +5,7 @@ from typing import Any
 from fastapi.routing import APIRouter
 from pydantic import BaseModel
 
-from src.web.services.backup_service import (
-    BackupMeta,
-    RestoreSummary,
-    get_backup_service,
-)
+from src.web.services.backup_service import BackupMeta, get_backup_service
 
 router = APIRouter()
 
@@ -44,8 +40,8 @@ def list_backups(profile: str) -> ListBackupsResponse:
     return ListBackupsResponse(backups=backups)
 
 
-@router.post("/{profile}/restore", response_model=RestoreSummary)
-async def restore_backup(profile: str, req: RestoreRequest) -> RestoreSummary:
+@router.post("/{profile}/restore")
+async def restore_backup(profile: str, req: RestoreRequest) -> None:
     """Restore a backup file (no dry-run mode).
 
     Raises:
@@ -53,10 +49,9 @@ async def restore_backup(profile: str, req: RestoreRequest) -> RestoreSummary:
         ProfileNotFoundError: If the profile is unknown.
         InvalidBackupFilenameError: If the filename is invalid (e.g., path traversal).
         BackupFileNotFoundError: If the backup file does not exist.
+        BackupParseError: If there was an error parsing or restoring the backup.
     """
-    return await get_backup_service().restore_backup(
-        profile=profile, filename=req.filename
-    )
+    await get_backup_service().restore_backup(profile=profile, filename=req.filename)
 
 
 @router.get("/{profile}/raw/{filename}")

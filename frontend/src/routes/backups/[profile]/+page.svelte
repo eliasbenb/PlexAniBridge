@@ -4,7 +4,7 @@
     import { ArchiveRestore, Eye, LoaderCircle, RefreshCcw } from "@lucide/svelte";
 
     import JsonCodeBlock from "$lib/components/json-code-block.svelte";
-    import type { BackupMeta, RestoreSummary } from "$lib/types/api";
+    import type { BackupMeta } from "$lib/types/api";
     import Modal from "$lib/ui/modal.svelte";
     import { apiJson } from "$lib/utils/api";
     import { humanDuration, humanSize } from "$lib/utils/human";
@@ -45,8 +45,8 @@
     async function restoreBackup(
         profile: string,
         filename: string,
-    ): Promise<RestoreSummary> {
-        return await apiJson<RestoreSummary>(`/api/backups/${profile}/restore`, {
+    ) {
+        await apiJson(`/api/backups/${profile}/restore`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ filename }),
@@ -89,11 +89,7 @@
             return;
         restoring = filename;
         try {
-            const res = await restoreBackup(params.profile, filename);
-            toast(
-                `Restore complete: ${res.restored}/${res.total_entries}`,
-                res.errors.length ? "warn" : "success",
-            );
+            await restoreBackup(params.profile, filename);
         } catch (e) {
             console.error(e);
             toast("Restore failed", "error");
