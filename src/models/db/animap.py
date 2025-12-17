@@ -1,7 +1,7 @@
 """Models for provider-range mapping graph."""
 
 from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy.sql.schema import ForeignKey, UniqueConstraint
+from sqlalchemy.sql.schema import ForeignKey, Index, UniqueConstraint
 from sqlalchemy.sql.sqltypes import Integer, String
 
 from src.models.db.base import Base
@@ -20,7 +20,10 @@ class AnimapEntry(Base):
     entry_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
     entry_scope: Mapped[str] = mapped_column(String, nullable=False, index=True)
 
-    __table_args__ = (UniqueConstraint("provider", "entry_id", "entry_scope"),)
+    __table_args__ = (
+        UniqueConstraint("provider", "entry_id", "entry_scope"),
+        Index("ix_animap_entry_provider_entry_id", "provider", "entry_id"),
+    )
 
 
 class AnimapMapping(Base):
