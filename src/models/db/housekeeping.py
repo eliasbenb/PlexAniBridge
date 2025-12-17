@@ -1,7 +1,7 @@
 """Housekeeping Model Module."""
 
-from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.sql.sqltypes import String
 
 from src.models.db.base import Base
 

@@ -2,10 +2,9 @@
 
 from typing import Any, cast
 
-from sqlalchemy import column
 from sqlalchemy.dialects import sqlite
 from sqlalchemy.orm import Mapped
-from sqlalchemy.sql import false
+from sqlalchemy.sql import column, false
 
 from src.utils.sql import (
     _to_like_pattern,

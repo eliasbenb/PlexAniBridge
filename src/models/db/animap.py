@@ -1,7 +1,8 @@
 """Models for provider-range mapping graph."""
 
-from sqlalchemy import ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.sql.schema import ForeignKey, UniqueConstraint
+from sqlalchemy.sql.sqltypes import Integer, String
 
 from src.models.db.base import Base
 
