@@ -19,7 +19,7 @@ from src.core.sync.stats import (
     SyncStats,
 )
 from src.models.db.pin import Pin
-from src.models.db.sync_history import SyncOutcome
+from src.models.db.sync_history import SyncHistory, SyncOutcome
 from src.utils.types import Comparable
 
 if TYPE_CHECKING:
@@ -583,8 +583,6 @@ class BaseSyncClient[
         error_message: str | None = None,
     ) -> None:
         """Record the outcome of a sync attempt."""
-        from src.models.db.sync_history import SyncHistory
-
         before_snapshot, after_snapshot = snapshots
         before_state = before_snapshot.serialize() if before_snapshot else None
         after_state = after_snapshot.serialize() if after_snapshot else None

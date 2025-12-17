@@ -5,7 +5,8 @@ from pathlib import Path
 from types import TracebackType
 from typing import TYPE_CHECKING
 
-from sqlalchemy import create_engine, event
+import sqlalchemy.event
+from sqlalchemy.engine import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from src import __file__ as src_file
@@ -90,7 +91,7 @@ class AniBridgeDB:
         )
         log.debug(f"SQLite engine created at $$'{self.db_path}'$$")
 
-        @event.listens_for(engine, "connect")
+        @sqlalchemy.event.listens_for(engine, "connect")
         def _set_sqlite_pragma(dbapi_connection: AsyncAdapt_aioodbc_connection, _):
             """Set SQLite PRAGMA settings on new connections."""
             cur = dbapi_connection.cursor()

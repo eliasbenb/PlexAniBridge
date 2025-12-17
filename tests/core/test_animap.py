@@ -9,8 +9,9 @@ from types import SimpleNamespace
 from typing import Any, cast
 
 import pytest
-from sqlalchemy import create_engine, select
+from sqlalchemy.engine import create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.sql import select
 
 from src.config.database import AniBridgeDB
 from src.core.animap import AnimapClient, AnimapEdge, MappingDescriptor

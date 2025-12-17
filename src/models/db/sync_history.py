@@ -5,8 +5,9 @@ from enum import StrEnum
 from typing import Any
 
 from anibridge.library import MediaKind
-from sqlalchemy import JSON, DateTime, Enum, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.schema import Index
+from sqlalchemy.sql.sqltypes import JSON, DateTime, Enum, Integer, String
 
 from src.models.db.base import Base
 

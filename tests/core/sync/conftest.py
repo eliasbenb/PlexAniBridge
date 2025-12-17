@@ -3,7 +3,7 @@
 from collections.abc import Iterator
 
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy.engine import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from src.models.db.base import Base

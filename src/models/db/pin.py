@@ -2,8 +2,9 @@
 
 from datetime import UTC, datetime
 
-from sqlalchemy import JSON, DateTime, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.schema import Index
+from sqlalchemy.sql.sqltypes import JSON, DateTime, Integer, String
 
 from src.models.db.base import Base
 

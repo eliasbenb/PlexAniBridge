@@ -4,7 +4,7 @@ import pathlib
 import sys
 from logging.config import fileConfig
 
-from sqlalchemy import create_engine
+from sqlalchemy.engine import create_engine
 
 from alembic import context
 
