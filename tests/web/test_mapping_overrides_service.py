@@ -9,7 +9,7 @@ import pytest
 
 from src import config as app_config
 from src.config.database import db
-from src.core.animap import MappingDescriptor
+from src.core.animap import AnimapDescriptor
 from src.models.db.animap import AnimapEntry, AnimapMapping, AnimapProvenance
 from src.web.services import mappings_service as mappings_service_module
 from src.web.services.mapping_overrides_service import MappingOverridesService
@@ -37,7 +37,7 @@ def overrides_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     state.scheduler = cast(Any, scheduler)
 
     async def fake_get_mapping(descriptor: str, **_kwargs):
-        parsed = MappingDescriptor.parse(descriptor)
+        parsed = AnimapDescriptor.parse(descriptor)
         return {
             "descriptor": descriptor,
             "provider": parsed.provider,
@@ -74,6 +74,7 @@ async def test_save_override_writes_file_and_syncs_db(
     result = await service.save_override(
         descriptor="anilist:101:movie",
         targets={"tmdb:202:movie": {"1": None}},
+        edges=[{"target_provider": "tmdb", "target_id": "202", "source_range": "1"}],
     )
     assert result["descriptor"] == "anilist:101:movie"
 
@@ -93,6 +94,7 @@ async def test_delete_override_removes_entry(
     await service.save_override(
         descriptor="anilist:303:movie",
         targets={"tmdb:404:movie": {"1": None}},
+        edges=[{"target_provider": "tmdb", "target_id": "404", "source_range": "1"}],
     )
     file_path = tmp_path / "mappings.json"
     with db() as ctx:

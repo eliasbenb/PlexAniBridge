@@ -29,10 +29,13 @@ class MovieSyncClient(BaseSyncClient[LibraryMovie, LibraryMovie, LibraryMovie]):
     ]:
         """Map a library movie to its corresponding list entry."""
         mapping_graph = self.animap_client.get_graph_for_ids(item.ids())
-        list_media_key = (
+        list_media_descriptor = (
             self.list_provider.resolve_mappings(mapping_graph, scope="movie")
             if mapping_graph
             else None
+        )
+        list_media_key = (
+            list_media_descriptor.entry_id if list_media_descriptor else None
         )
 
         if list_media_key is not None:
@@ -185,7 +188,12 @@ class MovieSyncClient(BaseSyncClient[LibraryMovie, LibraryMovie, LibraryMovie]):
         media_key: str | None,
     ) -> str:
         if not media_key and mapping is not None:
-            media_key = self.list_provider.resolve_mappings(mapping, scope="movie")
+            list_media_descriptor = self.list_provider.resolve_mappings(
+                mapping, scope="movie"
+            )
+            media_key = (
+                list_media_descriptor.entry_id if list_media_descriptor else None
+            )
         if not media_key and entry is not None:
             media_key = entry.media().key
         ids = {"library_key": child_item.key, "list_key": media_key, **item.ids()}

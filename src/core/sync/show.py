@@ -79,7 +79,7 @@ class ShowSyncClient(BaseSyncClient[LibraryShow, LibrarySeason, LibraryEpisode])
                     cast(ListMappingGraph, mapping_graph), scope=scope
                 )
             ) is not None:
-                return str(r), True
+                return str(r.entry_id), True
             return None, False
 
         async def resolve_season(
@@ -322,8 +322,11 @@ class ShowSyncClient(BaseSyncClient[LibraryShow, LibrarySeason, LibraryEpisode])
         media_key: str | None,
     ) -> str:
         if not media_key and mapping is not None:
-            media_key = self.list_provider.resolve_mappings(
+            list_media_descriptor = self.list_provider.resolve_mappings(
                 mapping, scope=f"s{child_item.index}"
+            )
+            media_key = (
+                list_media_descriptor.entry_id if list_media_descriptor else None
             )
         if not media_key and entry is not None:
             media_key = entry.media().key

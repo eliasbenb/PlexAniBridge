@@ -17,7 +17,7 @@ from anibridge.library import (
 from anibridge.list import ListEntry as ListEntryProtocol
 from anibridge.list import ListMediaType, ListStatus
 
-from src.core.animap import AnimapEdge, MappingDescriptor, MappingGraph
+from src.core.animap import AnimapDescriptor, AnimapEdge, AnimapGraph
 from src.core.sync.show import ShowSyncClient
 from src.models.db.sync_history import SyncHistory
 from tests.core.sync.fakes import (
@@ -98,15 +98,15 @@ def make_graph(
     target: tuple[str, str, str],
     source_range: str = "s1",
     destination_range: str | None = None,
-) -> MappingGraph:
+) -> AnimapGraph:
     """Helper to build a one-edge mapping graph for show tests."""
     edge = AnimapEdge(
-        source=MappingDescriptor(*source),
-        destination=MappingDescriptor(*target),
+        source=AnimapDescriptor(*source),
+        destination=AnimapDescriptor(*target),
         source_range=source_range,
         destination_range=destination_range,
     )
-    return MappingGraph(edges=(edge,))
+    return AnimapGraph(edges=(edge,))
 
 
 @pytest.mark.asyncio
