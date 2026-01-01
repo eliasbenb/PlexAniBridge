@@ -216,16 +216,14 @@ def test_sync_db_creates_entries_mappings_and_provenance(
     assert edge_keys == {
         ("anilist", "1", "movie", "tmdb", "10", "movie", "1", None),
         ("anilist", "2", "s1", "tvdb", "20", "s1", "s1", "e1-e12"),
-        ("tvdb", "20", "s1", "anilist", "2", "s1", "e1-e12", "s1"),
     }
 
     expected_source = str(mappings_path.resolve())
     assert [row.source for row in provenance_rows] == [
         expected_source,
         expected_source,
-        expected_source,
     ]
-    assert [row.n for row in provenance_rows] == [0, 0, 0]
+    assert [row.n for row in provenance_rows] == [0, 0]
 
 
 def test_get_graph_for_ids_returns_edges_for_providers(
@@ -249,10 +247,7 @@ def test_get_graph_for_ids_returns_edges_for_providers(
             e.destination_range,
         )
         for e in tvdb_edges
-    } == {
-        ("tvdb", "anilist", "e1-e12", "s1"),
-        ("anilist", "tvdb", "s1", "e1-e12"),
-    }
+    } == {("anilist", "tvdb", "s1", "e1-e12")}
 
 
 def test_sync_db_refreshes_provenance_when_hash_matches(

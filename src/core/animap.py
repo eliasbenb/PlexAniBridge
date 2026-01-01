@@ -213,7 +213,7 @@ class AnimapClient:
         dict[tuple[str, str, str, str | None], list[str]],
         int,
     ]:
-        """Convert raw mappings into descriptor pairs and edges."""
+        """Convert raw mappings into descriptor pairs and directed edges."""
         descriptors: dict[str, MappingDescriptor] = {}
         edges: dict[tuple[str, str, str, str | None], AnimapEdge] = {}
         provenance: dict[tuple[str, str, str, str | None], list[str]] = {}
@@ -284,26 +284,6 @@ class AnimapClient:
                             destination_range=destination_range,
                         )
                     provenance.setdefault(key, []).extend(
-                        provenance_by_descriptor.get(raw_source, [])
-                    )
-
-                    if destination_range is None:
-                        continue
-
-                    reverse_key = (
-                        target_desc.key(),
-                        source_desc.key(),
-                        destination_range,
-                        source_range,
-                    )
-                    if reverse_key not in edges:
-                        edges[reverse_key] = AnimapEdge(
-                            source=target_desc,
-                            destination=source_desc,
-                            source_range=destination_range,
-                            destination_range=source_range,
-                        )
-                    provenance.setdefault(reverse_key, []).extend(
                         provenance_by_descriptor.get(raw_source, [])
                     )
 

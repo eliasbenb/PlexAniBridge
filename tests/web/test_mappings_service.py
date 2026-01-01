@@ -102,6 +102,118 @@ async def test_custom_only_filters_items() -> None:
 
 
 @pytest.mark.asyncio
+async def test_custom_only_applies_before_pagination() -> None:
+    """Custom-only filtering happens before pagination slices results."""
+    service = MappingsService()
+    with _fresh_tables():
+        with db() as ctx:
+            upstream_entry = AnimapEntry(
+                provider="aaa", entry_id="1", entry_scope="movie"
+            )
+            upstream_target = AnimapEntry(
+                provider="dest", entry_id="1", entry_scope="movie"
+            )
+            custom_entry = AnimapEntry(
+                provider="zzz", entry_id="1", entry_scope="movie"
+            )
+            custom_target = AnimapEntry(
+                provider="dest", entry_id="2", entry_scope="movie"
+            )
+            ctx.session.add_all(
+                [upstream_entry, upstream_target, custom_entry, custom_target]
+            )
+            ctx.session.flush()
+
+            upstream_mapping = AnimapMapping(
+                source_entry_id=upstream_entry.id,
+                destination_entry_id=upstream_target.id,
+                source_range="1",
+                destination_range=None,
+            )
+            custom_mapping = AnimapMapping(
+                source_entry_id=custom_entry.id,
+                destination_entry_id=custom_target.id,
+                source_range="1",
+                destination_range=None,
+            )
+            ctx.session.add_all([upstream_mapping, custom_mapping])
+            ctx.session.flush()
+
+            upstream_source = service.upstream_url or "upstream"
+            ctx.session.add(
+                AnimapProvenance(
+                    mapping_id=upstream_mapping.id, n=0, source=upstream_source
+                )
+            )
+            ctx.session.add(
+                AnimapProvenance(mapping_id=custom_mapping.id, n=0, source="custom")
+            )
+            ctx.session.commit()
+
+        items, total = await service.list_mappings(
+            page=1, per_page=1, q=None, custom_only=True
+        )
+
+        assert total == 1
+        assert len(items) == 1
+        assert items[0]["descriptor"] == (
+            f"{custom_entry.provider}:{custom_entry.entry_id}:{custom_entry.entry_scope}"
+        )
+
+
+@pytest.mark.asyncio
+async def test_filter_custom_entry_ids_batches() -> None:
+    """Custom filtering handles large ID sets without exceeding SQL var limits."""
+    service = MappingsService()
+    with _fresh_tables():
+        total_entries = 1200
+        with db() as ctx:
+            entries: list[AnimapEntry] = []
+            for idx in range(total_entries):
+                entry = AnimapEntry(
+                    provider=f"p{idx:04d}", entry_id=str(idx), entry_scope="movie"
+                )
+                target = AnimapEntry(
+                    provider="t", entry_id=str(idx), entry_scope="movie"
+                )
+                ctx.session.add_all([entry, target])
+                entries.append(entry)
+            ctx.session.flush()
+
+            mappings: list[AnimapMapping] = []
+            for entry in entries:
+                target = (
+                    ctx.session.query(AnimapEntry)
+                    .filter_by(provider="t", entry_id=entry.entry_id)
+                    .one()
+                )
+                mapping = AnimapMapping(
+                    source_entry_id=entry.id,
+                    destination_entry_id=target.id,
+                    source_range="1",
+                    destination_range=None,
+                )
+                mappings.append(mapping)
+            ctx.session.add_all(mappings)
+            ctx.session.flush()
+
+            for n, mapping in enumerate(mappings):
+                source = (
+                    "custom" if n % 2 == 0 else (service.upstream_url or "upstream")
+                )
+                ctx.session.add(
+                    AnimapProvenance(mapping_id=mapping.id, n=0, source=source)
+                )
+            ctx.session.commit()
+
+            entry_ids = [e.id for e in entries]
+
+        custom_ids = service._filter_custom_entry_ids(entry_ids)
+
+        assert len(custom_ids) == total_entries // 2 + total_entries % 2
+
+
+@pytest.mark.asyncio
 async def test_search_by_entry_id() -> None:
     """Booru query supports filtering by Animap entry ID."""
     service = MappingsService()

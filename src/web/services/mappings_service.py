@@ -821,19 +821,29 @@ class MappingsService:
             return set()
 
         upstream = self.upstream_url
+        prov_clause = (
+            AnimapProvenance.source != upstream
+            if upstream
+            else AnimapProvenance.source.is_not(None)
+        )
+
+        custom_ids: set[int] = set()
+        batch_size = 500
         with db() as ctx:
-            prov_clause = (
-                AnimapProvenance.source != upstream
-                if upstream
-                else AnimapProvenance.source.is_not(None)
-            )
-            stmt = (
-                select(AnimapMapping.source_entry_id)
-                .join(AnimapProvenance, AnimapProvenance.mapping_id == AnimapMapping.id)
-                .where(AnimapMapping.source_entry_id.in_(ids))
-                .where(prov_clause)
-            )
-            return self._fetch_ids(ctx, stmt)
+            for start in range(0, len(ids), batch_size):
+                chunk = ids[start : start + batch_size]
+                stmt = (
+                    select(AnimapMapping.source_entry_id)
+                    .join(
+                        AnimapProvenance,
+                        AnimapProvenance.mapping_id == AnimapMapping.id,
+                    )
+                    .where(AnimapMapping.source_entry_id.in_(chunk))
+                    .where(prov_clause)
+                )
+                custom_ids.update(self._fetch_ids(ctx, stmt))
+
+        return custom_ids
 
     def _order_entry_ids(
         self, ids: set[int], order_hint: dict[int, int] | None
@@ -972,6 +982,27 @@ class MappingsService:
         # Default listing without booru query
         with db() as ctx:
             base_stmt = select(AnimapEntry)
+
+            if custom_only:
+                prov_clause = (
+                    AnimapProvenance.source != self.upstream_url
+                    if self.upstream_url
+                    else AnimapProvenance.source.is_not(None)
+                )
+                custom_exists = (
+                    select(1)
+                    .select_from(AnimapProvenance)
+                    .join(
+                        AnimapMapping,
+                        AnimapMapping.id == AnimapProvenance.mapping_id,
+                    )
+                    .where(AnimapMapping.source_entry_id == AnimapEntry.id)
+                    .where(prov_clause)
+                    .limit(1)
+                    .exists()
+                )
+                base_stmt = base_stmt.where(custom_exists)
+
             total = ctx.session.execute(
                 select(func.count()).select_from(base_stmt.subquery())
             ).scalar_one()
@@ -985,6 +1016,9 @@ class MappingsService:
                 .scalars()
                 .all()
             )
+
+        if not entries:
+            return [], total
 
         await ensure_not_cancelled()
         items = await self._build_items_for_entries(
