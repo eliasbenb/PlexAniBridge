@@ -14,6 +14,9 @@ def get_pyproject_version() -> str:
     Returns:
         str: AniBridge's version
     """
+    if src_file is None:
+        return "unknown"
+
     try:
         project_root = Path(src_file).resolve().parent.parent
         toml_file = project_root / "pyproject.toml"
@@ -38,6 +41,9 @@ def get_git_hash() -> str:
     Returns:
         str: AniBridge's current commit hash
     """
+    if src_file is None:
+        return "unknown"
+
     try:
         project_root = Path(src_file).resolve().parent.parent
         git_dir_path = project_root / ".git"

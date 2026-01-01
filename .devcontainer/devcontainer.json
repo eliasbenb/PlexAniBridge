@@ -14,6 +14,7 @@
     "customizations": {
         "vscode": {
             "extensions": [
+                "astral-sh.ty",
                 "charliermarsh.ruff",
                 "dbaeumer.vscode-eslint",
                 "eamodio.gitlens",

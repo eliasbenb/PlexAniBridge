@@ -3,7 +3,7 @@
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from anibridge.library import (
     LibraryEpisode,
@@ -45,8 +45,8 @@ class ItemIdentifier(BaseModel):
     @classmethod
     def from_item(cls, item: LibraryMedia) -> ItemIdentifier:
         """Create an identifier from a library media entity."""
-        kwargs = {
-            "rating_key": str(item.key),
+        kwargs: dict[str, Any] = {
+            "rating_key": item.key,
             "title": item.title,
             "item_type": item.media_kind.value,
             "parent_title": None,
@@ -56,12 +56,12 @@ class ItemIdentifier(BaseModel):
         }
 
         if isinstance(item, LibraryEpisode):
-            show = item.show()
+            show = cast(LibraryEpisode, item).show()
             kwargs["parent_title"] = show.title if show else None
             kwargs["season_index"] = item.season_index
             kwargs["episode_index"] = item.index
         elif isinstance(item, LibrarySeason):
-            show = item.show()
+            show = cast(LibrarySeason, item).show()
             kwargs["parent_title"] = show.title if show else None
             kwargs["season_index"] = item.index
         elif item.media_kind in (MediaKind.MOVIE, MediaKind.SHOW):

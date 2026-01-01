@@ -121,6 +121,11 @@ class AniBridgeDB:
         from alembic import command
 
         log.debug("Running database migrations")
+
+        if src_file is None:
+            log.error("Cannot determine source file path for Alembic configuration")
+            raise FileNotFoundError("Source file path is undefined")
+
         cfg = Config()
         cfg.set_main_option(
             "script_location", str(Path(src_file).resolve().parent.parent / "alembic")

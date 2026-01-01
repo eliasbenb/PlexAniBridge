@@ -743,7 +743,7 @@ class BaseSyncClient[
                 return new_value <= current_value
         return False
 
-    def _format_external_ids(self, ids: dict[str, str]) -> str:
+    def _format_external_ids(self, ids: dict[str, str | None]) -> str:
         """Format external identifiers for debug logging."""
         if not ids:
             return "$${}$$"

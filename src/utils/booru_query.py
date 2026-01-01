@@ -281,12 +281,10 @@ def _merge_unquoted_bare_terms(node: Node) -> Node:
 
     if isinstance(node, Not):
         merged_child = _merge_unquoted_bare_terms(node.child)
-        return Not(child=cast(Node, merged_child), _ids=node._ids)
+        return Not(child=merged_child, _ids=node._ids)
 
     if isinstance(node, Or):
-        merged_children = [
-            cast(Node, _merge_unquoted_bare_terms(child)) for child in node.children
-        ]
+        merged_children = [_merge_unquoted_bare_terms(child) for child in node.children]
         return Or(merged_children)
 
     if isinstance(node, And):
@@ -311,7 +309,7 @@ def _merge_unquoted_bare_terms(node: Node) -> Node:
                 continue
 
             _flush_buffer()
-            merged_children.append(cast(Node, merged_child))
+            merged_children.append(merged_child)
 
         _flush_buffer()
 

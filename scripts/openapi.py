@@ -9,6 +9,9 @@ from pathlib import Path
 
 from scripts import __file__ as scripts_file
 
+if scripts_file is None:
+    raise RuntimeError("Cannot determine scripts file path.")
+
 ROOT_DIR = Path(scripts_file).parent.parent.resolve()
 DEFAULT_OUTPUT = ROOT_DIR / "docs" / "web" / "openapi.json"
 

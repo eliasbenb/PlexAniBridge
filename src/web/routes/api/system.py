@@ -10,7 +10,7 @@ from typing import Any
 try:
     import resource
 except ImportError:  # Windows does not have resource module
-    resource = None
+    resource = None  # ty:ignore[invalid-assignment]
 
 from fastapi.routing import APIRouter
 from pydantic import BaseModel
