@@ -9,9 +9,7 @@ import pytest
 
 from src import config as app_config
 from src.config.database import db
-from src.core.animap import AnimapDescriptor
 from src.models.db.animap import AnimapEntry, AnimapMapping, AnimapProvenance
-from src.web.services import mappings_service as mappings_service_module
 from src.web.services.mapping_overrides_service import MappingOverridesService
 from src.web.state import get_app_state
 
@@ -35,30 +33,6 @@ def overrides_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     scheduler = DummyScheduler()
     state = get_app_state()
     state.scheduler = cast(Any, scheduler)
-
-    async def fake_get_mapping(descriptor: str, **_kwargs):
-        parsed = AnimapDescriptor.parse(descriptor)
-        return {
-            "descriptor": descriptor,
-            "provider": parsed.provider,
-            "entry_id": parsed.entry_id,
-            "scope": parsed.scope,
-            "edges": [],
-            "custom": True,
-            "sources": ["custom"],
-        }
-
-    monkeypatch.setattr(
-        mappings_service_module,
-        "get_mappings_service",
-        lambda: SimpleNamespace(get_mapping=fake_get_mapping),
-    )
-    monkeypatch.setattr(
-        mappings_service_module.MappingsService,
-        "_FIELD_MAP",
-        mappings_service_module.get_query_field_map(),
-        raising=False,
-    )
     yield tmp_path, scheduler
     state.scheduler = None
 
@@ -73,10 +47,22 @@ async def test_save_override_writes_file_and_syncs_db(
 
     result = await service.save_override(
         descriptor="anilist:101:movie",
-        targets={"tmdb:202:movie": {"1": None}},
-        edges=[{"target_provider": "tmdb", "target_id": "202", "source_range": "1"}],
+        targets=[
+            {
+                "provider": "tmdb",
+                "entry_id": "202",
+                "scope": "movie",
+                "ranges": [
+                    {
+                        "source_range": "1",
+                        "destination_range": None,
+                    }
+                ],
+            }
+        ],
     )
     assert result["descriptor"] == "anilist:101:movie"
+    assert result["layers"]["effective"]["tmdb:202:movie"]["1"] is None
 
     data = json.loads((tmp_path / "mappings.json").read_text(encoding="utf-8"))
     assert data["anilist:101:movie"] == {"tmdb:202:movie": {"1": None}}
@@ -93,8 +79,19 @@ async def test_delete_override_removes_entry(
 
     await service.save_override(
         descriptor="anilist:303:movie",
-        targets={"tmdb:404:movie": {"1": None}},
-        edges=[{"target_provider": "tmdb", "target_id": "404", "source_range": "1"}],
+        targets=[
+            {
+                "provider": "tmdb",
+                "entry_id": "404",
+                "scope": "movie",
+                "ranges": [
+                    {
+                        "source_range": "1",
+                        "destination_range": None,
+                    }
+                ],
+            }
+        ],
     )
     file_path = tmp_path / "mappings.json"
     with db() as ctx:
@@ -122,3 +119,52 @@ async def test_delete_override_removes_entry(
     await service.delete_override("anilist:303:movie")
     data = json.loads(file_path.read_text(encoding="utf-8"))
     assert "anilist:303:movie" not in data
+
+
+@pytest.mark.asyncio
+async def test_get_mapping_detail_layers_upstream_and_custom(
+    overrides_env: tuple[Path, DummyScheduler], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Detail view includes upstream placeholders and custom overrides."""
+    service = MappingOverridesService()
+
+    async def fake_load_upstream(self):
+        return {"anilist:909:movie": {"tmdb:777:movie": {"1": "1..3"}}}
+
+    monkeypatch.setattr(MappingOverridesService, "_load_upstream", fake_load_upstream)
+
+    await service.save_override(
+        descriptor="anilist:909:movie",
+        targets=[
+            {
+                "provider": "tmdb",
+                "entry_id": "777",
+                "scope": "movie",
+                "ranges": [
+                    {
+                        "source_range": "1",
+                        "destination_range": None,
+                    }
+                ],
+            }
+        ],
+    )
+
+    detail = await service.get_mapping_detail("anilist:909:movie")
+    assert detail["layers"]["upstream"]["tmdb:777:movie"]["1"] == "1..3"
+    assert detail["layers"]["custom"]["tmdb:777:movie"]["1"] is None
+    assert detail["layers"]["effective"]["tmdb:777:movie"]["1"] is None
+
+    assert detail["targets"]
+    entry = detail["targets"][0]
+    assert entry["origin"] == "mixed"
+    assert entry["ranges"] == [
+        {
+            "source_range": "1",
+            "upstream": "1..3",
+            "custom": None,
+            "effective": None,
+            "origin": "custom",
+            "inherited": False,
+        }
+    ]

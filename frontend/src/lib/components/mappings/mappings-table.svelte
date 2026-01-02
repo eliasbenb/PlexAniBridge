@@ -226,7 +226,7 @@
                                                 {/if}
                                                 {#if m.custom}
                                                     <span
-                                                        class="rounded bg-amber-600/30 px-1 py-0.5 text-[10px] text-amber-100 uppercase ring-1 ring-amber-700/50"
+                                                        class="rounded bg-amber-600/30 px-1 py-0.5 text-amber-100 uppercase ring-1 ring-amber-700/50"
                                                         >Custom</span>
                                                 {/if}
                                             </div>

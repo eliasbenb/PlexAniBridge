@@ -25,12 +25,6 @@ export interface MappingEdge {
     sources?: string[];
 }
 
-export interface OverrideEdgeInput {
-    target: string;
-    source_range: string;
-    destination_range: string | null;
-}
-
 export interface Mapping {
     descriptor: string;
     provider: string;
@@ -42,15 +36,59 @@ export interface Mapping {
     anilist?: AniListMedia | null;
 }
 
-export interface MappingOverridePayload {
-    descriptor: string;
-    targets?: Record<string, Record<string, string | null>>;
-    edges?: OverrideEdgeInput[];
+export interface RangeInputPayload {
+    source_range: string;
+    destination_range: string | null;
 }
 
-export interface MappingDetail extends Mapping {
-    override?: Record<string, Record<string, string | null>> | null;
-    override_edges?: OverrideEdgeInput[];
+export interface TargetPayload {
+    provider: string;
+    entry_id: string;
+    scope: string;
+    ranges: RangeInputPayload[];
+    deleted?: boolean;
+}
+
+export interface MappingOverridePayload {
+    descriptor: string;
+    targets: TargetPayload[];
+}
+
+export type RangeOrigin = "upstream" | "custom";
+export type TargetOrigin = "upstream" | "custom" | "mixed";
+
+export interface MappingRangeView {
+    source_range: string;
+    upstream?: string | null;
+    custom?: string | null;
+    effective?: string | null;
+    origin: RangeOrigin;
+    inherited?: boolean;
+}
+
+export interface MappingTarget {
+    descriptor: string;
+    provider: string;
+    entry_id: string;
+    scope: string;
+    origin: TargetOrigin;
+    deleted?: boolean;
+    ranges: MappingRangeView[];
+}
+
+export interface MappingLayers {
+    upstream: Record<string, Record<string, string | null> | null>;
+    custom: Record<string, Record<string, string | null> | null>;
+    effective: Record<string, Record<string, string | null> | null>;
+}
+
+export interface MappingDetail {
+    descriptor: string;
+    provider: string;
+    entry_id: string;
+    scope: string;
+    layers: MappingLayers;
+    targets: MappingTarget[];
 }
 
 export interface ListMappingsResponse {

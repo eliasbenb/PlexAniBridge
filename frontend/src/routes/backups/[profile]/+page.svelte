@@ -42,10 +42,7 @@
         return data.backups || [];
     }
 
-    async function restoreBackup(
-        profile: string,
-        filename: string,
-    ) {
+    async function restoreBackup(profile: string, filename: string) {
         await apiJson(`/api/backups/${profile}/restore`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },

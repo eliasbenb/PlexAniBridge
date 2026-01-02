@@ -3,42 +3,23 @@
 import asyncio
 import copy
 import json
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, ClassVar
 
 import yaml
 
 from src import config
+from src.config.settings import get_config
 from src.core.animap import AnimapDescriptor
 from src.core.mappings import MappingsClient
 from src.exceptions import (
     MappingError,
-    MappingNotFoundError,
     MissingDescriptorError,
     SchedulerNotInitializedError,
 )
-from src.web.services.mappings_service import get_mappings_service
 from src.web.state import get_app_state
 
 __all__ = ["MappingOverridesService", "get_mapping_overrides_service"]
-
-
-@dataclass(frozen=True)
-class OverridePayload:
-    """Override payload for a single descriptor."""
-
-    descriptor: str
-    targets: dict[str, dict[str, str | None]]
-
-
-@dataclass(frozen=True)
-class StructuredEdge:
-    """Structured override edge definition."""
-
-    target: str
-    source_range: str
-    destination_range: str | None
 
 
 class MappingOverridesService:
@@ -79,7 +60,7 @@ class MappingOverridesService:
             else:
                 with path.open("r", encoding="utf-8") as fh:
                     data = yaml.safe_load(fh)
-        except Exception as exc:
+        except Exception as exc:  # pragma: no cover - defensive
             raise MappingError("Failed to read custom mappings file") from exc
 
         if not data:
@@ -100,175 +81,294 @@ class MappingOverridesService:
             with path.open("w", encoding="utf-8") as fh:
                 yaml.safe_dump(raw, fh, sort_keys=False, allow_unicode=False)
 
-    def _merge_structured_edges(
-        self, targets: dict[str, dict[str, str | None]], edges: list[StructuredEdge]
-    ) -> dict[str, dict[str, str | None]]:
-        """Merge structured edge payloads into the target mapping shape."""
-        merged = {dst: dict(ranges) for dst, ranges in targets.items()}
-        for edge in edges:
-            bucket = merged.setdefault(edge.target, {})
-            bucket[edge.source_range] = edge.destination_range
+    async def _load_upstream(self) -> dict[str, Any]:
+        """Load the upstream mappings payload (without merging custom)."""
+        upstream_url = get_config().mappings_url
+        if not upstream_url:
+            return {}
+
+        async with MappingsClient(config.data_path, upstream_url) as client:
+            return await client.load_source(str(upstream_url)) or {}
+
+    def _normalize_targets(self, raw: Any) -> dict[str, dict[str, str | None] | None]:
+        """Normalize a raw descriptor payload into target-range maps.
+
+        A value of None for a target means the target is explicitly disabled.
+        """
+        if not isinstance(raw, dict):
+            return {}
+
+        cleaned: dict[str, dict[str, str | None] | None] = {}
+        for target_key, ranges in raw.items():
+            if target_key is None:
+                continue
+            target_str = str(target_key)
+            if target_str.startswith("$"):
+                continue
+            if ranges is None:
+                cleaned[target_str] = None
+                continue
+            if not isinstance(ranges, dict):
+                continue
+            normalized_ranges: dict[str, str | None] = {}
+            for src_range, dst_range in ranges.items():
+                if not isinstance(src_range, (str, int)):
+                    continue
+                if dst_range is not None and not isinstance(dst_range, str):
+                    continue
+                normalized_ranges[str(src_range)] = dst_range
+            cleaned[target_str] = normalized_ranges
+        return cleaned
+
+    def _merge_targets(
+        self,
+        upstream: dict[str, dict[str, str | None] | None],
+        custom: dict[str, dict[str, str | None] | None],
+    ) -> dict[str, dict[str, str | None] | None]:
+        """Overlay custom targets onto upstream targets, honoring deletions."""
+        merged: dict[str, dict[str, str | None] | None] = copy.deepcopy(upstream)
+        for target, ranges in custom.items():
+            if ranges is None:
+                merged[target] = None
+                continue
+            bucket = merged.setdefault(target, {}) or {}
+            merged[target] = bucket
+            for src_range, dst_range in ranges.items():
+                bucket[src_range] = dst_range
         return merged
 
-    def _validate_structured_edges(
-        self, edges: list[dict[str, Any]] | None
-    ) -> list[StructuredEdge]:
-        """Validate structured edge inputs and normalize into dataclasses."""
-        if not edges:
-            return []
-        normalized: list[StructuredEdge] = []
-        for raw in edges:
-            target = str(raw.get("target")) if raw.get("target") is not None else ""
-            src_range = raw.get("source_range")
-            dst_range = raw.get("destination_range")
-            if not target:
-                raise MappingError("edge.target is required")
-            if not isinstance(src_range, str) or not src_range:
-                raise MappingError("edge.source_range must be a non-empty string")
-            if dst_range is not None and not isinstance(dst_range, str):
-                raise MappingError("edge.destination_range must be a string or null")
-            AnimapDescriptor.parse(target)
-            normalized.append(
-                StructuredEdge(
-                    target=target,
-                    source_range=src_range,
-                    destination_range=dst_range,
-                )
+    def _build_range_views(
+        self,
+        upstream_ranges: dict[str, str | None],
+        custom_ranges: dict[str, str | None] | None,
+        effective_ranges: dict[str, str | None] | None,
+        *,
+        custom_deleted: bool = False,
+    ) -> list[dict[str, Any]]:
+        """Build a list of range view objects for a target descriptor."""
+        ranges: list[dict[str, Any]] = []
+        keys = (
+            set(upstream_ranges.keys())
+            | (set(custom_ranges.keys()) if custom_ranges else set())
+            | (set(effective_ranges.keys()) if effective_ranges else set())
+        )
+
+        for source_range in sorted(keys):
+            upstream_val = upstream_ranges.get(source_range)
+            custom_val = (custom_ranges or {}).get(source_range)
+            effective_val = (effective_ranges or {}).get(source_range)
+            explicit_remove = (
+                custom_ranges is not None
+                and source_range in custom_ranges
+                and custom_val is None
             )
+            origin = "upstream"
+            if custom_deleted:
+                origin = "deleted"
+            elif custom_ranges is not None and (
+                custom_val is not None or explicit_remove
+            ):
+                origin = "custom"
+            ranges.append(
+                {
+                    "source_range": source_range,
+                    "upstream": upstream_val,
+                    "custom": custom_val,
+                    "effective": effective_val,
+                    "origin": origin,
+                    "inherited": (
+                        not custom_deleted
+                        and not explicit_remove
+                        and custom_val is None
+                        and upstream_val is not None
+                    ),
+                }
+            )
+
+        return ranges
+
+    def _build_target_views(
+        self,
+        upstream: dict[str, dict[str, str | None] | None],
+        custom: dict[str, dict[str, str | None] | None],
+        effective: dict[str, dict[str, str | None] | None],
+    ) -> list[dict[str, Any]]:
+        """Construct per-target mapping views with origin metadata."""
+        keys = set(upstream.keys()) | set(custom.keys()) | set(effective.keys())
+        entries: list[dict[str, Any]] = []
+
+        for target_key in sorted(keys):
+            try:
+                parsed = AnimapDescriptor.parse(target_key)
+            except ValueError:
+                continue
+
+            upstream_raw = upstream.get(target_key)
+            upstream_ranges: dict[str, str | None] = upstream_raw or {}
+            custom_raw = custom.get(target_key)
+            custom_ranges: dict[str, str | None] = custom_raw or {}
+            effective_ranges: dict[str, str | None] = effective.get(target_key) or {}
+
+            custom_deleted = target_key in custom and custom_raw is None
+
+            origin = (
+                "deleted"
+                if custom_deleted
+                else ("custom" if custom_raw else "upstream")
+            )
+            if upstream_ranges and custom_raw and not custom_deleted:
+                origin = "mixed"
+
+            entries.append(
+                {
+                    "descriptor": parsed.key(),
+                    "provider": parsed.provider,
+                    "entry_id": parsed.entry_id,
+                    "scope": parsed.scope,
+                    "origin": origin,
+                    "deleted": custom_deleted,
+                    "ranges": self._build_range_views(
+                        upstream_ranges,
+                        custom_ranges,
+                        effective_ranges,
+                        custom_deleted=custom_deleted,
+                    ),
+                }
+            )
+
+        return entries
+
+    async def get_mapping_detail(self, descriptor: str) -> dict[str, Any]:
+        """Fetch mapping detail with layered upstream/custom targets.
+
+        Args:
+            descriptor (str): The mapping descriptor to retrieve.
+
+        Returns:
+            dict[str, Any]: The mapping detail data structure.
+        """
+        parsed = AnimapDescriptor.parse(descriptor)
+
+        async with self._lock:
+            custom_raw, _, _ = self._load_raw()
+        upstream_raw = await self._load_upstream()
+
+        upstream_targets = self._normalize_targets(
+            (upstream_raw or {}).get(parsed.key(), {})
+        )
+        custom_targets = self._normalize_targets(
+            (custom_raw or {}).get(parsed.key(), {})
+        )
+        effective_targets = self._merge_targets(upstream_targets, custom_targets)
+
+        return {
+            "descriptor": parsed.key(),
+            "provider": parsed.provider,
+            "entry_id": parsed.entry_id,
+            "scope": parsed.scope,
+            "layers": {
+                "upstream": upstream_targets,
+                "custom": custom_targets,
+                "effective": effective_targets,
+            },
+            "targets": self._build_target_views(
+                upstream_targets, custom_targets, effective_targets
+            ),
+        }
+
+    def _validate_ranges(
+        self, ranges: list[dict[str, Any]] | None
+    ) -> dict[str, str | None]:
+        """Validate and normalize range inputs."""
+        if not ranges:
+            return {}
+
+        normalized: dict[str, str | None] = {}
+        for raw in ranges:
+            source_range = str(raw.get("source_range", "")).strip()
+            dest = raw.get("destination_range")
+            if not source_range:
+                raise MappingError("source_range is required for each range")
+            if dest is not None and not isinstance(dest, str):
+                raise MappingError("destination_range must be a string or null")
+            normalized[source_range] = dest
+
         return normalized
 
-    def _validate_payload(
-        self,
-        descriptor: str,
-        targets: dict[str, Any] | None,
-        edges: list[dict[str, Any]] | None,
-    ) -> OverridePayload:
-        """Validate and parse an override payload."""
-        if not descriptor:
-            raise MissingDescriptorError("descriptor is required")
-        AnimapDescriptor.parse(descriptor)
+    def _validate_targets(
+        self, targets: list[dict[str, Any]] | None
+    ) -> dict[str, dict[str, str | None] | None]:
+        """Validate target payloads and return a mapping dict."""
+        if not targets:
+            return {}
 
-        parsed_targets: dict[str, dict[str, str | None]] = {}
-        for raw_dst, ranges in (targets or {}).items():
-            AnimapDescriptor.parse(raw_dst)
-            if not isinstance(ranges, dict):
-                raise MappingError(
-                    "targets must be a mapping of destination descriptors to range maps"
-                )
-            cleaned: dict[str, str | None] = {}
-            for src_range, dst_range in ranges.items():
-                if not isinstance(src_range, str) or not src_range:
-                    raise MappingError("source ranges must be non-empty strings")
-                if dst_range is not None and not isinstance(dst_range, str):
-                    raise MappingError("destination ranges must be strings or null")
-                cleaned[src_range] = dst_range
-            parsed_targets[raw_dst] = cleaned
+        normalized: dict[str, dict[str, str | None] | None] = {}
+        for entry in targets:
+            provider = str(entry.get("provider", "")).strip()
+            entry_id = str(entry.get("entry_id", "")).strip()
+            scope = str(entry.get("scope", "")).strip()
+            if not provider or not entry_id or not scope:
+                raise MappingError("provider, entry_id, and scope are required")
+            target = AnimapDescriptor(provider=provider, entry_id=entry_id, scope=scope)
+            if entry.get("deleted") is True:
+                normalized[target.key()] = None
+                continue
+            ranges = self._validate_ranges(entry.get("ranges"))
+            if ranges:
+                normalized[target.key()] = ranges
 
-        structured_edges = self._validate_structured_edges(edges)
-        if structured_edges:
-            parsed_targets = self._merge_structured_edges(
-                parsed_targets, structured_edges
-            )
-
-        return OverridePayload(descriptor=descriptor, targets=parsed_targets)
+        return normalized
 
     async def _sync_database(self) -> None:
         """Trigger a synchronization of the AniMap database."""
         scheduler = self._ensure_scheduler()
         await scheduler.shared_animap_client.sync_db()
 
-    @staticmethod
-    def _override_edges_from_targets(
-        targets: dict[str, dict[str, str | None]] | None,
-    ) -> list[dict[str, str | None]]:
-        """Convert the stored targets mapping into a structured edge list."""
-        if not targets:
-            return []
-        edges: list[dict[str, str | None]] = []
-        for target, ranges in targets.items():
-            for source_range, destination_range in (ranges or {}).items():
-                edges.append(
-                    {
-                        "target": target,
-                        "source_range": source_range,
-                        "destination_range": destination_range,
-                    }
-                )
-        return edges
-
-    async def get_mapping_detail(self, descriptor: str) -> dict[str, Any]:
-        """Fetch mapping detail merged with any override for the descriptor.
-
-        Args:
-            descriptor (str): The mapping descriptor to fetch.
-
-        Returns:
-            dict[str, Any]: The mapping detail with any override applied.
-        """
-        async with self._lock:
-            raw, _, _ = self._load_raw()
-            override = copy.deepcopy(raw.get(descriptor))
-
-        try:
-            item = await get_mappings_service().get_mapping(descriptor)
-        except MappingNotFoundError:
-            parsed = AnimapDescriptor.parse(descriptor)
-            item = {
-                "descriptor": descriptor,
-                "provider": parsed.provider,
-                "entry_id": parsed.entry_id,
-                "scope": parsed.scope,
-                "edges": [],
-                "custom": bool(override),
-                "sources": ["custom"] if override else [],
-            }
-
-        item.setdefault("override", override)
-        item["override_edges"] = self._override_edges_from_targets(override)
-        return item
-
     async def save_override(
         self,
         *,
         descriptor: str | None,
-        targets: dict[str, Any] | None,
-        edges: list[dict[str, Any]] | None,
+        targets: list[dict[str, Any]] | None,
     ) -> dict[str, Any]:
-        """Persist an override for a descriptor and trigger DB sync.
+        """Persist overrides for a descriptor and trigger DB sync.
 
         Args:
             descriptor (str | None): The mapping descriptor to override.
-            targets (dict[str, Any] | None): The target mappings.
-            edges (list[dict[str, Any]] | None): Structured edge definitions.
+            targets (list[dict[str, Any]] | None): Target mapping override payloads.
 
         Returns:
-            dict[str, Any]: The updated mapping detail with override applied.
+            dict[str, Any]: The updated mapping detail after saving.
         """
         if descriptor is None:
             raise MissingDescriptorError("descriptor is required")
-        payload = self._validate_payload(descriptor, targets, edges)
+
+        parsed = AnimapDescriptor.parse(descriptor)
+        target_map = self._validate_targets(targets)
 
         async with self._lock:
             raw, path, fmt = self._load_raw()
-            raw[payload.descriptor] = payload.targets
+            if target_map:
+                raw[parsed.key()] = target_map
+            else:
+                raw.pop(parsed.key(), None)
             self._write_raw(raw, path, fmt)
 
         await self._sync_database()
-        return await self.get_mapping_detail(payload.descriptor)
+        return await self.get_mapping_detail(parsed.key())
 
     async def delete_override(self, descriptor: str) -> dict[str, Any]:
         """Remove an override for the given descriptor and sync the DB.
 
         Args:
-            descriptor (str): The mapping descriptor to remove the override for.
+            descriptor (str): The mapping descriptor to delete overrides for.
 
         Returns:
             dict[str, Any]: Confirmation of successful deletion.
         """
-        payload = AnimapDescriptor.parse(descriptor)
+        parsed = AnimapDescriptor.parse(descriptor)
         async with self._lock:
             raw, path, fmt = self._load_raw()
-            raw.pop(payload.key(), None)
+            raw.pop(parsed.key(), None)
             self._write_raw(raw, path, fmt)
 
         await self._sync_database()

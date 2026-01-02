@@ -1,12 +1,13 @@
 <script lang="ts">
-    import { CopyPlus, FileJson, RefreshCcw, Trash2 } from "@lucide/svelte";
+    import { Info, Plus, RefreshCcw, Save, Trash2 } from "@lucide/svelte";
+    import { Tooltip } from "bits-ui";
 
-    import CodeEditor from "$lib/components/code-editor.svelte";
     import type {
         Mapping,
         MappingDetail,
-        MappingEdge,
         MappingOverridePayload,
+        MappingTarget,
+        TargetPayload,
     } from "$lib/types/api";
     import Modal from "$lib/ui/modal.svelte";
     import { apiFetch } from "$lib/utils/api";
@@ -26,250 +27,419 @@
         onSaved,
     }: Props = $props();
 
-    type OverrideEdgeInput = {
-        target: string;
+    type RangeMode = "inherited" | "custom";
+
+    type EditableRange = {
         source_range: string;
-        destination_range: string | null;
+        upstream_value: string | null;
+        custom_value: string | null;
+        mode: RangeMode;
+        original_source_range: string;
+    };
+
+    type EditableEntry = {
+        key: string;
+        provider: string;
+        entry_id: string;
+        scope: string;
+        provider_placeholder: string;
+        entry_id_placeholder: string;
+        scope_placeholder: string;
+        origin: "upstream" | "custom" | "mixed" | "deleted";
+        deleted: boolean;
+        original_descriptor: string;
+        ranges: EditableRange[];
     };
 
     const DESCRIPTOR_RE = /^[^:\s]+:[^:\s]+:[^:\s]+$/;
 
-    let descriptorInput = $state<string>("");
-    let targetsJson = $state<string>("{}");
-    let overrideEdges = $state<OverrideEdgeInput[]>([
-        { target: "", source_range: "", destination_range: null },
-    ]);
-    let overrideMode = $state<"structured" | "json">("structured");
-    let detail = $state<MappingDetail | null>(null);
+    const fieldInfo = {
+        provider:
+            "Provider that the override belongs to (e.g. 'anilist', 'tvdb_show', 'tmdb_movie').",
+        entryId: "Entry identifier from the provider that the override targets.",
+        scope: "Scope to apply the override for (e.g. 'movie', 'sX').",
+    } as const;
+
+    const rangeFieldInfo = {
+        source: "Source number range to match (e.g. '1', '1-12').",
+        destination: "Destination number or range to map to (e.g. '1', '1-12').",
+    };
+
+    type DescriptorState = { provider: string; entryId: string; scope: string };
+
+    type DescriptorField = {
+        field: keyof DescriptorState;
+        placeholder: string;
+        aria: string;
+        info: string;
+    };
+
+    const descriptorInputs: DescriptorField[] = [
+        {
+            field: "provider",
+            placeholder: "Provider",
+            aria: "Descriptor provider",
+            info: fieldInfo.provider,
+        },
+        {
+            field: "entryId",
+            placeholder: "ID",
+            aria: "Descriptor entry id",
+            info: fieldInfo.entryId,
+        },
+        {
+            field: "scope",
+            placeholder: "Scope",
+            aria: "Descriptor scope",
+            info: fieldInfo.scope,
+        },
+    ];
+
+    const EMPTY_DESCRIPTOR: DescriptorState = { provider: "", entryId: "", scope: "" };
+
+    type EntryFieldKey = "provider" | "entry_id" | "scope";
+    type EntryPlaceholderKey =
+        | "provider_placeholder"
+        | "entry_id_placeholder"
+        | "scope_placeholder";
+
+    type EntryField = {
+        key: EntryFieldKey;
+        placeholder: EntryPlaceholderKey;
+        aria: string;
+        info: string;
+        defaultLabel: string;
+    };
+
+    const entryFields: EntryField[] = [
+        {
+            key: "provider",
+            placeholder: "provider_placeholder",
+            aria: "Target provider",
+            info: fieldInfo.provider,
+            defaultLabel: "Provider",
+        },
+        {
+            key: "entry_id",
+            placeholder: "entry_id_placeholder",
+            aria: "Target entry ID",
+            info: fieldInfo.entryId,
+            defaultLabel: "Entry ID",
+        },
+        {
+            key: "scope",
+            placeholder: "scope_placeholder",
+            aria: "Target scope",
+            info: fieldInfo.scope,
+            defaultLabel: "Scope",
+        },
+    ];
+
+    let descriptor = $state<DescriptorState>({ ...EMPTY_DESCRIPTOR });
+    let entries = $state<EditableEntry[]>([]);
     let loadingDetail = $state(false);
     let saving = $state(false);
     let error = $state<string | null>(null);
-    let showJson = $state(false);
 
-    function getDescriptorError(): string | null {
-        if (!descriptorInput.trim()) return "Descriptor is required";
-        if (!DESCRIPTOR_RE.test(descriptorInput.trim())) {
-            return "Use provider:entry:scope (e.g. anilist:1:movie)";
+    function descriptorFromState(): string {
+        const provider = descriptor.provider.trim();
+        const entryId = descriptor.entryId.trim();
+        const scope = descriptor.scope.trim();
+        if (!provider && !entryId && !scope) {
+            return "";
         }
-        return null;
+        return `${provider}:${entryId}:${scope}`;
     }
 
-    function getStructuredIssues(): { missing: number; total: number; valid: number } {
-        const invalid = overrideEdges.filter(
-            (e) => !e.target.trim() || !e.source_range.trim(),
-        );
-        return {
-            missing: invalid.length,
-            total: overrideEdges.length,
-            valid: overrideEdges.length - invalid.length,
-        };
+    function setDescriptorFields(provider: string, entryId: string, scope: string) {
+        descriptor = { provider, entryId, scope };
     }
 
-    function totalEdges(): number {
-        return overrideEdges.filter(
-            (e) => e.target.trim() || e.source_range.trim() || e.destination_range,
-        ).length;
+    function canLoadDescriptor(): boolean {
+        const descriptor = descriptorFromState();
+        return !!descriptor && DESCRIPTOR_RE.test(descriptor);
     }
 
-    function prefillAvailable(): boolean {
-        return Boolean(detail?.override_edges?.length || detail?.edges?.length);
+    function toEditableEntries(data: MappingDetail): EditableEntry[] {
+        return (data.targets || []).map((entry: MappingTarget) => {
+            const isCustomEntry = entry.origin !== "upstream";
+            return {
+                key: entry.descriptor,
+                provider: isCustomEntry ? entry.provider : "",
+                entry_id: isCustomEntry ? entry.entry_id : "",
+                scope: isCustomEntry ? entry.scope : "",
+                provider_placeholder: entry.provider,
+                entry_id_placeholder: entry.entry_id,
+                scope_placeholder: entry.scope,
+                origin: entry.origin,
+                deleted: entry.deleted ?? false,
+                original_descriptor: entry.descriptor,
+                ranges: (entry.ranges || []).map((range) => ({
+                    source_range: range.source_range,
+                    upstream_value: range.upstream ?? null,
+                    custom_value:
+                        range.origin === "custom" ? (range.effective ?? null) : null,
+                    mode: (range.origin === "custom" || !range.upstream
+                        ? "custom"
+                        : "inherited") as RangeMode,
+                    original_source_range: range.source_range,
+                })),
+            };
+        });
     }
 
-    function addEdgeFromExisting(edge: MappingEdge) {
-        if (!edge) return;
-        const target = `${edge.target_provider}:${edge.target_entry_id}:${edge.target_scope}`;
-        overrideEdges = [
-            ...overrideEdges,
+    function hydrateDetail(data: MappingDetail) {
+        entries = toEditableEntries(data);
+        setDescriptorFields(data.provider, data.entry_id, data.scope);
+    }
+
+    function makeKey() {
+        return `tmp-${Math.random().toString(36).slice(2)}`;
+    }
+
+    function addEntry() {
+        entries = [
+            ...entries,
             {
-                target,
-                source_range: edge.source_range,
-                destination_range: edge.destination_range ?? null,
+                key: makeKey(),
+                provider: "",
+                entry_id: "",
+                scope: "",
+                provider_placeholder: "",
+                entry_id_placeholder: "",
+                scope_placeholder: "",
+                origin: "custom",
+                deleted: false,
+                original_descriptor: "",
+                ranges: [
+                    {
+                        source_range: "",
+                        upstream_value: null,
+                        custom_value: null,
+                        mode: "custom",
+                        original_source_range: "",
+                    },
+                ],
             },
         ];
-        overrideMode = "structured";
-        showJson = false;
-        syncJsonFromEdges();
     }
 
-    function cloneStructured(idx: number) {
-        const targetEdge = overrideEdges[idx];
-        if (!targetEdge) return;
-        overrideEdges = [
-            ...overrideEdges.slice(0, idx + 1),
-            { ...targetEdge },
-            ...overrideEdges.slice(idx + 1),
-        ];
-        syncJsonFromEdges();
+    function removeEntry(key: string) {
+        entries = entries
+            .map((entry) => {
+                if (entry.key !== key) return entry;
+                // If this is a locally-created target, drop it entirely.
+                if (entry.origin === "custom") {
+                    return null;
+                }
+                return { ...entry, deleted: true, origin: "deleted" };
+            })
+            .filter((entry): entry is EditableEntry => entry !== null);
     }
 
-    const canSave = $derived(() => {
-        if (saving) return false;
-        const descriptorError = getDescriptorError();
-        if (descriptorError) return false;
-        const structuredIssues = getStructuredIssues();
-        if (overrideMode === "structured" && structuredIssues.missing > 0) {
-            return false;
+    function updateEntry(
+        key: string,
+        updater: (entry: EditableEntry) => EditableEntry,
+    ) {
+        entries = entries.map((entry) => (entry.key === key ? updater(entry) : entry));
+    }
+
+    function addRange(key: string) {
+        updateEntry(key, (entry) => ({
+            ...entry,
+            ranges: [
+                ...entry.ranges,
+                {
+                    source_range: "",
+                    upstream_value: null,
+                    custom_value: null,
+                    mode: "custom",
+                    original_source_range: "",
+                },
+            ],
+        }));
+    }
+
+    function removeRange(key: string, index: number) {
+        updateEntry(key, (entry) => {
+            const next = entry.ranges.filter((_, i) => i !== index);
+            return { ...entry, ranges: next.length ? next : entry.ranges.slice(0, 1) };
+        });
+    }
+
+    function setSourceRange(key: string, index: number, value: string) {
+        updateEntry(key, (entry) => ({
+            ...entry,
+            ranges: entry.ranges.map((r, i) =>
+                i === index ? { ...r, source_range: value, mode: "custom" } : r,
+            ),
+        }));
+    }
+
+    function setRangeValue(key: string, index: number, value: string) {
+        updateEntry(key, (entry) => ({
+            ...entry,
+            ranges: entry.ranges.map((r, i) =>
+                i === index
+                    ? {
+                          ...r,
+                          mode: "custom",
+                          custom_value: value === "" ? null : value,
+                      }
+                    : r,
+            ),
+        }));
+    }
+
+    function revertEntry(key: string) {
+        updateEntry(key, (entry) => {
+            const ranges = entry.ranges.map((r) => ({
+                ...r,
+                mode: (r.upstream_value ? "inherited" : "custom") as RangeMode,
+                custom_value: null,
+                original_source_range: r.source_range,
+            }));
+            return {
+                ...entry,
+                provider: "",
+                entry_id: "",
+                scope: "",
+                deleted: false,
+                origin: entry.origin === "deleted" ? "upstream" : entry.origin,
+                original_descriptor: entry.original_descriptor,
+                ranges,
+            };
+        });
+    }
+
+    function buildPayload(): MappingOverridePayload | null {
+        const descriptor = descriptorFromState();
+        if (!descriptor || !DESCRIPTOR_RE.test(descriptor)) {
+            error = "Descriptor must be provider:entry:scope";
+            return null;
         }
-        return true;
-    });
 
-    function prefillFromDetailEdges() {
-        const fromOverride = detail?.override_edges?.length
-            ? detail.override_edges.map((edge) => ({
-                  target: edge.target,
-                  source_range: edge.source_range,
-                  destination_range: edge.destination_range ?? null,
-              }))
-            : null;
+        const payloadTargets: TargetPayload[] = [];
 
-        const fromUpstream = detail?.edges?.length
-            ? detail.edges.map((edge) => ({
-                  target: `${edge.target_provider}:${edge.target_entry_id}:${edge.target_scope}`,
-                  source_range: edge.source_range,
-                  destination_range: edge.destination_range ?? null,
-              }))
-            : null;
+        for (const entry of entries) {
+            const provider = (
+                entry.provider.trim() || entry.provider_placeholder
+            ).trim();
+            const entryId = (
+                entry.entry_id.trim() || entry.entry_id_placeholder
+            ).trim();
+            const scope = (entry.scope.trim() || entry.scope_placeholder).trim();
+            if (!provider || !entryId || !scope) continue;
 
-        const candidates = fromOverride ?? fromUpstream ?? [];
-        if (!candidates.length) return;
-        overrideEdges = candidates;
-        syncJsonFromEdges();
-        overrideMode = "structured";
-    }
+            const originalProvider =
+                entry.provider_placeholder.trim() || entry.provider.trim();
+            const originalEntryId =
+                entry.entry_id_placeholder.trim() || entry.entry_id.trim();
+            const originalScope = entry.scope_placeholder.trim() || entry.scope.trim();
+            const originalDescriptor =
+                entry.original_descriptor ||
+                (originalProvider && originalEntryId && originalScope
+                    ? `${originalProvider}:${originalEntryId}:${originalScope}`
+                    : "");
+            const newDescriptor = `${provider}:${entryId}:${scope}`;
+            const descriptorChanged =
+                newDescriptor !== originalDescriptor && !!originalDescriptor;
 
-    function resetState() {
-        descriptorInput = "";
-        targetsJson = "{}";
-        overrideEdges = [{ target: "", source_range: "", destination_range: null }];
-        overrideMode = "structured";
-        showJson = false;
-        detail = null;
-        loadingDetail = false;
-        saving = false;
-        error = null;
-    }
+            const removedSources: Record<string, boolean> = {};
+            const ranges = [] as {
+                source_range: string;
+                destination_range: string | null;
+            }[];
 
-    function edgesFromTargets(
-        targets: Record<string, Record<string, string | null>> | null,
-    ): OverrideEdgeInput[] {
-        if (!targets) return [];
-        const edges: OverrideEdgeInput[] = [];
-        for (const [target, ranges] of Object.entries(targets)) {
-            for (const [src, dst] of Object.entries(ranges || {})) {
-                edges.push({
-                    target,
-                    source_range: src,
-                    destination_range: dst ?? null,
+            if (entry.deleted) {
+                payloadTargets.push({
+                    provider: originalProvider || provider,
+                    entry_id: originalEntryId || entryId,
+                    scope: originalScope || scope,
+                    ranges: [],
+                    deleted: true,
+                });
+                continue;
+            }
+
+            for (const range of entry.ranges) {
+                const source = range.source_range.trim();
+                const destFromCustom = range.custom_value;
+                const destFromUpstream = range.upstream_value;
+                const destination_range =
+                    descriptorChanged && destFromCustom == null
+                        ? destFromUpstream
+                        : destFromCustom;
+
+                if ((descriptorChanged || range.mode !== "inherited") && source) {
+                    ranges.push({ source_range: source, destination_range });
+                }
+
+                const original = range.original_source_range.trim();
+                if (original && original !== source && !removedSources[original]) {
+                    ranges.push({ source_range: original, destination_range: null });
+                    removedSources[original] = true;
+                }
+            }
+
+            if (descriptorChanged) {
+                payloadTargets.push({
+                    provider: originalProvider,
+                    entry_id: originalEntryId,
+                    scope: originalScope,
+                    ranges: [],
+                    deleted: true,
                 });
             }
+
+            if (ranges.length === 0) continue;
+            payloadTargets.push({
+                provider,
+                entry_id: entryId,
+                scope,
+                ranges,
+                deleted: false,
+            });
         }
-        return edges;
+
+        return { descriptor, targets: payloadTargets };
     }
 
-    function targetsFromEdges(
-        edges: OverrideEdgeInput[],
-    ): Record<string, Record<string, string | null>> {
-        const out: Record<string, Record<string, string | null>> = {};
-        for (const edge of edges) {
-            if (!edge.target || !edge.source_range) continue;
-            const bucket = (out[edge.target] ||= {});
-            bucket[edge.source_range] = edge.destination_range ?? null;
+    async function loadDetail(explicit?: string) {
+        const descriptor = explicit?.trim() || descriptorFromState();
+        if (!descriptor) {
+            error = "Descriptor is required";
+            return;
         }
-        return out;
-    }
-
-    async function loadDetail(descriptor: string) {
-        if (!descriptor) return;
         loadingDetail = true;
         error = null;
         try {
             const res = await apiFetch(
                 `/api/mappings/${encodeURIComponent(descriptor)}`,
             );
-            if (!res.ok) {
-                if (res.status !== 404) {
-                    toast(`Failed to load mapping (HTTP ${res.status})`, "error");
-                }
-                detail = null;
-                overrideEdges = [
-                    { target: "", source_range: "", destination_range: null },
-                ];
-                return;
-            }
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = (await res.json()) as MappingDetail;
-            detail = data;
-            targetsJson = JSON.stringify(data.override ?? {}, null, 2) || "{}";
-            overrideEdges = data.override_edges?.length
-                ? [...data.override_edges].map((edge) => ({
-                      target: edge.target,
-                      source_range: edge.source_range,
-                      destination_range: edge.destination_range ?? null,
-                  }))
-                : edgesFromTargets(data.override ?? {}) || [
-                      { target: "", source_range: "", destination_range: null },
-                  ];
-        } catch {
+            hydrateDetail(data);
+            toast("Mapping loaded", "success");
+        } catch (err) {
+            console.error(err);
             error = "Failed to load mapping";
-            detail = null;
+            entries = [];
         } finally {
             loadingDetail = false;
         }
     }
 
     async function handleSave() {
-        const descriptor = descriptorInput.trim();
-        if (!descriptor) {
-            error = "Descriptor is required (e.g. anilist:1:movie)";
-            return;
-        }
-
-        let parsedTargets: Record<string, Record<string, string | null>> = {};
-        let parsedEdges: OverrideEdgeInput[] = [];
-
-        if (overrideMode === "json") {
-            try {
-                const raw = JSON.parse(targetsJson || "{}");
-                parsedTargets = (raw ?? {}) as Record<
-                    string,
-                    Record<string, string | null>
-                >;
-                parsedEdges = edgesFromTargets(parsedTargets);
-            } catch {
-                error = "Targets JSON is invalid";
-                return;
-            }
-        } else {
-            const cleaned = overrideEdges
-                .map((e) => ({
-                    target: e.target.trim(),
-                    source_range: e.source_range.trim(),
-                    destination_range: e.destination_range?.trim() || null,
-                }))
-                .filter((e) => e.target || e.source_range || e.destination_range);
-
-            if (cleaned.some((e) => !e.target || !e.source_range)) {
-                error = "Each edge needs a target descriptor and source range";
-                return;
-            }
-
-            parsedEdges = cleaned;
-            parsedTargets = targetsFromEdges(cleaned);
-            targetsJson = JSON.stringify(parsedTargets, null, 2) || "{}";
-        }
-
-        const payload: MappingOverridePayload = {
-            descriptor,
-            targets: parsedTargets,
-            edges: parsedEdges,
-        };
-
+        const payload = buildPayload();
+        if (!payload) return;
         saving = true;
         error = null;
         try {
             const method = mode === "edit" ? "PUT" : "POST";
             const url =
                 mode === "edit"
-                    ? `/api/mappings/${encodeURIComponent(descriptor)}`
+                    ? `/api/mappings/${encodeURIComponent(payload.descriptor)}`
                     : "/api/mappings";
             const res = await apiFetch(
                 url,
@@ -283,15 +453,13 @@
                         mode === "edit" ? "Override updated" : "Override created",
                 },
             );
-            if (!res.ok) {
-                error = `Save failed (HTTP ${res.status})`;
-                return;
-            }
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = (await res.json()) as MappingDetail;
-            detail = data;
+            hydrateDetail(data);
             onSaved?.(data);
             open = false;
-        } catch {
+        } catch (err) {
+            console.error(err);
             error = "Failed to save override";
         } finally {
             saving = false;
@@ -300,63 +468,28 @@
 
     $effect(() => {
         if (!open) {
-            resetState();
+            descriptor = { ...EMPTY_DESCRIPTOR };
+            entries = [];
+            loadingDetail = false;
+            saving = false;
+            error = null;
             return;
         }
 
         const nextDescriptor = mode === "edit" ? (mapping?.descriptor ?? "") : "";
-        descriptorInput = nextDescriptor;
-        targetsJson = "{}";
-        overrideEdges = [{ target: "", source_range: "", destination_range: null }];
-        overrideMode = "structured";
-        showJson = false;
-        detail = null;
+        descriptor =
+            mode === "edit"
+                ? {
+                      provider: mapping?.provider ?? "",
+                      entryId: mapping?.entry_id ?? "",
+                      scope: mapping?.scope ?? "",
+                  }
+                : { ...EMPTY_DESCRIPTOR };
+        entries = [];
         if (mode === "edit" && nextDescriptor) {
             loadDetail(nextDescriptor);
         }
     });
-
-    function renderEdgeSummary(edge: {
-        target_provider: string;
-        target_entry_id: string;
-        target_scope: string;
-        source_range: string;
-        destination_range?: string | null;
-    }) {
-        return `${edge.target_provider}:${edge.target_entry_id}:${edge.target_scope} (src ${edge.source_range} → dest ${edge.destination_range ?? "all"})`;
-    }
-
-    function addEdge() {
-        overrideEdges = [
-            ...overrideEdges,
-            { target: "", source_range: "", destination_range: null },
-        ];
-    }
-
-    function removeEdge(idx: number) {
-        overrideEdges = overrideEdges.filter((_, i) => i !== idx);
-        if (!overrideEdges.length) {
-            overrideEdges = [{ target: "", source_range: "", destination_range: null }];
-        }
-    }
-
-    function syncJsonFromEdges() {
-        targetsJson = JSON.stringify(targetsFromEdges(overrideEdges), null, 2) || "{}";
-    }
-
-    function syncEdgesFromJson() {
-        try {
-            const raw = JSON.parse(targetsJson || "{}");
-            const parsed = (raw ?? {}) as Record<string, Record<string, string | null>>;
-            const edges = edgesFromTargets(parsed);
-            overrideEdges = edges.length
-                ? edges
-                : [{ target: "", source_range: "", destination_range: null }];
-            error = null;
-        } catch {
-            error = "Targets JSON is invalid";
-        }
-    }
 </script>
 
 <Modal
@@ -371,286 +504,302 @@
         </div>
     {/snippet}
 
-    <div class="grid gap-4 p-4 xl:grid-cols-[1.6fr,1fr]">
-        <div class="space-y-4">
-            <div
-                class="rounded-xl border border-slate-800 bg-slate-900/70 p-4 shadow-inner">
-                <div class="flex flex-wrap items-center gap-2">
-                    <div class="min-w-60 flex-1">
-                        <label class="text-[12px] font-semibold text-slate-100">
-                            Descriptor
-                            <input
-                                class="mt-1 h-10 w-full rounded-lg border border-slate-700/60 bg-slate-950/70 px-3 text-[12px] text-slate-100 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/30 focus:outline-none"
-                                placeholder="provider:entry:scope (e.g. anilist:1:movie)"
-                                bind:value={descriptorInput}
-                                disabled={mode === "edit"} />
-                        </label>
-                        {#if getDescriptorError()}
-                            <p class="mt-1 text-[11px] text-rose-300">
-                                {getDescriptorError()}
-                            </p>
-                        {:else}
-                            <p class="mt-1 text-[11px] text-slate-400">
-                                Scope can be <span class="font-semibold text-slate-200"
-                                    >movie</span>
-                                or
-                                <span class="font-semibold text-slate-200">s1/s2</span> for
-                                seasons.
-                            </p>
-                        {/if}
-                    </div>
-                    <div class="flex flex-wrap items-center gap-2 text-[11px]">
-                        <button
-                            class="inline-flex items-center gap-1 rounded-md border border-slate-700 bg-slate-800 px-3 py-2 font-semibold text-slate-100 hover:border-emerald-500 hover:text-emerald-100"
-                            type="button"
-                            onclick={prefillFromDetailEdges}
-                            disabled={!prefillAvailable()}>
-                            <CopyPlus class="h-3.5 w-3.5" />
-                            Prefill from current
-                        </button>
-                        <button
-                            class="inline-flex items-center gap-1 rounded-md border border-slate-700 bg-slate-800 px-3 py-2 font-semibold text-slate-100 hover:border-emerald-500 hover:text-emerald-100"
-                            type="button"
-                            onclick={() => loadDetail(descriptorInput.trim())}
-                            disabled={loadingDetail ||
-                                !descriptorInput.trim() ||
-                                Boolean(getDescriptorError())}>
-                            <RefreshCcw class="h-3.5 w-3.5" />
-                            Load existing
-                        </button>
-                        <button
-                            class={`inline-flex items-center gap-1 rounded-md border px-3 py-2 font-semibold ${overrideMode === "structured" ? "border-emerald-500/60 bg-emerald-900/30 text-emerald-100" : "border-slate-700 bg-slate-800 text-slate-100"}`}
-                            type="button"
-                            onclick={() => {
-                                overrideMode = "structured";
-                                showJson = false;
-                                syncEdgesFromJson();
-                            }}>
-                            Structured
-                        </button>
-                        <button
-                            class={`inline-flex items-center gap-1 rounded-md border px-3 py-2 font-semibold ${showJson ? "border-emerald-500/60 bg-emerald-900/30 text-emerald-100" : "border-slate-700 bg-slate-800 text-slate-100"}`}
-                            type="button"
-                            onclick={() => {
-                                showJson = !showJson;
-                                overrideMode = showJson ? "json" : "structured";
-                                if (showJson) {
-                                    syncJsonFromEdges();
-                                } else {
-                                    syncEdgesFromJson();
-                                }
-                            }}>
-                            <FileJson class="h-3.5 w-3.5" /> JSON
-                        </button>
+    <div class="space-y-4 p-4">
+        <div
+            class="rounded-md border border-slate-800/70 bg-slate-900/70 p-4 shadow-inner">
+            <div class="flex flex-wrap items-start justify-between gap-4">
+                <div class="flex-1 space-y-3">
+                    <div class="grid gap-3 sm:grid-cols-3">
+                        {#each descriptorInputs as field (field.field)}
+                            <div class="relative w-full">
+                                <input
+                                    class="h-9 w-full rounded-md border border-slate-700/60 bg-slate-950 px-3 pr-10 text-[12px] text-slate-100 placeholder:text-slate-500 focus:border-emerald-500 focus:outline-none"
+                                    placeholder={field.placeholder}
+                                    aria-label={field.aria}
+                                    bind:value={descriptor[field.field]}
+                                    disabled={mode === "edit"} />
+                                <div
+                                    class="absolute inset-y-0 right-2 flex items-center">
+                                    <Tooltip.Root delayDuration={120}>
+                                        <Tooltip.Trigger>
+                                            <button
+                                                type="button"
+                                                class="pointer-events-auto inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-700/60 bg-slate-900/70 text-slate-400 transition-colors hover:text-slate-100 focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:outline-none"
+                                                aria-label={`${field.placeholder} info`}>
+                                                <Info class="h-3 w-3" />
+                                            </button>
+                                        </Tooltip.Trigger>
+                                        <Tooltip.Portal>
+                                            <Tooltip.Content
+                                                side="top"
+                                                sideOffset={6}
+                                                class="z-50 rounded-md border border-slate-800/70 bg-slate-900/95 px-2 py-1.5 text-[11px] text-slate-100 shadow-xl">
+                                                {field.info}
+                                                <Tooltip.Arrow />
+                                            </Tooltip.Content>
+                                        </Tooltip.Portal>
+                                    </Tooltip.Root>
+                                </div>
+                            </div>
+                        {/each}
                     </div>
                 </div>
-            </div>
-
-            <div
-                class="rounded-xl border border-slate-800 bg-slate-900/70 p-4 shadow-inner">
-                <div
-                    class="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-slate-100">
-                    <span class="rounded bg-slate-800/70 px-2 py-1"
-                        >{totalEdges()} edge{totalEdges() === 1 ? "" : "s"}</span>
-                    {#if overrideMode === "structured"}
-                        {@const issues = getStructuredIssues()}
-                        <span
-                            class={`rounded px-2 py-1 ring-1 ${issues.missing > 0 ? "bg-amber-900/40 text-amber-100 ring-amber-800/50" : "bg-emerald-900/40 text-emerald-100 ring-emerald-800/40"}`}>
-                            {issues.missing > 0
-                                ? `${issues.missing} missing field${issues.missing === 1 ? "" : "s"}`
-                                : "Ready"}
-                        </span>
-                    {/if}
-                    <div class="flex-1"></div>
+                <div class="flex flex-wrap items-center gap-2 text-[11px]">
                     <button
-                        class="inline-flex items-center gap-1 rounded-md border border-slate-700 bg-slate-800 px-3 py-1.5 text-[11px] font-semibold text-slate-100 hover:border-emerald-500 hover:text-emerald-100"
                         type="button"
-                        onclick={addEdge}>
-                        Add edge
+                        class="inline-flex items-center gap-1 rounded-md border border-slate-700/60 bg-slate-800/60 px-3 py-2 text-xs font-semibold text-slate-100 shadow-sm transition-colors hover:border-emerald-500 hover:text-emerald-100 focus:ring-2 focus:ring-emerald-500/40 focus:outline-none"
+                        onclick={() => loadDetail()}
+                        disabled={loadingDetail || !canLoadDescriptor()}>
+                        <RefreshCcw class="inline h-3.5 w-3.5" />
+                        Load existing
+                    </button>
+                    <button
+                        type="button"
+                        class="inline-flex items-center gap-1 rounded-md border border-slate-700/60 bg-slate-800/60 px-3 py-2 text-xs font-semibold text-slate-100 shadow-sm transition-colors hover:border-emerald-500 hover:text-emerald-100 focus:ring-2 focus:ring-emerald-500/40 focus:outline-none"
+                        onclick={addEntry}
+                        disabled={saving}>
+                        <Plus class="inline h-3.5 w-3.5" />
+                        Add Mapping
                     </button>
                 </div>
+            </div>
+        </div>
 
-                {#if overrideMode === "structured"}
-                    <div class="mt-3 space-y-2">
-                        <div
-                            class="grid gap-2 text-[11px] text-slate-400 md:grid-cols-[2fr,1fr,1fr,auto]">
-                            <span>Target descriptor</span>
-                            <span>Source range</span>
-                            <span>Destination range</span>
-                            <span class="text-right">Actions</span>
+        {#if entries.length === 0}
+            <div
+                class="rounded-md border border-dashed border-slate-800 bg-slate-950/70 p-6 text-center text-sm text-slate-400">
+                Load an existing mapping or add a mapping to start.
+            </div>
+        {:else}
+            <div class="space-y-4">
+                {#each entries as entry (entry.key)}
+                    <div
+                        class={`rounded-md border p-4 shadow-md ${
+                            entry.deleted && entry.origin !== "custom"
+                                ? "border-rose-900/60 bg-slate-950/50 opacity-70"
+                                : "border-slate-800 bg-slate-950/80"
+                        }`}>
+                        <div class="flex flex-wrap items-center gap-1.5">
+                            <span
+                                class={`font-mono text-xs ${
+                                    entry.deleted && entry.origin !== "custom"
+                                        ? "text-slate-500 line-through"
+                                        : "text-slate-300"
+                                }`}>
+                                {entry.provider ||
+                                    entry.provider_placeholder ||
+                                    "?"}:{entry.entry_id ||
+                                    entry.entry_id_placeholder ||
+                                    "?"}:{entry.scope || entry.scope_placeholder || "?"}
+                            </span>
+                            <span
+                                class={`rounded border px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase ${
+                                    entry.origin === "custom"
+                                        ? "border-emerald-800/60 bg-emerald-900/40 text-emerald-100"
+                                        : entry.origin === "mixed"
+                                          ? "border-amber-800/60 bg-amber-900/40 text-amber-100"
+                                          : "border-slate-700/70 bg-slate-800/60 text-slate-100"
+                                }`}>
+                                {entry.origin === "custom"
+                                    ? "Custom"
+                                    : entry.origin === "mixed"
+                                      ? "Mixed"
+                                      : "Upstream"}
+                            </span>
+                            {#if entry.deleted && entry.origin !== "custom"}
+                                <span
+                                    class="rounded border border-rose-800/60 bg-rose-900/40 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-rose-100 uppercase">
+                                    Disabled override
+                                </span>
+                            {/if}
+                            <span class="flex-1"></span>
+                            {#if entry.origin !== "custom"}
+                                <button
+                                    type="button"
+                                    class="inline-flex items-center gap-1 rounded-md border border-slate-700/60 bg-slate-900/60 px-3 py-1 text-[12px] font-semibold text-slate-200 transition-colors hover:border-slate-500 focus:outline-none"
+                                    onclick={() => revertEntry(entry.key)}>
+                                    Revert to upstream
+                                </button>
+                            {/if}
+                            <button
+                                type="button"
+                                class="inline-flex items-center rounded-md border border-slate-700/60 bg-slate-900/60 p-1 text-[12px] font-semibold text-emerald-200 shadow-sm transition-colors hover:border-emerald-400 hover:text-emerald-100 focus:outline-none"
+                                title="Add range"
+                                onclick={() => addRange(entry.key)}
+                                disabled={entry.deleted}>
+                                <Plus class="inline h-4 w-4" />
+                            </button>
+                            <button
+                                type="button"
+                                class="inline-flex items-center rounded-md border border-slate-700/60 bg-slate-900/60 p-1 text-[12px] font-semibold text-rose-200 transition-colors hover:border-rose-500 focus:outline-none"
+                                title="Remove target mapping"
+                                onclick={() => removeEntry(entry.key)}>
+                                <Trash2 class="inline h-4 w-4" />
+                            </button>
                         </div>
-                        <div
-                            class="divide-y divide-slate-800/60 rounded-md border border-slate-800 bg-slate-950/40">
-                            {#each overrideEdges as edge, idx (idx)}
-                                {@const targetId = `edge-target-${idx}`}
-                                {@const sourceId = `edge-source-${idx}`}
-                                {@const destId = `edge-dest-${idx}`}
-                                <div
-                                    class="grid gap-2 px-3 py-3 md:grid-cols-[2fr,1fr,1fr,auto] md:items-center">
+
+                        <div class="mt-3 grid gap-3 sm:grid-cols-3">
+                            {#each entryFields as field (field.key)}
+                                <div class="relative w-full">
                                     <input
-                                        id={targetId}
-                                        class="h-10 w-full rounded-md border border-slate-700/60 bg-slate-950/70 px-2 text-[12px] text-slate-100 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/30 focus:outline-none"
-                                        placeholder="provider:entry:scope"
-                                        bind:value={edge.target} />
-                                    <input
-                                        id={sourceId}
-                                        class="h-10 w-full rounded-md border border-slate-700/60 bg-slate-950/70 px-2 text-[12px] text-slate-100 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/30 focus:outline-none"
-                                        placeholder="1-12"
-                                        bind:value={edge.source_range} />
-                                    <input
-                                        id={destId}
-                                        class="h-10 w-full rounded-md border border-slate-700/60 bg-slate-950/70 px-2 text-[12px] text-slate-100 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/30 focus:outline-none"
-                                        placeholder="all / 1-12"
-                                        bind:value={edge.destination_range} />
-                                    <div class="flex items-center justify-end gap-2">
+                                        class="h-9 w-full rounded-md border border-slate-800/70 bg-slate-900 px-3 pr-10 text-[13px] text-slate-100 placeholder:text-slate-500 placeholder:opacity-70 focus:border-emerald-500 focus:outline-none"
+                                        placeholder={entry[field.placeholder] ||
+                                            field.defaultLabel}
+                                        aria-label={field.aria}
+                                        bind:value={entry[field.key]}
+                                        disabled={entry.deleted} />
+                                    <div
+                                        class="absolute inset-y-0 right-2 flex items-center">
+                                        <Tooltip.Root delayDuration={120}>
+                                            <Tooltip.Trigger>
+                                                <button
+                                                    type="button"
+                                                    class="pointer-events-auto inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-700/60 bg-slate-900/70 text-slate-400 transition-colors hover:text-slate-100 focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:outline-none"
+                                                    aria-label={`${field.defaultLabel} info`}>
+                                                    <Info class="h-3 w-3" />
+                                                </button>
+                                            </Tooltip.Trigger>
+                                            <Tooltip.Portal>
+                                                <Tooltip.Content
+                                                    side="top"
+                                                    sideOffset={6}
+                                                    class="z-50 rounded-md border border-slate-800/70 bg-slate-900/95 px-2 py-1.5 text-[11px] text-slate-100 shadow-xl">
+                                                    {field.info}
+                                                    <Tooltip.Arrow />
+                                                </Tooltip.Content>
+                                            </Tooltip.Portal>
+                                        </Tooltip.Root>
+                                    </div>
+                                </div>
+                            {/each}
+                        </div>
+
+                        <div class="mt-3 space-y-2 border-l border-slate-800/60 pl-4">
+                            {#each entry.ranges as range, idx (idx)}
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <div class="relative w-full min-w-44 flex-1">
+                                        <input
+                                            class="w-full min-w-0 rounded-md border border-slate-800/70 bg-slate-900 px-3 py-1 pr-10 text-[11px] text-slate-100 placeholder:text-slate-500 placeholder:opacity-80 focus:border-emerald-500 focus:outline-none"
+                                            value={range.mode === "custom"
+                                                ? range.source_range
+                                                : ""}
+                                            oninput={(ev) =>
+                                                setSourceRange(
+                                                    entry.key,
+                                                    idx,
+                                                    ev.currentTarget.value,
+                                                )}
+                                            placeholder={range.source_range ||
+                                                "Source range"}
+                                            aria-label="Range source"
+                                            disabled={entry.deleted} />
+                                        <div
+                                            class="absolute inset-y-0 right-2 flex items-center">
+                                            <Tooltip.Root delayDuration={120}>
+                                                <Tooltip.Trigger>
+                                                    <button
+                                                        type="button"
+                                                        class="pointer-events-auto inline-flex h-5 w-5 items-center justify-center rounded-full border border-slate-700/60 bg-slate-900/70 text-slate-400 transition-colors hover:text-slate-100 focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:outline-none"
+                                                        aria-label="Range source info">
+                                                        <Info class="h-3 w-3" />
+                                                    </button>
+                                                </Tooltip.Trigger>
+                                                <Tooltip.Portal>
+                                                    <Tooltip.Content
+                                                        side="top"
+                                                        sideOffset={6}
+                                                        class="z-50 rounded-md border border-slate-800/70 bg-slate-900/95 px-2 py-1 text-[11px] text-slate-100 shadow-xl">
+                                                        {rangeFieldInfo.source}
+                                                        <Tooltip.Arrow />
+                                                    </Tooltip.Content>
+                                                </Tooltip.Portal>
+                                            </Tooltip.Root>
+                                        </div>
+                                    </div>
+                                    <div class="relative w-full min-w-44 flex-1">
+                                        <input
+                                            class="w-full min-w-0 rounded-md border border-slate-800/70 bg-slate-900 px-3 py-1 pr-10 text-[11px] text-slate-100 placeholder:text-slate-500 placeholder:opacity-80 focus:border-emerald-500 focus:outline-none"
+                                            value={range.mode === "custom"
+                                                ? (range.custom_value ?? "")
+                                                : ""}
+                                            oninput={(ev) =>
+                                                setRangeValue(
+                                                    entry.key,
+                                                    idx,
+                                                    ev.currentTarget.value,
+                                                )}
+                                            placeholder={range.upstream_value ||
+                                                "Destination range"}
+                                            aria-label="Range destination"
+                                            disabled={entry.deleted} />
+                                        <div
+                                            class="absolute inset-y-0 right-2 flex items-center">
+                                            <Tooltip.Root delayDuration={120}>
+                                                <Tooltip.Trigger>
+                                                    <button
+                                                        type="button"
+                                                        class="pointer-events-auto inline-flex h-5 w-5 items-center justify-center rounded-full border border-slate-700/60 bg-slate-900/70 text-slate-400 transition-colors hover:text-slate-100 focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:outline-none"
+                                                        aria-label="Range destination info">
+                                                        <Info class="h-3 w-3" />
+                                                    </button>
+                                                </Tooltip.Trigger>
+                                                <Tooltip.Portal>
+                                                    <Tooltip.Content
+                                                        side="top"
+                                                        sideOffset={6}
+                                                        class="z-50 rounded-md border border-slate-800/70 bg-slate-900/95 px-2 py-1.5 text-[11px] text-slate-100 shadow-xl">
+                                                        {rangeFieldInfo.destination}
+                                                        <Tooltip.Arrow />
+                                                    </Tooltip.Content>
+                                                </Tooltip.Portal>
+                                            </Tooltip.Root>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center gap-1.5">
                                         <button
-                                            class="rounded-md border border-slate-800 px-2 py-2 text-slate-400 hover:border-emerald-600 hover:bg-emerald-900/40 hover:text-emerald-100"
                                             type="button"
-                                            title="Duplicate"
-                                            onclick={() => cloneStructured(idx)}>
-                                            <CopyPlus class="h-4 w-4" />
-                                        </button>
-                                        <button
-                                            class="rounded-md border border-slate-800 px-2 py-2 text-slate-400 hover:border-rose-700 hover:bg-rose-900/40 hover:text-rose-100"
-                                            type="button"
-                                            title="Remove edge"
-                                            onclick={() => removeEdge(idx)}>
-                                            <Trash2 class="h-4 w-4" />
+                                            class="inline-flex items-center rounded-md border border-slate-700/60 bg-slate-900/60 p-1 text-[12px] font-semibold text-rose-200 transition-colors hover:border-rose-500 focus:outline-none"
+                                            title="Remove range"
+                                            onclick={() => removeRange(entry.key, idx)}
+                                            disabled={entry.deleted}>
+                                            <Trash2 class="inline h-4 w-4" />
                                         </button>
                                     </div>
                                 </div>
                             {/each}
                         </div>
                     </div>
-                {/if}
-
-                {#if showJson}
-                    <div class="mt-4 space-y-2">
-                        <div
-                            class="flex items-center justify-between text-[11px] text-slate-300">
-                            <span>Advanced JSON editor</span>
-                            <button
-                                class="text-emerald-300 hover:underline"
-                                type="button"
-                                onclick={syncEdgesFromJson}>
-                                Sync to structured
-                            </button>
-                        </div>
-                        <CodeEditor
-                            language="json"
-                            class="h-72"
-                            bind:content={targetsJson} />
-                    </div>
-                {/if}
-
-                {#if error}
-                    <div
-                        class="mt-3 rounded-md border border-rose-700/60 bg-rose-900/40 px-3 py-2 text-[11px] text-rose-100">
-                        {error}
-                    </div>
-                {/if}
+                {/each}
             </div>
-        </div>
+        {/if}
 
-        <div class="space-y-3">
+        {#if error}
             <div
-                class="rounded-xl border border-slate-800 bg-slate-900/70 p-4 text-[11px] text-slate-200 shadow-inner">
-                <div class="mb-2 flex items-center justify-between">
-                    <span class="text-[12px] font-semibold text-slate-100"
-                        >Preview</span>
-                    {#if mode === "edit" && mapping?.descriptor}
-                        <button
-                            class="text-emerald-300 hover:underline"
-                            type="button"
-                            onclick={() => loadDetail(mapping.descriptor)}
-                            disabled={loadingDetail}>
-                            Refresh
-                        </button>
-                    {/if}
-                </div>
-                {#if loadingDetail}
-                    <div class="text-slate-400">Loading…</div>
-                {:else if detail}
-                    <div class="space-y-2">
-                        <div class="text-[12px] font-semibold text-slate-100">
-                            {detail.descriptor}
-                        </div>
-                        <div
-                            class="rounded border border-slate-700/60 bg-slate-900/60 p-2">
-                            {#if detail.edges?.length}
-                                <ul class="space-y-2">
-                                    {#each detail.edges as edge (renderEdgeSummary(edge))}
-                                        <li
-                                            class="flex items-start justify-between gap-2 text-slate-300">
-                                            <span class="leading-tight"
-                                                >{renderEdgeSummary(edge)}</span>
-                                            <button
-                                                class="rounded-md border border-slate-700 px-2 py-1 text-[11px] font-semibold text-slate-100 hover:border-emerald-500 hover:text-emerald-100"
-                                                type="button"
-                                                title="Add override for this edge"
-                                                onclick={() =>
-                                                    addEdgeFromExisting(edge)}>
-                                                Override
-                                            </button>
-                                        </li>
-                                    {/each}
-                                </ul>
-                                <p class="mt-2 text-[10px] text-slate-500">
-                                    Unchanged edges remain inherited; add overrides to
-                                    modify them.
-                                </p>
-                            {:else}
-                                <div class="text-slate-500">No outgoing edges</div>
-                            {/if}
-                        </div>
-                        {#if detail.override_edges?.length}
-                            <div class="space-y-1 text-[11px] text-slate-300">
-                                <div class="text-[12px] font-semibold text-slate-100">
-                                    Override edges
-                                </div>
-                                <ul class="space-y-1">
-                                    {#each detail.override_edges as edge, i (i)}
-                                        <li class="text-slate-300">
-                                            {edge.target}: {edge.source_range} → {edge.destination_range ??
-                                                "all"}
-                                        </li>
-                                    {/each}
-                                </ul>
-                            </div>
-                        {/if}
-                        {#if detail.sources?.length}
-                            <div class="text-slate-400">
-                                Sources: {detail.sources.join(", ")}
-                            </div>
-                        {/if}
-                    </div>
-                {:else}
-                    <div class="text-slate-500">No detail loaded.</div>
-                {/if}
+                class="rounded-md border border-rose-800 bg-rose-900/40 p-3 text-[12px] text-rose-100">
+                {error}
             </div>
+        {/if}
+        <div class="flex flex-wrap items-center gap-2">
+            <button
+                type="button"
+                class="inline-flex items-center gap-2 rounded-md border border-emerald-600/60 bg-emerald-600/30 px-3 py-2 text-[12px] font-semibold text-emerald-100 shadow-sm transition-colors hover:bg-emerald-600/40 focus:ring-2 focus:ring-emerald-500/40 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                onclick={handleSave}
+                disabled={saving}>
+                {#if saving}
+                    <Save class="h-4 w-4 animate-spin" />
+                {:else}
+                    <Save class="h-4 w-4" />
+                {/if}
+                Save
+            </button>
+            <button
+                type="button"
+                class="inline-flex items-center gap-2 rounded-md border border-slate-700/60 bg-slate-800/60 px-3 py-2 text-[12px] font-semibold text-slate-100 shadow-sm transition-colors hover:border-slate-500 focus:ring-2 focus:ring-slate-500/40 focus:outline-none"
+                onclick={() => loadDetail()}
+                disabled={loadingDetail || !canLoadDescriptor()}>
+                <RefreshCcw class="h-4 w-4" />
+                Reload
+            </button>
         </div>
     </div>
-
-    {#snippet footerChildren()}
-        <div class="flex w-full justify-end gap-2">
-            <button
-                class="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-[12px] font-semibold text-slate-200 hover:bg-slate-800"
-                type="button"
-                onclick={() => (open = false)}>
-                Cancel
-            </button>
-            <button
-                class="rounded-lg bg-emerald-600 px-3 py-2 text-[12px] font-semibold text-emerald-50 shadow hover:bg-emerald-500 disabled:opacity-60"
-                type="button"
-                onclick={handleSave}
-                disabled={!canSave}
-                aria-disabled={!canSave}>
-                {saving
-                    ? "Saving..."
-                    : mode === "edit"
-                      ? "Save Changes"
-                      : "Create Override"}
-            </button>
-        </div>
-    {/snippet}
 </Modal>

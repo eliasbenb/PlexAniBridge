@@ -7,7 +7,7 @@ from fastapi import Request
 from fastapi.exceptions import HTTPException
 from fastapi.param_functions import Query
 from fastapi.routing import APIRouter
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 
 from src.exceptions import (
     AniListFilterError,
@@ -59,41 +59,65 @@ class DeleteMappingResponse(BaseModel):
     ok: bool
 
 
+class RangeInputModel(BaseModel):
+    source_range: str
+    destination_range: str | None = None
+
+
+class TargetInputModel(BaseModel):
+    provider: str
+    entry_id: str
+    scope: str
+    ranges: list[RangeInputModel] = Field(default_factory=list)
+    deleted: bool = False
+
+
 class MappingOverridePayload(BaseModel):
     """Payload for creating or updating a mapping override."""
 
     descriptor: str
-    targets: dict[str, dict[str, str | None]] | None = None
-    edges: list[dict[str, Any]] | None = None
+    targets: list[TargetInputModel] = Field(default_factory=list)
 
-    @field_validator("targets")
-    @classmethod
-    def _ensure_targets(
-        cls, value: dict[str, dict[str, str | None]] | None
-    ) -> dict[str, dict[str, str | None]] | None:
-        if value is None:
-            return None
-        if not isinstance(value, dict):
-            raise ValueError("targets must be an object")
-        return value
+    def to_service_kwargs(self) -> dict[str, Any]:
+        """Return kwargs expected by MappingOverridesService."""
+        return {
+            "descriptor": self.descriptor,
+            "targets": [entry.model_dump() for entry in self.targets],
+        }
 
 
-class MappingDetailModel(MappingItemModel):
-    override: dict[str, dict[str, str | None]] | None = None
-    override_edges: list[dict[str, str | None]] = Field(default_factory=list)
+class MappingRangeViewModel(BaseModel):
+    source_range: str
+    upstream: str | None = None
+    custom: str | None = None
+    effective: str | None = None
+    origin: str
+    inherited: bool = False
 
 
-class OverrideDeleteKind(str):
-    CUSTOM = "custom"
-    FULL = "full"
+class MappingTargetViewModel(BaseModel):
+    descriptor: str
+    provider: str
+    entry_id: str
+    scope: str
+    origin: str
+    deleted: bool = False
+    ranges: list[MappingRangeViewModel] = Field(default_factory=list)
 
 
-def _prepare_override_kwargs(payload: MappingOverridePayload) -> dict[str, Any]:
-    return {
-        "descriptor": payload.descriptor,
-        "targets": payload.targets,
-        "edges": payload.edges,
-    }
+class MappingLayersModel(BaseModel):
+    upstream: dict[str, dict[str, str | None] | None] = Field(default_factory=dict)
+    custom: dict[str, dict[str, str | None] | None] = Field(default_factory=dict)
+    effective: dict[str, dict[str, str | None] | None] = Field(default_factory=dict)
+
+
+class MappingDetailModel(BaseModel):
+    descriptor: str
+    provider: str
+    entry_id: str
+    scope: str
+    layers: MappingLayersModel = Field(default_factory=MappingLayersModel)
+    targets: list[MappingTargetViewModel] = Field(default_factory=list)
 
 
 def get_query_capabilities() -> list[QueryFieldSpec]:
@@ -179,10 +203,17 @@ def query_capabilities() -> QueryCapabilitiesResponse:
     return QueryCapabilitiesResponse(fields=fields)
 
 
+@router.get("/{descriptor}", response_model=MappingDetailModel)
+async def get_mapping(descriptor: str) -> MappingDetailModel:
+    svc = get_mapping_overrides_service()
+    data = await svc.get_mapping_detail(descriptor)
+    return MappingDetailModel(**data)
+
+
 @router.post("", response_model=MappingDetailModel)
 async def create_mapping(mapping: MappingOverridePayload) -> MappingDetailModel:
     svc = get_mapping_overrides_service()
-    payload = _prepare_override_kwargs(mapping)
+    payload = mapping.to_service_kwargs()
     data = await svc.save_override(**payload)
     return MappingDetailModel(**data)
 
@@ -195,7 +226,7 @@ async def update_mapping(
         raise MappingIdMismatchError("descriptor in path and body must match")
 
     svc = get_mapping_overrides_service()
-    payload = _prepare_override_kwargs(mapping)
+    payload = mapping.to_service_kwargs()
     data = await svc.save_override(**payload)
     return MappingDetailModel(**data)
 

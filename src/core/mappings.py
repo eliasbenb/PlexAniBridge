@@ -12,6 +12,7 @@ import yaml
 from yaml import CSafeLoader as YamlLoader
 
 from src import __version__, log
+from src.utils.cache import gattl_cache
 
 __all__ = ["AnimapDict", "MappingsClient"]
 
@@ -438,6 +439,24 @@ class MappingsClient:
         merged_mappings = self._deep_merge(db_mappings, custom_mappings)
 
         return {k: v for k, v in merged_mappings.items() if not k.startswith("$")}
+
+    @gattl_cache(ttl=300, key=lambda self, src: src)
+    async def load_source(self, src: str) -> AnimapDict:
+        """Load mappings from a single source without merging.
+
+        This resets internal provenance and loaded-source tracking so callers can
+        inspect the raw payload and provenance produced by that specific source
+        (plus any of its includes).
+
+        Args:
+            src (str): File path or URL to load.
+
+        Returns:
+            AnimapDict: Parsed mapping payload, or an empty dict on failure.
+        """
+        self._loaded_sources = set()
+        self._provenance = {}
+        return await self._load_mappings(src)
 
     def get_provenance(self) -> dict[str, list[str]]:
         """Return a copy of the provenance map collected during the last load."""
