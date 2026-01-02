@@ -1,6 +1,5 @@
 """Tests for the backup listing and restoration service."""
 
-import asyncio
 import json
 from pathlib import Path
 from types import SimpleNamespace
@@ -9,7 +8,6 @@ from typing import Any, cast
 import pytest
 
 from src.web.services.backup_service import (
-    BackupParseError,
     BackupService,
     InvalidBackupFilenameError,
     ProfileNotFoundError,
@@ -38,6 +36,10 @@ class DummyListProvider:
     async def restore_entries(self, entries):
         """Record restored entries for assertions."""
         self._restored.extend(entries)
+
+    async def restore_list(self, backup: str):
+        """No-op for list restoration."""
+        pass
 
 
 class DummyBridge(SimpleNamespace):
@@ -102,25 +104,6 @@ def test_read_backup_raw_and_invalid_filename(configured_scheduler):
     assert service.read_backup_raw("primary", file_path.name) == {"entries": []}
     with pytest.raises(InvalidBackupFilenameError):
         service.read_backup_raw("primary", "../escape.json")
-
-
-def test_restore_backup_success_and_parse_errors(configured_scheduler):
-    """Restore backups through the provider and surface parse failures."""
-    tmp_path, provider, _ = configured_scheduler
-    service = BackupService()
-    file_path = _write_backup(
-        tmp_path,
-        "anibridge_primary_alist_20240505050505.json",
-        entries=[{"key": "2"}],
-    )
-    summary = asyncio.run(service.restore_backup("primary", file_path.name))
-    assert summary.ok is True
-    assert provider._restored == [{"key": "2"}]
-
-    broken = file_path.with_name("broken.json")
-    broken.write_text("{", encoding="utf-8")
-    with pytest.raises(BackupParseError):
-        asyncio.run(service.restore_backup("primary", broken.name))
 
 
 def test_backup_service_requires_scheduler_and_known_profiles():

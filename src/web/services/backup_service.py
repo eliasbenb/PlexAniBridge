@@ -4,7 +4,7 @@ import json
 from datetime import UTC, datetime
 from functools import lru_cache
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel
 
@@ -17,6 +17,9 @@ from src.exceptions import (
     SchedulerNotInitializedError,
 )
 from src.web.state import get_app_state
+
+if TYPE_CHECKING:
+    from src.core.bridge import BridgeClient
 
 __all__ = ["BackupService", "get_backup_service"]
 
@@ -35,7 +38,7 @@ class BackupMeta(BaseModel):
 class BackupService:
     """Service for listing and restoring provider-managed backups."""
 
-    def _get_profile_bridge(self, profile: str):
+    def _get_profile_bridge(self, profile: str) -> BridgeClient:
         """Get the scheduler bridge client for a profile."""
         scheduler = get_app_state().scheduler
         if not scheduler:
