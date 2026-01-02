@@ -38,8 +38,8 @@
         onRefresh,
     }: Props = $props();
 
-    let selected = $state([...(Array.isArray(value) ? value : [])]);
-    let internalBaseline = $state([...(Array.isArray(baseline) ? baseline : [])]);
+    let selected = $state<string[]>([...(Array.isArray(value) ? value : [])]);
+    let internalBaseline = $state<string[]>([]);
 
     const selectedCount = $derived(selected.length);
     const hasChanges = $derived(!arraysEqual(selected, internalBaseline));
