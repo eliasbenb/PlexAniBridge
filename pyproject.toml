@@ -74,8 +74,8 @@ ab-docs-serve = "scripts.dev:docs_serve"
 [project.urls]
 Documentation = "https://anibridge.eliasbenb.dev"
 Homepage = "https://anibridge.eliasbenb.dev"
-Issues = "https://github.com/eliasbenb/PlexAniBridge/issues"
-Source = "https://github.com/eliasbenb/PlexAniBridge"
+Issues = "https://github.com/anibridge/anibridge/issues"
+Source = "https://github.com/anibridge/anibridge"
 
 [tool.ruff]
 exclude = ["alembic"]

@@ -54,4 +54,4 @@ The project has a set of developer scripts at `scripts/dev.py` to help with comm
     - patch (Bad)
     - develop (Bad)
 - Each PR should solve one issue or add one feature (or a group of meaningfully connected issues/features), if you have multiple, please create a separate PR for each.
-- Check for existing pull requests at https://github.com/eliasbenb/PlexAniBridge/pulls to avoid duplicates.
+- Check for existing pull requests at https://github.com/anibridge/anibridge/pulls to avoid duplicates.

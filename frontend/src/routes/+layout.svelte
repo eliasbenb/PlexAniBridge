@@ -212,7 +212,7 @@
                 <div class="flex flex-row items-center justify-between gap-2">
                     <div class="flex flex-wrap items-center gap-3">
                         <a
-                            href="https://github.com/eliasbenb/PlexAniBridge"
+                            href="https://github.com/anibridge/anibridge"
                             target="_blank"
                             rel="noopener"
                             class="inline-flex items-center gap-1 text-slate-400 transition-colors hover:text-slate-200">
@@ -220,14 +220,14 @@
                         </a>
                         <div>
                             <a
-                                href={`https://github.com/eliasbenb/PlexAniBridge/releases/tag/v${version}`}
+                                href={`https://github.com/anibridge/anibridge/releases/tag/v${version}`}
                                 target="_blank"
                                 rel="noopener"
                                 class="text-slate-600 transition-colors hover:text-slate-200"
                                 >v{version}</a>
                             {#if gitHash}
                                 <a
-                                    href={`https://github.com/eliasbenb/PlexAniBridge/tree/${gitHash}`}
+                                    href={`https://github.com/anibridge/anibridge/tree/${gitHash}`}
                                     target="_blank"
                                     rel="noopener"
                                     class="ml-1 text-slate-600 transition-colors hover:text-slate-200"

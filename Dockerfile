@@ -48,7 +48,7 @@ LABEL maintainer="Elias Benbourenane <eliasbenbourenane@gmail.com>" \
     org.opencontainers.image.authors="Elias Benbourenane <eliasbenbourenane@gmail.com>" \
     org.opencontainers.image.url="https://anibridge.eliasbenb.dev" \
     org.opencontainers.image.documentation="https://anibridge.eliasbenb.dev" \
-    org.opencontainers.image.source="https://github.com/eliasbenb/PlexAniBridge" \
+    org.opencontainers.image.source="https://github.com/anibridge/anibridge" \
     org.opencontainers.image.licenses="MIT"
 
 ENV PATH=/opt/venv/bin:$PATH \
