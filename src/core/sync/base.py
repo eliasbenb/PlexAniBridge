@@ -2,6 +2,7 @@
 
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator, Callable, Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, ClassVar
 
@@ -44,6 +45,14 @@ def diff_snapshots(
     return diff
 
 
+@dataclass(frozen=True)
+class FieldRule:
+    """Rule describing how to compare and write a specific sync field."""
+
+    attr: str
+    comparator: Callable[[Comparable | None, Comparable | None], bool]
+
+
 class BaseSyncClient[
     ParentMediaT: LibraryMedia,
     ChildMediaT: LibraryMedia,
@@ -51,24 +60,36 @@ class BaseSyncClient[
 ](ABC):
     """Provider-agnostic base class for media synchronization."""
 
-    _ENTRY_FIELD_MAP: ClassVar[dict[SyncField, str]] = {
-        SyncField.STATUS: "status",
-        SyncField.PROGRESS: "progress",
-        SyncField.REPEATS: "repeats",
-        SyncField.REVIEW: "review",
-        SyncField.USER_RATING: "user_rating",
-        SyncField.STARTED_AT: "started_at",
-        SyncField.FINISHED_AT: "finished_at",
-    }
+    @staticmethod
+    def _comparison(op: str) -> Callable[[Comparable | None, Comparable | None], bool]:
+        def _compare(current: Comparable | None, new_value: Comparable | None) -> bool:
+            if current is None:
+                return new_value is not None
+            if new_value is None:
+                return False
+            match op:
+                case "ne":
+                    return new_value != current
+                case "gt":
+                    return new_value > current
+                case "gte":
+                    return new_value >= current
+                case "lt":
+                    return new_value < current
+                case "lte":
+                    return new_value <= current
+            return False
 
-    _COMPARISON_RULES: ClassVar[dict[SyncField, str]] = {
-        SyncField.STATUS: "gte",
-        SyncField.PROGRESS: "gt",
-        SyncField.REPEATS: "gt",
-        SyncField.REVIEW: "ne",
-        SyncField.USER_RATING: "ne",
-        SyncField.STARTED_AT: "lt",
-        SyncField.FINISHED_AT: "lt",
+        return _compare
+
+    _FIELD_RULES: ClassVar[dict[SyncField, FieldRule]] = {
+        SyncField.STATUS: FieldRule("status", _comparison("gte")),
+        SyncField.PROGRESS: FieldRule("progress", _comparison("gt")),
+        SyncField.REPEATS: FieldRule("repeats", _comparison("gt")),
+        SyncField.REVIEW: FieldRule("review", _comparison("ne")),
+        SyncField.USER_RATING: FieldRule("user_rating", _comparison("ne")),
+        SyncField.STARTED_AT: FieldRule("started_at", _comparison("lt")),
+        SyncField.FINISHED_AT: FieldRule("finished_at", _comparison("lt")),
     }
 
     def __init__(
@@ -380,22 +401,23 @@ class BaseSyncClient[
 
         considered_attrs: set[str] = set()
 
-        if SyncField.STATUS.value not in skip_fields and self._should_update_field(
-            self._COMPARISON_RULES[SyncField.STATUS],
-            SyncField.STATUS.value,
-            skip_fields,
+        status_rule = self._FIELD_RULES[SyncField.STATUS]
+        if self._should_apply_field(
+            SyncField.STATUS,
+            status_rule,
             status_value,
             before_snapshot.status,
+            skip_fields,
         ):
             entry.status = status_value
-        considered_attrs.add(self._ENTRY_FIELD_MAP[SyncField.STATUS])
+        considered_attrs.add(status_rule.attr)
         final_status = entry.status
 
         for field in SyncField:
             if field == SyncField.STATUS:
                 continue
 
-            attr_name = self._ENTRY_FIELD_MAP[field]
+            rule = self._FIELD_RULES[field]
             if field.value in skip_fields:
                 continue
             if final_status is None:
@@ -410,18 +432,14 @@ class BaseSyncClient[
                 continue
 
             value = await self._field_calculators[field](**calc_kwargs)
-            current_value = getattr(entry, attr_name)
-            if not self._should_update_field(
-                self._COMPARISON_RULES[field],
-                field.value,
-                skip_fields,
-                value,
-                current_value,
+            current_value = getattr(entry, rule.attr)
+            if not self._should_apply_field(
+                field, rule, value, current_value, skip_fields
             ):
                 continue
 
-            setattr(entry, attr_name, value)
-            considered_attrs.add(attr_name)
+            setattr(entry, rule.attr, value)
+            considered_attrs.add(rule.attr)
 
         after_snapshot = EntrySnapshot.from_entry(entry)
         diff = diff_snapshots(before_snapshot, after_snapshot, considered_attrs)
@@ -736,38 +754,22 @@ class BaseSyncClient[
     ) -> str | None:
         """Derive the mapping scope for the given item."""
 
-    def _should_update_field(
+    def _should_apply_field(
         self,
-        op: str,
-        field_name: str,
-        skip_fields: set[str],
+        field: SyncField,
+        rule: FieldRule,
         new_value: Comparable | None,
         current_value: Comparable | None,
+        skip_fields: set[str],
     ) -> bool:
-        """Determine whether a field should be updated."""
-        if field_name in skip_fields:
+        """Determine whether a field should be updated based on its rule."""
+        if field.value in skip_fields:
             return False
         if self.destructive_sync and new_value is not None:
             return True
         if current_value == new_value:
             return False
-        if current_value is None:
-            return new_value is not None
-        if new_value is None:
-            return False
-
-        match op:
-            case "ne":
-                return new_value != current_value
-            case "gt":
-                return new_value > current_value
-            case "gte":
-                return new_value >= current_value
-            case "lt":
-                return new_value < current_value
-            case "lte":
-                return new_value <= current_value
-        return False
+        return rule.comparator(current_value, new_value)
 
     def _format_external_ids(self, ids: dict[str, str | None]) -> str:
         """Format external identifiers for debug logging."""

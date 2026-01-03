@@ -177,15 +177,24 @@ def test_should_update_field_respects_comparison_rules(
 ) -> None:
     """Field updates honor skip lists, comparison operators, and destructive mode."""
     skip_fields = {SyncField.STATUS.value}
-    assert not stub_client._should_update_field(
-        "gt", SyncField.STATUS.value, skip_fields, 5, 4
+    status_rule = stub_client._FIELD_RULES[SyncField.STATUS]
+    progress_rule = stub_client._FIELD_RULES[SyncField.PROGRESS]
+
+    assert not stub_client._should_apply_field(
+        SyncField.STATUS, status_rule, 5, 4, skip_fields
     )
 
-    assert stub_client._should_update_field("gt", "progress", set(), 5, 4)
-    assert not stub_client._should_update_field("gt", "progress", set(), 3, 4)
+    assert stub_client._should_apply_field(
+        SyncField.PROGRESS, progress_rule, 5, 4, set()
+    )
+    assert not stub_client._should_apply_field(
+        SyncField.PROGRESS, progress_rule, 3, 4, set()
+    )
 
     stub_client.destructive_sync = True
-    assert stub_client._should_update_field("gt", "progress", set(), 1, None)
+    assert stub_client._should_apply_field(
+        SyncField.PROGRESS, progress_rule, 1, None, set()
+    )
 
 
 def test_format_diff_serializes_status_and_datetimes(
