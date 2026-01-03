@@ -1,134 +1,57 @@
-"""Service helpers for managing custom mapping overrides."""
+"""Service helpers for managing custom mapping overrides (v3 graph)."""
 
 import asyncio
 import copy
 import json
-from dataclasses import dataclass
-from functools import lru_cache
 from pathlib import Path
-from typing import Any, ClassVar, Literal
+from typing import Any, ClassVar
 
 import yaml
-from sqlalchemy.sql import delete
 
 from src import config
-from src.config.database import db
+from src.config.settings import get_config
+from src.core.animap import AnimapDescriptor
 from src.core.mappings import MappingsClient
 from src.exceptions import (
     MappingError,
-    MappingNotFoundError,
-    MissingAnilistIdError,
+    MissingDescriptorError,
     SchedulerNotInitializedError,
 )
-from src.models.db.provenance import AniMapProvenance
-from src.web.services.mappings_service import get_mappings_service
 from src.web.state import get_app_state
 
 __all__ = ["MappingOverridesService", "get_mapping_overrides_service"]
 
 
-@dataclass(frozen=True)
-class _FieldSpec:
-    """Specification describing how to sanitize override field values."""
-
-    kind: Literal["scalar", "list", "dict"]
-    value_type: type
-
-    def coerce(self, raw_value: Any) -> Any:
-        """Coerce a raw value into the expected representation."""
-        if raw_value is None:
-            return None
-
-        if self.kind == "scalar":
-            return self._coerce_scalar(raw_value)
-        if self.kind == "list":
-            return self._coerce_list(raw_value)
-        if self.kind == "dict":
-            return self._coerce_dict(raw_value)
-        raise ValueError("Unsupported field kind")
-
-    def _coerce_scalar(self, raw_value: Any) -> Any:
-        """Coerce a raw scalar value."""
-        if self.value_type is int:
-            try:
-                return int(raw_value)
-            except (TypeError, ValueError) as exc:
-                raise ValueError("Expected an integer value") from exc
-        if self.value_type is str:
-            return str(raw_value)
-        return raw_value
-
-    def _coerce_list(self, raw_value: Any) -> list[Any] | None:
-        """Coerce a raw list value."""
-        if raw_value is None:
-            return None
-        if isinstance(raw_value, list):
-            return [self._coerce_list_item(item) for item in raw_value]
-        return [self._coerce_list_item(raw_value)]
-
-    def _coerce_list_item(self, raw_value: Any) -> Any:
-        """Coerce a raw list item value."""
-        if self.value_type is int:
-            try:
-                return int(raw_value)
-            except (TypeError, ValueError) as exc:
-                raise ValueError("List items must be integers") from exc
-        if self.value_type is str:
-            return str(raw_value)
-        return raw_value
-
-    def _coerce_dict(self, raw_value: Any) -> dict[str, Any] | None:
-        """Coerce a raw dict value."""
-        if raw_value is None:
-            return None
-        if not isinstance(raw_value, dict):
-            raise ValueError("Expected an object for mapping fields")
-        return {
-            str(key): str(value) if value is not None else ""
-            for key, value in raw_value.items()
-        }
-
-
 class MappingOverridesService:
-    """Manage CRUD operations for custom AniMap overrides."""
+    """Manage CRUD operations for custom mapping overrides (descriptor graph)."""
 
-    _FIELD_SPECS: ClassVar[dict[str, _FieldSpec]] = {
-        "anidb_id": _FieldSpec("scalar", int),
-        "imdb_id": _FieldSpec("list", str),
-        "mal_id": _FieldSpec("list", int),
-        "tmdb_movie_id": _FieldSpec("list", int),
-        "tmdb_show_id": _FieldSpec("scalar", int),
-        "tvdb_id": _FieldSpec("scalar", int),
-        "tmdb_mappings": _FieldSpec("dict", str),
-        "tvdb_mappings": _FieldSpec("dict", str),
-    }
+    _SUPPORTED_FORMATS: ClassVar[tuple[str, ...]] = ("json", "yaml")
 
     def __init__(self) -> None:
-        """Initialize service state."""
+        """Initialise synchronization primitives for override operations."""
         self._lock = asyncio.Lock()
 
     def _ensure_scheduler(self):
-        """Ensure the application scheduler is available."""
+        """Ensure the scheduler is available and return it."""
         scheduler = get_app_state().scheduler
         if not scheduler:
             raise SchedulerNotInitializedError("Scheduler not initialized")
         return scheduler
 
-    def _resolve_custom_file(self) -> tuple[Path, Literal["json", "yaml"]]:
-        """Determine the custom mappings file path and format."""
+    def _resolve_custom_file(self) -> tuple[Path, str]:
+        """Determine the path and format of the custom mappings override file."""
         candidates = [config.data_path / name for name in MappingsClient.MAPPING_FILES]
         if not candidates or not candidates[0].exists():
-            return config.data_path / "mappings.custom.json", "json"
+            return config.data_path / "mappings.json", "json"
         if candidates[0].suffix.lower() == ".json":
             return candidates[0], "json"
         return candidates[0], "yaml"
 
-    def _load_raw(self) -> tuple[dict[str, Any], Path, Literal["json", "yaml"]]:
-        """Load the raw custom mappings file."""
+    def _load_raw(self) -> tuple[dict[str, Any], Path, str]:
+        """Load raw override data from the custom mappings file."""
         path, fmt = self._resolve_custom_file()
         if not path.exists():
-            raw: dict[str, Any] = {}
-            return raw, path, fmt
+            return {}, path, fmt
 
         try:
             if fmt == "json":
@@ -137,7 +60,7 @@ class MappingOverridesService:
             else:
                 with path.open("r", encoding="utf-8") as fh:
                     data = yaml.safe_load(fh)
-        except Exception as exc:
+        except Exception as exc:  # pragma: no cover - defensive
             raise MappingError("Failed to read custom mappings file") from exc
 
         if not data:
@@ -147,13 +70,8 @@ class MappingOverridesService:
 
         return data, path, fmt
 
-    def _write_raw(
-        self,
-        raw: dict[str, Any],
-        path: Path,
-        fmt: Literal["json", "yaml"],
-    ) -> None:
-        """Write the raw custom mappings file."""
+    def _write_raw(self, raw: dict[str, Any], path: Path, fmt: str) -> None:
+        """Persist raw override data to the custom mappings file."""
         path.parent.mkdir(parents=True, exist_ok=True)
         if fmt == "json":
             with path.open("w", encoding="utf-8") as fh:
@@ -163,166 +81,310 @@ class MappingOverridesService:
             with path.open("w", encoding="utf-8") as fh:
                 yaml.safe_dump(raw, fh, sort_keys=False, allow_unicode=False)
 
-    def _sanitize_entry(self, entry: dict[str, Any]) -> dict[str, Any]:
-        """Sanitize a raw override entry."""
-        sanitized: dict[str, Any] = {}
-        for key, value in entry.items():
-            key_str = str(key)
-            if key_str.startswith("$") or key_str == "anilist_id":
-                continue
-            spec = self._FIELD_SPECS.get(key_str)
-            if not spec:
-                raise ValueError(f"Unsupported override field '{key_str}'")
-            sanitized[key_str] = spec.coerce(value)
-        return sanitized
-
-    def _entry_from_fields(
-        self, fields: dict[str, dict[str, Any]] | None
-    ) -> dict[str, Any]:
-        """Construct an override entry from field-based specifications."""
-        if not fields:
+    async def _load_upstream(self) -> dict[str, Any]:
+        """Load the upstream mappings payload (without merging custom)."""
+        upstream_url = get_config().mappings_url
+        if not upstream_url:
             return {}
-        entry: dict[str, Any] = {}
-        for raw_name, payload in fields.items():
-            name = str(raw_name)
-            spec = self._FIELD_SPECS.get(name)
-            if not spec:
-                raise ValueError(f"Unsupported override field '{name}'")
 
-            mode = str(payload.get("mode", "omit")).lower()
-            if mode == "omit":
+        async with MappingsClient(config.data_path, upstream_url) as client:
+            return await client.load_source(str(upstream_url)) or {}
+
+    def _normalize_targets(self, raw: Any) -> dict[str, dict[str, str | None] | None]:
+        """Normalize a raw descriptor payload into target-range maps.
+
+        A value of None for a target means the target is explicitly disabled.
+        """
+        if not isinstance(raw, dict):
+            return {}
+
+        cleaned: dict[str, dict[str, str | None] | None] = {}
+        for target_key, ranges in raw.items():
+            if target_key is None:
                 continue
-            if mode == "null":
-                entry[name] = None
+            target_str = str(target_key)
+            if target_str.startswith("$"):
                 continue
-            if mode != "value":
-                raise ValueError(f"Invalid mode '{mode}' for field '{name}'")
+            if ranges is None:
+                cleaned[target_str] = None
+                continue
+            if not isinstance(ranges, dict):
+                continue
+            normalized_ranges: dict[str, str | None] = {}
+            for src_range, dst_range in ranges.items():
+                if not isinstance(src_range, (str, int)):
+                    continue
+                if dst_range is not None and not isinstance(dst_range, str):
+                    continue
+                normalized_ranges[str(src_range)] = dst_range
+            cleaned[target_str] = normalized_ranges
+        return cleaned
 
-            if "value" not in payload:
-                raise ValueError(f"Field '{name}' requires a value")
-            entry[name] = spec.coerce(payload.get("value"))
-        return entry
+    def _merge_targets(
+        self,
+        upstream: dict[str, dict[str, str | None] | None],
+        custom: dict[str, dict[str, str | None] | None],
+    ) -> dict[str, dict[str, str | None] | None]:
+        """Overlay custom targets onto upstream targets, honoring deletions."""
+        merged: dict[str, dict[str, str | None] | None] = copy.deepcopy(upstream)
+        for target, ranges in custom.items():
+            if ranges is None:
+                merged[target] = None
+                continue
+            bucket = merged.setdefault(target, {}) or {}
+            merged[target] = bucket
+            for src_range, dst_range in ranges.items():
+                bucket[src_range] = dst_range
+        return merged
 
-    async def _sync_database(self) -> None:
-        scheduler = self._ensure_scheduler()
-        await scheduler.shared_animap_client.sync_db()
+    def _build_range_views(
+        self,
+        upstream_ranges: dict[str, str | None],
+        custom_ranges: dict[str, str | None] | None,
+        effective_ranges: dict[str, str | None] | None,
+        *,
+        custom_deleted: bool = False,
+    ) -> list[dict[str, Any]]:
+        """Build a list of range view objects for a target descriptor."""
+        ranges: list[dict[str, Any]] = []
+        keys = (
+            set(upstream_ranges.keys())
+            | (set(custom_ranges.keys()) if custom_ranges else set())
+            | (set(effective_ranges.keys()) if effective_ranges else set())
+        )
 
-    async def get_mapping_detail(self, anilist_id: int) -> dict[str, Any]:
-        """Return mapping and override information for a single AniList ID.
+        for source_range in sorted(keys):
+            upstream_val = upstream_ranges.get(source_range)
+            custom_val = (custom_ranges or {}).get(source_range)
+            effective_val = (effective_ranges or {}).get(source_range)
+            explicit_remove = (
+                custom_ranges is not None
+                and source_range in custom_ranges
+                and custom_val is None
+            )
+            origin = "upstream"
+            if custom_deleted:
+                origin = "deleted"
+            elif custom_ranges is not None and (
+                custom_val is not None or explicit_remove
+            ):
+                origin = "custom"
+            ranges.append(
+                {
+                    "source_range": source_range,
+                    "upstream": upstream_val,
+                    "custom": custom_val,
+                    "effective": effective_val,
+                    "origin": origin,
+                    "inherited": (
+                        not custom_deleted
+                        and not explicit_remove
+                        and custom_val is None
+                        and upstream_val is not None
+                    ),
+                }
+            )
+
+        return ranges
+
+    def _build_target_views(
+        self,
+        upstream: dict[str, dict[str, str | None] | None],
+        custom: dict[str, dict[str, str | None] | None],
+        effective: dict[str, dict[str, str | None] | None],
+    ) -> list[dict[str, Any]]:
+        """Construct per-target mapping views with origin metadata."""
+        keys = set(upstream.keys()) | set(custom.keys()) | set(effective.keys())
+        entries: list[dict[str, Any]] = []
+
+        for target_key in sorted(keys):
+            try:
+                parsed = AnimapDescriptor.parse(target_key)
+            except ValueError:
+                continue
+
+            upstream_raw = upstream.get(target_key)
+            upstream_ranges: dict[str, str | None] = upstream_raw or {}
+            custom_raw = custom.get(target_key)
+            custom_ranges: dict[str, str | None] = custom_raw or {}
+            effective_ranges: dict[str, str | None] = effective.get(target_key) or {}
+
+            custom_deleted = target_key in custom and custom_raw is None
+
+            origin = (
+                "deleted"
+                if custom_deleted
+                else ("custom" if custom_raw else "upstream")
+            )
+            if upstream_ranges and custom_raw and not custom_deleted:
+                origin = "mixed"
+
+            entries.append(
+                {
+                    "descriptor": parsed.key(),
+                    "provider": parsed.provider,
+                    "entry_id": parsed.entry_id,
+                    "scope": parsed.scope,
+                    "origin": origin,
+                    "deleted": custom_deleted,
+                    "ranges": self._build_range_views(
+                        upstream_ranges,
+                        custom_ranges,
+                        effective_ranges,
+                        custom_deleted=custom_deleted,
+                    ),
+                }
+            )
+
+        return entries
+
+    async def get_mapping_detail(self, descriptor: str) -> dict[str, Any]:
+        """Fetch mapping detail with layered upstream/custom targets.
 
         Args:
-            anilist_id (int): The AniList ID of the mapping to retrieve.
+            descriptor (str): The mapping descriptor to retrieve.
 
         Returns:
-            dict[str, Any]: The mapping detail, including any override data.
+            dict[str, Any]: The mapping detail data structure.
         """
+        parsed = AnimapDescriptor.parse(descriptor)
+
         async with self._lock:
-            raw, _, _ = self._load_raw()
-            override = copy.deepcopy(raw.get(str(anilist_id)))
+            custom_raw, _, _ = self._load_raw()
+        upstream_raw = await self._load_upstream()
 
-        try:
-            item = await get_mappings_service().get_mapping(
-                anilist_id, with_anilist=True
-            )
-        except MappingNotFoundError:
-            item = {
-                "anilist_id": anilist_id,
-                "custom": bool(override),
-                "sources": ["custom"] if override else [],
-            }
+        upstream_targets = self._normalize_targets(
+            (upstream_raw or {}).get(parsed.key(), {})
+        )
+        custom_targets = self._normalize_targets(
+            (custom_raw or {}).get(parsed.key(), {})
+        )
+        effective_targets = self._merge_targets(upstream_targets, custom_targets)
 
-        item.setdefault("override", override)
-        if override is None:
-            item["override"] = None
-        return item
+        return {
+            "descriptor": parsed.key(),
+            "provider": parsed.provider,
+            "entry_id": parsed.entry_id,
+            "scope": parsed.scope,
+            "layers": {
+                "upstream": upstream_targets,
+                "custom": custom_targets,
+                "effective": effective_targets,
+            },
+            "targets": self._build_target_views(
+                upstream_targets, custom_targets, effective_targets
+            ),
+        }
+
+    def _validate_ranges(
+        self, ranges: list[dict[str, Any]] | None
+    ) -> dict[str, str | None]:
+        """Validate and normalize range inputs."""
+        if not ranges:
+            return {}
+
+        normalized: dict[str, str | None] = {}
+        for raw in ranges:
+            source_range = str(raw.get("source_range", "")).strip()
+            dest = raw.get("destination_range")
+            if not source_range:
+                raise MappingError("source_range is required for each range")
+            if dest is not None and not isinstance(dest, str):
+                raise MappingError("destination_range must be a string or null")
+            normalized[source_range] = dest
+
+        return normalized
+
+    def _validate_targets(
+        self, targets: list[dict[str, Any]] | None
+    ) -> dict[str, dict[str, str | None] | None]:
+        """Validate target payloads and return a mapping dict."""
+        if not targets:
+            return {}
+
+        normalized: dict[str, dict[str, str | None] | None] = {}
+        for entry in targets:
+            provider = str(entry.get("provider", "")).strip()
+            entry_id = str(entry.get("entry_id", "")).strip()
+            scope = str(entry.get("scope", "")).strip()
+            if not provider or not entry_id or not scope:
+                raise MappingError("provider, entry_id, and scope are required")
+            target = AnimapDescriptor(provider=provider, entry_id=entry_id, scope=scope)
+            if entry.get("deleted") is True:
+                normalized[target.key()] = None
+                continue
+            ranges = self._validate_ranges(entry.get("ranges"))
+            if ranges:
+                normalized[target.key()] = ranges
+
+        return normalized
+
+    async def _sync_database(self) -> None:
+        """Trigger a synchronization of the AniMap database."""
+        scheduler = self._ensure_scheduler()
+        await scheduler.shared_animap_client.sync_db()
 
     async def save_override(
         self,
         *,
-        anilist_id: int | None,
-        fields: dict[str, dict[str, Any]] | None,
-        raw: dict[str, Any] | None,
+        descriptor: str | None,
+        targets: list[dict[str, Any]] | None,
     ) -> dict[str, Any]:
-        """Persist override changes and refresh the AniMap database.
+        """Persist overrides for a descriptor and trigger DB sync.
 
         Args:
-            anilist_id (int | None): The AniList ID of the mapping to modify.
-            fields (dict[str, dict[str, Any]] | None): Field-based override
-                specifications.
-            raw (dict[str, Any] | None): Raw override entry.
+            descriptor (str | None): The mapping descriptor to override.
+            targets (list[dict[str, Any]] | None): Target mapping override payloads.
 
         Returns:
-            dict[str, Any]: The updated mapping detail.
+            dict[str, Any]: The updated mapping detail after saving.
         """
-        if anilist_id is None:
-            raise MissingAnilistIdError("anilist_id is required")
+        if descriptor is None:
+            raise MissingDescriptorError("descriptor is required")
 
-        async with self._lock:
-            raw_file, path, fmt = self._load_raw()
-            key = str(anilist_id)
+        parsed = AnimapDescriptor.parse(descriptor)
+        target_map = self._validate_targets(targets)
 
-            if raw is not None:
-                if not isinstance(raw, dict):
-                    raise ValueError("Override payload must be an object")
-                entry = self._sanitize_entry(raw)
-            else:
-                entry = self._entry_from_fields(fields)
-
-            if entry:
-                raw_file[key] = entry
-            else:
-                raw_file.pop(key, None)
-
-            self._write_raw(raw_file, path, fmt)
-
-        await self._sync_database()
-        return await self.get_mapping_detail(anilist_id)
-
-    async def delete_override(
-        self,
-        anilist_id: int,
-        *,
-        mode: Literal["custom", "full"] = "custom",
-    ) -> None:
-        """Remove an override or replace it with a null override marker.
-
-        Args:
-            anilist_id (int): The AniList ID of the mapping to modify.
-            mode (Literal["custom", "full"]): The deletion mode. If "custom",
-                the override entry is removed entirely. If "full", the override
-                entry is replaced with a null value to omit the mapping from AniMap.
-
-        Raises:
-            MappingNotFoundError: If the mapping does not exist.
-        """
         async with self._lock:
             raw, path, fmt = self._load_raw()
-            key = str(anilist_id)
-
-            if mode == "custom":
-                raw.pop(key, None)
+            if target_map:
+                raw[parsed.key()] = target_map
             else:
-                raw[key] = None
-
+                raw.pop(parsed.key(), None)
             self._write_raw(raw, path, fmt)
 
-        with db() as ctx:
-            source = str(self._resolve_custom_file()[0].resolve())
-            delete_stmt = delete(AniMapProvenance).where(
-                AniMapProvenance.anilist_id == anilist_id,
-                AniMapProvenance.source == source,
-            )
-            ctx.session.execute(delete_stmt)
-            ctx.session.commit()
+        await self._sync_database()
+        return await self.get_mapping_detail(parsed.key())
+
+    async def delete_override(self, descriptor: str) -> dict[str, Any]:
+        """Remove an override for the given descriptor and sync the DB.
+
+        Args:
+            descriptor (str): The mapping descriptor to delete overrides for.
+
+        Returns:
+            dict[str, Any]: Confirmation of successful deletion.
+        """
+        parsed = AnimapDescriptor.parse(descriptor)
+        async with self._lock:
+            raw, path, fmt = self._load_raw()
+            raw.pop(parsed.key(), None)
+            self._write_raw(raw, path, fmt)
 
         await self._sync_database()
+        return {"ok": True}
 
 
-@lru_cache(maxsize=1)
+_mapping_overrides_service: MappingOverridesService | None = None
+
+
 def get_mapping_overrides_service() -> MappingOverridesService:
-    """Return the singleton mapping override service.
+    """Return a singleton mapping overrides service instance.
 
     Returns:
-        MappingOverridesService: The mapping overrides service instance.
+        MappingOverridesService: The singleton service instance.
     """
-    return MappingOverridesService()
+    global _mapping_overrides_service
+    if _mapping_overrides_service is None:
+        _mapping_overrides_service = MappingOverridesService()
+    return _mapping_overrides_service

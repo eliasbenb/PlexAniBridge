@@ -1,5 +1,6 @@
 {
     "recommendations": [
+        "astral-sh.ty",
         "charliermarsh.ruff",
         "dbaeumer.vscode-eslint",
         "eamodio.gitlens",

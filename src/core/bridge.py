@@ -1,11 +1,9 @@
 """Bridge Client Module."""
 
-import contextlib
 from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 
 from anibridge.library import (
-    ExternalId,
     LibraryMedia,
     LibraryProvider,
     LibrarySection,
@@ -17,7 +15,7 @@ from starlette.requests import Request
 from src import log
 from src.config.database import db
 from src.config.settings import AniBridgeConfig, AniBridgeProfileConfig
-from src.core.animap import AniMapClient
+from src.core.animap import AnimapClient
 from src.core.providers import build_library_provider, build_list_provider
 from src.core.sync import BaseSyncClient, MovieSyncClient, ShowSyncClient
 from src.core.sync.stats import SyncProgress, SyncStats
@@ -35,7 +33,7 @@ class BridgeClient:
         profile_name: str,
         profile_config: AniBridgeProfileConfig,
         global_config: AniBridgeConfig,
-        shared_animap_client: AniMapClient,
+        shared_animap_client: AnimapClient,
     ) -> None:
         """Initialize the bridge client for a single profile.
 
@@ -43,7 +41,7 @@ class BridgeClient:
             profile_name (str): The name of the profile.
             profile_config (AniBridgeProfileConfig): The profile-specific configuration.
             global_config (AniBridgeConfig): The global application configuration.
-            shared_animap_client (AniMapClient): The shared AniMap client instance.
+            shared_animap_client (AnimapClient): The shared Animap client instance.
         """
         self.profile_name = profile_name
         self.profile_config = profile_config
@@ -399,73 +397,6 @@ class BridgeClient:
 
     async def _prefetch_list_entries(self, items: Sequence[LibraryMedia]) -> None:
         """Prefetch list entries for the provided media items when batching."""
-        imdb_ids, tmdb_ids, tvdb_ids = self._collect_external_ids(items)
-        if not imdb_ids and not tmdb_ids and not tvdb_ids:
-            return
-
-        mappings = list(
-            self.animap_client.get_mappings(
-                imdb=imdb_ids or None,
-                tmdb=tmdb_ids or None,
-                tvdb=tvdb_ids or None,
-            )
-        )
-        keys = sorted(
-            {
-                str(mapping.anilist_id)
-                for mapping in mappings
-                if mapping.anilist_id is not None
-            }
-        )
-        if not keys:
-            return
-
-        log.info(
-            f"[{self.profile_name}] Prefetching {len(keys)} entries from list "
-            "provider in batch mode (this may take a while)"
-        )
-
-        if self.current_sync is not None:
-            self.current_sync = self.current_sync.model_copy(
-                update={"stage": "prefetching"}
-            )
-
-        try:
-            await self.list_provider.get_entries_batch(keys)
-        except Exception:
-            log.error(
-                f"[{self.profile_name}] Failed to prefetch list entries",
-                exc_info=True,
-            )
-
-    def _collect_external_ids(
-        self, items: Sequence[LibraryMedia]
-    ) -> tuple[list[str], list[int], list[int]]:
-        """Collect external identifiers across a set of media items."""
-        imdb_ids: set[str] = set()
-        tmdb_ids: set[int] = set()
-        tvdb_ids: set[int] = set()
-
-        for item in items:
-            for external in item.ids():
-                self._append_external_id(external, imdb_ids, tmdb_ids, tvdb_ids)
-
-        return sorted(imdb_ids), sorted(tmdb_ids), sorted(tvdb_ids)
-
-    @staticmethod
-    def _append_external_id(
-        external: ExternalId,
-        imdb_ids: set[str],
-        tmdb_ids: set[int],
-        tvdb_ids: set[int],
-    ) -> None:
-        """Normalise and append an external identifier to the appropriate set."""
-        namespace = external.namespace.lower()
-        if namespace == "imdb":
-            imdb_ids.add(external.value)
-        elif namespace == "tmdb":
-            with contextlib.suppress(ValueError):
-                tmdb_ids.add(int(external.value))
-        elif namespace == "tvdb":
-            with contextlib.suppress(ValueError):
-                tvdb_ids.add(int(external.value))
+        # Prefetch is intentionally a no-op for the v3 mapping graph while
+        # provider-side resolution is being migrated.
+        return

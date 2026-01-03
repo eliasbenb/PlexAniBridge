@@ -2,7 +2,6 @@
 
 from collections.abc import Sequence
 from datetime import UTC, datetime
-from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast
 
 import pytest
@@ -18,9 +17,9 @@ from anibridge.library import (
 from anibridge.list import ListEntry as ListEntryProtocol
 from anibridge.list import ListMediaType, ListStatus
 
+from src.core.animap import AnimapDescriptor, AnimapEdge, AnimapGraph
 from src.core.sync.show import ShowSyncClient
-from src.models.db.animap import EpisodeMapping
-from src.models.db.sync_history import SyncHistory, SyncOutcome
+from src.models.db.sync_history import SyncHistory
 from tests.core.sync.fakes import (
     FakeAnimapClient,
     FakeLibraryEpisode,
@@ -94,22 +93,20 @@ def build_show(
     return show, season, episodes
 
 
-def make_episode_mapping(anilist_id: int, **mapping_overrides: Any) -> SimpleNamespace:
-    """Build a minimal AniMap-like object for mapping tests."""
-    mapping_kwargs = {
-        "service": "tvdb",
-        "season": 1,
-        "start": 1,
-        "end": 2,
-        "ratio": 1,
-    }
-    mapping_kwargs.update(mapping_overrides)
-    mapping = EpisodeMapping(**mapping_kwargs)
-    return SimpleNamespace(
-        anilist_id=anilist_id,
-        parsed_tmdb_mappings=[],
-        parsed_tvdb_mappings=[mapping],
+def make_graph(
+    source: tuple[str, str, str],
+    target: tuple[str, str, str],
+    source_range: str = "s1",
+    destination_range: str | None = None,
+) -> AnimapGraph:
+    """Helper to build a one-edge mapping graph for show tests."""
+    edge = AnimapEdge(
+        source=AnimapDescriptor(*source),
+        destination=AnimapDescriptor(*target),
+        source_range=source_range,
+        destination_range=destination_range,
     )
+    return AnimapGraph(edges=(edge,))
 
 
 @pytest.mark.asyncio
@@ -127,7 +124,16 @@ async def test_process_media_syncs_show_and_writes_history(
         total_units=len(episodes),
     )
     provider.entries["400"] = entry
-    show_client.animap_client = cast(Any, FakeAnimapClient([make_episode_mapping(400)]))
+    provider.resolved_key = "400"
+    show_client.animap_client = cast(
+        Any,
+        FakeAnimapClient(
+            make_graph(
+                ("anilist", "400", "s1"),
+                ("tmdb", "900", "s1"),
+            )
+        ),
+    )
 
     await show_client.process_media(cast(LibraryShowProtocol, show))
 
@@ -138,11 +144,28 @@ async def test_process_media_syncs_show_and_writes_history(
 
 
 @pytest.mark.asyncio
-async def test_map_media_skips_inactive_ranges(show_client: ShowSyncClient) -> None:
-    """Mapping ranges covering only inactive episodes are skipped."""
-    show, _, _ = build_show(view_counts=[0, 1])
+async def test_map_media_uses_mapping_resolution(show_client: ShowSyncClient) -> None:
+    """Mapping graphs resolve to list entries when provider supports it."""
+    provider = cast(FakeListProvider, show_client.list_provider)
+    show, season, episodes = build_show(view_counts=[1, 1])
+    entry = FakeListEntry(
+        provider=provider,
+        key="401",
+        title="Show",
+        media_type=ListMediaType.TV,
+        total_units=len(episodes),
+    )
+    provider.entries["401"] = entry
+    provider.resolved_key = "401"
     show_client.animap_client = cast(
-        Any, FakeAnimapClient([make_episode_mapping(401, end=1)])
+        Any,
+        FakeAnimapClient(
+            make_graph(
+                ("tmdb", "10", "s1"),
+                ("anilist", "401", "s1"),
+                source_range="s1",
+            )
+        ),
     )
 
     results = [
@@ -150,11 +173,13 @@ async def test_map_media_skips_inactive_ranges(show_client: ShowSyncClient) -> N
         async for result in show_client.map_media(cast(LibraryShowProtocol, show))
     ]
 
-    assert results == []
-    skipped = show_client.sync_stats.get_grandchild_items_by_outcome(
-        SyncOutcome.SKIPPED
-    )
-    assert skipped
+    assert len(results) == 1
+    mapped_season, mapped_eps, mapping, mapped_entry, media_key = results[0]
+    assert mapped_season is season
+    assert list(mapped_eps) == episodes
+    assert mapping is not None
+    assert mapped_entry is entry
+    assert media_key == "401"
 
 
 @pytest.mark.asyncio
@@ -210,7 +235,7 @@ async def test_calculate_status_variants(show_client: ShowSyncClient) -> None:
         child_item=cast(LibrarySeasonProtocol, season),
         grandchild_items=cast(Sequence[LibraryEpisodeProtocol], tuple(episodes)),
         entry=cast(ListEntryProtocol, entry),
-        animapping=None,
+        mapping=None,
     )
     assert status == ListStatus.REPEATING
 
@@ -220,7 +245,7 @@ async def test_calculate_status_variants(show_client: ShowSyncClient) -> None:
         child_item=cast(LibrarySeasonProtocol, season),
         grandchild_items=cast(Sequence[LibraryEpisodeProtocol], tuple(episodes)),
         entry=cast(ListEntryProtocol, entry),
-        animapping=None,
+        mapping=None,
     )
     assert status == ListStatus.CURRENT
 
@@ -235,7 +260,7 @@ async def test_calculate_status_variants(show_client: ShowSyncClient) -> None:
         child_item=cast(LibrarySeasonProtocol, paused_season),
         grandchild_items=cast(Sequence[LibraryEpisodeProtocol], tuple(paused_eps)),
         entry=cast(ListEntryProtocol, entry),
-        animapping=None,
+        mapping=None,
     )
     assert status == ListStatus.PAUSED
 
@@ -250,7 +275,7 @@ async def test_calculate_status_variants(show_client: ShowSyncClient) -> None:
         child_item=cast(LibrarySeasonProtocol, planning_season),
         grandchild_items=cast(Sequence[LibraryEpisodeProtocol], tuple(planning_eps)),
         entry=cast(ListEntryProtocol, entry),
-        animapping=None,
+        mapping=None,
     )
     assert status == ListStatus.PLANNING
 
@@ -277,7 +302,7 @@ async def test_calculate_review_prefers_episode_for_singletons(
         child_item=cast(LibrarySeasonProtocol, season),
         grandchild_items=cast(Sequence[LibraryEpisodeProtocol], tuple(episodes)),
         entry=cast(ListEntryProtocol, entry),
-        animapping=None,
+        mapping=None,
     )
 
     assert review == episode_review
@@ -304,16 +329,3 @@ async def test_filter_history_by_episodes_sorts_records(
     )
 
     assert [record.library_key for record in filtered] == ["ep-2", "ep-1"]
-
-
-def test_effective_show_ordering_prefers_explicit_provider(
-    show_client: ShowSyncClient,
-) -> None:
-    """Ensure provider ordering beats inferred IDs."""
-    show, _, _ = build_show(view_counts=[0], ordering="tmdb")
-    ordering = show_client._get_effective_show_ordering(
-        cast(LibraryShowProtocol, show),
-        tmdb_ids=[1],
-        tvdb_ids=[2],
-    )
-    assert ordering == "tmdb"

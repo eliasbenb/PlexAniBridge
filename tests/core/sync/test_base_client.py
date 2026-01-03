@@ -5,7 +5,6 @@ from datetime import UTC, datetime
 from typing import Any, cast
 
 import pytest
-from anibridge.library import ExternalId
 from anibridge.list import (
     ListEntry as ListEntryProtocol,
 )
@@ -15,6 +14,7 @@ from anibridge.list import (
 )
 
 from src.config.settings import SyncField
+from src.core.animap import MappingGraph
 from src.core.sync.base import BaseSyncClient, diff_snapshots
 from src.core.sync.stats import EntrySnapshot, ItemIdentifier
 from src.models.db.pin import Pin
@@ -35,7 +35,13 @@ class StubSyncClient(BaseSyncClient[Any, Any, Any]):
         """Initialize the stub and capture queued mapping results."""
         super().__init__(*args, **kwargs)
         self._map_results: list[
-            tuple[Any, Sequence[Any], None, ListEntryProtocol | None]
+            tuple[
+                Any,
+                Sequence[Any],
+                MappingGraph | None,
+                ListEntryProtocol | None,
+                str | None,
+            ]
         ] = []
         self._trackable_items: list[ItemIdentifier] = []
         self._status_override: ListStatus | None = ListStatus.CURRENT
@@ -51,10 +57,18 @@ class StubSyncClient(BaseSyncClient[Any, Any, Any]):
 
     async def map_media(
         self, item: Any
-    ) -> AsyncIterator[tuple[Any, Sequence[Any], None, ListEntryProtocol | None]]:
+    ) -> AsyncIterator[
+        tuple[
+            Any,
+            Sequence[Any],
+            MappingGraph | None,
+            ListEntryProtocol | None,
+            str | None,
+        ]
+    ]:
         """Yield any queued mapping results for testing purposes."""
         if False:
-            yield item, (), None, None
+            yield item, (), None, None, None
         for result in self._map_results:
             yield result
 
@@ -83,7 +97,10 @@ class StubSyncClient(BaseSyncClient[Any, Any, Any]):
     async def _calculate_review(self, **kwargs):
         return self._review_override
 
-    def _debug_log_title(self, item: Any, animapping=None) -> str:
+    def _derive_scope(self, *, item: Any, child_item: Any | None) -> str | None:
+        return None
+
+    def _debug_log_title(self, item: Any, mapping=None, media_key=None) -> str:
         return str(item)
 
     def _debug_log_ids(
@@ -92,7 +109,8 @@ class StubSyncClient(BaseSyncClient[Any, Any, Any]):
         item: Any,
         child_item: Any,
         entry: ListEntryProtocol | None,
-        animapping=None,
+        mapping=None,
+        media_key=None,
     ) -> str:
         return f"library_key: {getattr(child_item, 'key', 'unknown')}"
 
@@ -159,15 +177,24 @@ def test_should_update_field_respects_comparison_rules(
 ) -> None:
     """Field updates honor skip lists, comparison operators, and destructive mode."""
     skip_fields = {SyncField.STATUS.value}
-    assert not stub_client._should_update_field(
-        "gt", SyncField.STATUS.value, skip_fields, 5, 4
+    status_rule = stub_client._FIELD_RULES[SyncField.STATUS]
+    progress_rule = stub_client._FIELD_RULES[SyncField.PROGRESS]
+
+    assert not stub_client._should_apply_field(
+        SyncField.STATUS, status_rule, 5, 4, skip_fields
     )
 
-    assert stub_client._should_update_field("gt", "progress", set(), 5, 4)
-    assert not stub_client._should_update_field("gt", "progress", set(), 3, 4)
+    assert stub_client._should_apply_field(
+        SyncField.PROGRESS, progress_rule, 5, 4, set()
+    )
+    assert not stub_client._should_apply_field(
+        SyncField.PROGRESS, progress_rule, 3, 4, set()
+    )
 
     stub_client.destructive_sync = True
-    assert stub_client._should_update_field("gt", "progress", set(), 1, None)
+    assert stub_client._should_apply_field(
+        SyncField.PROGRESS, progress_rule, 1, None, set()
+    )
 
 
 def test_format_diff_serializes_status_and_datetimes(
@@ -216,32 +243,6 @@ def test_best_search_result_applies_threshold(stub_client: StubSyncClient) -> No
     )
 
 
-def test_extract_external_ids_groups_by_namespace(stub_client: StubSyncClient) -> None:
-    """External IDs are separated based on their namespace and converted to ints."""
-    movie = make_movie(
-        ids=[
-            ExternalId(namespace="imdb", value="tt123"),
-            ExternalId(namespace="tmdb", value="101"),
-            ExternalId(namespace="tvdb", value="202"),
-            ExternalId(namespace="anilist", value="303"),
-            ExternalId(namespace="mal", value="404"),
-            ExternalId(namespace="anidb", value="505"),
-            ExternalId(namespace="tmdb", value="invalid"),
-        ]
-    )
-
-    imdb, tmdb, tvdb, anidb, anilist, mal = stub_client._extract_external_ids(
-        cast(Any, movie)
-    )
-
-    assert imdb == ["tt123"]
-    assert tmdb == [101]
-    assert tvdb == [202]
-    assert anilist == [303]
-    assert mal == [404]
-    assert anidb == [505]
-
-
 def test_get_pinned_fields_caches_results(stub_client: StubSyncClient, sync_db) -> None:
     """Pinned field lookups use the database once and then hit the cache."""
     with sync_db as ctx:
@@ -287,7 +288,7 @@ async def test_sync_media_updates_entry_and_history(
         child_item=movie,
         grandchild_items=(movie,),
         entry=cast(ListEntryProtocol, entry),
-        animapping=None,
+        mapping=None,
     )
 
     assert result is SyncOutcome.SYNCED
@@ -322,7 +323,7 @@ async def test_sync_media_skips_when_entry_up_to_date(
         child_item=movie,
         grandchild_items=(movie,),
         entry=cast(ListEntryProtocol, entry),
-        animapping=None,
+        mapping=None,
     )
 
     assert result is SyncOutcome.SKIPPED
@@ -352,7 +353,7 @@ async def test_sync_media_deletes_when_destructive(
         child_item=movie,
         grandchild_items=(movie,),
         entry=cast(ListEntryProtocol, entry),
-        animapping=None,
+        mapping=None,
     )
 
     assert result is SyncOutcome.DELETED
@@ -383,12 +384,12 @@ async def test_sync_media_batches_when_enabled(
         child_item=movie,
         grandchild_items=(movie,),
         entry=cast(ListEntryProtocol, entry),
-        animapping=None,
+        mapping=None,
     )
 
     assert result is SyncOutcome.SYNCED
-    assert stub_client._batch_entries == [entry]
-    assert stub_client.batch_history_items
+    assert [update.entry for update in stub_client._pending_updates] == [entry]
+    assert stub_client._pending_updates
     assert provider.updated_entries == []
 
 
@@ -410,14 +411,14 @@ async def test_batch_sync_flushes_history(stub_client: StubSyncClient, sync_db) 
         child_item=movie,
         grandchild_items=(movie,),
         entry=cast(ListEntryProtocol, entry),
-        animapping=None,
+        mapping=None,
     )
 
     await stub_client.batch_sync()
 
     assert provider.batch_updates and provider.batch_updates[0][0] is entry
-    assert not stub_client._batch_entries
-    assert not stub_client.batch_history_items
+    assert not [update.entry for update in stub_client._pending_updates]
+    assert not stub_client._pending_updates
 
     with sync_db as ctx:
         history = ctx.session.query(SyncHistory).all()

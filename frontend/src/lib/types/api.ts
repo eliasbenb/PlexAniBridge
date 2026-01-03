@@ -16,36 +16,79 @@ export interface ProviderMediaMetadata {
 }
 
 // --- Mappings API ---
-export interface Mapping {
-    anilist_id: number;
-    anidb_id?: number | null;
-    imdb_id?: string[] | null;
-    mal_id?: number[] | null;
-    tmdb_movie_id?: number[] | null;
-    tmdb_show_id?: number | null;
-    tvdb_id?: number | null;
-    tmdb_mappings?: Record<string, string> | null;
-    tvdb_mappings?: Record<string, string> | null;
-    anilist?: AniListMedia | null;
-    custom?: boolean;
+export interface MappingEdge {
+    target_provider: string;
+    target_entry_id: string;
+    target_scope: string;
+    source_range: string;
+    destination_range?: string | null;
     sources?: string[];
 }
 
-export type MappingOverrideMode = "omit" | "null" | "value";
+export interface Mapping {
+    descriptor: string;
+    provider: string;
+    entry_id: string;
+    scope: string;
+    edges: MappingEdge[];
+    custom?: boolean;
+    sources?: string[];
+    anilist?: AniListMedia | null;
+}
 
-export interface MappingOverrideFieldInput {
-    mode: MappingOverrideMode;
-    value?: unknown;
+export interface RangeInputPayload {
+    source_range: string;
+    destination_range: string | null;
+}
+
+export interface TargetPayload {
+    provider: string;
+    entry_id: string;
+    scope: string;
+    ranges: RangeInputPayload[];
+    deleted?: boolean;
 }
 
 export interface MappingOverridePayload {
-    anilist_id: number;
-    fields?: Record<string, MappingOverrideFieldInput> | null;
-    raw?: Record<string, unknown> | null;
+    descriptor: string;
+    targets: TargetPayload[];
 }
 
-export interface MappingDetail extends Mapping {
-    override?: Record<string, unknown> | null;
+export type RangeOrigin = "upstream" | "custom";
+export type TargetOrigin = "upstream" | "custom" | "mixed";
+
+export interface MappingRangeView {
+    source_range: string;
+    upstream?: string | null;
+    custom?: string | null;
+    effective?: string | null;
+    origin: RangeOrigin;
+    inherited?: boolean;
+}
+
+export interface MappingTarget {
+    descriptor: string;
+    provider: string;
+    entry_id: string;
+    scope: string;
+    origin: TargetOrigin;
+    deleted?: boolean;
+    ranges: MappingRangeView[];
+}
+
+export interface MappingLayers {
+    upstream: Record<string, Record<string, string | null> | null>;
+    custom: Record<string, Record<string, string | null> | null>;
+    effective: Record<string, Record<string, string | null> | null>;
+}
+
+export interface MappingDetail {
+    descriptor: string;
+    provider: string;
+    entry_id: string;
+    scope: string;
+    layers: MappingLayers;
+    targets: MappingTarget[];
 }
 
 export interface ListMappingsResponse {
@@ -60,7 +103,7 @@ export interface ListMappingsResponse {
 export type DeleteMappingResponse = OkResponse;
 
 export type FieldType = "int" | "string" | "enum";
-export type FieldOperator = "=" | ">" | ">=" | "<" | "<=" | "*" | "?" | "range";
+export type FieldOperator = "=" | ">" | ">=" | "<" | "<=" | "*" | "?" | "range" | "in";
 
 export interface FieldCapability {
     key: string;
@@ -209,6 +252,7 @@ export interface HistoryItem {
     library_media_key?: string | null;
     list_namespace?: string | null;
     list_media_key?: string | null;
+    animap_entry_id?: number | null;
     media_kind?: string | null;
     outcome: string;
     before_state?: Record<string, unknown> | null;
@@ -281,15 +325,4 @@ export interface ListBackupsResponse {
 
 export interface RawBackup {
     [key: string]: unknown;
-}
-
-export interface RestoreSummary {
-    ok: boolean;
-    filename: string;
-    total_entries: number;
-    processed: number;
-    restored: number;
-    skipped: number;
-    errors: Record<string, unknown>[];
-    elapsed_seconds: number;
 }

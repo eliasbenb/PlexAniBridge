@@ -4,10 +4,12 @@ import argparse
 import subprocess
 import sys
 import time
-import tomllib
 from pathlib import Path
 
 from scripts import __file__ as scripts_file
+
+if scripts_file is None:
+    raise RuntimeError("Cannot determine scripts file path.")
 
 ROOT_DIR = Path(scripts_file).parent.parent.resolve()
 
@@ -112,59 +114,14 @@ def bump_version() -> None:
     print_task("Bumping application version...")
 
     try:
-        with open(ROOT_DIR / "pyproject.toml", "rb") as f:
-            pyproject = tomllib.load(f)
-
-        current_version = pyproject["project"]["version"]
-        print_info(f"Current version: {current_version}")
-
         part = parse_version_args()
         print_info(f"Bumping {part} version...")
-
-        new_version = current_version
-        match part:
-            case "major":
-                new_version = f"{int(current_version.split('.')[0]) + 1}.0.0"
-            case "minor":
-                new_version = (
-                    f"{current_version.split('.')[0]}."
-                    f"{int(current_version.split('.')[1]) + 1}.0"
-                )
-            case "patch":
-                new_version = (
-                    f"{current_version.split('.')[0]}."
-                    f"{current_version.split('.')[1]}."
-                    f"{int(current_version.split('.')[2]) + 1}"
-                )
-
-        print_info(f"New version: {new_version}")
-
-        found = False
-        with open(ROOT_DIR / "pyproject.toml") as f:
-            lines = f.readlines()
-        for i, line in enumerate(lines):
-            if line.startswith("version = "):
-                lines[i] = f'version = "{new_version}"\n'
-                found = True
-                break
-
-        if not found:
-            print_error("Version line not found in pyproject.toml!")
-            raise RuntimeError("Version line not found in pyproject.toml!")
-
-        print_info("Updating pyproject.toml with new version...")
-        with open(ROOT_DIR / "pyproject.toml", "w") as f:
-            f.writelines(lines)
+        subprocess.run(["uv", "version", "--bump", part], cwd=ROOT_DIR, check=True)
 
         print_info("Updating dependencies with new version...")
         subprocess.run(
             ["uv", "sync", "--all-groups", "--all-packages"], cwd=ROOT_DIR, check=True
         )
-
-        print_info("Syncing OpenAPI spec with new version...")
-        subprocess.run(["uv", "run", "ab-openapi"], cwd=ROOT_DIR, check=True)
-
-        print_success(f"Version bumped to {new_version} successfully!")
     except subprocess.CalledProcessError:
         print_error("Version bump failed!")
         raise

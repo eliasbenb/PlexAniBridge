@@ -3,7 +3,7 @@ name = "AniBridge"
 version = "1.10.1"
 description = "The smart way to keep your AniList profile perfectly synchronized with your Plex library."
 readme = "README.md"
-requires-python = "==3.14.*"
+requires-python = ">=3.14"
 license = { text = "MIT" }
 
 authors = [
@@ -32,27 +32,28 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "anibridge-anilist-provider @ git+https://github.com/anibridge/anibridge-anilist-provider.git",
-    "anibridge-list-interface @ git+https://github.com/anibridge/anibridge-list-interface.git",
-    "anibridge-library-interface @ git+https://github.com/anibridge/anibridge-library-interface.git",
-    "anibridge-plex-provider @ git+https://github.com/anibridge/anibridge-plex-provider.git",
     "aiocache>=0.12.3",
     "aiohttp>=3.13.2",
-    "alembic>=1.17.1",
+    "alembic>=1.17.2",
+    "anibridge-anilist-provider>=0.1.0",
+    "anibridge-library-interface>=0.1.1",
+    "anibridge-list-interface>=0.1.1",
+    "anibridge-plex-provider>=0.1.1",
     "async-lru>=2.0.5",
-    "cachetools>=6.2.1",
+    "bcrypt>=5.0.0",
+    "cachetools>=6.2.3",
     "colorama>=0.4.6",
-    "fastapi[all]>=0.121.1",
+    "fastapi[all]>=0.124.4",
     "limiter>=0.5.0",
-    "pydantic>=2.12.4",
+    "orjson>=3.11.5",
     "pydantic-settings>=2.12.0",
+    "pydantic>=2.12.5",
     "pyparsing>=3.2.5",
     "pyyaml>=6.0.3",
     "rapidfuzz>=3.14.3",
     "requests>=2.32.5",
     "ruamel-yaml>=0.18.16",
-    "sqlalchemy>=2.0.44",
-    "bcrypt>=5.0.0",
+    "sqlalchemy>=2.0.45",
 ]
 
 [project.scripts]
@@ -73,14 +74,8 @@ ab-docs-serve = "scripts.dev:docs_serve"
 [project.urls]
 Documentation = "https://anibridge.eliasbenb.dev"
 Homepage = "https://anibridge.eliasbenb.dev"
-Issues = "https://github.com/eliasbenb/PlexAniBridge/issues"
-Source = "https://github.com/eliasbenb/PlexAniBridge"
-
-[tool.hatch.build.targets.wheel]
-packages = ["scripts"]
-
-[tool.hatch.metadata]
-allow-direct-references = true
+Issues = "https://github.com/anibridge/anibridge/issues"
+Source = "https://github.com/anibridge/anibridge"
 
 [tool.ruff]
 exclude = ["alembic"]
@@ -120,12 +115,16 @@ filterwarnings = [
     "ignore:'asyncio.iscoroutinefunction' is deprecated.*:DeprecationWarning:async_lru",
 ]
 
+[tool.uv.build-backend]
+module-name = "scripts"
+module-root = ""
+
 [tool.uv.workspace]
 members = ["docs"]
 
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["uv_build>=0.9.21,<0.10.0"]
+build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
@@ -134,4 +133,5 @@ dev = [
     "pytest-asyncio>=1.3.0",
     "pytest-cov>=7.0.0",
     "ruff>=0.14.4",
+    "ty>=0.0.8",
 ]

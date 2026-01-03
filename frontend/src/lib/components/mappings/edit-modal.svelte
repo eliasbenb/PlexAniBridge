@@ -1,29 +1,17 @@
 <script lang="ts">
-    import { Tabs } from "bits-ui";
+    import { Info, Plus, RefreshCcw, Save, Trash2 } from "@lucide/svelte";
+    import { Tooltip } from "bits-ui";
 
-    import CodeEditor from "$lib/components/code-editor.svelte";
-    import {
-        FIELD_DEFS,
-        mappingSchema,
-        type FieldId,
-        type FieldStateMap,
-        type FieldStateValue,
-        type OverrideFieldDefinition,
-        type OverrideFieldType,
-        type SeasonRow,
-    } from "$lib/components/mappings/columns";
     import type {
         Mapping,
         MappingDetail,
-        MappingOverrideFieldInput,
-        MappingOverrideMode,
         MappingOverridePayload,
+        MappingTarget,
+        TargetPayload,
     } from "$lib/types/api";
     import Modal from "$lib/ui/modal.svelte";
-    import { apiFetch, isAbortError } from "$lib/utils/api";
+    import { apiFetch } from "$lib/utils/api";
     import { toast } from "$lib/utils/notify";
-    import MappingDetailPreview from "./mapping-detail-preview.svelte";
-    import MappingFieldCard from "./mapping-field-card.svelte";
 
     interface Props {
         open: boolean;
@@ -39,570 +27,424 @@
         onSaved,
     }: Props = $props();
 
-    const MODE_OPTIONS: MappingOverrideMode[] = ["omit", "null", "value"];
+    type RangeMode = "inherited" | "custom";
 
-    function defaultValueFor(type: OverrideFieldType): FieldStateValue {
-        return type === "season" ? [] : "";
-    }
+    type EditableRange = {
+        source_range: string;
+        upstream_value: string | null;
+        custom_value: string | null;
+        mode: RangeMode;
+        original_source_range: string;
+    };
 
-    function createEmptyFieldState(): FieldStateMap {
-        const state: FieldStateMap = {} as FieldStateMap;
-        for (const def of FIELD_DEFS) {
-            state[def.id] = { mode: "omit", value: defaultValueFor(def.type) };
-        }
-        return state;
-    }
+    type EditableEntry = {
+        key: string;
+        provider: string;
+        entry_id: string;
+        scope: string;
+        provider_placeholder: string;
+        entry_id_placeholder: string;
+        scope_placeholder: string;
+        origin: "upstream" | "custom" | "mixed" | "deleted";
+        deleted: boolean;
+        original_descriptor: string;
+        ranges: EditableRange[];
+    };
 
-    let fieldState = $state<FieldStateMap>(createEmptyFieldState());
-    let detail = $state<MappingDetail | null>(null);
-    let anilistIdInput = $state<string>("");
-    const pendingPrefillId = $derived(parseAnilistIdValue(anilistIdInput));
-    let activeTab = $state<"form" | "json">("form");
-    let rawJson = $state<string>("{}");
-    let formError = $state<string | null>(null);
-    let jsonError = $state<string | null>(null);
+    const DESCRIPTOR_RE = /^[^:\s]+:[^:\s]+:[^:\s]+$/;
+
+    const fieldInfo = {
+        provider:
+            "Provider that the override belongs to (e.g. 'anilist', 'tvdb_show', 'tmdb_movie').",
+        entryId: "Entry identifier from the provider that the override targets.",
+        scope: "Scope to apply the override for (e.g. 'movie', 'sX').",
+    } as const;
+
+    const rangeFieldInfo = {
+        source: "Source number range to match (e.g. '1', '1-12').",
+        destination: "Destination number or range to map to (e.g. '1', '1-12').",
+    };
+
+    type DescriptorState = { provider: string; entryId: string; scope: string };
+
+    type DescriptorField = {
+        field: keyof DescriptorState;
+        placeholder: string;
+        aria: string;
+        info: string;
+    };
+
+    const descriptorInputs: DescriptorField[] = [
+        {
+            field: "provider",
+            placeholder: "Provider",
+            aria: "Descriptor provider",
+            info: fieldInfo.provider,
+        },
+        {
+            field: "entryId",
+            placeholder: "ID",
+            aria: "Descriptor entry id",
+            info: fieldInfo.entryId,
+        },
+        {
+            field: "scope",
+            placeholder: "Scope",
+            aria: "Descriptor scope",
+            info: fieldInfo.scope,
+        },
+    ];
+
+    const EMPTY_DESCRIPTOR: DescriptorState = { provider: "", entryId: "", scope: "" };
+
+    type EntryFieldKey = "provider" | "entry_id" | "scope";
+    type EntryPlaceholderKey =
+        | "provider_placeholder"
+        | "entry_id_placeholder"
+        | "scope_placeholder";
+
+    type EntryField = {
+        key: EntryFieldKey;
+        placeholder: EntryPlaceholderKey;
+        aria: string;
+        info: string;
+        defaultLabel: string;
+    };
+
+    const entryFields: EntryField[] = [
+        {
+            key: "provider",
+            placeholder: "provider_placeholder",
+            aria: "Target provider",
+            info: fieldInfo.provider,
+            defaultLabel: "Provider",
+        },
+        {
+            key: "entry_id",
+            placeholder: "entry_id_placeholder",
+            aria: "Target entry ID",
+            info: fieldInfo.entryId,
+            defaultLabel: "Entry ID",
+        },
+        {
+            key: "scope",
+            placeholder: "scope_placeholder",
+            aria: "Target scope",
+            info: fieldInfo.scope,
+            defaultLabel: "Scope",
+        },
+    ];
+
+    let descriptor = $state<DescriptorState>({ ...EMPTY_DESCRIPTOR });
+    let entries = $state<EditableEntry[]>([]);
     let loadingDetail = $state(false);
     let saving = $state(false);
-    let loadedDetailId: number | null = $state(null);
-    let initialized = $state(false);
-    let currentAbort: AbortController | null = null;
+    let error = $state<string | null>(null);
 
-    function updateFieldStateFromOverride(
-        override: Record<string, unknown> | null,
-    ): void {
-        const next = createEmptyFieldState();
-        for (const def of FIELD_DEFS) {
-            const value = override ? override[def.id] : undefined;
-            if (value === undefined) {
-                continue;
-            }
-            if (value === null) {
-                next[def.id] = { mode: "null", value: defaultValueFor(def.type) };
-                continue;
-            }
-            next[def.id] = {
-                mode: "value",
-                value: convertOverrideToStateValue(def, value),
+    function descriptorFromState(): string {
+        const provider = descriptor.provider.trim();
+        const entryId = descriptor.entryId.trim();
+        const scope = descriptor.scope.trim();
+        if (!provider && !entryId && !scope) {
+            return "";
+        }
+        return `${provider}:${entryId}:${scope}`;
+    }
+
+    function setDescriptorFields(provider: string, entryId: string, scope: string) {
+        descriptor = { provider, entryId, scope };
+    }
+
+    function canLoadDescriptor(): boolean {
+        const descriptor = descriptorFromState();
+        return !!descriptor && DESCRIPTOR_RE.test(descriptor);
+    }
+
+    function toEditableEntries(data: MappingDetail): EditableEntry[] {
+        return (data.targets || []).map((entry: MappingTarget) => {
+            const isCustomEntry = entry.origin !== "upstream";
+            return {
+                key: entry.descriptor,
+                provider: isCustomEntry ? entry.provider : "",
+                entry_id: isCustomEntry ? entry.entry_id : "",
+                scope: isCustomEntry ? entry.scope : "",
+                provider_placeholder: entry.provider,
+                entry_id_placeholder: entry.entry_id,
+                scope_placeholder: entry.scope,
+                origin: entry.origin,
+                deleted: entry.deleted ?? false,
+                original_descriptor: entry.descriptor,
+                ranges: (entry.ranges || []).map((range) => ({
+                    source_range: range.source_range,
+                    upstream_value: range.upstream ?? null,
+                    custom_value:
+                        range.origin === "custom" ? (range.effective ?? null) : null,
+                    mode: (range.origin === "custom" || !range.upstream
+                        ? "custom"
+                        : "inherited") as RangeMode,
+                    original_source_range: range.source_range,
+                })),
             };
-        }
-        fieldState = next;
-    }
-
-    function convertOverrideToStateValue(
-        def: OverrideFieldDefinition,
-        value: unknown,
-    ): FieldStateValue {
-        if (def.type === "season") {
-            if (!value || typeof value !== "object") return [];
-            return Object.entries(value as Record<string, string | null>).map(
-                ([season, pattern]) => ({
-                    season,
-                    value: pattern ? String(pattern) : "",
-                }),
-            );
-        }
-        if (Array.isArray(value)) {
-            return value.map((item) => String(item)).join(", ");
-        }
-        return value == null ? "" : String(value);
-    }
-
-    function setFieldMode(fieldId: FieldId, modeValue: MappingOverrideMode) {
-        const def = FIELD_DEFS.find((f) => f.id === fieldId);
-        if (!def) return;
-        const current = fieldState[fieldId];
-        const previousMode = current?.mode ?? "omit";
-        let nextValue: FieldStateValue = current?.value ?? defaultValueFor(def.type);
-
-        if (modeValue === "value") {
-            if (def.type === "season") {
-                let rows = Array.isArray(nextValue)
-                    ? (nextValue as SeasonRow[]).map((row) => ({ ...row }))
-                    : [];
-                if (previousMode !== "value" || !rows.length) {
-                    const effectiveRows = getEffectiveSeasonRows(def);
-                    if (effectiveRows.length) {
-                        rows = effectiveRows;
-                    }
-                }
-                if (!rows.length) {
-                    rows = [{ season: "", value: "" }];
-                }
-                nextValue = rows;
-            } else if (previousMode !== "value") {
-                const effectiveValue = getEffectiveStateValue(def);
-                if (typeof effectiveValue === "string") {
-                    nextValue = effectiveValue;
-                } else if (typeof nextValue === "string") {
-                    nextValue = "";
-                } else {
-                    nextValue = defaultValueFor(def.type);
-                }
-            }
-        } else {
-            nextValue = defaultValueFor(def.type);
-        }
-
-        fieldState = {
-            ...fieldState,
-            [fieldId]: { mode: modeValue, value: nextValue },
-        };
-    }
-
-    function setFieldStringValue(fieldId: FieldId, value: string) {
-        if (!fieldState[fieldId]) return;
-        fieldState = { ...fieldState, [fieldId]: { ...fieldState[fieldId], value } };
-    }
-
-    function mutateSeasonRows(
-        fieldId: FieldId,
-        mutator: (rows: SeasonRow[]) => SeasonRow[],
-    ) {
-        const state = fieldState[fieldId];
-        if (!state) return;
-        const rows = Array.isArray(state.value) ? (state.value as SeasonRow[]) : [];
-        const nextRows = mutator([...rows]);
-        fieldState = { ...fieldState, [fieldId]: { ...state, value: nextRows } };
-    }
-
-    function addSeasonRow(fieldId: FieldId) {
-        mutateSeasonRows(fieldId, (rows) => [...rows, { season: "", value: "" }]);
-    }
-
-    function updateSeasonRow(
-        fieldId: FieldId,
-        index: number,
-        key: keyof SeasonRow,
-        value: string,
-    ) {
-        mutateSeasonRows(fieldId, (rows) => {
-            if (!rows[index]) return rows;
-            rows[index] = { ...rows[index], [key]: value };
-            return rows;
         });
     }
 
-    function removeSeasonRow(fieldId: FieldId, index: number) {
-        mutateSeasonRows(fieldId, (rows) => {
-            rows.splice(index, 1);
-            return rows;
+    function hydrateDetail(data: MappingDetail) {
+        entries = toEditableEntries(data);
+        setDescriptorFields(data.provider, data.entry_id, data.scope);
+    }
+
+    function makeKey() {
+        return `tmp-${Math.random().toString(36).slice(2)}`;
+    }
+
+    function addEntry() {
+        entries = [
+            ...entries,
+            {
+                key: makeKey(),
+                provider: "",
+                entry_id: "",
+                scope: "",
+                provider_placeholder: "",
+                entry_id_placeholder: "",
+                scope_placeholder: "",
+                origin: "custom",
+                deleted: false,
+                original_descriptor: "",
+                ranges: [
+                    {
+                        source_range: "",
+                        upstream_value: null,
+                        custom_value: null,
+                        mode: "custom",
+                        original_source_range: "",
+                    },
+                ],
+            },
+        ];
+    }
+
+    function removeEntry(key: string) {
+        entries = entries
+            .map((entry) => {
+                if (entry.key !== key) return entry;
+                // If this is a locally-created target, drop it entirely.
+                if (entry.origin === "custom") {
+                    return null;
+                }
+                return { ...entry, deleted: true, origin: "deleted" };
+            })
+            .filter((entry): entry is EditableEntry => entry !== null);
+    }
+
+    function updateEntry(
+        key: string,
+        updater: (entry: EditableEntry) => EditableEntry,
+    ) {
+        entries = entries.map((entry) => (entry.key === key ? updater(entry) : entry));
+    }
+
+    function addRange(key: string) {
+        updateEntry(key, (entry) => ({
+            ...entry,
+            ranges: [
+                ...entry.ranges,
+                {
+                    source_range: "",
+                    upstream_value: null,
+                    custom_value: null,
+                    mode: "custom",
+                    original_source_range: "",
+                },
+            ],
+        }));
+    }
+
+    function removeRange(key: string, index: number) {
+        updateEntry(key, (entry) => {
+            const next = entry.ranges.filter((_, i) => i !== index);
+            return { ...entry, ranges: next.length ? next : entry.ranges.slice(0, 1) };
         });
     }
 
-    function formatEffective(def: OverrideFieldDefinition): string {
-        if (!detail) return "unknown";
-        const value = (detail as unknown as Record<string, unknown>)[def.id];
-        if (value === undefined) return "unknown";
-        if (value === null) return "null";
-        if (def.type === "season") {
-            if (typeof value !== "object" || value === null) return "-";
-            const entries = Object.entries(value as Record<string, string | null>);
-            if (!entries.length) return "-";
-            return entries
-                .map(([season, pattern]) => `${season}: ${pattern ?? ""}`)
-                .join(", ");
-        }
-        if (Array.isArray(value)) {
-            return value.join(", ");
-        }
-        return String(value);
+    function setSourceRange(key: string, index: number, value: string) {
+        updateEntry(key, (entry) => ({
+            ...entry,
+            ranges: entry.ranges.map((r, i) =>
+                i === index ? { ...r, source_range: value, mode: "custom" } : r,
+            ),
+        }));
     }
 
-    function getEffectiveStateValue(
-        def: OverrideFieldDefinition,
-    ): FieldStateValue | null {
-        if (!detail) return null;
-        const value = (detail as unknown as Record<string, unknown>)[def.id];
-        if (value === undefined || value === null) {
+    function setRangeValue(key: string, index: number, value: string) {
+        updateEntry(key, (entry) => ({
+            ...entry,
+            ranges: entry.ranges.map((r, i) =>
+                i === index
+                    ? {
+                          ...r,
+                          mode: "custom",
+                          custom_value: value === "" ? null : value,
+                      }
+                    : r,
+            ),
+        }));
+    }
+
+    function revertEntry(key: string) {
+        updateEntry(key, (entry) => {
+            const ranges = entry.ranges.map((r) => ({
+                ...r,
+                mode: (r.upstream_value ? "inherited" : "custom") as RangeMode,
+                custom_value: null,
+                original_source_range: r.source_range,
+            }));
+            return {
+                ...entry,
+                provider: "",
+                entry_id: "",
+                scope: "",
+                deleted: false,
+                origin: entry.origin === "deleted" ? "upstream" : entry.origin,
+                original_descriptor: entry.original_descriptor,
+                ranges,
+            };
+        });
+    }
+
+    function buildPayload(): MappingOverridePayload | null {
+        const descriptor = descriptorFromState();
+        if (!descriptor || !DESCRIPTOR_RE.test(descriptor)) {
+            error = "Descriptor must be provider:entry:scope";
             return null;
         }
-        const converted = convertOverrideToStateValue(def, value);
-        if (def.type === "season") {
-            const rows = Array.isArray(converted) ? (converted as SeasonRow[]) : [];
-            return rows.map((row) => ({ ...row }));
-        }
-        return typeof converted === "string" ? converted : String(converted ?? "");
-    }
 
-    function getEffectiveSeasonRows(def: OverrideFieldDefinition): SeasonRow[] {
-        if (def.type !== "season") return [];
-        const value = getEffectiveStateValue(def);
-        return Array.isArray(value)
-            ? (value as SeasonRow[]).map((row) => ({ ...row }))
-            : [];
-    }
+        const payloadTargets: TargetPayload[] = [];
 
-    function parseTokens(input: string): string[] {
-        return input
-            .split(/[\s,]+/)
-            .map((token) => token.trim())
-            .filter(Boolean);
-    }
+        for (const entry of entries) {
+            const provider = (
+                entry.provider.trim() || entry.provider_placeholder
+            ).trim();
+            const entryId = (
+                entry.entry_id.trim() || entry.entry_id_placeholder
+            ).trim();
+            const scope = (entry.scope.trim() || entry.scope_placeholder).trim();
+            if (!provider || !entryId || !scope) continue;
 
-    function parseNumberList(input: string): number[] {
-        const tokens = parseTokens(input);
-        const result: number[] = [];
-        for (const token of tokens) {
-            const parsed = Number(token);
-            if (!Number.isInteger(parsed)) {
-                throw new Error(`Invalid integer '${token}'`);
+            const originalProvider =
+                entry.provider_placeholder.trim() || entry.provider.trim();
+            const originalEntryId =
+                entry.entry_id_placeholder.trim() || entry.entry_id.trim();
+            const originalScope = entry.scope_placeholder.trim() || entry.scope.trim();
+            const originalDescriptor =
+                entry.original_descriptor ||
+                (originalProvider && originalEntryId && originalScope
+                    ? `${originalProvider}:${originalEntryId}:${originalScope}`
+                    : "");
+            const newDescriptor = `${provider}:${entryId}:${scope}`;
+            const descriptorChanged =
+                newDescriptor !== originalDescriptor && !!originalDescriptor;
+
+            const removedSources: Record<string, boolean> = {};
+            const ranges = [] as {
+                source_range: string;
+                destination_range: string | null;
+            }[];
+
+            if (entry.deleted) {
+                payloadTargets.push({
+                    provider: originalProvider || provider,
+                    entry_id: originalEntryId || entryId,
+                    scope: originalScope || scope,
+                    ranges: [],
+                    deleted: true,
+                });
+                continue;
             }
-            result.push(parsed);
-        }
-        return result;
-    }
 
-    function parseStringList(input: string): string[] {
-        return parseTokens(input);
-    }
+            for (const range of entry.ranges) {
+                const source = range.source_range.trim();
+                const destFromCustom = range.custom_value;
+                const destFromUpstream = range.upstream_value;
+                const destination_range =
+                    descriptorChanged && destFromCustom == null
+                        ? destFromUpstream
+                        : destFromCustom;
 
-    function buildSeasonMapping(rows: SeasonRow[]): Record<string, string> {
-        const mapping: Record<string, string> = {};
-        for (const row of rows) {
-            const season = row.season.trim();
-            const value = row.value.trim();
-            if (!season && !value) continue;
-            if (!season) {
-                throw new Error("Season key is required (e.g. s1)");
+                if ((descriptorChanged || range.mode !== "inherited") && source) {
+                    ranges.push({ source_range: source, destination_range });
+                }
+
+                const original = range.original_source_range.trim();
+                if (original && original !== source && !removedSources[original]) {
+                    ranges.push({ source_range: original, destination_range: null });
+                    removedSources[original] = true;
+                }
             }
-            mapping[season] = value;
-        }
-        return mapping;
-    }
 
-    function resolveFieldValue(
-        def: OverrideFieldDefinition,
-        state: { value: FieldStateValue },
-    ): unknown {
-        if (def.type === "season") {
-            return buildSeasonMapping((state.value as SeasonRow[]) || []);
-        }
-        const text = String(state.value ?? "").trim();
-        if (def.type === "number") {
-            if (!text) {
-                throw new Error(`${def.label}: value is required`);
+            if (descriptorChanged) {
+                payloadTargets.push({
+                    provider: originalProvider,
+                    entry_id: originalEntryId,
+                    scope: originalScope,
+                    ranges: [],
+                    deleted: true,
+                });
             }
-            const parsed = Number(text);
-            if (!Number.isInteger(parsed)) {
-                throw new Error(`${def.label}: value must be an integer`);
-            }
-            return parsed;
+
+            if (ranges.length === 0) continue;
+            payloadTargets.push({
+                provider,
+                entry_id: entryId,
+                scope,
+                ranges,
+                deleted: false,
+            });
         }
-        if (def.type === "number_list") {
-            return text ? parseNumberList(text) : [];
+
+        return { descriptor, targets: payloadTargets };
+    }
+
+    async function loadDetail(explicit?: string) {
+        const descriptor = explicit?.trim() || descriptorFromState();
+        if (!descriptor) {
+            error = "Descriptor is required";
+            return;
         }
-        return text ? parseStringList(text) : [];
-    }
-
-    function buildFieldsPayload(): Record<string, MappingOverrideFieldInput> {
-        const payload: Record<string, MappingOverrideFieldInput> = {};
-        for (const def of FIELD_DEFS) {
-            const state = fieldState[def.id];
-            if (!state || state.mode === "omit") continue;
-            payload[def.id] =
-                state.mode === "null"
-                    ? { mode: "null" }
-                    : { mode: "value", value: resolveFieldValue(def, state) };
-        }
-        return payload;
-    }
-
-    function normaliseOverride(
-        override: Record<string, unknown> | null | undefined,
-    ): Record<string, unknown> {
-        return override ? { ...override } : {};
-    }
-
-    function toJsonString(
-        anilistId: number | null,
-        override: Record<string, unknown> = {},
-    ): string {
-        const payload =
-            anilistId != null
-                ? composeOverrideWithAnilistId(anilistId, override)
-                : override;
-        return JSON.stringify(payload, null, 4);
-    }
-
-    function applyDetailState(
-        anilistId: number | null,
-        nextDetail: MappingDetail | null,
-    ): void {
-        detail = nextDetail;
-        loadedDetailId = nextDetail?.anilist_id ?? null;
-        updateFieldStateFromOverride(nextDetail?.override ?? null);
-        rawJson = toJsonString(
-            nextDetail?.anilist_id ?? anilistId,
-            normaliseOverride(nextDetail?.override),
-        );
-    }
-
-    function parseAnilistIdValue(value: unknown): number | null {
-        if (value == null) return null;
-        if (typeof value === "number") {
-            return Number.isInteger(value) && value > 0 ? value : null;
-        }
-        if (typeof value === "string") {
-            const parsed = Number(value.trim());
-            return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
-        }
-        const coerced = Number(value);
-        return Number.isInteger(coerced) && coerced > 0 ? coerced : null;
-    }
-
-    function resolveExistingAnilistId(): number | null {
-        return mapping?.anilist_id ?? detail?.anilist_id ?? loadedDetailId ?? null;
-    }
-
-    function resolveAnilistIdFromForm(): number | null {
-        if (mode === "edit") {
-            return resolveExistingAnilistId();
-        }
-        const parsed = parseAnilistIdValue(anilistIdInput);
-        return parsed ?? resolveExistingAnilistId();
-    }
-
-    function composeOverrideWithAnilistId(
-        anilistId: number | null,
-        override: Record<string, unknown>,
-    ): Record<string, unknown> {
-        const payload = { ...override };
-        return anilistId ? { anilist_id: anilistId, ...payload } : payload;
-    }
-
-    function extractOverrideFromJson(input: Record<string, unknown>): {
-        anilistId: number | null;
-        override: Record<string, unknown>;
-    } {
-        const { anilist_id, ...rest } = input;
-        return { anilistId: parseAnilistIdValue(anilist_id), override: { ...rest } };
-    }
-
-    async function fetchDetail(anilistId: number, { silent = false } = {}) {
-        if (currentAbort) {
-            currentAbort.abort();
-        }
-        const controller = new AbortController();
-        currentAbort = controller;
         loadingDetail = true;
+        error = null;
         try {
             const res = await apiFetch(
-                `/api/mappings/${anilistId}`,
-                { signal: controller.signal },
-                { silent: true },
+                `/api/mappings/${encodeURIComponent(descriptor)}`,
             );
-            if (!res.ok) {
-                applyDetailState(anilistId, null);
-                if (!silent) {
-                    if (res.status === 404) {
-                        toast("No existing mapping found for this AniList ID", "info");
-                    } else {
-                        toast(`Failed to load mapping (HTTP ${res.status})`, "error");
-                    }
-                }
-                return;
-            }
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = (await res.json()) as MappingDetail;
-            applyDetailState(anilistId, data);
-            if (mode !== "edit") {
-                anilistIdInput = String(anilistId);
-            }
-        } catch (error) {
-            if (isAbortError(error)) return;
-            applyDetailState(anilistId, null);
-            if (!silent) {
-                toast("Failed to load mapping details", "error");
-            }
+            hydrateDetail(data);
+            toast("Mapping loaded", "success");
+        } catch (err) {
+            console.error(err);
+            error = "Failed to load mapping";
+            entries = [];
         } finally {
-            if (currentAbort === controller) {
-                currentAbort = null;
-            }
             loadingDetail = false;
         }
     }
 
-    function resetEditorState() {
-        fieldState = createEmptyFieldState();
-        detail = null;
-        rawJson = toJsonString(null);
-        formError = null;
-        jsonError = null;
-        loadingDetail = false;
-        saving = false;
-        loadedDetailId = null;
-    }
-
-    $effect(() => {
-        if (!open) {
-            initialized = false;
-            resetEditorState();
-            return;
-        }
-        if (!initialized) {
-            if (mode === "edit" && mapping) {
-                anilistIdInput = String(mapping.anilist_id);
-                fetchDetail(mapping.anilist_id);
-            } else {
-                anilistIdInput = "";
-                rawJson = toJsonString(null);
-                updateFieldStateFromOverride(null);
-            }
-            initialized = true;
-        }
-    });
-
-    $effect(() => {
-        if (!open) return;
-        if (mode === "edit" && mapping) {
-            if (loadedDetailId !== mapping.anilist_id && !loadingDetail) {
-                anilistIdInput = String(mapping.anilist_id);
-                fetchDetail(mapping.anilist_id, { silent: true });
-            }
-        }
-    });
-
-    $effect(() => {
-        if (!open || activeTab !== "form") return;
-        try {
-            rawJson = toJsonString(
-                resolveAnilistIdFromForm(),
-                buildOverrideFromState(),
-            );
-        } catch {
-            // ignore invalid form state while the user is editing
-        }
-    });
-
-    $effect(() => {
-        if (!open || mode !== "create") return;
-        const parsedInput = parseAnilistIdValue(anilistIdInput);
-        if (detail && (!parsedInput || parsedInput !== loadedDetailId)) {
-            detail = null;
-        }
-    });
-
-    function handleAddSeason(fieldId: FieldId) {
-        addSeasonRow(fieldId);
-    }
-
-    function switchTab(next: "form" | "json") {
-        if (next === activeTab) return;
-        if (next === "json") {
-            try {
-                rawJson = toJsonString(
-                    resolveAnilistIdFromForm(),
-                    buildOverrideFromState(),
-                );
-                formError = null;
-                jsonError = null;
-                activeTab = next;
-            } catch (error) {
-                formError = (error as Error).message;
-            }
-            return;
-        }
-        try {
-            const parsed = rawJson.trim() ? JSON.parse(rawJson) : {};
-            if (parsed !== null && typeof parsed !== "object") {
-                throw new Error("Override must be an object");
-            }
-            const { anilistId: parsedAnilistId, override } = extractOverrideFromJson(
-                parsed as Record<string, unknown>,
-            );
-            if (mode !== "edit" && parsedAnilistId) {
-                anilistIdInput = String(parsedAnilistId);
-            }
-            updateFieldStateFromOverride(override);
-            formError = null;
-            jsonError = null;
-            activeTab = next;
-        } catch (error) {
-            jsonError = `Invalid JSON: ${(error as Error).message}`;
-        }
-    }
-
-    function buildOverrideFromState(): Record<string, unknown> {
-        const entry: Record<string, unknown> = {};
-        for (const def of FIELD_DEFS) {
-            const state = fieldState[def.id];
-            if (!state || state.mode === "omit") continue;
-            entry[def.id] =
-                state.mode === "null" ? null : resolveFieldValue(def, state);
-        }
-        return entry;
-    }
-
-    async function save() {
-        formError = null;
-        jsonError = null;
-
-        let payload: MappingOverridePayload | null = null;
-        let targetAnilistId: number | null = null;
-
-        if (activeTab === "json") {
-            let parsed: unknown;
-            try {
-                parsed = rawJson.trim() ? JSON.parse(rawJson) : {};
-                if (parsed !== null && typeof parsed !== "object") {
-                    throw new Error("Override must be an object");
-                }
-            } catch (error) {
-                jsonError = `Invalid JSON: ${(error as Error).message}`;
-                return;
-            }
-
-            const parsedRecord = parsed as Record<string, unknown>;
-            const { anilistId: jsonAnilistId } = extractOverrideFromJson(parsedRecord);
-            targetAnilistId =
-                mode === "edit"
-                    ? resolveExistingAnilistId()
-                    : (jsonAnilistId ?? parseAnilistIdValue(anilistIdInput));
-
-            if (!targetAnilistId) {
-                jsonError = "AniList ID is required";
-                return;
-            }
-
-            if (mode !== "edit") {
-                anilistIdInput = String(targetAnilistId);
-            }
-
-            payload = {
-                anilist_id: targetAnilistId,
-                raw: { ...parsedRecord },
-                fields: null,
-            };
-        } else {
-            targetAnilistId = resolveAnilistIdFromForm();
-            if (!targetAnilistId) {
-                formError = "AniList ID is required";
-                return;
-            }
-
-            try {
-                const fieldsPayload = buildFieldsPayload();
-                payload = {
-                    anilist_id: targetAnilistId,
-                    fields: fieldsPayload,
-                    raw: null,
-                };
-            } catch (error) {
-                formError = (error as Error).message;
-                return;
-            }
-        }
-
-        if (!payload || !targetAnilistId) {
-            formError = "AniList ID is required";
-            return;
-        }
-
+    async function handleSave() {
+        const payload = buildPayload();
+        if (!payload) return;
         saving = true;
+        error = null;
         try {
+            const method = mode === "edit" ? "PUT" : "POST";
+            const url =
+                mode === "edit"
+                    ? `/api/mappings/${encodeURIComponent(payload.descriptor)}`
+                    : "/api/mappings";
             const res = await apiFetch(
-                mode === "edit" ? `/api/mappings/${targetAnilistId}` : "/api/mappings",
+                url,
                 {
-                    method: mode === "edit" ? "PUT" : "POST",
+                    method,
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(payload),
                 },
@@ -611,153 +453,353 @@
                         mode === "edit" ? "Override updated" : "Override created",
                 },
             );
-            if (!res.ok) return;
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = (await res.json()) as MappingDetail;
-            applyDetailState(data.anilist_id, data);
-            if (mode !== "edit") {
-                anilistIdInput = String(data.anilist_id);
-            }
+            hydrateDetail(data);
             onSaved?.(data);
             open = false;
+        } catch (err) {
+            console.error(err);
+            error = "Failed to save override";
         } finally {
             saving = false;
         }
     }
 
-    async function loadEffectiveForCreate() {
-        formError = null;
-        jsonError = null;
-        const parsed = parseAnilistIdValue(anilistIdInput);
-        if (!parsed) {
-            formError = "Enter a valid AniList ID";
+    $effect(() => {
+        if (!open) {
+            descriptor = { ...EMPTY_DESCRIPTOR };
+            entries = [];
+            loadingDetail = false;
+            saving = false;
+            error = null;
             return;
         }
-        await fetchDetail(parsed);
-    }
+
+        const nextDescriptor = mode === "edit" ? (mapping?.descriptor ?? "") : "";
+        descriptor =
+            mode === "edit"
+                ? {
+                      provider: mapping?.provider ?? "",
+                      entryId: mapping?.entry_id ?? "",
+                      scope: mapping?.scope ?? "",
+                  }
+                : { ...EMPTY_DESCRIPTOR };
+        entries = [];
+        if (mode === "edit" && nextDescriptor) {
+            loadDetail(nextDescriptor);
+        }
+    });
 </script>
 
 <Modal
     bind:open
-    contentClass="fixed left-1/2 top-1/2 z-50 w-full max-w-5xl -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-2xl border border-slate-500/40 bg-slate-900/80 shadow-[0_48px_120px_-48px_rgba(15,23,42,0.45)] ring-1 ring-emerald-400/20"
-    headerWrapperClass="px-6 pt-6 pb-4 border-b border-slate-500/30 bg-slate-900/65"
-    footerClass="border-t border-slate-500/30 bg-slate-900/65 px-6 py-4"
-    titleClass="flex items-center gap-3 text-base font-semibold tracking-wide text-slate-100">
+    contentClass="fixed top-1/2 left-1/2 z-50 w-full max-w-6xl -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl border border-slate-800 bg-slate-950/90 shadow-2xl ring-1 ring-slate-800/60 backdrop-blur"
+    headerWrapperClass="border-b border-slate-800/80 bg-slate-900/70 px-4 py-3"
+    footerClass="flex items-center justify-end gap-3 border-t border-slate-800/70 bg-slate-900/70 px-4 py-3"
+    closeButtonClass="rounded-md px-2 py-1 text-xs text-slate-400 hover:bg-slate-800/70 hover:text-slate-100">
     {#snippet titleChildren()}
-        <span class="flex items-center gap-2">
-            {mode === "edit" ? "Edit Mapping Override" : "New Mapping Override"}
-        </span>
-    {/snippet}
-    {#snippet footerChildren()}
-        <div class="flex w-full flex-wrap items-center justify-between gap-3">
-            <div class="text-xs text-rose-200">{formError}</div>
-            <div class="flex items-center gap-2">
-                <button
-                    class="inline-flex h-9 items-center rounded-lg border border-slate-500/50 bg-slate-800/60 px-3 text-[11px] font-semibold text-slate-100 transition hover:border-slate-400/50 hover:bg-slate-800/70"
-                    onclick={() => (open = false)}
-                    type="button">
-                    Cancel
-                </button>
-                <button
-                    class="inline-flex h-9 items-center rounded-lg bg-emerald-500 px-4 text-[11px] font-semibold text-emerald-50 transition hover:bg-emerald-400 disabled:opacity-60"
-                    disabled={saving}
-                    onclick={save}
-                    type="button">
-                    {saving ? "Saving…" : "Save Override"}
-                </button>
-            </div>
+        <div class="text-sm font-semibold tracking-wide text-slate-100">
+            {mode === "edit" ? "Edit Mapping Override" : "Create Mapping Override"}
         </div>
     {/snippet}
-    <div
-        class="max-h-[70vh] space-y-5 overflow-y-auto border-slate-600/40 bg-slate-900/70 p-5 text-[11px] shadow-[0_36px_80px_-44px_rgba(15,23,42,0.55)] ring-1 ring-slate-800/35 backdrop-blur">
+
+    <div class="space-y-4 p-4">
         <div
-            class="rounded-lg border border-slate-600/30 bg-slate-900/60 p-5 shadow-inner">
-            <div class="grid gap-5 md:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
-                <div class="space-y-2">
-                    <label
-                        for="anilist-id"
-                        class="block text-[12px] font-semibold tracking-[0.08em] text-slate-100 uppercase">
-                        AniList Identifier
-                    </label>
-                    <div class="mt-1 flex flex-wrap items-center gap-2">
-                        <input
-                            id="anilist-id"
-                            class="h-9 w-full rounded-lg border border-slate-500/35 bg-slate-900/50 px-3 text-[12px] text-slate-100 shadow-inner transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/30 focus:outline-none"
-                            type="number"
-                            placeholder="e.g. 12345"
-                            bind:value={anilistIdInput}
-                            disabled={mode === "edit"} />
-                    </div>
-                    <p class="text-[10px] text-slate-300">
-                        Provide an AniList anime identifier to inspect and override
-                        downstream provider mappings.
-                    </p>
-                </div>
-                <MappingDetailPreview
-                    {detail}
-                    {mode}
-                    {loadingDetail}
-                    {pendingPrefillId}
-                    {loadedDetailId}
-                    on:prefill={loadEffectiveForCreate} />
-            </div>
-        </div>
-        {#if loadingDetail}
-            <div
-                class="rounded-md border border-slate-600/40 bg-slate-900/55 p-4 text-center text-[11px] text-slate-100">
-                Loading mapping details…
-            </div>
-        {:else}
-            <Tabs.Root
-                value={activeTab}
-                onValueChange={(v) => switchTab(v as typeof activeTab)}
-                class="space-y-4">
-                <Tabs.List
-                    class="flex items-center gap-1 rounded-lg border border-slate-600/40 bg-slate-900/55 p-1 text-[11px] text-slate-200">
-                    <Tabs.Trigger
-                        value="form"
-                        class="inline-flex h-8 items-center gap-1 rounded-md px-3 font-medium text-slate-200 transition hover:text-slate-50 data-[state=active]:bg-emerald-500/20 data-[state=active]:text-emerald-100">
-                        Form
-                    </Tabs.Trigger>
-                    <Tabs.Trigger
-                        value="json"
-                        class="inline-flex h-8 items-center gap-1 rounded-md px-3 font-medium text-slate-200 transition hover:text-slate-50 data-[state=active]:bg-emerald-500/20 data-[state=active]:text-emerald-100">
-                        JSON
-                    </Tabs.Trigger>
-                </Tabs.List>
-                <Tabs.Content value="form">
-                    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                        {#each FIELD_DEFS as field (field.id)}
-                            {@const state = fieldState[field.id]}
-                            <MappingFieldCard
-                                {field}
-                                {state}
-                                modeOptions={MODE_OPTIONS}
-                                effectiveText={formatEffective(field)}
-                                effectiveSeasonRows={getEffectiveSeasonRows(field)}
-                                onModeChange={(modeValue) =>
-                                    setFieldMode(field.id, modeValue)}
-                                onStringChange={(value) =>
-                                    setFieldStringValue(field.id, value)}
-                                onAddSeason={() => handleAddSeason(field.id)}
-                                onUpdateSeason={(index, key, value) =>
-                                    updateSeasonRow(field.id, index, key, value)}
-                                onRemoveSeason={(index) =>
-                                    removeSeasonRow(field.id, index)} />
+            class="rounded-md border border-slate-800/70 bg-slate-900/70 p-4 shadow-inner">
+            <div class="flex flex-wrap items-start justify-between gap-4">
+                <div class="flex-1 space-y-3">
+                    <div class="grid gap-3 sm:grid-cols-3">
+                        {#each descriptorInputs as field (field.field)}
+                            <div class="relative w-full">
+                                <input
+                                    class="h-9 w-full rounded-md border border-slate-700/60 bg-slate-950 px-3 pr-10 text-[12px] text-slate-100 placeholder:text-slate-500 focus:border-emerald-500 focus:outline-none"
+                                    placeholder={field.placeholder}
+                                    aria-label={field.aria}
+                                    bind:value={descriptor[field.field]}
+                                    disabled={mode === "edit"} />
+                                <div
+                                    class="absolute inset-y-0 right-2 flex items-center">
+                                    <Tooltip.Root delayDuration={120}>
+                                        <Tooltip.Trigger>
+                                            <button
+                                                type="button"
+                                                class="pointer-events-auto inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-700/60 bg-slate-900/70 text-slate-400 transition-colors hover:text-slate-100 focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:outline-none"
+                                                aria-label={`${field.placeholder} info`}>
+                                                <Info class="h-3 w-3" />
+                                            </button>
+                                        </Tooltip.Trigger>
+                                        <Tooltip.Portal>
+                                            <Tooltip.Content
+                                                side="top"
+                                                sideOffset={6}
+                                                class="z-50 rounded-md border border-slate-800/70 bg-slate-900/95 px-2 py-1.5 text-[11px] text-slate-100 shadow-xl">
+                                                {field.info}
+                                                <Tooltip.Arrow />
+                                            </Tooltip.Content>
+                                        </Tooltip.Portal>
+                                    </Tooltip.Root>
+                                </div>
+                            </div>
                         {/each}
                     </div>
-                </Tabs.Content>
-                <Tabs.Content value="json">
-                    <CodeEditor
-                        bind:content={rawJson}
-                        language="json"
-                        schemas={[
-                            { uri: "", schema: mappingSchema, fileMatch: ["*"] },
-                        ]} />
-                    {#if jsonError}
-                        <p class="mt-2 text-xs text-rose-300">{jsonError}</p>
-                    {/if}
-                </Tabs.Content>
-            </Tabs.Root>
+                </div>
+                <div class="flex flex-wrap items-center gap-2 text-[11px]">
+                    <button
+                        type="button"
+                        class="inline-flex items-center gap-1 rounded-md border border-slate-700/60 bg-slate-800/60 px-3 py-2 text-xs font-semibold text-slate-100 shadow-sm transition-colors hover:border-emerald-500 hover:text-emerald-100 focus:ring-2 focus:ring-emerald-500/40 focus:outline-none"
+                        onclick={() => loadDetail()}
+                        disabled={loadingDetail || !canLoadDescriptor()}>
+                        <RefreshCcw class="inline h-3.5 w-3.5" />
+                        Load existing
+                    </button>
+                    <button
+                        type="button"
+                        class="inline-flex items-center gap-1 rounded-md border border-slate-700/60 bg-slate-800/60 px-3 py-2 text-xs font-semibold text-slate-100 shadow-sm transition-colors hover:border-emerald-500 hover:text-emerald-100 focus:ring-2 focus:ring-emerald-500/40 focus:outline-none"
+                        onclick={addEntry}
+                        disabled={saving}>
+                        <Plus class="inline h-3.5 w-3.5" />
+                        Add Mapping
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        {#if entries.length === 0}
+            <div
+                class="rounded-md border border-dashed border-slate-800 bg-slate-950/70 p-6 text-center text-sm text-slate-400">
+                Load an existing mapping or add a mapping to start.
+            </div>
+        {:else}
+            <div class="space-y-4">
+                {#each entries as entry (entry.key)}
+                    <div
+                        class={`rounded-md border p-4 shadow-md ${
+                            entry.deleted && entry.origin !== "custom"
+                                ? "border-rose-900/60 bg-slate-950/50 opacity-70"
+                                : "border-slate-800 bg-slate-950/80"
+                        }`}>
+                        <div class="flex flex-wrap items-center gap-1.5">
+                            <span
+                                class={`font-mono text-xs ${
+                                    entry.deleted && entry.origin !== "custom"
+                                        ? "text-slate-500 line-through"
+                                        : "text-slate-300"
+                                }`}>
+                                {entry.provider ||
+                                    entry.provider_placeholder ||
+                                    "?"}:{entry.entry_id ||
+                                    entry.entry_id_placeholder ||
+                                    "?"}:{entry.scope || entry.scope_placeholder || "?"}
+                            </span>
+                            <span
+                                class={`rounded border px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase ${
+                                    entry.origin === "custom"
+                                        ? "border-emerald-800/60 bg-emerald-900/40 text-emerald-100"
+                                        : entry.origin === "mixed"
+                                          ? "border-amber-800/60 bg-amber-900/40 text-amber-100"
+                                          : "border-slate-700/70 bg-slate-800/60 text-slate-100"
+                                }`}>
+                                {entry.origin === "custom"
+                                    ? "Custom"
+                                    : entry.origin === "mixed"
+                                      ? "Mixed"
+                                      : "Upstream"}
+                            </span>
+                            {#if entry.deleted && entry.origin !== "custom"}
+                                <span
+                                    class="rounded border border-rose-800/60 bg-rose-900/40 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-rose-100 uppercase">
+                                    Disabled override
+                                </span>
+                            {/if}
+                            <span class="flex-1"></span>
+                            {#if entry.origin !== "custom"}
+                                <button
+                                    type="button"
+                                    class="inline-flex items-center gap-1 rounded-md border border-slate-700/60 bg-slate-900/60 px-3 py-1 text-[12px] font-semibold text-slate-200 transition-colors hover:border-slate-500 focus:outline-none"
+                                    onclick={() => revertEntry(entry.key)}>
+                                    Revert to upstream
+                                </button>
+                            {/if}
+                            <button
+                                type="button"
+                                class="inline-flex items-center rounded-md border border-slate-700/60 bg-slate-900/60 p-1 text-[12px] font-semibold text-emerald-200 shadow-sm transition-colors hover:border-emerald-400 hover:text-emerald-100 focus:outline-none"
+                                title="Add range"
+                                onclick={() => addRange(entry.key)}
+                                disabled={entry.deleted}>
+                                <Plus class="inline h-4 w-4" />
+                            </button>
+                            <button
+                                type="button"
+                                class="inline-flex items-center rounded-md border border-slate-700/60 bg-slate-900/60 p-1 text-[12px] font-semibold text-rose-200 transition-colors hover:border-rose-500 focus:outline-none"
+                                title="Remove target mapping"
+                                onclick={() => removeEntry(entry.key)}>
+                                <Trash2 class="inline h-4 w-4" />
+                            </button>
+                        </div>
+
+                        <div class="mt-3 grid gap-3 sm:grid-cols-3">
+                            {#each entryFields as field (field.key)}
+                                <div class="relative w-full">
+                                    <input
+                                        class="h-9 w-full rounded-md border border-slate-800/70 bg-slate-900 px-3 pr-10 text-[13px] text-slate-100 placeholder:text-slate-500 placeholder:opacity-70 focus:border-emerald-500 focus:outline-none"
+                                        placeholder={entry[field.placeholder] ||
+                                            field.defaultLabel}
+                                        aria-label={field.aria}
+                                        bind:value={entry[field.key]}
+                                        disabled={entry.deleted} />
+                                    <div
+                                        class="absolute inset-y-0 right-2 flex items-center">
+                                        <Tooltip.Root delayDuration={120}>
+                                            <Tooltip.Trigger>
+                                                <button
+                                                    type="button"
+                                                    class="pointer-events-auto inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-700/60 bg-slate-900/70 text-slate-400 transition-colors hover:text-slate-100 focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:outline-none"
+                                                    aria-label={`${field.defaultLabel} info`}>
+                                                    <Info class="h-3 w-3" />
+                                                </button>
+                                            </Tooltip.Trigger>
+                                            <Tooltip.Portal>
+                                                <Tooltip.Content
+                                                    side="top"
+                                                    sideOffset={6}
+                                                    class="z-50 rounded-md border border-slate-800/70 bg-slate-900/95 px-2 py-1.5 text-[11px] text-slate-100 shadow-xl">
+                                                    {field.info}
+                                                    <Tooltip.Arrow />
+                                                </Tooltip.Content>
+                                            </Tooltip.Portal>
+                                        </Tooltip.Root>
+                                    </div>
+                                </div>
+                            {/each}
+                        </div>
+
+                        <div class="mt-3 space-y-2 border-l border-slate-800/60 pl-4">
+                            {#each entry.ranges as range, idx (idx)}
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <div class="relative w-full min-w-44 flex-1">
+                                        <input
+                                            class="w-full min-w-0 rounded-md border border-slate-800/70 bg-slate-900 px-3 py-1 pr-10 text-[11px] text-slate-100 placeholder:text-slate-500 placeholder:opacity-80 focus:border-emerald-500 focus:outline-none"
+                                            value={range.mode === "custom"
+                                                ? range.source_range
+                                                : ""}
+                                            oninput={(ev) =>
+                                                setSourceRange(
+                                                    entry.key,
+                                                    idx,
+                                                    ev.currentTarget.value,
+                                                )}
+                                            placeholder={range.source_range ||
+                                                "Source range"}
+                                            aria-label="Range source"
+                                            disabled={entry.deleted} />
+                                        <div
+                                            class="absolute inset-y-0 right-2 flex items-center">
+                                            <Tooltip.Root delayDuration={120}>
+                                                <Tooltip.Trigger>
+                                                    <button
+                                                        type="button"
+                                                        class="pointer-events-auto inline-flex h-5 w-5 items-center justify-center rounded-full border border-slate-700/60 bg-slate-900/70 text-slate-400 transition-colors hover:text-slate-100 focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:outline-none"
+                                                        aria-label="Range source info">
+                                                        <Info class="h-3 w-3" />
+                                                    </button>
+                                                </Tooltip.Trigger>
+                                                <Tooltip.Portal>
+                                                    <Tooltip.Content
+                                                        side="top"
+                                                        sideOffset={6}
+                                                        class="z-50 rounded-md border border-slate-800/70 bg-slate-900/95 px-2 py-1 text-[11px] text-slate-100 shadow-xl">
+                                                        {rangeFieldInfo.source}
+                                                        <Tooltip.Arrow />
+                                                    </Tooltip.Content>
+                                                </Tooltip.Portal>
+                                            </Tooltip.Root>
+                                        </div>
+                                    </div>
+                                    <div class="relative w-full min-w-44 flex-1">
+                                        <input
+                                            class="w-full min-w-0 rounded-md border border-slate-800/70 bg-slate-900 px-3 py-1 pr-10 text-[11px] text-slate-100 placeholder:text-slate-500 placeholder:opacity-80 focus:border-emerald-500 focus:outline-none"
+                                            value={range.mode === "custom"
+                                                ? (range.custom_value ?? "")
+                                                : ""}
+                                            oninput={(ev) =>
+                                                setRangeValue(
+                                                    entry.key,
+                                                    idx,
+                                                    ev.currentTarget.value,
+                                                )}
+                                            placeholder={range.upstream_value ||
+                                                "Destination range"}
+                                            aria-label="Range destination"
+                                            disabled={entry.deleted} />
+                                        <div
+                                            class="absolute inset-y-0 right-2 flex items-center">
+                                            <Tooltip.Root delayDuration={120}>
+                                                <Tooltip.Trigger>
+                                                    <button
+                                                        type="button"
+                                                        class="pointer-events-auto inline-flex h-5 w-5 items-center justify-center rounded-full border border-slate-700/60 bg-slate-900/70 text-slate-400 transition-colors hover:text-slate-100 focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:outline-none"
+                                                        aria-label="Range destination info">
+                                                        <Info class="h-3 w-3" />
+                                                    </button>
+                                                </Tooltip.Trigger>
+                                                <Tooltip.Portal>
+                                                    <Tooltip.Content
+                                                        side="top"
+                                                        sideOffset={6}
+                                                        class="z-50 rounded-md border border-slate-800/70 bg-slate-900/95 px-2 py-1.5 text-[11px] text-slate-100 shadow-xl">
+                                                        {rangeFieldInfo.destination}
+                                                        <Tooltip.Arrow />
+                                                    </Tooltip.Content>
+                                                </Tooltip.Portal>
+                                            </Tooltip.Root>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center gap-1.5">
+                                        <button
+                                            type="button"
+                                            class="inline-flex items-center rounded-md border border-slate-700/60 bg-slate-900/60 p-1 text-[12px] font-semibold text-rose-200 transition-colors hover:border-rose-500 focus:outline-none"
+                                            title="Remove range"
+                                            onclick={() => removeRange(entry.key, idx)}
+                                            disabled={entry.deleted}>
+                                            <Trash2 class="inline h-4 w-4" />
+                                        </button>
+                                    </div>
+                                </div>
+                            {/each}
+                        </div>
+                    </div>
+                {/each}
+            </div>
         {/if}
+
+        {#if error}
+            <div
+                class="rounded-md border border-rose-800 bg-rose-900/40 p-3 text-[12px] text-rose-100">
+                {error}
+            </div>
+        {/if}
+        <div class="flex flex-wrap items-center gap-2">
+            <button
+                type="button"
+                class="inline-flex items-center gap-2 rounded-md border border-emerald-600/60 bg-emerald-600/30 px-3 py-2 text-[12px] font-semibold text-emerald-100 shadow-sm transition-colors hover:bg-emerald-600/40 focus:ring-2 focus:ring-emerald-500/40 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                onclick={handleSave}
+                disabled={saving}>
+                {#if saving}
+                    <Save class="h-4 w-4 animate-spin" />
+                {:else}
+                    <Save class="h-4 w-4" />
+                {/if}
+                Save
+            </button>
+            <button
+                type="button"
+                class="inline-flex items-center gap-2 rounded-md border border-slate-700/60 bg-slate-800/60 px-3 py-2 text-[12px] font-semibold text-slate-100 shadow-sm transition-colors hover:border-slate-500 focus:ring-2 focus:ring-slate-500/40 focus:outline-none"
+                onclick={() => loadDetail()}
+                disabled={loadingDetail || !canLoadDescriptor()}>
+                <RefreshCcw class="h-4 w-4" />
+                Reload
+            </button>
+        </div>
     </div>
 </Modal>

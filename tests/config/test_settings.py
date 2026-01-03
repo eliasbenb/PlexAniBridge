@@ -38,14 +38,14 @@ def test_find_yaml_config_file_prefers_data_path(
 def test_profile_parent_requires_assignment() -> None:
     """Test that accessing parent on unassigned profile raises ProfileConfigError."""
     profile = AniBridgeProfileConfig(
-        provider_config={
-            "anilist": {"token": SecretStr("anilist-token")},
+        library_provider_config={
             "plex": {
                 "token": SecretStr("plex-token"),
                 "user": "eliasbenb",
                 "url": "http://plex:32400",
             },
-        }
+        },
+        list_provider_config={"anilist": {"token": SecretStr("anilist-token")}},
     )
 
     with pytest.raises(ProfileConfigError):
@@ -56,39 +56,39 @@ def test_config_creates_default_profile_from_globals() -> None:
     """Test that AniBridgeConfig creates a default profile from global settings."""
     config = AniBridgeConfig(
         global_config=AniBridgeProfileConfig(
-            provider_config={
-                "anilist": {"token": "anilist-token"},
+            library_provider_config={
                 "plex": {
                     "token": "plex-token",
                     "user": "eliasbenb",
                     "url": "http://plex:32400",
                     "sections": ["Anime"],
                 },
-            }
+            },
+            list_provider_config={"anilist": {"token": "anilist-token"}},
         )
     )
 
     profile = config.get_profile("default")
 
     assert profile.parent is config
-    assert profile.provider_config["anilist"]["token"] == "anilist-token"
-    assert profile.provider_config["plex"]["token"] == "plex-token"
-    assert profile.provider_config["plex"]["user"] == "eliasbenb"
-    assert profile.provider_config["plex"]["url"] == "http://plex:32400"
-    assert profile.provider_config["plex"]["sections"] == ["Anime"]
+    assert profile.list_provider_config["anilist"]["token"] == "anilist-token"
+    assert profile.library_provider_config["plex"]["token"] == "plex-token"
+    assert profile.library_provider_config["plex"]["user"] == "eliasbenb"
+    assert profile.library_provider_config["plex"]["url"] == "http://plex:32400"
+    assert profile.library_provider_config["plex"]["sections"] == ["Anime"]
 
 
 def test_config_profile_inherits_global_values() -> None:
     """Test that a profile inherits global settings from AniBridgeConfig."""
     config = AniBridgeConfig(
         global_config=AniBridgeProfileConfig(
-            provider_config={
+            library_provider_config={
                 "plex": {"url": "http://global"},
             }
         ),
         profiles={
             "primary": AniBridgeProfileConfig(
-                provider_config={
+                library_provider_config={
                     "anilist": {"token": "anilist-token"},
                 }
             )
@@ -97,7 +97,7 @@ def test_config_profile_inherits_global_values() -> None:
 
     profile = config.get_profile("primary")
 
-    assert profile.provider_config["plex"]["url"] == "http://global"
+    assert profile.library_provider_config["plex"]["url"] == "http://global"
 
 
 def test_get_profile_raises_for_unknown_name(

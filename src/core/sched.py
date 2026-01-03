@@ -10,7 +10,7 @@ from cachetools.func import lru_cache
 
 from src import log
 from src.config.settings import AniBridgeConfig, ScanMode
-from src.core.animap import AniMapClient
+from src.core.animap import AnimapClient
 from src.core.bridge import BridgeClient
 from src.exceptions import ProfileNotFoundError
 
@@ -97,29 +97,31 @@ class ProfileScheduler:
             return
 
         self._running = True
-
         if ScanMode.PERIODIC in self.scan_modes:
-            log.debug(
-                f"[{self.profile_name}] Starting periodic "
-                f"sync every {self.scan_interval}s"
+            self._spawn_loop(
+                name="periodic",
+                interval=self.scan_interval,
+                poll=False,
             )
-            task = asyncio.create_task(self._periodic_loop())
-            self._tasks.add(task)
-            task.add_done_callback(self._tasks.discard)
 
         if ScanMode.POLL in self.scan_modes:
-            log.debug(
-                f"[{self.profile_name}] Starting polling "
-                f"sync every {self.poll_interval}s"
+            self._spawn_loop(
+                name="poll",
+                interval=self.poll_interval,
+                poll=True,
             )
-            task = asyncio.create_task(self._poll_loop())
-            self._tasks.add(task)
-            task.add_done_callback(self._tasks.discard)
 
     async def stop(self) -> None:
         """Stop the profile scheduler."""
         self._running = False
         self.stop_event.set()
+
+        for task in list(self._tasks):
+            if not task.done():
+                task.cancel()
+
+        if self._tasks:
+            await asyncio.gather(*self._tasks, return_exceptions=True)
 
         current_task = self._current_task
         if current_task and not current_task.done():
@@ -127,38 +129,35 @@ class ProfileScheduler:
             with contextlib.suppress(asyncio.CancelledError):
                 await current_task
 
-    async def _periodic_loop(self) -> None:
-        """Handle periodic synchronization."""
+    def _spawn_loop(self, *, name: str, interval: int, poll: bool) -> None:
+        """Create and track a looping sync task."""
+        log.debug(f"[{self.profile_name}] Starting {name} sync every {interval}s")
+        task = asyncio.create_task(
+            self._run_loop(name=name, interval=interval, poll=poll)
+        )
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
+
+    async def _run_loop(self, *, name: str, interval: int, poll: bool) -> None:
+        """Handle periodic or polling synchronization loops."""
         while self._running and not self.stop_event.is_set():
             try:
-                await self.sync()
+                await self.sync(poll=poll)
 
-                next_sync = datetime.now(UTC) + timedelta(seconds=self.scan_interval)
-                log.info(
-                    f"[{self.profile_name}] Next periodic "
-                    f"sync scheduled for: {next_sync.astimezone()}"
-                )
+                if not poll:
+                    next_sync = datetime.now(UTC) + timedelta(seconds=interval)
+                    log.info(
+                        f"[{self.profile_name}] Next {name} sync scheduled for: "
+                        f"{next_sync.astimezone()}"
+                    )
 
                 with contextlib.suppress(asyncio.TimeoutError):
-                    await asyncio.wait_for(self.stop_event.wait(), self.scan_interval)
+                    await asyncio.wait_for(self.stop_event.wait(), interval)
             except asyncio.CancelledError:
-                log.debug(f"[{self.profile_name}] Periodic sync cancelled")
+                log.debug(f"[{self.profile_name}] {name} sync cancelled")
                 break
             except Exception:
-                log.error(f"[{self.profile_name}] Periodic sync error", exc_info=True)
-                await asyncio.sleep(10)
-
-    async def _poll_loop(self) -> None:
-        """Handle polling-based synchronization."""
-        while self._running and not self.stop_event.is_set():
-            try:
-                await self.sync(poll=True)
-                await asyncio.sleep(self.poll_interval)
-            except asyncio.CancelledError:
-                log.info(f"[{self.profile_name}] Poll sync cancelled")
-                break
-            except Exception:
-                log.error(f"[{self.profile_name}] Poll sync error", exc_info=True)
+                log.error(f"[{self.profile_name}] {name} sync error", exc_info=True)
                 await asyncio.sleep(10)
 
 
@@ -176,7 +175,7 @@ class SchedulerClient:
             global_config (AniBridgeConfig): Global application configuration.
         """
         self.global_config = global_config
-        self.shared_animap_client = AniMapClient(
+        self.shared_animap_client = AnimapClient(
             global_config.data_path, global_config.mappings_url
         )
         self.bridge_clients: dict[str, BridgeClient] = {}

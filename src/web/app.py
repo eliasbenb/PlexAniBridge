@@ -5,6 +5,7 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from logging import DEBUG
 from pathlib import Path
+from typing import Any, cast
 
 from fastapi.applications import FastAPI
 from fastapi.exception_handlers import http_exception_handler
@@ -85,7 +86,7 @@ def create_app(scheduler: SchedulerClient | None = None) -> FastAPI:
 
     # Add request logging middleware if in debug mode
     if log.level <= DEBUG:
-        app.add_middleware(RequestLoggingMiddleware)
+        app.add_middleware(cast(Any, RequestLoggingMiddleware))
         log.debug("Web: Request logging enabled (debug mode)")
 
     # Add basic auth middleware if configured
@@ -93,7 +94,7 @@ def create_app(scheduler: SchedulerClient | None = None) -> FastAPI:
         config.web.basic_auth.username and config.web.basic_auth.password
     ) or config.web.basic_auth.htpasswd_path:
         app.add_middleware(
-            BasicAuthMiddleware,
+            cast(Any, BasicAuthMiddleware),
             username=config.web.basic_auth.username,
             password=config.web.basic_auth.password.get_secret_value()
             if config.web.basic_auth.password

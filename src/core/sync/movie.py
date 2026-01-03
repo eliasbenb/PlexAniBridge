@@ -6,9 +6,10 @@ from datetime import datetime
 from anibridge.library import LibraryMovie
 from anibridge.list import ListEntry, ListMediaType, ListStatus
 
+from src.core.animap import MappingGraph
 from src.core.sync.base import BaseSyncClient
 from src.core.sync.stats import ItemIdentifier
-from src.models.db.animap import AniMap
+from src.utils.cache import gattl_cache
 
 __all__ = ["MovieSyncClient"]
 
@@ -19,35 +20,33 @@ class MovieSyncClient(BaseSyncClient[LibraryMovie, LibraryMovie, LibraryMovie]):
     async def map_media(
         self, item: LibraryMovie
     ) -> AsyncIterator[
-        tuple[LibraryMovie, Sequence[LibraryMovie], AniMap | None, ListEntry | None]
+        tuple[
+            LibraryMovie,
+            Sequence[LibraryMovie],
+            MappingGraph | None,
+            ListEntry | None,
+            str | None,
+        ]
     ]:
         """Map a library movie to its corresponding list entry."""
-        imdb_ids, tmdb_ids, tvdb_ids, anidb_ids, anilist_ids, mal_ids = (
-            self._extract_external_ids(item)
+        mapping_graph = self.animap_client.get_graph_for_ids(item.ids())
+        list_media_descriptor = (
+            self.list_provider.resolve_mappings(mapping_graph, scope="movie")
+            if mapping_graph
+            else None
         )
-        mappings = list(
-            self.animap_client.get_mappings(
-                imdb=imdb_ids or None,
-                tmdb=tmdb_ids or None,
-                tvdb=tvdb_ids or None,
-                anidb=anidb_ids or None,
-                anilist=anilist_ids or None,
-                mal=mal_ids or None,
-            )
+        list_media_key = (
+            list_media_descriptor.entry_id if list_media_descriptor else None
         )
 
-        for mapping in mappings:
-            try:
-                entry = await self.list_provider.get_entry(str(mapping.anilist_id))
-            except Exception:
-                continue
-
-            yield item, (item,), mapping, entry
+        if list_media_key is not None:
+            entry = await self.list_provider.get_entry(str(list_media_key))
+            yield item, (item,), mapping_graph, entry, str(list_media_key)
             return
 
         entry = await self.search_media(item, item)
         if entry is not None:
-            yield item, (item,), None, entry
+            yield item, (item,), None, entry, entry.media().key
 
     async def search_media(
         self, item: LibraryMovie, child_item: LibraryMovie
@@ -69,6 +68,10 @@ class MovieSyncClient(BaseSyncClient[LibraryMovie, LibraryMovie, LibraryMovie]):
     ) -> list[ItemIdentifier]:
         return [ItemIdentifier.from_item(item)]
 
+    @gattl_cache(ttl=15, key=lambda self, item: item)
+    async def _get_history(self, item: LibraryMovie):
+        return await item.history()
+
     async def _calculate_status(
         self,
         *,
@@ -76,10 +79,10 @@ class MovieSyncClient(BaseSyncClient[LibraryMovie, LibraryMovie, LibraryMovie]):
         child_item: LibraryMovie,
         grandchild_items: Sequence[LibraryMovie],
         entry: ListEntry,
-        animapping: AniMap | None,
+        mapping: MappingGraph | None,
     ) -> ListStatus | None:
         has_views = item.view_count > 0
-        history = await item.history()
+        history = await self._get_history(item)
         has_history = bool(history)
 
         if has_views and item.on_watching:
@@ -101,7 +104,7 @@ class MovieSyncClient(BaseSyncClient[LibraryMovie, LibraryMovie, LibraryMovie]):
         child_item: LibraryMovie,
         grandchild_items: Sequence[LibraryMovie],
         entry: ListEntry,
-        animapping: AniMap | None,
+        mapping: MappingGraph | None,
     ) -> int | None:
         return item.user_rating
 
@@ -112,7 +115,7 @@ class MovieSyncClient(BaseSyncClient[LibraryMovie, LibraryMovie, LibraryMovie]):
         child_item: LibraryMovie,
         grandchild_items: Sequence[LibraryMovie],
         entry: ListEntry,
-        animapping: AniMap | None,
+        mapping: MappingGraph | None,
     ) -> int | None:
         total_units = entry.total_units or len(grandchild_items) or 1
         return total_units if item.view_count > 0 else None
@@ -124,7 +127,7 @@ class MovieSyncClient(BaseSyncClient[LibraryMovie, LibraryMovie, LibraryMovie]):
         child_item: LibraryMovie,
         grandchild_items: Sequence[LibraryMovie],
         entry: ListEntry,
-        animapping: AniMap | None,
+        mapping: MappingGraph | None,
     ) -> int | None:
         return item.view_count - 1 if item.view_count > 0 else None
 
@@ -135,9 +138,9 @@ class MovieSyncClient(BaseSyncClient[LibraryMovie, LibraryMovie, LibraryMovie]):
         child_item: LibraryMovie,
         grandchild_items: Sequence[LibraryMovie],
         entry: ListEntry,
-        animapping: AniMap | None,
+        mapping: MappingGraph | None,
     ) -> datetime | None:
-        history = await item.history()
+        history = await self._get_history(item)
         if not history:
             return None
         return min(record.viewed_at for record in history)
@@ -149,9 +152,9 @@ class MovieSyncClient(BaseSyncClient[LibraryMovie, LibraryMovie, LibraryMovie]):
         child_item: LibraryMovie,
         grandchild_items: Sequence[LibraryMovie],
         entry: ListEntry,
-        animapping: AniMap | None,
+        mapping: MappingGraph | None,
     ) -> datetime | None:
-        history = await item.history()
+        history = await self._get_history(item)
         if not history:
             return None
         return max(record.viewed_at for record in history)
@@ -163,12 +166,20 @@ class MovieSyncClient(BaseSyncClient[LibraryMovie, LibraryMovie, LibraryMovie]):
         child_item: LibraryMovie,
         grandchild_items: Sequence[LibraryMovie],
         entry: ListEntry,
-        animapping: AniMap | None,
+        mapping: MappingGraph | None,
     ) -> str | None:
         return await item.review()
 
+    def _derive_scope(
+        self, *, item: LibraryMovie, child_item: LibraryMovie | None
+    ) -> str | None:
+        return "movie"
+
     def _debug_log_title(
-        self, item: LibraryMovie, animapping: AniMap | None = None
+        self,
+        item: LibraryMovie,
+        mapping: MappingGraph | None = None,
+        media_key: str | None = None,
     ) -> str:
         return f"$$'{item.title}'$$"
 
@@ -178,17 +189,17 @@ class MovieSyncClient(BaseSyncClient[LibraryMovie, LibraryMovie, LibraryMovie]):
         item: LibraryMovie,
         child_item: LibraryMovie,
         entry: ListEntry | None,
-        animapping: AniMap | None,
+        mapping: MappingGraph | None,
+        media_key: str | None,
     ) -> str:
-        ids = ", ".join(repr(external) for external in item.ids())
-        ids = ids or "none"
-        media_key = self._resolve_list_media_key(
-            animapping, entry.media().key if entry else None
-        )
-        media_key = media_key or "unknown"
-        return (
-            f"$${{library_key: {child_item.key}, media_key: {media_key}"
-            + f", {ids}}}$$"
-            if ids
-            else ""
-        )
+        if not media_key and mapping is not None:
+            list_media_descriptor = self.list_provider.resolve_mappings(
+                mapping, scope="movie"
+            )
+            media_key = (
+                list_media_descriptor.entry_id if list_media_descriptor else None
+            )
+        if not media_key and entry is not None:
+            media_key = entry.media().key
+        ids = {"library_key": child_item.key, "list_key": media_key, **item.ids()}
+        return self._format_external_ids(ids)

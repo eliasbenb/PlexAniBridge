@@ -426,7 +426,7 @@
         </p>
         <div class="grid gap-3 md:grid-cols-2">
             <a
-                href="https://github.com/eliasbenb/PlexAniBridge"
+                href="https://github.com/anibridge/anibridge"
                 target="_blank"
                 rel="noreferrer noopener"
                 class="group flex h-full items-stretch gap-3 rounded-md border border-slate-800/70 bg-slate-900/50 p-4 transition-colors hover:bg-slate-900/70">
@@ -442,12 +442,12 @@
                         Source code, issue tracking, and release notes.
                     </p>
                     <div class="mt-2 text-[11px] text-slate-500">
-                        github.com/eliasbenb/PlexAniBridge
+                        github.com/anibridge/anibridge
                     </div>
                 </div>
             </a>
             <a
-                href="https://ghcr.io/eliasbenb/plexanibridge"
+                href="https://ghcr.io/anibridge/anibridge"
                 target="_blank"
                 rel="noreferrer noopener"
                 class="group flex h-full items-stretch gap-3 rounded-md border border-slate-800/70 bg-slate-900/50 p-4 transition-colors hover:bg-slate-900/70">
@@ -461,7 +461,7 @@
                         Prebuilt container images.
                     </p>
                     <div class="mt-2 text-[11px] text-slate-500">
-                        ghcr.io/eliasbenb/plexanibridge
+                        ghcr.io/anibridge/anibridge
                     </div>
                 </div>
             </a>

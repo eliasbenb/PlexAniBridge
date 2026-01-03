@@ -164,11 +164,18 @@ class AniBridgeProfileConfig(BaseModel):
         default="",
         description="Namespace of the list provider to use",
     )
-    provider_config: dict[str, dict] = Field(
+
+    library_provider_config: dict[str, dict] = Field(
         default_factory=dict,
         exclude=True,
         repr=False,
-        description="Provider configuration by namespace",
+        description="Library provider configuration by namespace",
+    )
+    list_provider_config: dict[str, dict] = Field(
+        default_factory=dict,
+        exclude=True,
+        repr=False,
+        description="List provider configuration by namespace",
     )
 
     scan_interval: int = Field(
@@ -228,10 +235,11 @@ class AniBridgeProfileConfig(BaseModel):
             return self
 
         for field in self.__class__.model_fields:
-            if field == "provider_config":  # Special handling to do 1-level dict merge
-                global_providers = self._parent.global_config.provider_config
-                profile_providers = self.provider_config
-                self.provider_config = {**global_providers, **profile_providers}
+            if field in ("library_provider_config", "list_provider_config"):
+                # Special handling to do 1-level dict merge for provider configs
+                global_providers = getattr(self._parent.global_config, field)
+                profile_providers = getattr(self, field)
+                setattr(self, field, {**global_providers, **profile_providers})
             elif field in self.model_fields_set:  # Field set on profile level
                 continue
             else:  # Inherit from global if not set
@@ -265,7 +273,7 @@ class AniBridgeConfig(BaseSettings):
         default=LogLevel.INFO, description="Logging level for the application"
     )
     mappings_url: str | None = Field(
-        default="https://raw.githubusercontent.com/eliasbenb/PlexAniBridge-Mappings/v2/mappings.json",
+        default="https://raw.githubusercontent.com/anibridge/anibridge-mappings-staging/v3/mappings.json",
         description=(
             "URL to JSON or YAML file to use as the upstream mappings source. "
             "If not set, no upstream mappings will be used."

@@ -1,37 +1,11 @@
-"""Tests covering AniList filter construction for mappings service."""
+"""Lightweight tests for mappings query specs (v3)."""
 
-import pytest
-
-from src.exceptions import AniListFilterError
 from src.web.services.mappings_query_spec import get_query_field_map
-from src.web.services.mappings_service import MappingsService
 
 
-@pytest.fixture(scope="module")
-def mappings_service() -> MappingsService:
-    """Provide a MappingsService instance for filter tests."""
-    return MappingsService()
-
-
-def test_build_anilist_filters_multi_enum(mappings_service: MappingsService) -> None:
-    """Multiple AniList enum values should resolve and deduplicate."""
-    spec = get_query_field_map()["anilist.format"]
-    filters = mappings_service._build_anilist_term_filters(
-        spec,
-        "TV,Movie,TV",
-        ("tv", "Movie", "TV"),
-    )
-    assert filters == {"format_in": ["TV", "MOVIE"]}
-
-
-def test_build_anilist_filters_multi_not_supported(
-    mappings_service: MappingsService,
-) -> None:
-    """Fields without *_in support should raise when given multiple values."""
-    spec = get_query_field_map()["anilist.title"]
-    with pytest.raises(AniListFilterError):
-        mappings_service._build_anilist_term_filters(
-            spec,
-            "Naruto,Bleach",
-            ("Naruto", "Bleach"),
-        )
+def test_query_field_map_contains_core_fields() -> None:
+    """The mappings query field map contains core fields."""
+    field_map = get_query_field_map()
+    core_keys = {"source.provider", "source.id", "source.scope"}
+    assert core_keys.issubset(set(field_map.keys()))
+    assert field_map["source.provider"].desc == "Source provider"

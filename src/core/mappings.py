@@ -3,27 +3,32 @@
 import asyncio
 import json
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import Any, ClassVar, cast
 from urllib.parse import urljoin, urlparse
 
 import aiohttp
+import orjson
 import yaml
+from yaml import CSafeLoader as YamlLoader
 
 from src import __version__, log
+from src.utils.cache import gattl_cache
 
-__all__ = ["AniMapDict", "MappingsClient"]
+__all__ = ["AnimapDict", "MappingsClient"]
 
-type AniMapDict = dict[str, dict[str, Any]]
+type AnimapDict = dict[str, dict[str, Any]]
 
 
 class MappingsClient:
     """Load mappings from files or URLs and merge them together."""
 
     MAPPING_FILES: ClassVar[list[str]] = [
-        "mappings.custom.yaml",
-        "mappings.custom.yml",
-        "mappings.custom.json",
+        "mappings.yaml",
+        "mappings.yml",
+        "mappings.json",
     ]
+
+    _MAX_INCLUDE_CONCURRENCY: ClassVar[int] = 8
 
     def __init__(self, data_path: Path, upstream_url: str | None) -> None:
         """Initialize the MappingsClient with the data path.
@@ -101,6 +106,59 @@ class MappingsClient:
         parsed = urlparse(src)
         return bool(parsed.scheme) and bool(parsed.netloc)
 
+    def _decode_mappings(self, payload: bytes, src: str) -> AnimapDict:
+        """Decode a raw JSON/YAML payload from a given source."""
+        suffix = Path(src).suffix.lower()
+        try:
+            if suffix in {".yaml", ".yml"}:
+                return self._dict_str_keys(
+                    yaml.load(payload.decode(), Loader=YamlLoader)
+                )
+            if suffix == ".json":
+                return orjson.loads(payload)
+
+            log.warning(
+                f"Unknown file type for $$'{src}'$$, defaulting to JSON parsing"
+            )
+            return orjson.loads(payload)
+        except (json.JSONDecodeError, yaml.YAMLError):
+            log.error(f"Error decoding file $$'{src}'$$", exc_info=True)
+        except Exception:
+            log.error(f"Unexpected error reading file $$'{src}'$$", exc_info=True)
+        return {}
+
+    async def _finalize_mappings(
+        self, src: str, mappings: AnimapDict, loaded_chain: set[str]
+    ) -> AnimapDict:
+        """Merge includes and track provenance for a decoded source payload."""
+        self._loaded_sources.add(src)
+
+        if not mappings:
+            log.warning(f"No mappings found in $$'{src}'$$")
+            return {}
+
+        includes_value: dict | list = mappings.get("$includes", [])
+        if isinstance(includes_value, list):
+            includes = [str(item) for item in includes_value]
+        else:
+            includes = []
+            log.warning(
+                f"The $includes key in $$'{src}'$$ is not a list, ignoring all entries"
+            )
+
+        merged = self._deep_merge(
+            await self._load_includes(includes, loaded_chain, src), mappings
+        )
+
+        for key in merged:
+            if not str(key).startswith("$"):
+                k = str(key)
+                lst = self._provenance.setdefault(k, [])
+                if src not in lst:
+                    lst.append(src)
+
+        return merged
+
     def _dict_str_keys(self, d: dict | list) -> Any:
         """Ensure all keys in a dictionary are strings.
 
@@ -148,7 +206,7 @@ class MappingsClient:
 
     async def _load_includes(
         self, includes: list[str], loaded_chain: set[str], parent: str
-    ) -> AniMapDict:
+    ) -> AnimapDict:
         """Load mappings from included files or URLs.
 
         Args:
@@ -158,9 +216,18 @@ class MappingsClient:
             parent (str): Parent path or URL to resolve relative paths against
 
         Returns:
-            AniMapDict: Merged mappings from all included files
+            AnimapDict: Merged mappings from all included files
         """
         mappings: dict[str, dict[str, Any]] = {}
+        semaphore = asyncio.Semaphore(self._MAX_INCLUDE_CONCURRENCY)
+
+        async def _load_one(resolved_include: str) -> AnimapDict:
+            async with semaphore:
+                new_loaded_chain = loaded_chain | {resolved_include}
+                return await self._load_mappings(resolved_include, new_loaded_chain)
+
+        tasks: list[asyncio.Task[AnimapDict]] = []
+
         for include in includes:
             resolved_include = self._resolve_path(include, parent)
 
@@ -174,99 +241,51 @@ class MappingsClient:
                 log.info(f"Skipping already loaded include: $$'{resolved_include}'$$")
                 continue
 
-            new_loaded_chain = loaded_chain | {resolved_include}
-            include_mappings = await self._load_mappings(
-                resolved_include, new_loaded_chain
-            )
-            mappings = self._deep_merge(include_mappings, mappings)
+            tasks.append(asyncio.create_task(_load_one(resolved_include)))
+
+        if not tasks:
+            return mappings
+
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        for result in results:
+            if isinstance(result, Exception):
+                log.error(
+                    "Failed to load include",
+                    exc_info=(type(result), result, result.__traceback__),
+                )
+                continue
+            mappings = self._deep_merge(cast(AnimapDict, result), mappings)
+
         return mappings
 
     async def _load_mappings_file(
         self, file: str, loaded_chain: set[str]
-    ) -> AniMapDict:
-        """Load mappings from a file.
-
-        Args:
-            file (str): Path to the file to load
-            loaded_chain (set[str]): Set of already loaded includes to prevent circular
-                                     includes
-
-        Returns:
-            AniMapDict: Mappings loaded from the file
-        """
-        mappings: AniMapDict = {}
+    ) -> AnimapDict:
+        """Load mappings from a local file."""
         file_path = Path(file)
-
         try:
-            match file_path.suffix:
-                case ".json":
-                    with file_path.open() as f:
-                        mappings = json.load(f)
-                case ".yaml" | ".yml":
-                    with file_path.open() as f:
-                        mappings = self._dict_str_keys(yaml.safe_load(f))
-        except (json.JSONDecodeError, yaml.YAMLError):
-            log.error(
-                f"Error decoding file $$'{file_path.resolve()!s}'$$", exc_info=True
-            )
+            payload = file_path.read_bytes()
         except Exception:
             log.error(
                 f"Unexpected error reading file $$'{file_path.resolve()!s}'$$",
                 exc_info=True,
             )
-
-        self._loaded_sources.add(file)
-
-        if not mappings:
-            log.warning(f"No mappings found in file $$'{file_path.resolve()!s}'$$")
             return {}
 
-        includes: list[str] = []
-        includes_value: dict | list = mappings.get("$includes", [])
-        if isinstance(includes_value, list):
-            includes = [str(item) for item in includes_value]
-        else:
-            log.warning(
-                f"The $includes key in "
-                f"$$'{file_path.resolve()!s}'$$ is not a list, ignoring all entries"
-            )
-
-        merged = self._deep_merge(
-            await self._load_includes(includes, loaded_chain, str(file_path)), mappings
-        )
-
-        # Record provenance for keys present in this file or its includes
-        for key in merged:
-            if not str(key).startswith("$"):
-                k = str(key)
-                src = str(file_path)
-                lst = self._provenance.setdefault(k, [])
-                if src not in lst:
-                    lst.append(src)
-        return merged
+        mappings = self._decode_mappings(payload, str(file_path))
+        return await self._finalize_mappings(str(file_path), mappings, loaded_chain)
 
     async def _load_mappings_url(
         self, url: str, loaded_chain: set[str], retry_count: int = 0
-    ) -> AniMapDict:
-        """Load mappings from a URL.
-
-        Args:
-            url (str): URL to load mappings from
-            loaded_chain (set[str]): Set of already loaded includes to prevent circular
-                                     includes
-            retry_count (int): Number of retries to attempt (default: 0)
-
-        Returns:
-            AniMapDict: Mappings loaded from the URL
-        """
-        mappings: AniMapDict = {}
-        mappings_raw: str = ""
+    ) -> AnimapDict:
+        """Load mappings from a URL with basic retry handling."""
         session = await self._get_session()
+        mappings_raw: bytes | None = None
 
         try:
             async with session.get(url) as response:
                 response.raise_for_status()
-                mappings_raw = await response.text()
+                mappings_raw = await response.read()
         except (TimeoutError, aiohttp.ClientError):
             if retry_count < 2:
                 log.warning(
@@ -282,54 +301,15 @@ class MappingsClient:
                 exc_info=True,
             )
 
-        try:
-            match Path(url).suffix:
-                case ".json":
-                    mappings = json.loads(mappings_raw)
-                case ".yaml" | ".yml":
-                    mappings = self._dict_str_keys(yaml.safe_load(mappings_raw))
-                case _:
-                    log.warning(
-                        f"Unknown file type for URL "
-                        f"$$'{url}'$$, defaulting to JSON parsing"
-                    )
-                    mappings = json.loads(mappings_raw)
-        except (json.JSONDecodeError, yaml.YAMLError):
-            log.error(f"Error decoding file $$'{url!s}'$$", exc_info=True)
-        except Exception:
-            log.error(f"Unexpected error reading file $$'{url!s}'$$", exc_info=True)
-
-        self._loaded_sources.add(url)
-
-        if not mappings:
-            log.warning(f"No mappings found in URL $$'{url}'$$")
+        if mappings_raw is None:
             return {}
 
-        includes: list[str] = []
-        includes_value: dict | list = mappings.get("$includes", [])
-        if isinstance(includes_value, list):
-            includes = [str(item) for item in includes_value]
-        else:
-            log.warning(f"$includes in {url} is not a list, ignoring")
-
-        merged = self._deep_merge(
-            await self._load_includes(includes, loaded_chain, url), mappings
-        )
-
-        # Record provenance for keys present at this URL or its includes
-        for key in merged:
-            if not str(key).startswith("$"):
-                k = str(key)
-                src = str(url)
-                lst = self._provenance.setdefault(k, [])
-                if src not in lst:
-                    lst.append(src)
-
-        return merged
+        mappings = self._decode_mappings(mappings_raw, url)
+        return await self._finalize_mappings(url, mappings, loaded_chain)
 
     async def _load_mappings(
         self, src: str, loaded_chain: set[str] | None = None
-    ) -> AniMapDict:
+    ) -> AnimapDict:
         """Load mappings from a file or URL.
 
         Args:
@@ -338,7 +318,7 @@ class MappingsClient:
                                      circular includes (default: empty set)
 
         Returns:
-            AniMapDict: Mappings loaded from the file or URL
+            AnimapDict: Mappings loaded from the file or URL
         """
         if loaded_chain is None:
             loaded_chain = set()
@@ -354,31 +334,23 @@ class MappingsClient:
             log.warning(f"Invalid mappings source: $$'{src}'$$, skipping")
             return {}
 
-    def _deep_merge(self, d1: AniMapDict, d2: AniMapDict) -> AniMapDict:
-        """Recursively merge two dictionaries.
-
-        Special handling for episode mapping keys to prevent overwriting.
-
-        Args:
-            d1 (AniMapDict): First dictionary
-            d2 (AniMapDict): Second dictionary
-
-        Returns:
-            AniMapDict: Merged dictionary
-        """
+    def _deep_merge(self, d1: AnimapDict, d2: AnimapDict) -> AnimapDict:
+        """Recursively merge two dictionaries with last-write-wins semantics."""
         result = d1.copy()
 
         for key, value in d2.items():
-            if key in ("tmdb_mappings", "tvdb_mappings") or key not in result:
+            if key not in result:
                 result[key] = value
-            elif isinstance(result[key], dict) and isinstance(value, dict):
+                continue
+
+            if isinstance(result[key], dict) and isinstance(value, dict):
                 result[key] = self._deep_merge(result[key], value)
             else:
                 result[key] = value
 
         return result
 
-    async def load_mappings(self) -> AniMapDict:
+    async def load_mappings(self) -> AnimapDict:
         """Load mappings from files and URLs and merge them together.
 
         Loads custom mappings from local files (if they exist) and default mappings
@@ -386,7 +358,7 @@ class MappingsClient:
         Filters out any keys starting with '$' from the final result.
 
         Returns:
-            AniMapDict: Merged mappings with system keys removed
+            AnimapDict: Merged mappings with system keys removed
         """
         self._loaded_sources = set()
         self._provenance = {}
@@ -422,19 +394,24 @@ class MappingsClient:
 
         return {k: v for k, v in merged_mappings.items() if not k.startswith("$")}
 
-    def get_provenance(self) -> dict[int, list[str]]:
-        """Return a copy of the provenance map collected during the last load.
+    @gattl_cache(ttl=300, key=lambda self, src: src)
+    async def load_source(self, src: str) -> AnimapDict:
+        """Load mappings from a single source without merging.
+
+        This resets internal provenance and loaded-source tracking so callers can
+        inspect the raw payload and provenance produced by that specific source
+        (plus any of its includes).
+
+        Args:
+            src (str): File path or URL to load.
 
         Returns:
-            dict[int, list[str]]: Mapping of anilist_id to list of unique sources
+            AnimapDict: Parsed mapping payload, or an empty dict on failure.
         """
-        result: dict[int, list[str]] = {}
-        for k, sources in self._provenance.items():
-            try:
-                anilist_id = int(k)
-            except ValueError:
-                log.warning(f"Skipping invalid anilist_id in provenance: $$'{k}'$$")
-                continue
-            result[anilist_id] = [str(s) for s in sources]
+        self._loaded_sources = set()
+        self._provenance = {}
+        return await self._load_mappings(src)
 
-        return result
+    def get_provenance(self) -> dict[str, list[str]]:
+        """Return a copy of the provenance map collected during the last load."""
+        return {str(k): list(v) for k, v in self._provenance.items()}

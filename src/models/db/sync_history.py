@@ -5,8 +5,9 @@ from enum import StrEnum
 from typing import Any
 
 from anibridge.library import MediaKind
-from sqlalchemy import JSON, DateTime, Enum, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.schema import ForeignKey, Index
+from sqlalchemy.sql.sqltypes import JSON, DateTime, Enum, Integer, String
 
 from src.models.db.base import Base
 
@@ -42,6 +43,13 @@ class SyncHistory(Base):
         String, nullable=True, index=True
     )
 
+    animap_entry_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("animap_entry.id", ondelete="SET NULL", onupdate="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+
     media_kind: Mapped[MediaKind] = mapped_column(Enum(MediaKind), index=True)
     outcome: Mapped[SyncOutcome] = mapped_column(Enum(SyncOutcome), index=True)
 
@@ -60,14 +68,13 @@ class SyncHistory(Base):
     )
 
     __table_args__ = (
+        Index("ix_sync_history_profile_timestamp", "profile_name", "timestamp"),
         Index(
-            "ix_sync_history_upsert_keys",
+            "ix_sync_history_profile_library_media_outcome",
             "profile_name",
             "library_namespace",
             "library_section_key",
             "library_media_key",
-            "list_namespace",
-            "list_media_key",
             "outcome",
         ),
     )

@@ -4,8 +4,7 @@ import json
 from datetime import UTC, datetime
 from functools import lru_cache
 from pathlib import Path
-from time import perf_counter
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel
 
@@ -18,6 +17,9 @@ from src.exceptions import (
     SchedulerNotInitializedError,
 )
 from src.web.state import get_app_state
+
+if TYPE_CHECKING:
+    from src.core.bridge import BridgeClient
 
 __all__ = ["BackupService", "get_backup_service"]
 
@@ -33,23 +35,10 @@ class BackupMeta(BaseModel):
     age_seconds: float
 
 
-class RestoreSummary(BaseModel):
-    """Result of a restore operation."""
-
-    ok: bool
-    filename: str
-    total_entries: int
-    processed: int
-    restored: int
-    skipped: int
-    errors: list[dict[str, Any]]
-    elapsed_seconds: float
-
-
 class BackupService:
     """Service for listing and restoring provider-managed backups."""
 
-    def _get_profile_bridge(self, profile: str):
+    def _get_profile_bridge(self, profile: str) -> BridgeClient:
         """Get the scheduler bridge client for a profile."""
         scheduler = get_app_state().scheduler
         if not scheduler:
@@ -155,7 +144,7 @@ class BackupService:
 
         return path
 
-    async def restore_backup(self, profile: str, filename: str) -> RestoreSummary:
+    async def restore_backup(self, profile: str, filename: str) -> None:
         """Restore a backup file for a profile.
 
         Args:
@@ -167,66 +156,23 @@ class BackupService:
             ProfileNotFoundError: If the profile is unknown.
             InvalidBackupFilenameError: If the filename is invalid.
             BackupFileNotFoundError: If the file does not exist.
+            BackupParseError: If there was an error parsing or restoring the backup.
         """
         log.info(f"Restoring backup $$'{filename}'$$ for profile $$'{profile}'$$")
         bridge = self._get_profile_bridge(profile)
         path = self._resolve_backup_path(profile, filename)
 
+        raw_backup = path.read_text(encoding="utf-8")
         try:
-            raw_payload = json.loads(path.read_text(encoding="utf-8"))
-        except json.JSONDecodeError as exc:
-            raise BackupParseError("Backup file is not valid JSON") from exc
-
-        try:
-            parsed = bridge.list_provider.deserialize_backup_entries(raw_payload)
+            await bridge.list_provider.restore_list(raw_backup)
         except NotImplementedError as exc:
             raise BackupParseError(
-                "List provider does not support backup deserialization"
+                "List provider does not support backup restoration"
             ) from exc
-
-        total = len(parsed.entries)
-        start = perf_counter()
-        errors: list[dict[str, Any]] = []
-
-        restored = 0
-        list_provider = bridge.list_provider
-        entries = list(parsed.entries)
-        log.debug(
-            "Parsed backup entries: %s for user %s",
-            len(entries),
-            parsed.user or "unknown",
-        )
-        try:
-            await list_provider.restore_entries(entries)
-            restored = len(entries)
-        except Exception as e:
-            errors.append(
-                {
-                    "index_start": 0,
-                    "count": len(entries),
-                    "error": str(e),
-                }
-            )
-            log.error(
-                f"Error restoring backup entries: {e}",
-                exc_info=True,
-            )
-        elapsed = perf_counter() - start
+        except Exception as exc:
+            raise BackupParseError(f"Error during backup restoration: {exc}") from exc
         log.info(
-            f"Restore completed for profile "
-            f"$$'{profile}'$$: {restored}/{total} restored, "
-            f"errors={len(errors)}, in {elapsed:.2f}s"
-        )
-
-        return RestoreSummary(
-            ok=not errors,
-            filename=filename,
-            total_entries=total,
-            processed=total,
-            restored=restored,
-            skipped=0,
-            errors=errors,
-            elapsed_seconds=elapsed,
+            f"Successfully restored backup $$'{filename}'$$ for profile $$'{profile}'$$"
         )
 
 

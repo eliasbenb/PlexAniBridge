@@ -1,21 +1,18 @@
-"""Mappings service for CRUD operations, listing, and provenance updates."""
+"""Mappings service for provider-range mapping graph (v3)."""
 
 import asyncio
 import calendar
 import re
-from collections import deque
-from collections.abc import Awaitable, Callable, Iterable, Mapping
+from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
-from functools import lru_cache
 from typing import Any, ClassVar
 
-from pyparsing import ParseResults
-from sqlalchemy import and_, func, or_, select
-from sqlalchemy.sql import exists
+from sqlalchemy.sql import func, or_, select
 
 from src.config.database import db
 from src.config.settings import get_config
-from src.core.anilist import AniListClient
+from src.core.animap import AnimapDescriptor
 from src.exceptions import (
     AniListFilterError,
     AniListSearchError,
@@ -23,9 +20,8 @@ from src.exceptions import (
     BooruQuerySyntaxError,
     MappingNotFoundError,
 )
-from src.models.db.animap import AniMap
-from src.models.db.provenance import AniMapProvenance
-from src.models.schemas.anilist import Media as AniListMetadata
+from src.models.db.animap import AnimapEntry, AnimapMapping, AnimapProvenance
+from src.models.schemas.anilist import Media
 from src.utils.booru_query import (
     And,
     KeyTerm,
@@ -37,17 +33,6 @@ from src.utils.booru_query import (
     evaluate,
     parse_query,
 )
-from src.utils.sql import (
-    json_array_between,
-    json_array_compare,
-    json_array_contains,
-    json_array_exists,
-    json_array_like,
-    json_dict_has_key,
-    json_dict_has_value,
-    json_dict_key_like,
-    json_dict_value_like,
-)
 from src.web.services.mappings_query_spec import (
     QueryFieldKind,
     QueryFieldSpec,
@@ -58,8 +43,51 @@ from src.web.state import get_app_state
 __all__ = ["MappingsService", "get_mappings_service"]
 
 
+@dataclass(frozen=True)
+class EdgeView:
+    """Flattened view of an outgoing mapping edge."""
+
+    target_provider: str
+    target_entry_id: str
+    target_scope: str
+    source_range: str
+    destination_range: str | None
+    sources: list[str]
+
+
+@dataclass(frozen=True)
+class MappingItem:
+    """Flattened mapping entry with outgoing edges."""
+
+    provider: str
+    entry_id: str
+    scope: str
+    edges: list[EdgeView]
+    custom: bool
+    sources: list[str]
+    anilist_id: int | None = None
+    anilist: Media | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return a JSON-friendly representation.
+
+        Returns:
+            dict[str, Any]: Mapping item as a dictionary.
+        """
+        return {
+            "provider": self.provider,
+            "entry_id": self.entry_id,
+            "scope": self.scope,
+            "descriptor": f"{self.provider}:{self.entry_id}:{self.scope}",
+            "edges": [edge.__dict__ for edge in self.edges],
+            "custom": self.custom,
+            "sources": self.sources,
+            "anilist": self.anilist.model_dump() if self.anilist else None,
+        }
+
+
 class MappingsService:
-    """Service to manage custom mappings and DB provenance."""
+    """Service to query the v3 mapping graph with booru-like queries."""
 
     _FIELD_MAP: ClassVar[Mapping[str, QueryFieldSpec]] = get_query_field_map()
     _ANILIST_KINDS: ClassVar[frozenset[QueryFieldKind]] = frozenset(
@@ -69,29 +97,48 @@ class MappingsService:
             QueryFieldKind.ANILIST_ENUM,
         }
     )
-
-    # The max AniList results must be greater than the total number of media entries
-    # (21K+ as of 10/2025)
     _ANILIST_MAX_RESULTS: ClassVar[int] = 25000
     _CMP_RE: ClassVar[re.Pattern[str]] = re.compile(r"^(>=|>|<=|<)(\d+)$")
     _RANGE_RE: ClassVar[re.Pattern[str]] = re.compile(r"^(\d+)\.\.(\d+)$")
 
     def __init__(self) -> None:
-        """Initialize service with config and paths."""
+        """Initialise mapping service with query specs and upstream URL."""
         self.upstream_url: str | None = get_config().mappings_url
 
     @staticmethod
     def _fetch_ids(ctx, stmt) -> set[int]:
-        """Executes a statement and returns AniList identifiers."""
-        return {int(aid) for aid in ctx.session.execute(stmt).scalars()}
+        """Execute a statement and return integer identifiers."""
+        return {int(val) for val in ctx.session.execute(stmt).scalars()}
 
+    @staticmethod
+    def _has_wildcards(value: str | None) -> bool:
+        """Check if a string contains wildcard markers."""
+        if value is None:
+            return False
+        return "*" in value or "?" in value
+
+    @staticmethod
+    def _normalize_null(value: str | None) -> str | None:
+        """Interpret the literal 'null' as None for filters."""
+        if value is None:
+            return None
+        if value.strip().lower() == "null":
+            return None
+        return value
+
+    @staticmethod
+    def _like_pattern(value: str) -> str:
+        """Translate wildcards into SQL LIKE pattern."""
+        return value.replace("*", "%").replace("?", "_")
+
+    @staticmethod
     def _parse_numeric_filters(
-        self, raw: Any
+        raw: Any,
     ) -> tuple[tuple[str, int] | None, tuple[int, int] | None, str]:
-        """Parses comparison and range tokens from raw filter input."""
+        """Parse comparison and range tokens from raw filter input."""
         text = "" if raw is None else str(raw)
-        cmp_match = self._CMP_RE.match(text)
-        range_match = self._RANGE_RE.match(text)
+        cmp_match = MappingsService._CMP_RE.match(text)
+        range_match = MappingsService._RANGE_RE.match(text)
         cmp_filter = (
             (cmp_match.group(1), int(cmp_match.group(2))) if cmp_match else None
         )
@@ -239,13 +286,14 @@ class MappingsService:
 
     async def _resolve_anilist_term(
         self,
-        client: AniListClient,
+        client,
         spec: QueryFieldSpec,
         raw_value: str,
+        *,
+        multi_values: tuple[str, ...] | None = None,
     ) -> set[int]:
-        """Resolve AniList-backed query terms into identifier sets."""
-        filters = self._build_anilist_term_filters(spec, raw_value)
-
+        """Resolve AniList-backed query terms into AniList identifier sets."""
+        filters = self._build_anilist_term_filters(spec, raw_value, multi_values)
         try:
             ids = await client.search_media_ids(
                 filters=filters, max_results=self._ANILIST_MAX_RESULTS
@@ -258,7 +306,7 @@ class MappingsService:
             raise AniListSearchError(
                 f"Failed to resolve AniList filter '{spec.key}'"
             ) from exc
-        return set(ids)
+        return {int(aid) for aid in ids}
 
     def _collect_anilist_and_groups(self, node: Node) -> list[list[KeyTerm]]:
         """Collect AniList key term groups that share a direct AND relationship."""
@@ -291,11 +339,6 @@ class MappingsService:
 
             if isinstance(current, Not):
                 visit(current.child)
-                return
-
-            if isinstance(current, ParseResults):
-                for child in current:
-                    visit(child)
                 return
 
             if isinstance(current, list):
@@ -408,7 +451,7 @@ class MappingsService:
 
     @staticmethod
     def _scalar_cmp(column, operator: str, num: int):
-        """Builds a scalar comparison expression for numeric columns."""
+        """Build a scalar comparison expression for numeric columns."""
         if operator == ">":
             return column > num
         if operator == ">=":
@@ -419,300 +462,450 @@ class MappingsService:
             return column <= num
         return None
 
-    def _filter_scalar(
+    def _filter_entry_column(
         self,
         ctx,
         column,
-        cmp_filter: tuple[str, int] | None,
-        range_filter: tuple[int, int] | None,
-        raw_value: str,
-        values: tuple[str, ...] | None = None,
+        raw_value: str | None,
+        values: tuple[str | None, ...] | None = None,
     ) -> set[int]:
-        """Filters scalar columns using comparison or range syntax."""
-        stmt = select(AniMap.anilist_id)
+        """Filter entries by a scalar column supporting wildcards and IN lists."""
+        stmt = select(AnimapEntry.id)
         if values:
-            seen: set[int] = set()
-            numbers: list[int] = []
-            for raw in values:
-                try:
-                    num = int(raw)
-                except (TypeError, ValueError):
-                    return set()
-                if num in seen:
-                    continue
-                seen.add(num)
-                numbers.append(num)
-            if not numbers:
-                return set()
-            return self._fetch_ids(ctx, stmt.where(column.in_(numbers)))
-        if cmp_filter:
-            op, num = cmp_filter
-            cond = self._scalar_cmp(column, op, num)
-            if cond is None:
-                return set()
-            return self._fetch_ids(ctx, stmt.where(cond))
-        if range_filter:
-            lo, hi = range_filter
-            return self._fetch_ids(ctx, stmt.where(and_(column >= lo, column <= hi)))
-        try:
-            num = int(raw_value)
-        except Exception:
-            return set()
-        return self._fetch_ids(ctx, stmt.where(column == num))
-
-    def _filter_json_array(
-        self,
-        ctx,
-        column,
-        numeric: bool,
-        raw_value: str,
-        cmp_filter: tuple[str, int] | None,
-        range_filter: tuple[int, int] | None,
-        values: tuple[str, ...] | None = None,
-    ) -> set[int]:
-        """Filters JSON array columns using scalar or wildcard logic."""
-        stmt = select(AniMap.anilist_id)
-        if numeric:
-            if values:
-                seen: set[int] = set()
-                nums: list[int] = []
-                for raw in values:
-                    try:
-                        val = int(raw)
-                    except (TypeError, ValueError):
-                        return set()
-                    if val in seen:
-                        continue
-                    seen.add(val)
-                    nums.append(val)
-                if not nums:
-                    return set()
-                return self._fetch_ids(
-                    ctx, stmt.where(json_array_contains(column, nums))
-                )
-            if cmp_filter:
-                op, num = cmp_filter
-                return self._fetch_ids(
-                    ctx, stmt.where(json_array_compare(column, op, num))
-                )
-            if range_filter:
-                lo, hi = range_filter
-                return self._fetch_ids(
-                    ctx, stmt.where(json_array_between(column, lo, hi))
-                )
-            try:
-                num = int(raw_value)
-            except Exception:
-                return set()
-            return self._fetch_ids(ctx, stmt.where(json_array_contains(column, [num])))
-        text = raw_value
-        if values:
-            if not any(self._has_wildcards(val) for val in values):
-                unique_values = list(dict.fromkeys(values))
-                if not unique_values:
-                    return set()
-                return self._fetch_ids(
-                    ctx, stmt.where(json_array_contains(column, unique_values))
-                )
-            conditions = []
-            for val in values:
-                if self._has_wildcards(val):
-                    conditions.append(json_array_like(column, val))
+            clauses = []
+            for part in values:
+                if part is None:
+                    clauses.append(column.is_(None))
+                elif self._has_wildcards(part):
+                    clauses.append(column.like(self._like_pattern(part)))
                 else:
-                    conditions.append(json_array_contains(column, [val]))
-            if not conditions:
+                    clauses.append(column == part)
+            if not clauses:
                 return set()
-            return self._fetch_ids(ctx, stmt.where(or_(*conditions)))
-        if self._has_wildcards(text):
-            return self._fetch_ids(ctx, stmt.where(json_array_like(column, text)))
-        return self._fetch_ids(ctx, stmt.where(json_array_contains(column, [text])))
+            return self._fetch_ids(ctx, stmt.where(or_(*clauses)))
 
-    def _filter_json_dict(
+        if raw_value is None:
+            return self._fetch_ids(ctx, stmt.where(column.is_(None)))
+
+        if self._has_wildcards(raw_value):
+            return self._fetch_ids(
+                ctx, stmt.where(column.like(self._like_pattern(raw_value)))
+            )
+
+        return self._fetch_ids(ctx, stmt.where(column == raw_value))
+
+    def _filter_edge_target(
         self,
         ctx,
-        column,
-        raw_value: str,
-        values: tuple[str, ...] | None = None,
+        attr: str,
+        raw_value: str | None,
+        values: tuple[str | None, ...] | None = None,
     ) -> set[int]:
-        """Filters JSON dictionary columns using key/value lookups."""
-        if values:
-            conditions: list[Any] = []
-            for val in values:
-                if self._has_wildcards(val):
-                    conditions.append(json_dict_key_like(column, val))
-                    conditions.append(json_dict_value_like(column, val))
-                else:
-                    if val != "":
-                        conditions.append(json_dict_has_key(column, val))
-                    conditions.append(json_dict_has_value(column, val))
-            if not conditions:
-                return set()
-            stmt = select(AniMap.anilist_id).where(or_(*conditions))
-            return self._fetch_ids(ctx, stmt)
-        text = raw_value
-        conditions: list[Any] = []
-        if self._has_wildcards(text):
-            conditions.append(json_dict_key_like(column, text))
-            conditions.append(json_dict_value_like(column, text))
-        else:
-            if text != "":
-                conditions.append(json_dict_has_key(column, text))
-            conditions.append(json_dict_has_value(column, text))
-        if not conditions:
-            return set()
-        stmt = select(AniMap.anilist_id).where(or_(*conditions))
-        return self._fetch_ids(ctx, stmt)
-
-    @staticmethod
-    def _non_empty_json_object(column):
-        """Builds a predicate ensuring a JSON object column contains entries."""
-        return and_(
-            column.is_not(None),
-            func.json_type(column) == "object",
-            exists(select(1).select_from(func.json_each(column))),
+        """Filter entries that have outgoing edges matching destination attributes."""
+        dest_column = getattr(AnimapEntry, attr)
+        stmt = select(AnimapMapping.source_entry_id).join(
+            AnimapEntry, AnimapEntry.id == AnimapMapping.destination_entry_id
         )
 
-    def _resolve_has(self, ctx, value: str) -> set[int]:
-        """Evaluates ``has`` filters and returns matching identifiers."""
-        norm = value.strip().lower()
-        if norm in ("anilist", "id"):
-            return self._fetch_ids(ctx, select(AniMap.anilist_id))
-        conditions = {
-            "anidb": AniMap.anidb_id.is_not(None),
-            "imdb": json_array_exists(AniMap.imdb_id),
-            "mal": json_array_exists(AniMap.mal_id),
-            "tmdb_movie": json_array_exists(AniMap.tmdb_movie_id),
-            "tmdb_show": AniMap.tmdb_show_id.is_not(None),
-            "tvdb": AniMap.tvdb_id.is_not(None),
-            "tmdb_mappings": self._non_empty_json_object(AniMap.tmdb_mappings),
-            "tvdb_mappings": self._non_empty_json_object(AniMap.tvdb_mappings),
-        }
-        cond = conditions.get(norm)
-        if cond is None:
+        clauses = []
+        target_values = values or (raw_value,)
+        for part in target_values:
+            if part is None:
+                clauses.append(dest_column.is_(None))
+            elif self._has_wildcards(part):
+                clauses.append(dest_column.like(self._like_pattern(part)))
+            else:
+                clauses.append(dest_column == part)
+
+        if not clauses:
             return set()
-        return self._fetch_ids(ctx, select(AniMap.anilist_id).where(cond))
 
-    @staticmethod
-    def _has_wildcards(s: str) -> bool:
-        """Checks whether a search string includes wildcard characters."""
-        return "*" in s or "?" in s
+        return self._fetch_ids(ctx, stmt.where(or_(*clauses)))
 
-    @staticmethod
-    def _collect_provenance(ctx, anilist_ids: Iterable[int]) -> dict[int, list[str]]:
-        """Collects provenance sources for the provided AniList identifiers."""
-        ids = [int(aid) for aid in anilist_ids]
-        result: dict[int, list[str]] = {aid: [] for aid in ids}
+    def _filter_edge_range(
+        self,
+        ctx,
+        attr: str,
+        raw_value: str | None,
+        values: tuple[str | None, ...] | None = None,
+    ) -> set[int]:
+        """Filter entries by source/destination ranges on mappings."""
+        column = getattr(AnimapMapping, attr)
+        stmt = select(AnimapMapping.source_entry_id)
+        clauses = []
+        target_values = values or (raw_value,)
+        for part in target_values:
+            if part is None:
+                clauses.append(column.is_(None))
+            elif self._has_wildcards(part):
+                clauses.append(column.like(self._like_pattern(part)))
+            else:
+                clauses.append(column == part)
+        if not clauses:
+            return set()
+        return self._fetch_ids(ctx, stmt.where(or_(*clauses)))
+
+    def _entry_ids_for_anilist_ids(self, anilist_ids: Iterable[int]) -> set[int]:
+        """Map AniList identifiers to entry IDs, including linked edges."""
+        ids = {int(aid) for aid in anilist_ids if aid is not None}
         if not ids:
-            return result
-        rows = ctx.session.execute(
-            select(
-                AniMapProvenance.anilist_id,
-                AniMapProvenance.n,
-                AniMapProvenance.source,
-            )
-            .where(AniMapProvenance.anilist_id.in_(ids))
-            .order_by(
-                AniMapProvenance.anilist_id.asc(),
-                AniMapProvenance.n.asc(),
-            )
-        ).all()
-        for aid, _n, src in rows:
-            result.setdefault(int(aid), []).append(src)
-        return result
+            return set()
 
-    def _is_custom_source(self, sources: list[str]) -> bool:
-        """Determines whether the latest provenance source is a custom entry."""
-        if not sources:
-            return False
-        last_src = sources[-1]
-        if last_src is None:
-            return False
-        if self.upstream_url:
-            return last_src != self.upstream_url
-        return True
+        with db() as ctx:
+            rows = (
+                ctx.session.execute(
+                    select(AnimapEntry).where(
+                        AnimapEntry.provider == "anilist",
+                        AnimapEntry.entry_id.in_(tuple(str(aid) for aid in ids)),
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            entry_ids = {row.id for row in rows}
+
+            if not entry_ids:
+                return set()
+
+            mappings = (
+                ctx.session.execute(
+                    select(AnimapMapping).where(
+                        or_(
+                            AnimapMapping.source_entry_id.in_(entry_ids),
+                            AnimapMapping.destination_entry_id.in_(entry_ids),
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+
+            for mapping in mappings:
+                entry_ids.add(mapping.source_entry_id)
+                entry_ids.add(mapping.destination_entry_id)
+
+        return entry_ids
+
+    async def _resolve_bare_term(self, term: str) -> set[int]:
+        """Resolve bare AniList search terms to entry identifiers."""
+        client = await get_app_state().ensure_public_anilist()
+        text = self._normalize_text_query(term)
+        if not text:
+            return set()
+        try:
+            ids = await client.search_media_ids(
+                filters={"search": text}, max_results=self._ANILIST_MAX_RESULTS
+            )
+        except (AniListFilterError, AniListSearchError):
+            raise
+        except Exception as exc:
+            if isinstance(exc, asyncio.CancelledError):
+                raise
+            raise AniListSearchError(
+                f"Failed to resolve AniList search term '{term}'"
+            ) from exc
+        return self._entry_ids_for_anilist_ids(ids)
+
+    def _resolve_db_term(self, ctx, term: KeyTerm) -> set[int]:
+        """Resolve a KeyTerm into matching entry identifiers."""
+        spec = self._FIELD_MAP.get(term.key.lower())
+        if not spec:
+            return set()
+
+        raw_value = self._normalize_null(
+            term.value if term.quoted else term.value.strip()
+        )
+        value_parts = (
+            tuple(self._normalize_null(part) for part in term.values)
+            if term.values
+            else None
+        )
+
+        if spec.kind == QueryFieldKind.DB_SCALAR:
+            if not spec.column:
+                return set()
+            return self._filter_entry_column(ctx, spec.column, raw_value, value_parts)
+
+        if spec.kind == QueryFieldKind.DB_EDGE_TARGET:
+            if not spec.edge_field:
+                return set()
+            return self._filter_edge_target(
+                ctx, spec.edge_field, raw_value, value_parts
+            )
+
+        if spec.kind == QueryFieldKind.DB_EDGE_RANGE:
+            if not spec.edge_field:
+                return set()
+            return self._filter_edge_range(ctx, spec.edge_field, raw_value, value_parts)
+
+        return set()
 
     def _build_item(
         self,
-        anilist_id: int,
-        animap: AniMap | None,
-        sources: list[str],
-    ) -> dict[str, Any]:
-        """Builds a response item for list endpoints."""
-        item = {
-            "anilist_id": anilist_id,
-            "custom": self._is_custom_source(sources),
-            "sources": sources,
-        }
-        if not animap:
-            return item
-        item.update(
-            {
-                "anidb_id": animap.anidb_id,
-                "imdb_id": animap.imdb_id,
-                "mal_id": animap.mal_id,
-                "tmdb_movie_id": animap.tmdb_movie_id,
-                "tmdb_show_id": animap.tmdb_show_id,
-                "tvdb_id": animap.tvdb_id,
-                "tmdb_mappings": animap.tmdb_mappings,
-                "tvdb_mappings": animap.tvdb_mappings,
-            }
+        entry: AnimapEntry,
+        edges: Iterable[AnimapMapping],
+        provenance: Mapping[int, list[str]],
+    ) -> MappingItem:
+        """Construct a MappingItem from DB rows."""
+        edge_views: list[EdgeView] = []
+        seen_sources: list[str] = []
+        entry_by_id: dict[int, AnimapEntry] = self._fetch_entries_for_edges(edges)
+
+        for edge in edges:
+            edge_sources = provenance.get(edge.id, [])
+            for src in edge_sources:
+                if src not in seen_sources:
+                    seen_sources.append(src)
+
+            target = entry_by_id.get(edge.destination_entry_id)
+            if not target:
+                continue
+            edge_views.append(
+                EdgeView(
+                    target_provider=target.provider,
+                    target_entry_id=target.entry_id,
+                    target_scope=target.entry_scope,
+                    source_range=edge.source_range,
+                    destination_range=edge.destination_range,
+                    sources=edge_sources,
+                )
+            )
+
+        custom = (
+            any(src != self.upstream_url for src in seen_sources)
+            if seen_sources
+            else False
         )
-        return item
 
-    async def get_mapping(
+        anilist_id = self._resolve_anilist_id(entry, entry_by_id, edges)
+        return MappingItem(
+            provider=entry.provider,
+            entry_id=entry.entry_id,
+            scope=entry.entry_scope,
+            edges=edge_views,
+            custom=custom,
+            sources=seen_sources,
+            anilist_id=anilist_id,
+        )
+
+    def _resolve_anilist_id(
         self,
-        anilist_id: int,
-        *,
-        with_anilist: bool = False,
-    ) -> dict[str, Any]:
-        """Fetch a single mapping entry by AniList identifier.
+        entry: AnimapEntry,
+        entry_by_id: Mapping[int, AnimapEntry],
+        edges: Iterable[AnimapMapping],
+    ) -> int | None:
+        """Pick the first AniList identifier available for a mapping entry."""
 
-        Args:
-            anilist_id (int): AniList identifier to retrieve.
-            with_anilist (bool): Include AniList metadata in the response.
+        def _to_int(value: str | None) -> int | None:
+            try:
+                return int(value) if value is not None else None
+            except (TypeError, ValueError):
+                return None
 
-        Returns:
-            dict[str, Any]: Mapping payload suitable for API responses.
+        if entry.provider == "anilist":
+            return _to_int(entry.entry_id)
 
-        Raises:
-            MappingNotFoundError: If no mapping exists for the identifier.
-        """
-        with db() as ctx:
-            animap = ctx.session.get(AniMap, int(anilist_id))
-            if animap is None:
-                raise MappingNotFoundError("Mapping not found")
+        for edge in edges:
+            target = entry_by_id.get(edge.destination_entry_id)
+            if target and target.provider == "anilist":
+                aid = _to_int(target.entry_id)
+                if aid is not None:
+                    return aid
 
-            sources = self._collect_provenance(ctx, [anilist_id]).get(anilist_id, [])
-            item = self._build_item(anilist_id, animap, sources)
+        return None
 
-        if with_anilist:
-            anilist_client = await get_app_state().ensure_public_anilist()
-            medias = await anilist_client.batch_get_anime([int(anilist_id)])
-            media_map = {m.id: m for m in medias}
-            media = media_map.get(int(anilist_id))
-            if media:
-                item["anilist"] = {
-                    field: getattr(media, field)
-                    for field in AniListMetadata.model_fields
-                    if hasattr(media, field)
-                }
-            else:
-                item["anilist"] = None
+    async def _attach_anilist_metadata(
+        self, items: list[MappingItem]
+    ) -> list[MappingItem]:
+        """Fetch AniList metadata for items with a resolvable AniList ID."""
+        seen_ids: set[int] = set()
+        anilist_ids: list[int] = []
+        for item in items:
+            if item.anilist_id is None:
+                continue
+            if item.anilist_id not in seen_ids:
+                seen_ids.add(item.anilist_id)
+                anilist_ids.append(item.anilist_id)
 
-        return item
+        if not anilist_ids:
+            return items
 
-    @staticmethod
-    def _load_animaps(ctx, anilist_ids: Iterable[int]) -> dict[int, AniMap]:
-        """Loads mapping models keyed by AniList identifier."""
-        ids = list({int(aid) for aid in anilist_ids})
+        client = await get_app_state().ensure_public_anilist()
+        metadata = await client.batch_get_anime(anilist_ids)
+        by_id = {m.id: m for m in metadata}
+
+        return [
+            replace(item, anilist=by_id.get(item.anilist_id or -1)) for item in items
+        ]
+
+    def _fetch_entries_for_edges(
+        self, edges: Iterable[AnimapMapping]
+    ) -> dict[int, AnimapEntry]:
+        ids: set[int] = set()
+        for edge in edges:
+            ids.add(edge.source_entry_id)
+            ids.add(edge.destination_entry_id)
         if not ids:
             return {}
-        result: dict[int, AniMap] = {}
-        for animap in ctx.session.execute(
-            select(AniMap).where(AniMap.anilist_id.in_(ids))
-        ).scalars():
-            result[animap.anilist_id] = animap
-        return result
+        with db() as ctx:
+            rows = (
+                ctx.session.execute(select(AnimapEntry).where(AnimapEntry.id.in_(ids)))
+                .scalars()
+                .all()
+            )
+        return {row.id: row for row in rows}
+
+    def _load_edges_and_provenance(
+        self, entry_ids: Iterable[int]
+    ) -> tuple[Sequence[AnimapMapping], dict[int, list[str]]]:
+        """Load mapping edges and provenance rows for the given entries."""
+        ids = list(entry_ids)
+        if not ids:
+            return [], {}
+
+        with db() as ctx:
+            edge_rows = (
+                ctx.session.execute(
+                    select(AnimapMapping).where(AnimapMapping.source_entry_id.in_(ids))
+                )
+                .scalars()
+                .all()
+            )
+            edge_ids = [edge.id for edge in edge_rows]
+            prov_rows = (
+                ctx.session.execute(
+                    select(AnimapProvenance).where(
+                        AnimapProvenance.mapping_id.in_(edge_ids)
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            provenance: dict[int, list[str]] = {}
+            for row in prov_rows:
+                provenance.setdefault(row.mapping_id, []).append(row.source)
+
+        return edge_rows, provenance
+
+    async def _build_items_for_entries(
+        self,
+        entries: Iterable[AnimapEntry],
+        with_anilist: bool,
+        *,
+        custom_only: bool,
+    ) -> list[MappingItem]:
+        """Construct MappingItem objects for the provided entries."""
+        entry_list = list(entries)
+        if not entry_list:
+            return []
+
+        entry_ids = [e.id for e in entry_list]
+        edge_rows, provenance = self._load_edges_and_provenance(entry_ids)
+
+        items: list[MappingItem] = []
+        for entry in entry_list:
+            entry_edges = [e for e in edge_rows if e.source_entry_id == entry.id]
+            item = self._build_item(entry, entry_edges, provenance)
+            if custom_only and not item.custom:
+                continue
+            items.append(item)
+
+        if with_anilist:
+            return await self._attach_anilist_metadata(items)
+        return items
+
+    def _filter_custom_entry_ids(self, entry_ids: Iterable[int]) -> set[int]:
+        """Return the subset of entry IDs that have a custom provenance source."""
+        ids = list(entry_ids)
+        if not ids:
+            return set()
+
+        upstream = self.upstream_url
+        prov_clause = (
+            AnimapProvenance.source != upstream
+            if upstream
+            else AnimapProvenance.source.is_not(None)
+        )
+
+        custom_ids: set[int] = set()
+        batch_size = 500
+        with db() as ctx:
+            for start in range(0, len(ids), batch_size):
+                chunk = ids[start : start + batch_size]
+                stmt = (
+                    select(AnimapMapping.source_entry_id)
+                    .join(
+                        AnimapProvenance,
+                        AnimapProvenance.mapping_id == AnimapMapping.id,
+                    )
+                    .where(AnimapMapping.source_entry_id.in_(chunk))
+                    .where(prov_clause)
+                )
+                custom_ids.update(self._fetch_ids(ctx, stmt))
+
+        return custom_ids
+
+    def _order_entry_ids(
+        self, ids: set[int], order_hint: dict[int, int] | None
+    ) -> list[int]:
+        if not order_hint:
+            return sorted(ids)
+        return sorted(ids, key=lambda eid: (order_hint.get(eid, 10**9), eid))
+
+    async def _evaluate_query(
+        self, q: str, custom_only: bool
+    ) -> tuple[list[int], dict[int, int] | None]:
+        """Evaluate a booru-like query into ordered entry identifiers."""
+        node = parse_query(q)
+        key_terms = collect_key_terms(node)
+        term_results: dict[int, set[int]] = {}
+
+        client = None
+        # Resolve AniList terms first to hydrate the cache
+        for term in key_terms:
+            spec = self._FIELD_MAP.get(term.key.lower())
+            if not spec or spec.kind not in self._ANILIST_KINDS:
+                continue
+            if client is None:
+                client = await get_app_state().ensure_public_anilist()
+            value_text = term.value if term.quoted else term.value.strip()
+            ids = await self._resolve_anilist_term(
+                client, spec, value_text, multi_values=term.values
+            )
+            entry_ids = self._entry_ids_for_anilist_ids(ids)
+            term_results[id(term)] = entry_ids
+
+        bare_cache: dict[str, set[int]] = {}
+        for term_text in collect_bare_terms(node):
+            bare_cache[term_text] = await self._resolve_bare_term(term_text)
+
+        with db() as ctx:
+            universe_ids = self._fetch_ids(ctx, select(AnimapEntry.id))
+
+            def db_resolver(term: KeyTerm) -> set[int]:
+                spec = self._FIELD_MAP.get(term.key.lower())
+                if spec and spec.kind in self._ANILIST_KINDS:
+                    cached = term_results.get(id(term))
+                    return set(cached or set())
+                return self._resolve_db_term(ctx, term)
+
+            def anilist_resolver(term: str) -> list[int]:
+                return list(bare_cache.get(term, set()))
+
+            eval_res = evaluate(
+                node,
+                db_resolver=db_resolver,
+                anilist_resolver=anilist_resolver,
+                universe_ids=universe_ids,
+            )
+
+        matching_ids: set[int] = set(eval_res.ids)
+        if custom_only and matching_ids:
+            custom_ids = self._filter_custom_entry_ids(matching_ids)
+            matching_ids = matching_ids & custom_ids
+
+        ordered = self._order_entry_ids(matching_ids, eval_res.order_hint)
+        return ordered, eval_res.order_hint if eval_res.used_bare else None
 
     async def list_mappings(
         self,
@@ -721,23 +914,23 @@ class MappingsService:
         per_page: int,
         q: str | None,
         custom_only: bool,
-        with_anilist: bool,
+        with_anilist: bool = False,
         cancel_check: Callable[[], Awaitable[bool]] | None = None,
     ) -> tuple[list[dict[str, Any]], int]:
-        """List mappings with optional booru-like query.
+        """List mapping entries with pagination and optional booru-like query.
 
         Args:
-            page (int): 1-based page number.
-            per_page (int): Number of items per page.
-            q (str | None): Booru-like query string.
-            custom_only (bool): Include only custom mappings.
-            with_anilist (bool): Include AniList metadata.
-            cancel_check (Callable[[], Awaitable[bool]] | None): Async
-                callback returning True when the caller has cancelled the
-                request.
+            page (int): The page number (1-based).
+            per_page (int): The number of items per page.
+            q (str | None): The booru-like query string.
+            custom_only (bool): Whether to include only custom mappings.
+            with_anilist (bool): Whether to attach AniList metadata.
+            cancel_check (Callable[[], Awaitable[bool]] | None): Optional async
+                function to check for cancellation.
 
         Returns:
-            tuple[list[dict[str, Any]], int]: The list of mappings and the total count.
+            tuple[list[dict[str, Any]], int]: A tuple of the list of mapping items
+                and the total number of matching items.
         """
 
         async def ensure_not_cancelled() -> None:
@@ -748,399 +941,132 @@ class MappingsService:
                 raise asyncio.CancelledError
 
         await ensure_not_cancelled()
-        upstream_url = self.upstream_url
 
-        async def resolve_bare_term(term: str) -> list[int]:
-            """Resolve a bare AniList search term using filter-based search."""
-            await ensure_not_cancelled()
-            client = await get_app_state().ensure_public_anilist()
-            text = self._normalize_text_query(term)
-            if not text:
-                return []
+        if q and q.strip():
             try:
-                ids = await client.search_media_ids(
-                    filters={"search": text},
-                    max_results=self._ANILIST_MAX_RESULTS,
-                )
-            except (AniListFilterError, AniListSearchError):
+                ordered_ids, _ = await self._evaluate_query(q, custom_only)
+            except (BooruQuerySyntaxError, AniListFilterError, AniListSearchError):
+                raise
+            except asyncio.CancelledError:
                 raise
             except Exception as exc:
-                if isinstance(exc, asyncio.CancelledError):
-                    raise
-                raise AniListSearchError(
-                    f"Failed to resolve AniList search term '{term}'"
+                raise BooruQueryEvaluationError(
+                    "Failed to evaluate booru query"
                 ) from exc
-            await ensure_not_cancelled()
-            return list(dict.fromkeys(ids))
 
-        items: list[dict[str, Any]] = []
-        total: int = 0
+            total = len(ordered_ids)
+            start = (page - 1) * per_page
+            end = start + per_page
+            page_ids = ordered_ids[start:end]
+            if not page_ids:
+                return [], total
 
-        with db() as ctx:
-            stmt = select(AniMap)
-            sub = (
-                select(
-                    AniMapProvenance.anilist_id,
-                    func.max(AniMapProvenance.n).label("maxn"),
+            with db() as ctx:
+                entries = (
+                    ctx.session.execute(
+                        select(AnimapEntry).where(AnimapEntry.id.in_(page_ids))
+                    )
+                    .scalars()
+                    .all()
                 )
-                .group_by(AniMapProvenance.anilist_id)
-                .subquery()
+
+            # preserve order
+            entry_map = {e.id: e for e in entries}
+            ordered_entries = [entry_map[eid] for eid in page_ids if eid in entry_map]
+            items = await self._build_items_for_entries(
+                ordered_entries, with_anilist, custom_only=custom_only
             )
-            stmt = stmt.outerjoin(
-                sub,
-                sub.c.anilist_id == AniMap.anilist_id,
-            )
-            stmt = stmt.outerjoin(
-                AniMapProvenance,
-                and_(
-                    AniMapProvenance.anilist_id == sub.c.anilist_id,
-                    AniMapProvenance.n == sub.c.maxn,
-                ),
-            )
+            await ensure_not_cancelled()
+            return [item.to_dict() for item in items], total
 
-            ani_term_nodes: dict[tuple[str, tuple[str, ...]], deque[KeyTerm]] = {}
-            term_results: dict[int, set[int]] = {}
+        # Default listing without booru query
+        with db() as ctx:
+            base_stmt = select(AnimapEntry)
 
-            def resolve_db(term: KeyTerm) -> set[int]:
-                """Resolve a KeyTerm into matching AniList identifiers."""
-                lowered = term.key.lower()
-                spec = self._FIELD_MAP.get(lowered)
-                if not spec:
-                    return set()
-                raw_value = term.value if term.quoted else term.value.strip()
-                value_parts = term.values
-                value_key = value_parts or (raw_value,)
-
-                if spec.kind == QueryFieldKind.DB_SCALAR:
-                    if not spec.column:
-                        return set()
-                    if value_parts:
-                        return self._filter_scalar(
-                            ctx,
-                            spec.column,
-                            None,
-                            None,
-                            "",
-                            value_parts,
-                        )
-                    cmp_filter, range_filter, text_value = self._parse_numeric_filters(
-                        raw_value
+            if custom_only:
+                prov_clause = (
+                    AnimapProvenance.source != self.upstream_url
+                    if self.upstream_url
+                    else AnimapProvenance.source.is_not(None)
+                )
+                custom_exists = (
+                    select(1)
+                    .select_from(AnimapProvenance)
+                    .join(
+                        AnimapMapping,
+                        AnimapMapping.id == AnimapProvenance.mapping_id,
                     )
-                    return self._filter_scalar(
-                        ctx, spec.column, cmp_filter, range_filter, text_value
-                    )
+                    .where(AnimapMapping.source_entry_id == AnimapEntry.id)
+                    .where(prov_clause)
+                    .limit(1)
+                    .exists()
+                )
+                base_stmt = base_stmt.where(custom_exists)
 
-                if spec.kind == QueryFieldKind.DB_JSON_ARRAY:
-                    if not spec.column:
-                        return set()
-                    if value_parts:
-                        return self._filter_json_array(
-                            ctx,
-                            spec.column,
-                            bool(spec.json_array_numeric),
-                            "",
-                            None,
-                            None,
-                            value_parts,
-                        )
-                    cmp_filter, range_filter, text_value = self._parse_numeric_filters(
-                        raw_value
-                    )
-                    return self._filter_json_array(
-                        ctx,
-                        spec.column,
-                        bool(spec.json_array_numeric),
-                        text_value,
-                        cmp_filter,
-                        range_filter,
-                    )
+            total = ctx.session.execute(
+                select(func.count()).select_from(base_stmt.subquery())
+            ).scalar_one()
 
-                if spec.kind == QueryFieldKind.DB_JSON_DICT:
-                    if not spec.column:
-                        return set()
-                    if value_parts:
-                        return self._filter_json_dict(ctx, spec.column, "", value_parts)
-                    return self._filter_json_dict(ctx, spec.column, raw_value)
-
-                if spec.kind == QueryFieldKind.DB_HAS:
-                    if value_parts:
-                        result: set[int] = set()
-                        for part in value_parts:
-                            result |= self._resolve_has(ctx, part)
-                        return result
-                    return self._resolve_has(ctx, raw_value)
-
-                if spec.kind in self._ANILIST_KINDS:
-                    cache_key = (spec.key, value_key)
-                    queue = ani_term_nodes.get(cache_key)
-                    if queue:
-                        term_node = queue[0]
-                        cached = term_results.get(id(term_node))
-                        if cached is not None:
-                            queue.popleft()
-                            return set(cached)
-                    return set()
-
-                return set()
-
-            if q and q.strip():
-                try:
-                    node = parse_query(q)
-                except BooruQuerySyntaxError:
-                    raise
-                except Exception as exc:
-                    if isinstance(exc, asyncio.CancelledError):
-                        raise
-                    raise BooruQuerySyntaxError("Invalid query syntax") from exc
-
-                bare_cache: dict[str, list[int]] = {}
-                for term in collect_bare_terms(node):
-                    await ensure_not_cancelled()
-                    bare_cache[term] = await resolve_bare_term(term)
-
-                key_terms = collect_key_terms(node)
-                term_filters: dict[int, dict[str, Any]] = {}
-                term_specs: dict[int, QueryFieldSpec] = {}
-                term_value_texts: dict[int, str] = {}
-                term_value_keys: dict[int, tuple[str, ...]] = {}
-                individual_cache: dict[tuple[str, tuple[str, ...]], set[int]] = {}
-                client = None
-                if key_terms:
-                    for term in key_terms:
-                        await ensure_not_cancelled()
-                        spec = self._FIELD_MAP.get(term.key.lower())
-                        if not spec or spec.kind not in self._ANILIST_KINDS:
-                            continue
-                        term_id = id(term)
-                        value_text = term.value if term.quoted else term.value.strip()
-                        value_parts = term.values or (value_text,)
-                        ani_term_nodes.setdefault(
-                            (spec.key, value_parts), deque()
-                        ).append(term)
-                        term_specs[term_id] = spec
-                        term_value_texts[term_id] = value_text
-                        term_value_keys[term_id] = value_parts
-                        term_filters[term_id] = self._build_anilist_term_filters(
-                            spec, value_text, term.values
-                        )
-
-                    if term_filters:
-                        groups = self._collect_anilist_and_groups(node)
-                        for group in groups:
-                            await ensure_not_cancelled()
-                            if not all(id(term) in term_filters for term in group):
-                                continue
-                            # Combine compatible AniList filters upstream.
-                            combined_filters: dict[str, Any] = {}
-                            conflict = False
-                            for term in group:
-                                for fk, fv in term_filters[id(term)].items():
-                                    existing = combined_filters.get(fk)
-                                    if existing is not None and existing != fv:
-                                        conflict = True
-                                        break
-                                    if existing is None:
-                                        combined_filters[fk] = fv
-                                if conflict:
-                                    break
-                            if conflict:
-                                # Conflicting constraints yield an empty intersection.
-                                for term in group:
-                                    term_results.setdefault(id(term), set())
-                                continue
-                            if client is None:
-                                await ensure_not_cancelled()
-                                client = await get_app_state().ensure_public_anilist()
-                            try:
-                                ids = await client.search_media_ids(
-                                    filters=combined_filters,
-                                    max_results=self._ANILIST_MAX_RESULTS,
-                                )
-                            except (AniListFilterError, AniListSearchError):
-                                raise
-                            except Exception as exc:
-                                if isinstance(exc, asyncio.CancelledError):
-                                    raise
-                                terms_desc = ", ".join(
-                                    f"{t.key}:{t.value.strip()}" for t in group
-                                )
-                                raise AniListSearchError(
-                                    f"Failed to resolve AniList filter group "
-                                    f"'{terms_desc}'"
-                                ) from exc
-                            result_set = set(ids)
-                            for term in group:
-                                term_results[id(term)] = result_set
-
-                    for term in key_terms:
-                        await ensure_not_cancelled()
-                        spec = term_specs.get(id(term))
-                        if not spec:
-                            continue
-                        term_id = id(term)
-                        if term_id in term_results:
-                            continue
-                        value_text = term_value_texts.get(term_id)
-                        value_key = term_value_keys.get(term_id)
-                        if value_text is None or value_key is None:
-                            value_text = (
-                                term.value if term.quoted else term.value.strip()
-                            )
-                            value_key = term.values or (value_text,)
-                            term_value_texts[term_id] = value_text
-                            term_value_keys[term_id] = value_key
-                        filters_dict = term_filters.get(term_id)
-                        if filters_dict is None:
-                            filters_dict = self._build_anilist_term_filters(
-                                spec,
-                                value_text,
-                                term.values,
-                            )
-                            term_filters[term_id] = filters_dict
-                        cache_key = (spec.key, value_key)
-                        cached = individual_cache.get(cache_key)
-                        if cached is None:
-                            if client is None:
-                                await ensure_not_cancelled()
-                                client = await get_app_state().ensure_public_anilist()
-                            try:
-                                ids = await client.search_media_ids(
-                                    filters=filters_dict,
-                                    max_results=self._ANILIST_MAX_RESULTS,
-                                )
-                            except (AniListFilterError, AniListSearchError):
-                                raise
-                            except Exception as exc:
-                                if isinstance(exc, asyncio.CancelledError):
-                                    raise
-                                raise AniListSearchError(
-                                    f"Failed to resolve AniList filter "
-                                    f"'{spec.key}:{value_text}'"
-                                ) from exc
-                            cached = set(ids)
-                            individual_cache[cache_key] = cached
-                        term_results[term_id] = cached
-
-                def anilist_resolver(term: str) -> list[int]:
-                    return bare_cache.get(term, [])
-
-                all_ids = self._fetch_ids(ctx, select(AniMap.anilist_id))
-                try:
-                    eval_res = evaluate(
-                        node,
-                        db_resolver=resolve_db,
-                        anilist_resolver=anilist_resolver,
-                        universe_ids=all_ids,
-                    )
-                except Exception as exc:
-                    if isinstance(exc, asyncio.CancelledError):
-                        raise
-                    raise BooruQueryEvaluationError(
-                        "Failed to evaluate booru query"
-                    ) from exc
-
-                if eval_res.used_bare and eval_res.order_hint:
-                    final_ids = sorted(
-                        list(eval_res.ids),
-                        key=lambda aid: (eval_res.order_hint.get(aid, 10**9), aid),
-                    )
-                else:
-                    final_ids = sorted(list(eval_res.ids))
-
-                await ensure_not_cancelled()
-                sources_by_id = self._collect_provenance(ctx, final_ids)
-                if custom_only and final_ids:
-                    final_ids = [
-                        aid
-                        for aid in final_ids
-                        if self._is_custom_source(sources_by_id.get(aid, []))
-                    ]
-                sources_by_id = {aid: sources_by_id.get(aid, []) for aid in final_ids}
-
-                total = len(final_ids)
-                start = (page - 1) * per_page
-                end = start + per_page
-                page_ids = final_ids[start:end]
-
-                if page_ids:
-                    await ensure_not_cancelled()
-                    rows_map = self._load_animaps(ctx, page_ids)
-                    items = [
-                        self._build_item(
-                            aid,
-                            rows_map.get(aid),
-                            sources_by_id.get(aid, []),
-                        )
-                        for aid in page_ids
-                    ]
-                else:
-                    items = []
-            else:
-                await ensure_not_cancelled()
-                where_clauses: list[Any] = []
-                if custom_only:
-                    if upstream_url:
-                        where_clauses.append(
-                            and_(
-                                AniMapProvenance.source.is_not(None),
-                                AniMapProvenance.source != upstream_url,
-                            )
-                        )
-                    else:
-                        where_clauses.append(AniMapProvenance.source.is_not(None))
-
-                if where_clauses:
-                    stmt = stmt.where(and_(*where_clauses))
-
-                count_stmt = select(func.count()).select_from(stmt.subquery())
-                total = ctx.session.execute(count_stmt).scalar_one()
-
-                paged_stmt = (
-                    stmt.order_by(AniMap.anilist_id.asc())
+            entries = (
+                ctx.session.execute(
+                    base_stmt.order_by(AnimapEntry.provider, AnimapEntry.entry_id)
                     .offset((page - 1) * per_page)
                     .limit(per_page)
                 )
-                animaps = list(ctx.session.execute(paged_stmt).scalars())
-                await ensure_not_cancelled()
-                anilist_ids = [animap.anilist_id for animap in animaps]
-                sources_by_id = self._collect_provenance(ctx, anilist_ids)
-                items = [
-                    self._build_item(
-                        animap.anilist_id,
-                        animap,
-                        sources_by_id.get(animap.anilist_id, []),
-                    )
-                    for animap in animaps
-                ]
+                .scalars()
+                .all()
+            )
 
-        # Optionally fetch AniList metadata for page items only.
-        if with_anilist and items:
-            await ensure_not_cancelled()
-            anilist_client = await get_app_state().ensure_public_anilist()
-            anilist_ids = [int(it["anilist_id"]) for it in items]
-            medias = await anilist_client.batch_get_anime(anilist_ids)
-            by_id = {m.id: m for m in medias}
-            for it in items:
-                await ensure_not_cancelled()
-                m = by_id.get(int(it["anilist_id"]))
-                if m:
-                    it["anilist"] = {
-                        k: getattr(m, k)
-                        for k in AniListMetadata.model_fields
-                        if hasattr(m, k)
-                    }
-                else:
-                    it["anilist"] = None
+        if not entries:
+            return [], total
 
         await ensure_not_cancelled()
-        return items, total
+        items = await self._build_items_for_entries(
+            entries, with_anilist, custom_only=custom_only
+        )
+        await ensure_not_cancelled()
+        return [item.to_dict() for item in items], total
+
+    async def get_mapping(self, descriptor: str) -> dict[str, Any]:
+        """Return a single mapping entry by descriptor.
+
+        Args:
+            descriptor (str): The mapping descriptor to fetch.
+
+        Returns:
+            dict[str, Any]: The mapping item.
+        """
+        parsed = AnimapDescriptor.parse(descriptor)
+        with db() as ctx:
+            entry = (
+                ctx.session.execute(
+                    select(AnimapEntry).where(
+                        AnimapEntry.provider == parsed.provider,
+                        AnimapEntry.entry_id == parsed.entry_id,
+                        AnimapEntry.entry_scope == parsed.scope,
+                    )
+                )
+                .scalars()
+                .first()
+            )
+            if not entry:
+                raise MappingNotFoundError("Mapping not found")
+
+        edge_rows, provenance = self._load_edges_and_provenance([entry.id])
+        item = self._build_item(entry, edge_rows, provenance)
+        return item.to_dict()
 
 
-@lru_cache(maxsize=1)
+_mappings_service: MappingsService | None = None
+
+
 def get_mappings_service() -> MappingsService:
-    """Returns the cached singleton instance of the mappings service.
+    """Return a singleton mappings service instance.
 
     Returns:
-        MappingsService: Shared service instance.
+        MappingsService: The singleton service instance.
     """
-    return MappingsService()
+    global _mappings_service
+    if _mappings_service is None:
+        _mappings_service = MappingsService()
+    return _mappings_service

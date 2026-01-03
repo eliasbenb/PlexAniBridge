@@ -33,7 +33,7 @@ class ColorFormatter(logging.Formatter):
         Bracketed values: Dimmed (e.g., $${key: value}$$)
     """
 
-    COLORS: ClassVar[dict[str, str]] = {
+    COLORS: ClassVar[dict[str, object]] = {
         "DEBUG": Fore.CYAN,
         "INFO": Fore.GREEN,
         "SUCCESS": Fore.GREEN + Style.BRIGHT,

@@ -1,7 +1,5 @@
 # Data
-/data/**
-!/data/config.example.yaml
-!/data/mappings.example.*
+/data/
 
 # Database
 *.db

@@ -28,11 +28,10 @@ if supports_utf8():
 ║  Docker: {"Yes" if get_docker_status() else "No":<69}║
 ║  Author: {f"{__author__} @{__maintainer__}":<69}║
 ║  License: {__license__:<68}║
-║  Repository: https://github.com/eliasbenb/PlexAniBridge                       ║
-║  Documentation: https://anibridge.eliasbenb.dev                            ║
+║  Repository: https://github.com/anibridge/anibridge                       ║
+║  Documentation: https://anibridge.eliasbenb.dev                               ║
 ║                                                                               ║
-╚═══════════════════════════════════════════════════════════════════════════════╝
-    """.strip()
+╚═══════════════════════════════════════════════════════════════════════════════╝""".strip()
 else:
     ANIBDRIGE_HEADER = f"""
 +-------------------------------------------------------------------------------+
@@ -44,8 +43,7 @@ else:
 |  Docker: {"Yes" if get_docker_status() else "No":<69}|
 |  Author: {f"{__author__} @{__maintainer__}":<69}|
 |  License: {__license__:<68}|
-|  Repository: https://github.com/eliasbenb/PlexAniBridge                       |
-|  Documentation: https://anibridge.eliasbenb.dev                            |
+|  Repository: https://github.com/anibridge/anibridge                       |
+|  Documentation: https://anibridge.eliasbenb.dev                               |
 |                                                                               |
-+-------------------------------------------------------------------------------+
-    """.strip()
++-------------------------------------------------------------------------------+""".strip()

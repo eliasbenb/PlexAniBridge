@@ -5,8 +5,10 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
-from anibridge.library import ExternalId, HistoryEntry, MediaKind
+from anibridge.library import HistoryEntry, MediaKind
 from anibridge.list import ListMediaType, ListStatus
+
+from src.core.animap import AnimapDescriptor, AnimapEdge, AnimapGraph
 
 
 class FakeLibraryProvider:
@@ -55,7 +57,7 @@ class FakeLibraryMediaBase:
         on_watchlist: bool = False,
         user_rating: int | None = None,
         view_count: int = 0,
-        ids: Sequence[ExternalId] | None = None,
+        ids: dict[str, str] | None = None,
         history: Sequence[HistoryEntry] | None = None,
         review: str | None = None,
         section: FakeSection | None = None,
@@ -68,7 +70,7 @@ class FakeLibraryMediaBase:
         self._on_watchlist = on_watchlist
         self._user_rating = user_rating
         self._view_count = view_count
-        self._ids = list(ids or [])
+        self._ids = dict(ids or {})
         self._history = list(history or [])
         self._review = review
         self._section = section or FakeSection(key="section-1")
@@ -108,9 +110,9 @@ class FakeLibraryMediaBase:
         """Return the watch history entries for this item."""
         return list(self._history)
 
-    def ids(self) -> list[ExternalId]:
+    def ids(self) -> dict[str, str]:
         """Return the external IDs associated with this item."""
-        return list(self._ids)
+        return dict(self._ids)
 
     async def review(self) -> str | None:
         """Return the user review for this item."""
@@ -242,6 +244,7 @@ class FakeListProvider:
         self.updated_entries: list[tuple[str, FakeListEntry]] = []
         self.batch_updates: list[list[FakeListEntry]] = []
         self.deleted_keys: list[str] = []
+        self.resolved_key: str | None = None
 
     async def get_entry(self, key: str) -> FakeListEntry | None:
         """Return the entry for the given key, or None if not found."""
@@ -266,6 +269,21 @@ class FakeListProvider:
     async def search(self, query: str) -> Sequence[FakeListEntry]:
         """Return the pre-seeded search results."""
         return list(self.search_results)
+
+    def resolve_mappings(
+        self,
+        mapping: AnimapGraph | None,
+        *,
+        scope: str | None = None,
+    ) -> AnimapDescriptor | None:
+        """Optionally resolve a media key from a mapping graph."""
+        if self.resolved_key is not None:
+            return AnimapDescriptor(
+                provider=FakeListProvider.NAMESPACE,
+                entry_id=self.resolved_key,
+                scope=scope or "s1",
+            )
+        return None
 
 
 class FakeListMedia:
@@ -398,15 +416,31 @@ class FakeListEntry:
 
 
 class FakeAnimapClient:
-    """Stub that returns pre-seeded AniMap entries for sync tests."""
+    """Stub that returns a pre-seeded mapping graph for sync tests."""
 
-    def __init__(self, mappings: Sequence[Any] | None = None) -> None:
-        """Initialize the fake AniMap client with optional mappings."""
-        self._mappings = list(mappings or [])
+    def __init__(self, graph: AnimapGraph | None = None) -> None:
+        """Initialize the fake Animap client with an optional graph."""
+        self.graph = graph or AnimapGraph(edges=tuple())
 
-    def get_mappings(self, **_: Any) -> Sequence[Any]:
-        """Return all pre-seeded AniMap entries."""
-        return list(self._mappings)
+    def get_graph_for_ids(self, *_: Any, **__: Any) -> AnimapGraph:
+        """Return the configured mapping graph regardless of inputs."""
+        return self.graph
+
+    @staticmethod
+    def make_graph(
+        source: tuple[str, str, str],
+        target: tuple[str, str, str],
+        source_range: str = "movie",
+        destination_range: str | None = None,
+    ) -> AnimapGraph:
+        """Helper to build a simple one-edge graph for tests."""
+        edge = AnimapEdge(
+            source=AnimapDescriptor(*source),
+            destination=AnimapDescriptor(*target),
+            source_range=source_range,
+            destination_range=destination_range,
+        )
+        return AnimapGraph(edges=(edge,))
 
 
 def make_history_entry(key: str, *, ts: datetime) -> HistoryEntry:

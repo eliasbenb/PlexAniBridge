@@ -5,7 +5,8 @@ from pathlib import Path
 from types import TracebackType
 from typing import TYPE_CHECKING
 
-from sqlalchemy import create_engine, event
+import sqlalchemy.event
+from sqlalchemy.engine import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from src import __file__ as src_file
@@ -90,7 +91,7 @@ class AniBridgeDB:
         )
         log.debug(f"SQLite engine created at $$'{self.db_path}'$$")
 
-        @event.listens_for(engine, "connect")
+        @sqlalchemy.event.listens_for(engine, "connect")
         def _set_sqlite_pragma(dbapi_connection: AsyncAdapt_aioodbc_connection, _):
             """Set SQLite PRAGMA settings on new connections."""
             cur = dbapi_connection.cursor()
@@ -120,6 +121,11 @@ class AniBridgeDB:
         from alembic import command
 
         log.debug("Running database migrations")
+
+        if src_file is None:
+            log.error("Cannot determine source file path for Alembic configuration")
+            raise FileNotFoundError("Source file path is undefined")
+
         cfg = Config()
         cfg.set_main_option(
             "script_location", str(Path(src_file).resolve().parent.parent / "alembic")
@@ -132,6 +138,12 @@ class AniBridgeDB:
         except Exception as e:
             log.error(f"Database migration failed: {e}", exc_info=True)
             raise
+
+        # Ensure ORM metadata tables are present (Alembic is expected to manage
+        # schema migrations for the active models).
+        from src.models.db import Base
+
+        Base.metadata.create_all(self.engine)
 
     def __enter__(self) -> AniBridgeDB:
         """Enters the context manager, returning the database instance."""
