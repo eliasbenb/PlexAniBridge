@@ -99,8 +99,7 @@ class BaseSyncClient[
 
         self.sync_stats = SyncStats()
         self._pin_cache: dict[tuple[str, str], list[str]] = {}
-        self._batch_entries: list[ListEntry] = []
-        self.batch_history_items: list[BatchUpdate[ParentMediaT, ChildMediaT]] = []
+        self._pending_updates: list[BatchUpdate[ParentMediaT, ChildMediaT]] = []
 
         self._field_calculators: dict[
             SyncField,
@@ -434,145 +433,172 @@ class BaseSyncClient[
             )
             return SyncOutcome.SKIPPED
 
-        diff_str = self._format_diff(diff)
+        plan = BatchUpdate(
+            item=item,
+            child=child_item,
+            grandchildren=grandchild_items,
+            mapping=mapping,
+            before=before_snapshot,
+            after=after_snapshot,
+            entry=entry,
+            list_media_key=list_media_key,
+        )
 
+        diff_str = self._format_diff(diff)
+        return await self._dispatch_update(
+            plan,
+            diff_str,
+            debug_title=debug_title,
+            debug_ids=debug_ids,
+        )
+
+    async def _dispatch_update(
+        self,
+        plan: BatchUpdate[ParentMediaT, ChildMediaT],
+        diff_str: str,
+        *,
+        debug_title: str,
+        debug_ids: str,
+    ) -> SyncOutcome:
+        """Queue or apply an update based on batching and dry-run settings."""
         if self.batch_requests:
             log.info(
-                f"[{self.profile_name}] Queuing {item.media_kind.value} "
+                f"[{self.profile_name}] Queuing {plan.item.media_kind.value} "
                 f"for batch sync {debug_title} {debug_ids}"
             )
             log.success(f"\t\tQUEUED UPDATE: {diff_str}")
-            self._batch_entries.append(entry)
-            self.batch_history_items.append(
-                BatchUpdate(
-                    item=item,
-                    child=child_item,
-                    grandchildren=grandchild_items,
-                    mapping=mapping,
-                    before=before_snapshot,
-                    after=after_snapshot,
-                    entry=entry,
-                )
-            )
+            self._pending_updates.append(plan)
             return SyncOutcome.SYNCED
 
+        return await self._apply_update(plan, diff_str, debug_title, debug_ids)
+
+    async def _apply_update(
+        self,
+        plan: BatchUpdate[ParentMediaT, ChildMediaT],
+        diff_str: str,
+        debug_title: str,
+        debug_ids: str,
+    ) -> SyncOutcome:
+        """Apply a single list entry update or short-circuit when dry-run."""
         if self.dry_run:
             log.info(
                 f"[{self.profile_name}] Dry run enabled; skipping sync of "
-                f"{item.media_kind.value} {debug_title} {debug_ids}"
+                f"{plan.item.media_kind.value} {debug_title} {debug_ids}"
             )
             log.success(f"\t\tDRY RUN UPDATE: {diff_str}")
             return SyncOutcome.SKIPPED
 
         try:
-            await self.list_provider.update_entry(after_snapshot.media_key, entry)
+            await self.list_provider.update_entry(plan.after.media_key, plan.entry)
             log.success(
-                f"[{self.profile_name}] Synced {item.media_kind.value} "
+                f"[{self.profile_name}] Synced {plan.item.media_kind.value} "
                 f"{debug_title} {debug_ids}"
             )
             log.success(f"\t\tUPDATE: {diff_str}")
             await self._create_sync_history(
-                item=item,
-                child_item=child_item,
-                grandchild_items=grandchild_items,
-                snapshots=(before_snapshot, after_snapshot),
-                mapping=mapping,
-                list_media_key=list_media_key,
+                item=plan.item,
+                child_item=plan.child,
+                grandchild_items=plan.grandchildren,
+                snapshots=(plan.before, plan.after),
+                mapping=plan.mapping,
+                list_media_key=plan.list_media_key,
                 outcome=SyncOutcome.SYNCED,
             )
             return SyncOutcome.SYNCED
         except Exception as exc:
             log.error(
-                f"[{self.profile_name}] Failed to sync {item.media_kind.value} "
+                f"[{self.profile_name}] Failed to sync {plan.item.media_kind.value} "
                 f"{debug_title} {debug_ids}",
                 exc_info=True,
             )
             await self._create_sync_history(
-                item=item,
-                child_item=child_item,
-                grandchild_items=grandchild_items,
-                snapshots=(before_snapshot, after_snapshot),
-                mapping=mapping,
-                list_media_key=list_media_key,
+                item=plan.item,
+                child_item=plan.child,
+                grandchild_items=plan.grandchildren,
+                snapshots=(plan.before, plan.after),
+                mapping=plan.mapping,
+                list_media_key=plan.list_media_key,
                 outcome=SyncOutcome.FAILED,
                 error_message=str(exc),
             )
             raise
 
+    def _render_diff(self, plan: BatchUpdate[ParentMediaT, ChildMediaT]) -> str:
+        """Render a diff string for a planned update."""
+        diff = diff_snapshots(
+            plan.before,
+            plan.after,
+            set(plan.after.to_dict().keys()),
+        )
+        return self._format_diff(diff)
+
     async def batch_sync(self) -> None:
         """Flush any queued batch updates to the list provider."""
-        if not self._batch_entries:
+        if not self._pending_updates:
             return
 
         log.success(
-            f"[{self.profile_name}] Syncing {len(self._batch_entries)} items "
+            f"[{self.profile_name}] Syncing {len(self._pending_updates)} items "
             f"to list provider in batch mode"
         )
 
         if self.dry_run:
             log.info(
                 f"[{self.profile_name}] Dry run enabled; skipping batch sync of "
-                f"{len(self._batch_entries)} items"
+                f"{len(self._pending_updates)} items"
             )
-            for record in self.batch_history_items:
-                before_snapshot = record.before
-                after_snapshot = record.after
-                diff = diff_snapshots(
-                    before_snapshot,
-                    after_snapshot,
-                    set(after_snapshot.to_dict().keys()),
-                )
-                diff_str = self._format_diff(diff)
+            for update in self._pending_updates:
+                diff_str = self._render_diff(update)
                 debug_title = self._debug_log_title(
-                    item=record.item,
-                    mapping=record.mapping,
-                    media_key=record.after.media_key,
+                    item=update.item,
+                    mapping=update.mapping,
+                    media_key=update.after.media_key,
                 )
                 debug_ids = self._debug_log_ids(
-                    item=record.item,
-                    child_item=record.child,
-                    entry=record.entry,
-                    mapping=record.mapping,
-                    media_key=record.after.media_key,
+                    item=update.item,
+                    child_item=update.child,
+                    entry=update.entry,
+                    mapping=update.mapping,
+                    media_key=update.after.media_key,
                 )
                 log.success(
                     f"[{self.profile_name}] Dry run update for "
-                    f"{record.item.media_kind.value} {debug_title} {debug_ids}"
+                    f"{update.item.media_kind.value} {debug_title} {debug_ids}"
                 )
                 log.success(f"\t\tDRY RUN BATCH UPDATE: {diff_str}")
-            self._batch_entries.clear()
-            self.batch_history_items.clear()
+            self._pending_updates.clear()
             return
 
         try:
-            await self.list_provider.update_entries_batch(self._batch_entries)
-            for record in self.batch_history_items:
+            await self.list_provider.update_entries_batch(
+                [update.entry for update in self._pending_updates]
+            )
+            for update in self._pending_updates:
                 await self._create_sync_history(
-                    item=record.item,
-                    child_item=record.child,
-                    grandchild_items=record.grandchildren,
-                    snapshots=(record.before, record.after),
-                    mapping=record.mapping,
-                    list_media_key=record.after.media_key,
+                    item=update.item,
+                    child_item=update.child,
+                    grandchild_items=update.grandchildren,
+                    snapshots=(update.before, update.after),
+                    mapping=update.mapping,
+                    list_media_key=update.list_media_key,
                     outcome=SyncOutcome.SYNCED,
                 )
         except Exception as exc:
             log.error("Batch sync failed", exc_info=True)
-            for record in self.batch_history_items:
+            for update in self._pending_updates:
                 await self._create_sync_history(
-                    item=record.item,
-                    child_item=record.child,
-                    grandchild_items=record.grandchildren,
-                    snapshots=(record.before, record.after),
-                    mapping=record.mapping,
-                    list_media_key=record.after.media_key,
+                    item=update.item,
+                    child_item=update.child,
+                    grandchild_items=update.grandchildren,
+                    snapshots=(update.before, update.after),
+                    mapping=update.mapping,
+                    list_media_key=update.list_media_key,
                     outcome=SyncOutcome.FAILED,
                     error_message=str(exc),
                 )
             raise
         finally:
-            self._batch_entries.clear()
-            self.batch_history_items.clear()
+            self._pending_updates.clear()
 
     async def _create_sync_history(
         self,

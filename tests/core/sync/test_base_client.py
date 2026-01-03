@@ -379,8 +379,8 @@ async def test_sync_media_batches_when_enabled(
     )
 
     assert result is SyncOutcome.SYNCED
-    assert stub_client._batch_entries == [entry]
-    assert stub_client.batch_history_items
+    assert [update.entry for update in stub_client._pending_updates] == [entry]
+    assert stub_client._pending_updates
     assert provider.updated_entries == []
 
 
@@ -408,8 +408,8 @@ async def test_batch_sync_flushes_history(stub_client: StubSyncClient, sync_db) 
     await stub_client.batch_sync()
 
     assert provider.batch_updates and provider.batch_updates[0][0] is entry
-    assert not stub_client._batch_entries
-    assert not stub_client.batch_history_items
+    assert not [update.entry for update in stub_client._pending_updates]
+    assert not stub_client._pending_updates
 
     with sync_db as ctx:
         history = ctx.session.query(SyncHistory).all()

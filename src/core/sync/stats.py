@@ -387,7 +387,7 @@ class EntrySnapshot:
 
 @dataclass(slots=True)
 class BatchUpdate[ParentMediaT: LibraryMedia, ChildMediaT: LibraryMedia]:
-    """Container for deferred batch updates and associated metadata."""
+    """Container for deferred sync updates and associated metadata."""
 
     item: ParentMediaT
     child: ChildMediaT
@@ -396,3 +396,4 @@ class BatchUpdate[ParentMediaT: LibraryMedia, ChildMediaT: LibraryMedia]:
     before: EntrySnapshot | None
     after: EntrySnapshot
     entry: ListEntry
+    list_media_key: str | None
