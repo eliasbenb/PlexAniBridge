@@ -46,39 +46,44 @@ def validate_configuration():
         bool: True if configuration is valid, False otherwise
     """
     config = get_config()
+
+    def _profile_error(profile_name: str) -> str | None:
+        try:
+            profile_config = config.get_profile(profile_name)
+            log.info(f"AniBridge: Profile $$'{profile_name}'$$: {profile_config!s}")
+        except KeyError as e:
+            return f"AniBridge: Profile $$'{profile_name}'$$ not found: {e}"
+        except ValidationError as e:
+            return (
+                f"AniBridge: Invalid configuration for profile "
+                f"$$'{profile_name}'$$: {e}"
+            )
+        except ValueError as e:
+            return (
+                f"AniBridge: Configuration error for profile $$'{profile_name}'$$: {e}"
+            )
+        except (AttributeError, TypeError) as e:
+            return (
+                f"AniBridge: Configuration structure error for profile "
+                f"$$'{profile_name}'$$: {e}"
+            )
+        return None
+
     try:
         if len(config.profiles) == 0:
             log.warning("AniBridge: No sync profiles configured")
             return True
 
-        for profile_name in config.profiles:
-            try:
-                profile_config = config.get_profile(profile_name)
-                log.info(f"AniBridge: Profile $$'{profile_name}'$$: {profile_config!s}")
-            except KeyError as e:
-                log.error(f"AniBridge: Profile $$'{profile_name}'$$ not found: {e}")
-                return False
-            except ValidationError as e:
-                log.error(
-                    f"AniBridge: Invalid configuration for profile "
-                    f"$$'{profile_name}'$$: {e}"
-                )
-                return False
-            except ValueError as e:
-                log.error(
-                    f"AniBridge: Configuration error for profile "
-                    f"$$'{profile_name}'$$: {e}"
-                )
-                return False
-            except (AttributeError, TypeError) as e:
-                log.error(
-                    f"AniBridge: Configuration structure error for profile "
-                    f"$$'{profile_name}'$$: {e}"
-                )
-                return False
+        errors = [
+            message
+            for profile_name in config.profiles
+            if (message := _profile_error(profile_name)) is not None
+        ]
 
-        return True
+        for message in errors:
+            log.error(message)
 
+        return not errors
     except ValidationError as e:
         log.error(f"AniBridge: Global configuration validation failed: {e}")
         return False
