@@ -35,10 +35,10 @@ dependencies = [
     "aiocache>=0.12.3",
     "aiohttp>=3.13.2",
     "alembic>=1.17.2",
-    "anibridge-anilist-provider @ git+https://github.com/anibridge/anibridge-anilist-provider.git",
-    "anibridge-library-interface @ git+https://github.com/anibridge/anibridge-library-interface.git",
-    "anibridge-list-interface @ git+https://github.com/anibridge/anibridge-list-interface.git",
-    "anibridge-plex-provider @ git+https://github.com/anibridge/anibridge-plex-provider.git",
+    "anibridge-anilist-provider>=0.1.0",
+    "anibridge-library-interface>=0.1.1",
+    "anibridge-list-interface>=0.1.1",
+    "anibridge-plex-provider>=0.1.1",
     "async-lru>=2.0.5",
     "bcrypt>=5.0.0",
     "cachetools>=6.2.3",
@@ -76,12 +76,6 @@ Documentation = "https://anibridge.eliasbenb.dev"
 Homepage = "https://anibridge.eliasbenb.dev"
 Issues = "https://github.com/eliasbenb/PlexAniBridge/issues"
 Source = "https://github.com/eliasbenb/PlexAniBridge"
-
-[tool.hatch.build.targets.wheel]
-packages = ["scripts"]
-
-[tool.hatch.metadata]
-allow-direct-references = true
 
 [tool.ruff]
 exclude = ["alembic"]
@@ -121,12 +115,16 @@ filterwarnings = [
     "ignore:'asyncio.iscoroutinefunction' is deprecated.*:DeprecationWarning:async_lru",
 ]
 
+[tool.uv.build-backend]
+module-name = "scripts"
+module-root = ""
+
 [tool.uv.workspace]
 members = ["docs"]
 
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["uv_build>=0.9.21,<0.10.0"]
+build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
