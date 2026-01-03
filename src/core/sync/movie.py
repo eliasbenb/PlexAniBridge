@@ -9,6 +9,7 @@ from anibridge.list import ListEntry, ListMediaType, ListStatus
 from src.core.animap import MappingGraph
 from src.core.sync.base import BaseSyncClient
 from src.core.sync.stats import ItemIdentifier
+from src.utils.cache import gattl_cache
 
 __all__ = ["MovieSyncClient"]
 
@@ -67,6 +68,10 @@ class MovieSyncClient(BaseSyncClient[LibraryMovie, LibraryMovie, LibraryMovie]):
     ) -> list[ItemIdentifier]:
         return [ItemIdentifier.from_item(item)]
 
+    @gattl_cache(ttl=15, key=lambda self, item: item)
+    async def _get_history(self, item: LibraryMovie):
+        return await item.history()
+
     async def _calculate_status(
         self,
         *,
@@ -77,7 +82,7 @@ class MovieSyncClient(BaseSyncClient[LibraryMovie, LibraryMovie, LibraryMovie]):
         mapping: MappingGraph | None,
     ) -> ListStatus | None:
         has_views = item.view_count > 0
-        history = await item.history()
+        history = await self._get_history(item)
         has_history = bool(history)
 
         if has_views and item.on_watching:
@@ -135,7 +140,7 @@ class MovieSyncClient(BaseSyncClient[LibraryMovie, LibraryMovie, LibraryMovie]):
         entry: ListEntry,
         mapping: MappingGraph | None,
     ) -> datetime | None:
-        history = await item.history()
+        history = await self._get_history(item)
         if not history:
             return None
         return min(record.viewed_at for record in history)
@@ -149,7 +154,7 @@ class MovieSyncClient(BaseSyncClient[LibraryMovie, LibraryMovie, LibraryMovie]):
         entry: ListEntry,
         mapping: MappingGraph | None,
     ) -> datetime | None:
-        history = await item.history()
+        history = await self._get_history(item)
         if not history:
             return None
         return max(record.viewed_at for record in history)
