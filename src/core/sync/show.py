@@ -185,26 +185,37 @@ class ShowSyncClient(BaseSyncClient[LibraryShow, LibrarySeason, LibraryEpisode])
         on_watching = item.on_watching and any(
             episode.on_watching for episode in grandchild_items
         )
-        is_finished = (
+        is_finished = len(grandchild_items) == watched_count
+        is_completed = (
             entry.total_units is not None and watched_count >= entry.total_units
-        ) or (entry.total_units is None and watched_count >= len(grandchild_items))
+        )
 
-        if is_finished:
+        # We've watched all required episodes at least once
+        if is_completed:
+            # We're in the middle of re-watching
             if on_watching and min_view_count >= 1:
                 return ListStatus.REPEATING
             return ListStatus.COMPLETED
 
+        # We're in the middle of the first watchthrough
         if on_watching:
             return ListStatus.CURRENT
 
+        # We've stopped watching partway through or have no more available episodes
         if watched_count:
+            # Either the list or library has incomplete data; assume current
+            if is_finished:  # and not is_completed
+                return ListStatus.CURRENT
+            # We've dropped the show but the user still wants to watch it later
             if item.on_watchlist or child_item.on_watchlist:
                 return ListStatus.PAUSED
             return ListStatus.DROPPED
 
+        # We've had no activity on this show yet but it's on the watchlist
         if item.on_watchlist or child_item.on_watchlist:
             return ListStatus.PLANNING
 
+        # No activity; leave it untracked
         return None
 
     async def _calculate_user_rating(
