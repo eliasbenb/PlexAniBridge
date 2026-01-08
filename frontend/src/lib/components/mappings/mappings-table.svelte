@@ -90,9 +90,9 @@
             case "tmdb_show":
                 return `https://www.themoviedb.org/tv/${entryId}`;
             case "tvdb_movie":
-                return `https://www.thetvdb.com/movies/${entryId}`;
+                return `https://www.thetvdb.com/dereferrer/movie/${entryId}`;
             case "tvdb_show":
-                return `https://www.thetvdb.com/series/${entryId}`;
+                return `https://www.thetvdb.com/dereferrer/series/${entryId}`;
             case "mal":
             case "myanimelist":
                 return `https://myanimelist.net/anime/${entryId}`;
