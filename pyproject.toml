@@ -101,6 +101,9 @@ extend-immutable-calls = [
     "fastapi.param_functions.Security",
 ]
 
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["D"]
+
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 

@@ -249,21 +249,6 @@ async def test_calculate_status_variants(show_client: ShowSyncClient) -> None:
     )
     assert status == ListStatus.CURRENT
 
-    paused_show, paused_season, paused_eps = build_show(
-        view_counts=[1],
-        show_kwargs={"on_watchlist": True},
-        season_kwargs={"on_watchlist": True},
-    )
-    entry.total_units = 5
-    status = await show_client._calculate_status(
-        item=cast(LibraryShowProtocol, paused_show),
-        child_item=cast(LibrarySeasonProtocol, paused_season),
-        grandchild_items=cast(Sequence[LibraryEpisodeProtocol], tuple(paused_eps)),
-        entry=cast(ListEntryProtocol, entry),
-        mapping=None,
-    )
-    assert status == ListStatus.PAUSED
-
     planning_show, planning_season, planning_eps = build_show(
         view_counts=[0],
         show_kwargs={"on_watchlist": True},

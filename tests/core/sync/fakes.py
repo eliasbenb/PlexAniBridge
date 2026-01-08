@@ -5,7 +5,14 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
-from anibridge.library import HistoryEntry, MediaKind
+from anibridge.library import (
+    HistoryEntry,
+    LibraryEpisode,
+    LibraryMovie,
+    LibrarySeason,
+    LibraryShow,
+    MediaKind,
+)
 from anibridge.list import ListMediaType, ListStatus
 
 from src.core.animap import AnimapDescriptor, AnimapEdge, AnimapGraph
@@ -46,6 +53,34 @@ class FakeSection:
 
 class FakeLibraryMediaBase:
     """Base implementation shared by fake library entities."""
+
+    def __hash__(self) -> int:
+        """Stable identity hash used by caching helpers."""
+        return id(self)
+
+    @property
+    def key(self) -> str:
+        return getattr(self, "_key", "")
+
+    @key.setter
+    def key(self, value: str) -> None:
+        self._key = value
+
+    @property
+    def title(self) -> str:
+        return getattr(self, "_title", "")
+
+    @title.setter
+    def title(self, value: str) -> None:
+        self._title = value
+
+    @property
+    def media_kind(self) -> MediaKind:
+        return self._media_kind
+
+    @media_kind.setter
+    def media_kind(self, value: MediaKind) -> None:
+        self._media_kind = value
 
     def __init__(
         self,
@@ -114,6 +149,10 @@ class FakeLibraryMediaBase:
         """Return the external IDs associated with this item."""
         return dict(self._ids)
 
+    def media(self) -> FakeLibraryMediaBase:
+        """Return a provider-native media object."""
+        return self
+
     async def review(self) -> str | None:
         """Return the user review for this item."""
         return self._review
@@ -123,7 +162,7 @@ class FakeLibraryMediaBase:
         return self._section
 
 
-class FakeLibraryMovie(FakeLibraryMediaBase):
+class FakeLibraryMovie(FakeLibraryMediaBase, LibraryMovie):
     """Concrete movie stub."""
 
     def __init__(self, *, key: str, title: str, **kwargs: Any) -> None:
@@ -131,7 +170,7 @@ class FakeLibraryMovie(FakeLibraryMediaBase):
         super().__init__(key=key, title=title, media_kind=MediaKind.MOVIE, **kwargs)
 
 
-class FakeLibraryShow(FakeLibraryMediaBase):
+class FakeLibraryShow(FakeLibraryMediaBase, LibraryShow):
     """Concrete show stub with configurable ordering/children."""
 
     def __init__(
@@ -174,7 +213,7 @@ class FakeLibraryShow(FakeLibraryMediaBase):
         self._seasons = list(seasons)
 
 
-class FakeLibrarySeason(FakeLibraryMediaBase):
+class FakeLibrarySeason(FakeLibraryMediaBase, LibrarySeason):
     """Concrete season stub referencing parent show."""
 
     def __init__(
@@ -202,7 +241,7 @@ class FakeLibrarySeason(FakeLibraryMediaBase):
         return self._show
 
 
-class FakeLibraryEpisode(FakeLibraryMediaBase):
+class FakeLibraryEpisode(FakeLibraryMediaBase, LibraryEpisode):
     """Concrete episode stub referencing parent show and season."""
 
     def __init__(
@@ -413,6 +452,15 @@ class FakeListEntry:
     @finished_at.setter
     def finished_at(self, value: datetime | None) -> None:
         self._finished_at = value
+
+    @property
+    def total_units(self) -> int | None:
+        """Return or set the total units on the provider-native media object."""
+        return getattr(self._media, "total_units", None)
+
+    @total_units.setter
+    def total_units(self, value: int | None) -> None:
+        self._media.total_units = value
 
 
 class FakeAnimapClient:
