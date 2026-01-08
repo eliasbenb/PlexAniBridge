@@ -40,7 +40,7 @@ __all__ = [
     "parse_query",
 ]
 
-pp.ParserElement.enablePackrat()  # Supposed to speed up parsing
+pp.ParserElement.enable_packrat()  # Supposed to speed up parsing
 
 DbResolver = Callable[["KeyTerm"], set[int]]
 AniListResolver = Callable[[str], list[int]]
@@ -109,7 +109,7 @@ def _make_parser() -> pp.ParserElement:
     identifier = pp.Word(pp.alphas, pp.alphanums + "_.")
 
     # Normalize identifier to lowercase
-    identifier = identifier.setParseAction(lambda _s, _loc, t: str(t[0]).lower())
+    identifier = identifier.set_parse_action(lambda _s, _loc, t: str(t[0]).lower())
 
     integer = pp.Word(pp.nums)
     restricted_chars = {"(", ")", "|", "~", '"'}
@@ -119,10 +119,10 @@ def _make_parser() -> pp.ParserElement:
         ch for ch in pp.printables if ch not in (restricted_chars | {","})
     )
     value_word_token = pp.Word(value_word_chars)
-    qstring_token = pp.QuotedString('"', escChar="\\", unquoteResults=True)
+    qstring_token = pp.QuotedString('"', esc_char="\\", unquote_results=True)
 
     # Tokens for comparisons and ranges
-    cmp_op = pp.oneOf("> >= < <=", caseless=False)
+    cmp_op = pp.one_of("> >= < <=", caseless=False)
     cmp_val = pp.Combine(cmp_op + pp.Word(pp.nums))
     range_val = pp.Combine(pp.Word(pp.nums) + pp.Literal("..") + pp.Word(pp.nums))
 
@@ -130,7 +130,7 @@ def _make_parser() -> pp.ParserElement:
         expr: pp.ParserElement, *, quoted: bool = False
     ) -> pp.ParserElement:
         """Wrap a value token parser to produce ParsedValueToken nodes."""
-        return expr.copy().setParseAction(
+        return expr.copy().set_parse_action(
             lambda _s, _loc, toks: ParsedValueToken(
                 text=str(toks[0]) if quoted else str(toks[0]).strip(),
                 quoted=quoted,
@@ -145,7 +145,7 @@ def _make_parser() -> pp.ParserElement:
         | _value_token(integer)
     )
 
-    value = pp.Group(pp.delimitedList(value_atom, delim=","))
+    value = pp.Group(pp.DelimitedList(value_atom, delim=","))
 
     colon = pp.Suppress(":")
 
@@ -178,13 +178,13 @@ def _make_parser() -> pp.ParserElement:
         parts = tuple(dict.fromkeys(tok.text for tok in cleaned))
         return KeyTerm(key=key, value=",".join(parts), values=parts, quoted=False)
 
-    key_term = (identifier + colon + value).setParseAction(_key_term_action)
+    key_term = (identifier + colon + value).set_parse_action(_key_term_action)
 
     # Normalize bare term to string
-    bare_word = word_token.copy().setParseAction(
+    bare_word = word_token.copy().set_parse_action(
         lambda _s, _loc, toks: BareTerm(text=str(toks[0]), quoted=False)
     )
-    bare_qstring = qstring_token.copy().setParseAction(
+    bare_qstring = qstring_token.copy().set_parse_action(
         lambda _s, _loc, toks: BareTerm(text=str(toks[0]), quoted=True)
     )
     bare = bare_qstring | bare_word
@@ -215,7 +215,7 @@ def _make_parser() -> pp.ParserElement:
                 node = OrMarker(cast(Node, node))
         return node
 
-    pref = (pp.ZeroOrMore(tilde | not_kw) + atom).setParseAction(_prefix_action)
+    pref = (pp.ZeroOrMore(tilde | not_kw) + atom).set_parse_action(_prefix_action)
 
     def _and_action(_s, _loc, toks):
         """Handle conjunction of tokens."""
@@ -244,7 +244,7 @@ def _make_parser() -> pp.ParserElement:
             return nodes[0]
         return And(nodes)
 
-    conj = pp.OneOrMore(pref).setParseAction(_and_action)
+    conj = pp.OneOrMore(pref).set_parse_action(_and_action)
 
     def _or_action(_s, _loc, toks):
         """Handle disjunction of tokens separated by |."""
@@ -263,7 +263,7 @@ def _make_parser() -> pp.ParserElement:
         return Or(flattened)
 
     # OR has lower precedence than AND (conjunction)
-    or_expr = (conj + pp.ZeroOrMore(pp.Suppress(pipe) + conj)).setParseAction(
+    or_expr = (conj + pp.ZeroOrMore(pp.Suppress(pipe) + conj)).set_parse_action(
         _or_action
     )
 
@@ -339,7 +339,7 @@ def parse_query(q: str) -> Node:
         return And([])
 
     try:
-        res = PARSER.parseString(q, parseAll=True)
+        res = PARSER.parse_string(q, parse_all=True)
     except pp.ParseBaseException as exc:
         raise BooruQuerySyntaxError(str(exc)) from exc
     node_any = res[0]
