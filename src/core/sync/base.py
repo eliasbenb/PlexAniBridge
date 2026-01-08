@@ -141,11 +141,13 @@ class BaseSyncClient[
 
     def clear_cache(self) -> None:
         """Clear any LRU/TTL caches defined on the client."""
-        for attr in dir(self):
-            value = getattr(self, attr, None)
-            if callable(value) and hasattr(value, "cache_clear"):
-                value.cache_clear()  # type: ignore
+        self.library_provider.clear_cache()
+        self.list_provider.clear_cache()
         self._pin_cache.clear()
+        for v in dir(self):
+            attr = getattr(self, v)
+            if callable(attr) and hasattr(attr, "cache_clear"):
+                attr.cache_clear()
 
     def _get_pinned_fields(self, namespace: str, media_key: str | None) -> list[str]:
         """Return the set of pinned fields for the given list media identifier."""
