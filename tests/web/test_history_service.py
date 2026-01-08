@@ -26,6 +26,8 @@ class DummyMedia:
     key: str
     title: str
     poster_image: str
+    external_url: str
+    labels: dict[str, str]
 
 
 class DummyListEntry:
@@ -33,7 +35,13 @@ class DummyListEntry:
 
     def __init__(self, key: str) -> None:
         """Store the derived media information for a given key."""
-        self._media = DummyMedia(key=key, title=f"List {key}", poster_image=f"L-{key}")
+        self._media = DummyMedia(
+            key=key,
+            title=f"List {key}",
+            poster_image=f"L-{key}",
+            external_url=f"http://list/{key}",
+            labels={"format": "movie"},
+        )
         self.title = self._media.title
 
     def media(self) -> DummyMedia:
@@ -69,7 +77,11 @@ class DummyLibraryItem:
 
     key: str
     title: str
-    poster_image: str
+    _media: DummyMedia
+
+    def media(self) -> DummyMedia:
+        """Return the provider-native media object."""
+        return self._media
 
 
 @dataclass
@@ -97,7 +109,17 @@ class DummyLibraryProvider:
     async def list_items(self, section, keys):
         """Return fake library items for the requested keys."""
         return [
-            DummyLibraryItem(key=k, title=f"Library {k}", poster_image=f"P-{k}")
+            DummyLibraryItem(
+                key=k,
+                title=f"Library {k}",
+                _media=DummyMedia(
+                    key=k,
+                    title=f"Library {k}",
+                    poster_image=f"P-{k}",
+                    external_url=f"http://library/{k}",
+                    labels={"genre": "drama"},
+                ),
+            )
             for k in keys
         ]
 
