@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, ClassVar
 
-from anibridge.library import LibraryMedia, LibraryProvider
+from anibridge.library import LibraryEntry, LibraryProvider
 from anibridge.list import ListEntry, ListProvider, ListStatus, MappingGraph
 from rapidfuzz import fuzz
 
@@ -54,9 +54,9 @@ class FieldRule:
 
 
 class BaseSyncClient[
-    ParentMediaT: LibraryMedia,
-    ChildMediaT: LibraryMedia,
-    GrandchildMediaT: LibraryMedia,
+    ParentMediaT: LibraryEntry,
+    ChildMediaT: LibraryEntry,
+    GrandchildMediaT: LibraryEntry,
 ](ABC):
     """Provider-agnostic base class for media synchronization."""
 
@@ -170,7 +170,7 @@ class BaseSyncClient[
 
     async def process_media(self, item: ParentMediaT) -> None:
         """Process a single library item."""
-        ids_summary = self._format_external_ids(item.ids())
+        ids_summary = self._format_external_ids(item.media().ids())
         log.debug(
             f"[{self.profile_name}] Processing {item.media_kind.value} "
             f"$$'{item.title}'$$ {ids_summary}"
@@ -623,7 +623,7 @@ class BaseSyncClient[
         *,
         item: ParentMediaT,
         child_item: ChildMediaT | None,
-        grandchild_items: Sequence[LibraryMedia] | None,
+        grandchild_items: Sequence[LibraryEntry] | None,
         snapshots: tuple[EntrySnapshot | None, EntrySnapshot | None],
         mapping: MappingGraph | None,
         list_media_key: str | None,
@@ -654,7 +654,7 @@ class BaseSyncClient[
             resolved_list_descriptor.entry_id if resolved_list_descriptor else None
         )
 
-        library_target: LibraryMedia = child_item if child_item is not None else item
+        library_target: LibraryEntry = child_item if child_item is not None else item
         library_namespace = self.library_provider.NAMESPACE
         library_section_key = library_target.section().key
         library_media_key = str(library_target.key)
@@ -771,7 +771,7 @@ class BaseSyncClient[
             return False
         return rule.comparator(current_value, new_value)
 
-    def _format_external_ids(self, ids: dict[str, str | None]) -> str:
+    def _format_external_ids(self, ids: dict[str, str]) -> str:
         """Format external identifiers for debug logging."""
         if not ids:
             return "$${}$$"

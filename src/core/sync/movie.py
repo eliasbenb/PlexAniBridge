@@ -29,7 +29,7 @@ class MovieSyncClient(BaseSyncClient[LibraryMovie, LibraryMovie, LibraryMovie]):
         ]
     ]:
         """Map a library movie to its corresponding list entry."""
-        mapping_graph = self.animap_client.get_graph_for_ids(item.ids())
+        mapping_graph = self.animap_client.get_graph_for_ids(item.media().ids())
         list_media_descriptor = (
             self.list_provider.resolve_mappings(mapping_graph, scope="movie")
             if mapping_graph
@@ -117,7 +117,7 @@ class MovieSyncClient(BaseSyncClient[LibraryMovie, LibraryMovie, LibraryMovie]):
         entry: ListEntry,
         mapping: MappingGraph | None,
     ) -> int | None:
-        total_units = entry.total_units or len(grandchild_items) or 1
+        total_units = entry.media().total_units or len(grandchild_items) or 1
         return total_units if item.view_count > 0 else None
 
     async def _calculate_repeats(
@@ -201,5 +201,9 @@ class MovieSyncClient(BaseSyncClient[LibraryMovie, LibraryMovie, LibraryMovie]):
             )
         if not media_key and entry is not None:
             media_key = entry.media().key
-        ids = {"library_key": child_item.key, "list_key": media_key, **item.ids()}
+        ids = {
+            "library_key": child_item.key or "",
+            "list_key": media_key or "",
+            **item.media().ids(),
+        }
         return self._format_external_ids(ids)

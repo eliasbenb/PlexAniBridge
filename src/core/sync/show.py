@@ -58,7 +58,7 @@ class ShowSyncClient(BaseSyncClient[LibraryShow, LibrarySeason, LibraryEpisode])
             if ep.season_index in wanted_indexes:
                 episodes_by_season[ep.season_index].append(ep)
 
-        mapping_graph = self.animap_client.get_graph_for_ids(item.ids())
+        mapping_graph = self.animap_client.get_graph_for_ids(item.media().ids())
         entry_cache: dict[str, ListEntry | None] = {}
 
         async def get_entry_cached(key: str) -> ListEntry | None:
@@ -154,7 +154,8 @@ class ShowSyncClient(BaseSyncClient[LibraryShow, LibrarySeason, LibraryEpisode])
         filtered = [
             entry
             for entry in tv_results
-            if entry.total_units is None or entry.total_units == episode_count
+            if entry.media().total_units is None
+            or entry.media().total_units == episode_count
         ]
         candidates = filtered or tv_results
         return self._best_search_result(item.title, candidates)
@@ -186,9 +187,8 @@ class ShowSyncClient(BaseSyncClient[LibraryShow, LibrarySeason, LibraryEpisode])
             episode.on_watching for episode in grandchild_items
         )
         is_finished = len(grandchild_items) == watched_count
-        is_completed = (
-            entry.total_units is not None and watched_count >= entry.total_units
-        )
+        _total_units = entry.media().total_units
+        is_completed = _total_units is not None and watched_count >= _total_units
 
         # We've watched all required episodes at least once
         if is_completed:
@@ -248,7 +248,7 @@ class ShowSyncClient(BaseSyncClient[LibraryShow, LibrarySeason, LibraryEpisode])
         mapping: MappingGraph | None,
     ) -> int | None:
         watched = len([episode for episode in grandchild_items if episode.view_count])
-        total_units = entry.total_units or len(grandchild_items)
+        total_units = entry.media().total_units or len(grandchild_items)
         if total_units:
             return min(watched, total_units)
         return watched or None
@@ -304,7 +304,7 @@ class ShowSyncClient(BaseSyncClient[LibraryShow, LibrarySeason, LibraryEpisode])
         entry: ListEntry,
         mapping: MappingGraph | None,
     ) -> str | None:
-        if entry.total_units == 1 and len(grandchild_items) == 1:
+        if entry.media().total_units == 1 and len(grandchild_items) == 1:
             review = await grandchild_items[0].review()
             if review:
                 return review
@@ -341,7 +341,11 @@ class ShowSyncClient(BaseSyncClient[LibraryShow, LibrarySeason, LibraryEpisode])
             )
         if not media_key and entry is not None:
             media_key = entry.media().key
-        ids = {"library_key": child_item.key, "list_key": media_key, **item.ids()}
+        ids = {
+            "library_key": child_item.key or "",
+            "list_key": media_key or "",
+            **item.media().ids(),
+        }
         return self._format_external_ids(ids)
 
     @glru_cache(maxsize=32, key=lambda self, item: item)

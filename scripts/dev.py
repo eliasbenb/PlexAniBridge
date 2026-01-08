@@ -120,7 +120,9 @@ def bump_version() -> None:
 
         print_info("Updating dependencies with new version...")
         subprocess.run(
-            ["uv", "sync", "--all-groups", "--all-packages"], cwd=ROOT_DIR, check=True
+            ["uv", "sync", "--all-extras", "--all-groups", "--all-packages"],
+            cwd=ROOT_DIR,
+            check=True,
         )
     except subprocess.CalledProcessError:
         print_error("Version bump failed!")
@@ -180,7 +182,7 @@ def deps_install() -> None:
         if target in ("both", "backend"):
             print_info("Installing Python dependencies...")
             subprocess.run(
-                ["uv", "sync", "--all-groups", "--all-packages"],
+                ["uv", "sync", "--all-extras", "--all-groups", "--all-packages"],
                 cwd=ROOT_DIR,
                 check=True,
             )
@@ -209,7 +211,14 @@ def deps_upgrade() -> None:
         if target in ("both", "backend"):
             print_info("Upgrading Python dependencies...")
             subprocess.run(
-                ["uv", "sync", "--upgrade", "--all-groups", "--all-packages"],
+                [
+                    "uv",
+                    "sync",
+                    "--upgrade",
+                    "--all-extras",
+                    "--all-groups",
+                    "--all-packages",
+                ],
                 cwd=ROOT_DIR,
                 check=True,
             )

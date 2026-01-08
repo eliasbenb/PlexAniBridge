@@ -1,6 +1,6 @@
 [project]
 name = "AniBridge"
-version = "1.10.1"
+version = "2.0.0"
 description = "The smart way to keep your AniList profile perfectly synchronized with your Plex library."
 readme = "README.md"
 requires-python = ">=3.14"
@@ -35,10 +35,10 @@ dependencies = [
     "aiocache>=0.12.3",
     "aiohttp>=3.13.2",
     "alembic>=1.17.2",
-    "anibridge-anilist-provider>=0.1.0",
-    "anibridge-library-interface>=0.1.1",
-    "anibridge-list-interface>=0.1.1",
-    "anibridge-plex-provider>=0.1.1",
+    "anibridge-anilist-provider>=0.1.1,<0.2.0",
+    "anibridge-library-base>=0.1.1",
+    "anibridge-list-base>=0.1.1",
+    "anibridge-plex-provider>=0.1.1,<0.2.0",
     "async-lru>=2.0.5",
     "bcrypt>=5.0.0",
     "cachetools>=6.2.3",
@@ -68,8 +68,6 @@ ab-lint = "scripts.dev:lint"
 ab-start = "scripts.dev:start"
 ab-test = "scripts.dev:test"
 ab-openapi = "scripts.openapi:main"
-ab-docs-build = "scripts.dev:docs_build"
-ab-docs-serve = "scripts.dev:docs_serve"
 
 [project.urls]
 Documentation = "https://anibridge.eliasbenb.dev"
@@ -119,16 +117,13 @@ filterwarnings = [
 module-name = "scripts"
 module-root = ""
 
-[tool.uv.workspace]
-members = ["docs"]
-
 [build-system]
 requires = ["uv_build>=0.9.21,<0.10.0"]
 build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
-    "py-spy>=0.4.1",
+    "py-spy @ git+https://github.com/czardoz/py-spy.git", # Until upstream suports Python 3.14
     "pytest>=9.0.0",
     "pytest-asyncio>=1.3.0",
     "pytest-cov>=7.0.0",

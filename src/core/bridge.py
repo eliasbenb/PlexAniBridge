@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 
 from anibridge.library import (
-    LibraryMedia,
+    LibraryEntry,
     LibraryProvider,
     LibrarySection,
     MediaKind,
@@ -395,7 +395,7 @@ class BridgeClient:
 
         return sync_client.sync_stats
 
-    async def _prefetch_list_entries(self, items: Sequence[LibraryMedia]) -> None:
+    async def _prefetch_list_entries(self, items: Sequence[LibraryEntry]) -> None:
         """Prefetch list entries for the provided media items when batching."""
         # Prefetch is intentionally a no-op for the v3 mapping graph while
         # provider-side resolution is being migrated.

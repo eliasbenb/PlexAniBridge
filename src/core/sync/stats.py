@@ -6,8 +6,8 @@ from datetime import UTC, datetime
 from typing import Any, Literal, cast
 
 from anibridge.library import (
+    LibraryEntry,
     LibraryEpisode,
-    LibraryMedia,
     LibrarySeason,
     MediaKind,
 )
@@ -43,7 +43,7 @@ class ItemIdentifier(BaseModel):
     repr: str | None = None  # Cached string representation
 
     @classmethod
-    def from_item(cls, item: LibraryMedia) -> ItemIdentifier:
+    def from_item(cls, item: LibraryEntry) -> ItemIdentifier:
         """Create an identifier from a library media entity."""
         kwargs: dict[str, Any] = {
             "rating_key": item.key,
@@ -73,11 +73,11 @@ class ItemIdentifier(BaseModel):
         return cls(**kwargs)
 
     @classmethod
-    def from_items(cls, items: Sequence[LibraryMedia]) -> Sequence[ItemIdentifier]:
+    def from_items(cls, items: Sequence[LibraryEntry]) -> Sequence[ItemIdentifier]:
         """Create ItemIdentifiers from a sequence of library media objects.
 
         Args:
-            items (Sequence[LibraryMedia]): List of library media objects
+            items (Sequence[LibraryEntry]): List of library media objects
 
         Returns:
             Sequence[ItemIdentifier]: List of identifiers for the media items
@@ -386,12 +386,12 @@ class EntrySnapshot:
 
 
 @dataclass(slots=True)
-class BatchUpdate[ParentMediaT: LibraryMedia, ChildMediaT: LibraryMedia]:
+class BatchUpdate[ParentMediaT: LibraryEntry, ChildMediaT: LibraryEntry]:
     """Container for deferred sync updates and associated metadata."""
 
     item: ParentMediaT
     child: ChildMediaT
-    grandchildren: Sequence[LibraryMedia]
+    grandchildren: Sequence[LibraryEntry]
     mapping: MappingGraph | None
     before: EntrySnapshot | None
     after: EntrySnapshot
