@@ -123,12 +123,6 @@
     const timelineCoverImage = (item: HistoryItem): string | null =>
         item.list_media?.poster_url ?? item.library_media?.poster_url ?? null;
 
-    const timelineListUrl = (item: HistoryItem): string | null =>
-        item.list_media?.external_url ?? null;
-
-    const timelineLibraryUrl = (item: HistoryItem): string | null =>
-        item.library_media?.external_url ?? null;
-
     function toHistoryItem(
         key: RowKey,
         pin: PinResponse | null | undefined,
@@ -521,8 +515,6 @@
                                     meta={PINNED_META}
                                     displayTitle={timelineDisplayTitle}
                                     coverImage={timelineCoverImage}
-                                    listUrl={timelineListUrl}
-                                    libraryUrl={timelineLibraryUrl}
                                     hasPins={true}
                                     togglePins={() => toggleRow(rowKey)}
                                     openPins={expanded[rowKey] || false}
@@ -596,8 +588,6 @@
                                     {meta}
                                     displayTitle={timelineDisplayTitle}
                                     coverImage={timelineCoverImage}
-                                    listUrl={timelineListUrl}
-                                    libraryUrl={timelineLibraryUrl}
                                     hasPins={true}
                                     togglePins={() => toggleRow(rowKey)}
                                     openPins={expanded[rowKey] || false}

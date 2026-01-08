@@ -13,6 +13,7 @@ export interface ProviderMediaMetadata {
     title?: string | null;
     poster_url?: string | null;
     external_url?: string | null;
+    labels?: string[] | null;
 }
 
 // --- Mappings API ---

@@ -100,6 +100,8 @@ class HistoryService:
                 key=media.key,
                 title=media.title,
                 poster_url=media.poster_image,
+                external_url=media.external_url,
+                labels=(list(media.labels) if media.labels else None),
             )
         return metadata
 
@@ -145,7 +147,8 @@ class HistoryService:
                     namespace=namespace,
                     key=key,
                     title=item.title,
-                    poster_url=item.poster_image,
+                    poster_url=item.media().poster_image,
+                    external_url=item.media().external_url,
                 )
         return metadata
 

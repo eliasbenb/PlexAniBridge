@@ -127,14 +127,6 @@
         return item.list_media?.poster_url ?? item.library_media?.poster_url ?? null;
     }
 
-    function listUrl(item: HistoryItem) {
-        return item.list_media?.external_url ?? null;
-    }
-
-    function libraryUrl(item: HistoryItem) {
-        return item.library_media?.external_url ?? null;
-    }
-
     async function deleteHistory(item: HistoryItem) {
         if (!confirm("Delete this history entry?")) return;
         try {
@@ -456,8 +448,6 @@
                 {isProfileRunning}
                 {displayTitle}
                 {coverImage}
-                {listUrl}
-                {libraryUrl}
                 {canRetry}
                 {retryHistory}
                 retryLoading={retryLoading[item.id] || false}

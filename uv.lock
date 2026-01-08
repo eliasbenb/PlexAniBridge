@@ -174,7 +174,7 @@ dev = [
 
 [[package]]
 name = "anibridge-anilist-provider"
-version = "0.1.1"
+version = "0.1.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
@@ -183,9 +183,9 @@ dependencies = [
     { name = "limiter" },
     { name = "pydantic" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/26/0c/4215a17846b785dabee01a577a6e7b7d1c3eb6f9be4e719e589ec4a97df1/anibridge_anilist_provider-0.1.1.tar.gz", hash = "sha256:9eb2a2d0d2a0611b3e76b06525658a039e643cd905c1babea9aa73e80c2dcc37", size = 13375, upload-time = "2026-01-08T00:16:22.264Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/25/57/9be8d9655eb655ccfc540c2029810e20faba7d40cb06492575befbde42a6/anibridge_anilist_provider-0.1.2.tar.gz", hash = "sha256:3474db3c75f3f269e4d08689df5899a410e8e5b0178b42bf6f3b4227306c537b", size = 13626, upload-time = "2026-01-08T15:02:27.952Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/70/b2/4167ed48795f2b2b06844d32d900e24c7bb4ca0e7743dd376bb226d3b5e3/anibridge_anilist_provider-0.1.1-py3-none-any.whl", hash = "sha256:d25f7dfc97e255b9023dccfa93ef8f2ab02f47fc599c8dcbb3996f46bb9fcd6b", size = 15328, upload-time = "2026-01-08T00:16:20.286Z" },
+    { url = "https://files.pythonhosted.org/packages/00/6f/1cf68ea333771d0e857b09a37c77f386d22ffdee9bb8db2c3e70cf60c0c5/anibridge_anilist_provider-0.1.2-py3-none-any.whl", hash = "sha256:6bd722c0c82668e24949f85a1412f73421b802ddcc8095ef8141636a12ec612f", size = 15577, upload-time = "2026-01-08T15:02:26.933Z" },
 ]
 
 [[package]]
@@ -1264,15 +1264,15 @@ wheels = [
 
 [[package]]
 name = "sentry-sdk"
-version = "2.48.0"
+version = "2.49.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "certifi" },
     { name = "urllib3" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/40/f0/0e9dc590513d5e742d7799e2038df3a05167cba084c6ca4f3cdd75b55164/sentry_sdk-2.48.0.tar.gz", hash = "sha256:5213190977ff7fdff8a58b722fb807f8d5524a80488626ebeda1b5676c0c1473", size = 384828, upload-time = "2025-12-16T14:55:41.722Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/02/94/23ac26616a883f492428d9ee9ad6eee391612125326b784dbfc30e1e7bab/sentry_sdk-2.49.0.tar.gz", hash = "sha256:c1878599cde410d481c04ef50ee3aedd4f600e4d0d253f4763041e468b332c30", size = 387228, upload-time = "2026-01-08T09:56:25.642Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/4d/19/8d77f9992e5cbfcaa9133c3bf63b4fbbb051248802e1e803fed5c552fbb2/sentry_sdk-2.48.0-py2.py3-none-any.whl", hash = "sha256:6b12ac256769d41825d9b7518444e57fa35b5642df4c7c5e322af4d2c8721172", size = 414555, upload-time = "2025-12-16T14:55:40.152Z" },
+    { url = "https://files.pythonhosted.org/packages/88/43/1c586f9f413765201234541857cb82fda076f4b0f7bad4a0ec248da39cf3/sentry_sdk-2.49.0-py2.py3-none-any.whl", hash = "sha256:6ea78499133874445a20fe9c826c9e960070abeb7ae0cdf930314ab16bb97aa0", size = 415693, upload-time = "2026-01-08T09:56:21.872Z" },
 ]
 
 [[package]]

@@ -19,6 +19,7 @@
     import TimelineManagePins from "$lib/components/timeline/timeline-manage-pins.svelte";
     import type { ItemDiffUi, OutcomeMeta } from "$lib/components/timeline/types";
     import type { HistoryItem } from "$lib/types/api";
+    import {titleCase} from "$lib/components/timeline/utils";
 
     export interface PinsPanelContext {
         item: HistoryItem;
@@ -36,8 +37,6 @@
         meta: OutcomeMeta;
         displayTitle: (item: HistoryItem) => string | null;
         coverImage: (item: HistoryItem) => string | null;
-        listUrl?: (item: HistoryItem) => string | null;
-        libraryUrl?: (item: HistoryItem) => string | null;
         canRetry?: (item: HistoryItem) => boolean;
         retryHistory?: (item: HistoryItem) => void;
         retryLoading?: boolean;
@@ -70,8 +69,6 @@
         meta,
         displayTitle,
         coverImage,
-        listUrl = () => null,
-        libraryUrl = () => null,
         canRetry = () => false,
         retryHistory = () => undefined,
         retryLoading = false,
@@ -143,31 +140,7 @@
         aria-hidden="true">
     </div>
     <div class="flex min-w-0 flex-1 items-stretch gap-3">
-        {#if listUrl(item)}
-            <!-- eslint-disable svelte/no-navigation-without-resolve -->
-            <a
-                href={listUrl(item)}
-                target="_blank"
-                rel="noopener"
-                class="timeline-cover block shrink-0">
-                {#if coverImage(item)}
-                    <div
-                        class="timeline-cover-frame relative h-full w-full overflow-hidden rounded-md border border-slate-800 bg-slate-800/40">
-                        <img
-                            src={coverImage(item)!}
-                            alt={displayTitle(item) || "Cover"}
-                            loading="lazy"
-                            class="timeline-cover-img h-full w-full object-cover transition-[filter] duration-150 ease-out group-hover:blur-none" />
-                    </div>
-                {:else}
-                    <div
-                        class="timeline-cover-fallback flex h-full w-full items-center justify-center rounded-md border border-dashed border-slate-700 bg-slate-800/30 text-[9px] text-slate-500 select-none">
-                        No Art
-                    </div>
-                {/if}
-            </a>
-            <!-- eslint-enable svelte/no-navigation-without-resolve -->
-        {:else if coverImage(item)}
+        {#if coverImage(item)}
             <div class="timeline-cover shrink-0">
                 <div
                     class="timeline-cover-frame relative h-full w-full overflow-hidden rounded-md border border-slate-800 bg-slate-800/40">
@@ -202,32 +175,32 @@
                     <div
                         class="chip-scroll space-y-1 overflow-x-auto mask-[linear-gradient(to_right,black,black_calc(100%-10px),transparent)] whitespace-nowrap">
                         <div class="flex items-center gap-1 text-[10px] text-slate-300">
-                            {#if listUrl(item)}
+                            {#if item.list_media?.external_url}
                                 <!-- eslint-disable svelte/no-navigation-without-resolve -->
                                 <a
-                                    href={listUrl(item)!}
+                                    href={item.list_media.external_url}
                                     target="_blank"
                                     rel="noopener"
                                     class="inline-flex items-center gap-1 rounded-md border border-sky-600/60 bg-sky-700/50 px-1.5 py-0.5 text-[10px] font-semibold text-sky-100 hover:bg-sky-600/60"
                                     title="Open in List">
                                     <ExternalLink
                                         class="inline h-3.5 w-3.5 text-[11px]" />
-                                    {item.list_namespace || "List"}
+                                    {titleCase(item.list_namespace || "list")}
                                 </a>
                                 <!-- eslint-enable svelte/no-navigation-without-resolve -->
                             {/if}
 
-                            {#if libraryUrl(item)}
+                            {#if item.library_media?.external_url}
                                 <!-- eslint-disable svelte/no-navigation-without-resolve -->
                                 <a
-                                    href={libraryUrl(item)!}
+                                    href={item.library_media.external_url}
                                     target="_blank"
                                     rel="noopener"
                                     class="inline-flex items-center gap-1 rounded-md border border-amber-600 bg-amber-700/60 px-1.5 py-0.5 text-[10px] text-amber-100 transition-colors hover:bg-amber-600/60"
                                     title="Open in Library">
                                     <ExternalLink
                                         class="inline h-3.5 w-3.5 text-[11px]" />
-                                    {item.library_namespace || "Library"}
+                                    {titleCase(item.library_namespace || "library")}
                                 </a>
                                 <!-- eslint-enable svelte/no-navigation-without-resolve -->
                             {/if}
@@ -252,24 +225,15 @@
                                 </span>
                             {/if}
 
-                            <span
-                                class="inline-flex items-center rounded bg-slate-800/70 px-1.5 py-0.5 tracking-wide text-slate-400 uppercase">
-                                {item.library_namespace}
-                                {item.library_media_key}
-                            </span>
-                            {#if item.list_namespace && item.list_media_key}
-                                <span
-                                    class="inline-flex items-center rounded bg-slate-800/70 px-1.5 py-0.5 tracking-wide text-slate-400 uppercase">
-                                    {item.list_namespace}
-                                    {item.list_media_key}
-                                </span>
+                            {#if item.list_media?.labels}
+                                {#each item.list_media?.labels as label (label)}
+                                    <span
+                                        class="inline-flex items-center rounded bg-slate-800/70 px-1.5 py-0.5 tracking-wide text-slate-200 uppercase">
+                                        {label}
+                                    </span>
+                                {/each}
                             {/if}
-                            {#if item.media_kind}
-                                <span
-                                    class="inline-flex items-center rounded bg-slate-800/70 px-1.5 py-0.5 tracking-wide text-slate-400 uppercase">
-                                    {item.media_kind}
-                                </span>
-                            {/if}
+
                         </div>
                         <div class="mt-2 flex items-center gap-2">
                             {#if canShowDiff(item)}

@@ -13,3 +13,4 @@ class ProviderMediaMetadata(BaseModel):
     title: str | None = None
     poster_url: str | None = None
     external_url: str | None = None
+    labels: list[str] | None = None
