@@ -110,18 +110,18 @@ class BaseSyncClient[
         profile_name: str,
     ) -> None:
         """Initialize the base synchronisation client."""
-        self.library_provider = library_provider
-        self.list_provider = list_provider
-        self.animap_client = animap_client
+        self.library_provider: LibraryProvider = library_provider
+        self.list_provider: ListProvider = list_provider
+        self.animap_client: AnimapClient = animap_client
         self.excluded_sync_fields = {field.value for field in excluded_sync_fields}
-        self.full_scan = full_scan
-        self.destructive_sync = destructive_sync
-        self.search_fallback_threshold = search_fallback_threshold
-        self.batch_requests = batch_requests
-        self.dry_run = dry_run
-        self.profile_name = profile_name
+        self.full_scan: bool = full_scan
+        self.destructive_sync: bool = destructive_sync
+        self.search_fallback_threshold: int = search_fallback_threshold
+        self.batch_requests: bool = batch_requests
+        self.dry_run: bool = dry_run
+        self.profile_name: str = profile_name
 
-        self.sync_stats = SyncStats()
+        self.sync_stats: SyncStats = SyncStats()
         self._pin_cache: dict[tuple[str, str], list[str]] = {}
         self._pending_updates: list[BatchUpdate[ParentMediaT, ChildMediaT]] = []
         self._failure_history_cleanup_queue: set[tuple[str, str]] = set()

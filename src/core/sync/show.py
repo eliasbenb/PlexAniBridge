@@ -4,7 +4,6 @@ from collections import defaultdict
 from collections.abc import AsyncIterator, Sequence
 from dataclasses import dataclass
 from datetime import datetime
-from typing import cast
 
 from anibridge.library import (
     HistoryEntry,
@@ -13,7 +12,6 @@ from anibridge.library import (
     LibraryShow,
 )
 from anibridge.list import ListEntry, ListMediaType, ListStatus
-from anibridge.list import MappingGraph as ListMappingGraph
 
 from src.core.animap import MappingGraph
 from src.core.sync.base import BaseSyncClient
@@ -75,9 +73,7 @@ class ShowSyncClient(BaseSyncClient[LibraryShow, LibrarySeason, LibraryEpisode])
         def resolve_key(scope: str) -> tuple[str | None, bool]:
             """Attempt to resolve a media key for the given scope."""
             if (
-                r := self.list_provider.resolve_mappings(
-                    cast(ListMappingGraph, mapping_graph), scope=scope
-                )
+                r := self.list_provider.resolve_mappings(mapping_graph, scope=scope)
             ) is not None:
                 return str(r.entry_id), True
             return None, False
