@@ -386,12 +386,15 @@ class BridgeClient:
                     exc_info=True,
                 )
 
-        if self.profile_config.batch_requests:
-            if self.current_sync is not None:
-                self.current_sync = self.current_sync.model_copy(
-                    update={"stage": "finalizing"}
-                )
-            await sync_client.batch_sync()
+        try:
+            if self.profile_config.batch_requests:
+                if self.current_sync is not None:
+                    self.current_sync = self.current_sync.model_copy(
+                        update={"stage": "finalizing"}
+                    )
+                await sync_client.batch_sync()
+        finally:
+            sync_client.flush_failure_history_cleanup()
 
         return sync_client.sync_stats
 

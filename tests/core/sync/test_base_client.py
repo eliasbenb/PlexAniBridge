@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from typing import Any, cast
 
 import pytest
+from anibridge.library import MediaKind
 from anibridge.list import (
     ListEntry as ListEntryProtocol,
 )
@@ -423,6 +424,50 @@ async def test_batch_sync_flushes_history(stub_client: StubSyncClient, sync_db) 
     with sync_db as ctx:
         history = ctx.session.query(SyncHistory).all()
         assert history and history[0].outcome == SyncOutcome.SYNCED
+
+
+def test_flush_failure_history_cleanup_batched_removal(
+    stub_client: StubSyncClient, sync_db
+) -> None:
+    """Batched cleanup removes queued failure history rows."""
+    movie = make_movie()
+    library_section_key = movie.section().key
+    library_media_key = str(movie.key)
+    library_namespace = stub_client.library_provider.NAMESPACE
+    list_namespace = stub_client.list_provider.NAMESPACE
+
+    with sync_db as ctx:
+        ctx.session.add_all(
+            [
+                SyncHistory(
+                    profile_name=stub_client.profile_name,
+                    library_namespace=library_namespace,
+                    library_section_key=library_section_key,
+                    library_media_key=library_media_key,
+                    list_namespace=list_namespace,
+                    list_media_key="entry",
+                    media_kind=MediaKind.MOVIE,
+                    outcome=SyncOutcome.NOT_FOUND,
+                ),
+                SyncHistory(
+                    profile_name=stub_client.profile_name,
+                    library_namespace=library_namespace,
+                    library_section_key=library_section_key,
+                    library_media_key=library_media_key,
+                    list_namespace=list_namespace,
+                    list_media_key="entry",
+                    media_kind=MediaKind.MOVIE,
+                    outcome=SyncOutcome.FAILED,
+                ),
+            ]
+        )
+        ctx.session.commit()
+
+    stub_client._cleanup_failure_history(item=movie)
+    stub_client.flush_failure_history_cleanup()
+
+    with sync_db as ctx:
+        assert ctx.session.query(SyncHistory).count() == 0
 
 
 @pytest.mark.asyncio

@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 from anibridge.library import LibraryEntry, LibraryProvider
 from anibridge.list import ListEntry, ListProvider, ListStatus, MappingGraph
 from rapidfuzz import fuzz
+from sqlalchemy import tuple_
 
 from src import log
 from src.config.database import db
@@ -28,6 +29,8 @@ if TYPE_CHECKING:
     from src.core.animap import AnimapClient
 
 __all__ = ["BaseSyncClient"]
+
+FAILURE_HISTORY_CLEANUP_BATCH_SIZE = 256
 
 
 def diff_snapshots(
@@ -121,6 +124,7 @@ class BaseSyncClient[
         self.sync_stats = SyncStats()
         self._pin_cache: dict[tuple[str, str], list[str]] = {}
         self._pending_updates: list[BatchUpdate[ParentMediaT, ChildMediaT]] = []
+        self._failure_history_cleanup_queue: set[tuple[str, str]] = set()
 
         self._field_calculators: dict[
             SyncField,
@@ -260,6 +264,7 @@ class BaseSyncClient[
         self, item: ParentMediaT
     ) -> list[ItemIdentifier]:
         """Return all identifiers that should be tracked for the given item."""
+        ...
 
     @abstractmethod
     def map_media(
@@ -274,6 +279,7 @@ class BaseSyncClient[
         ]
     ]:
         """Yield potential list entries matching the supplied library item."""
+        ...
 
     @abstractmethod
     async def search_media(
@@ -449,6 +455,7 @@ class BaseSyncClient[
                 f"[{self.profile_name}] Skipping {item.media_kind.value} "
                 f"because it is already up to date {debug_title} {debug_ids}"
             )
+            self._cleanup_failure_history(item=item, child_item=child_item)
             return SyncOutcome.SKIPPED
 
         plan = BatchUpdate(
@@ -664,18 +671,7 @@ class BaseSyncClient[
         with db() as ctx:
             if outcome == SyncOutcome.SYNCED:
                 # Remove any previous NOT_FOUND/FAILED records on successful sync
-                delete_filters = [
-                    SyncHistory.profile_name == self.profile_name,
-                    SyncHistory.library_namespace == library_namespace,
-                    SyncHistory.library_section_key == library_section_key,
-                    SyncHistory.library_media_key == library_media_key,
-                    SyncHistory.outcome.in_(
-                        [SyncOutcome.NOT_FOUND, SyncOutcome.FAILED]
-                    ),
-                ]
-                ctx.session.query(SyncHistory).filter(*delete_filters).delete(
-                    synchronize_session=False
-                )
+                self._cleanup_failure_history(item=item, child_item=child_item)
 
             if outcome == SyncOutcome.SKIPPED:
                 return
@@ -745,6 +741,62 @@ class BaseSyncClient[
             ctx.session.add(history_record)
             ctx.session.commit()
 
+    def flush_failure_history_cleanup(self) -> None:
+        """Remove cached failure history rows in a single delete statement."""
+        if not self._failure_history_cleanup_queue:
+            return
+
+        targets = set(self._failure_history_cleanup_queue)
+        target_pairs = list(targets)
+        profile_name = self.profile_name
+        library_namespace = self.library_provider.NAMESPACE
+
+        with db() as ctx:
+            for start in range(
+                0,
+                len(target_pairs),
+                FAILURE_HISTORY_CLEANUP_BATCH_SIZE,
+            ):
+                chunk = target_pairs[start : start + FAILURE_HISTORY_CLEANUP_BATCH_SIZE]
+                ctx.session.query(SyncHistory).filter(
+                    SyncHistory.profile_name == profile_name,
+                    SyncHistory.library_namespace == library_namespace,
+                    tuple_(
+                        SyncHistory.library_section_key,
+                        SyncHistory.library_media_key,
+                    ).in_(chunk),
+                    SyncHistory.outcome.in_(
+                        [SyncOutcome.NOT_FOUND, SyncOutcome.FAILED]
+                    ),
+                ).delete(synchronize_session=False)
+            ctx.session.commit()
+
+        self._failure_history_cleanup_queue -= targets
+        log.debug(
+            f"[{profile_name}] Cleaned up failure history for "
+            f"{len(targets)} cached targets"
+        )
+
+    def _cleanup_failure_history(
+        self,
+        item: ParentMediaT,
+        child_item: ChildMediaT | None = None,
+    ) -> None:
+        """Delete NOT_FOUND/FAILED history rows."""
+        library_target: LibraryEntry = child_item if child_item is not None else item
+        library_section_key = library_target.section().key
+        library_media_key = str(library_target.key)
+
+        if not library_media_key:
+            return
+
+        cleanup_key = (library_section_key, library_media_key)
+        self._failure_history_cleanup_queue.add(cleanup_key)
+        if len(self._failure_history_cleanup_queue) >= (
+            FAILURE_HISTORY_CLEANUP_BATCH_SIZE
+        ):
+            self.flush_failure_history_cleanup()
+
     @abstractmethod
     def _derive_scope(
         self,
@@ -753,6 +805,7 @@ class BaseSyncClient[
         child_item: ChildMediaT | None,
     ) -> str | None:
         """Derive the mapping scope for the given item."""
+        ...
 
     def _should_apply_field(
         self,
@@ -811,6 +864,7 @@ class BaseSyncClient[
         mapping: MappingGraph | None,
     ) -> ListStatus | None:
         """Calculate the desired status for the list entry."""
+        ...
 
     @abstractmethod
     async def _calculate_user_rating(
@@ -823,6 +877,7 @@ class BaseSyncClient[
         mapping: MappingGraph | None,
     ) -> int | None:
         """Calculate the desired score for the list entry."""
+        ...
 
     @abstractmethod
     async def _calculate_progress(
@@ -835,6 +890,7 @@ class BaseSyncClient[
         mapping: MappingGraph | None,
     ) -> int | None:
         """Calculate the desired progress for the list entry."""
+        ...
 
     @abstractmethod
     async def _calculate_repeats(
@@ -847,6 +903,7 @@ class BaseSyncClient[
         mapping: MappingGraph | None,
     ) -> int | None:
         """Calculate the desired repeat count for the list entry."""
+        ...
 
     @abstractmethod
     async def _calculate_started_at(
@@ -859,6 +916,7 @@ class BaseSyncClient[
         mapping: MappingGraph | None,
     ) -> datetime | None:
         """Calculate the desired start date for the list entry."""
+        ...
 
     @abstractmethod
     async def _calculate_finished_at(
@@ -871,6 +929,7 @@ class BaseSyncClient[
         mapping: MappingGraph | None,
     ) -> datetime | None:
         """Calculate the desired completion date for the list entry."""
+        ...
 
     @abstractmethod
     async def _calculate_review(
@@ -883,6 +942,7 @@ class BaseSyncClient[
         mapping: MappingGraph | None,
     ) -> str | None:
         """Calculate the desired review/notes for the list entry."""
+        ...
 
     @abstractmethod
     def _debug_log_title(
@@ -892,6 +952,7 @@ class BaseSyncClient[
         media_key: str | None = None,
     ) -> str:
         """Return a debug-friendly title representation."""
+        ...
 
     @abstractmethod
     def _debug_log_ids(
@@ -904,6 +965,7 @@ class BaseSyncClient[
         media_key: str | None,
     ) -> str:
         """Return a debug-friendly identifier representation."""
+        ...
 
     async def _ensure_entry(
         self,
