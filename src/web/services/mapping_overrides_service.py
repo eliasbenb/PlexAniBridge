@@ -356,24 +356,6 @@ class MappingOverridesService:
         await self._sync_database()
         return await self.get_mapping_detail(parsed.key())
 
-    async def delete_override(self, descriptor: str) -> dict[str, Any]:
-        """Remove an override for the given descriptor and sync the DB.
-
-        Args:
-            descriptor (str): The mapping descriptor to delete overrides for.
-
-        Returns:
-            dict[str, Any]: Confirmation of successful deletion.
-        """
-        parsed = AnimapDescriptor.parse(descriptor)
-        async with self._lock:
-            raw, path, fmt = self._load_raw()
-            raw.pop(parsed.key(), None)
-            self._write_raw(raw, path, fmt)
-
-        await self._sync_database()
-        return {"ok": True}
-
 
 _mapping_overrides_service: MappingOverridesService | None = None
 

@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { Popover, Tooltip } from "bits-ui";
+    import { Tooltip } from "bits-ui";
 
     import type { ColumnConfig } from "$lib/components/mappings/columns";
     import MappingCard from "$lib/components/mappings/mapping-card.svelte";
@@ -10,7 +10,6 @@
         items: Mapping[];
         columns?: ColumnConfig[];
         onEdit?: (payload: { mapping: Mapping }) => void;
-        onDelete?: (payload: { mapping: Mapping }) => void;
         onNavigateToQuery?: (payload: { query: string }) => void;
     }
 
@@ -18,7 +17,6 @@
         items = $bindable([]),
         columns = $bindable([]),
         onEdit,
-        onDelete,
         onNavigateToQuery,
     }: Props = $props();
 
@@ -324,30 +322,9 @@
                                     <div
                                         class="flex justify-end gap-1 whitespace-nowrap">
                                         <button
-                                            class="inline-flex h-6 items-center rounded-md bg-slate-800 px-2 text-[11px] text-slate-200 hover:bg-slate-700"
+                                            class="inline-flex h-6 items-center rounded-md bg-emerald-700 px-2 text-[11px] text-emerald-50 hover:bg-emerald-600"
                                             onclick={() => onEdit?.({ mapping: m })}
                                             >Edit</button>
-                                        <Popover.Root>
-                                            <Popover.Trigger
-                                                class="inline-flex h-6 items-center rounded-md bg-rose-700/70 px-2 text-[11px] text-rose-200 hover:bg-rose-600"
-                                                aria-label="Delete mapping"
-                                                title="Delete mapping">
-                                                Del
-                                            </Popover.Trigger>
-                                            <Popover.Content
-                                                align="end"
-                                                side="top"
-                                                sideOffset={6}
-                                                class="z-50 w-44 rounded-md border border-rose-800/60 bg-slate-950/95 p-2 text-left text-[11px] shadow-lg">
-                                                <div class="space-y-1">
-                                                    <Popover.Close
-                                                        class="flex w-full items-center justify-start rounded px-2 py-1 text-left text-[11px] text-rose-100 hover:bg-rose-900/60"
-                                                        onclick={() =>
-                                                            onDelete?.({ mapping: m })}
-                                                        >Remove override</Popover.Close>
-                                                </div>
-                                            </Popover.Content>
-                                        </Popover.Root>
                                     </div>
                                 {/if}
                             </td>

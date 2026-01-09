@@ -229,10 +229,3 @@ async def update_mapping(
     payload = mapping.to_service_kwargs()
     data = await svc.save_override(**payload)
     return MappingDetailModel(**data)
-
-
-@router.delete("/{descriptor}", response_model=DeleteMappingResponse)
-async def delete_mapping(descriptor: str) -> DeleteMappingResponse:
-    svc = get_mapping_overrides_service()
-    data = await svc.delete_override(descriptor)
-    return DeleteMappingResponse(**data)

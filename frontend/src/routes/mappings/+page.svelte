@@ -134,22 +134,6 @@
         editorOpen = true;
     }
 
-    async function handleDelete({ mapping }: { mapping: Mapping }) {
-        const message =
-            "Are you sure you want to remove this custom override and revert to upstream?";
-        if (!confirm(message)) return;
-
-        const res = await apiFetch(
-            `/api/mappings/${encodeURIComponent(mapping.descriptor)}`,
-            { method: "DELETE" },
-            { successMessage: "Override removed" },
-        );
-
-        if (res.ok) {
-            await load();
-        }
-    }
-
     async function handleSaved() {
         editorOpen = false;
         await load();
@@ -353,7 +337,6 @@
             {items}
             bind:columns
             onEdit={handleEdit}
-            onDelete={handleDelete}
             onNavigateToQuery={({ query: next }) => navigateToQuery(next)} />
     </div>
     <Pagination

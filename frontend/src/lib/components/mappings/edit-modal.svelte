@@ -623,7 +623,7 @@
                             {/if}
                             <button
                                 type="button"
-                                class="inline-flex items-center rounded-md border border-slate-700/60 bg-slate-900/60 p-1 text-[12px] font-semibold text-emerald-200 shadow-sm transition-colors hover:border-emerald-400 hover:text-emerald-100 focus:outline-none"
+                                class="inline-flex items-center rounded-md border border-slate-700/60 bg-slate-900/60 p-1 text-[12px] font-semibold text-emerald-200 shadow-sm transition-colors hover:border-emerald-400 hover:text-emerald-100 focus:outline-none disabled:pointer-events-none disabled:opacity-50 disabled:hover:border-slate-700/60 disabled:hover:text-emerald-200"
                                 title="Add range"
                                 onclick={() => addRange(entry.key)}
                                 disabled={entry.deleted}>
@@ -631,9 +631,10 @@
                             </button>
                             <button
                                 type="button"
-                                class="inline-flex items-center rounded-md border border-slate-700/60 bg-slate-900/60 p-1 text-[12px] font-semibold text-rose-200 transition-colors hover:border-rose-500 focus:outline-none"
+                                class="inline-flex items-center rounded-md border border-slate-700/60 bg-slate-900/60 p-1 text-[12px] font-semibold text-rose-200 transition-colors hover:border-rose-500 focus:outline-none disabled:pointer-events-none disabled:opacity-50 disabled:hover:border-slate-700/60 disabled:hover:text-rose-200"
                                 title="Remove target mapping"
-                                onclick={() => removeEntry(entry.key)}>
+                                onclick={() => removeEntry(entry.key)}
+                                disabled={entry.deleted}>
                                 <Trash2 class="inline h-4 w-4" />
                             </button>
                         </div>
@@ -758,7 +759,7 @@
                                     <div class="flex items-center gap-1.5">
                                         <button
                                             type="button"
-                                            class="inline-flex items-center rounded-md border border-slate-700/60 bg-slate-900/60 p-1 text-[12px] font-semibold text-rose-200 transition-colors hover:border-rose-500 focus:outline-none"
+                                            class="inline-flex items-center rounded-md border border-slate-700/60 bg-slate-900/60 p-1 text-[12px] font-semibold text-rose-200 transition-colors hover:border-rose-500 focus:outline-none disabled:pointer-events-none disabled:opacity-50 disabled:hover:border-slate-700/60 disabled:hover:text-rose-200"
                                             title="Remove range"
                                             onclick={() => removeRange(entry.key, idx)}
                                             disabled={entry.deleted}>
