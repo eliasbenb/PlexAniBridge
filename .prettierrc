@@ -2,5 +2,48 @@
     "useTabs": false,
     "tabWidth": 4,
     "singleQuote": false,
-    "trailingComma": "all"
+    "trailingComma": "all",
+    "printWidth": 88,
+    "objectWrap": "collapse",
+    "bracketSameLine": true,
+    "singleAttributePerLine": true,
+    "overrides": [
+        {
+            "files": "*.svelte",
+            "options": {
+                "parser": "svelte",
+                "plugins": [
+                    "prettier-plugin-svelte",
+                    "prettier-plugin-tailwindcss",
+                    "@ianvs/prettier-plugin-sort-imports"
+                ],
+                "importOrder": [
+                    "^svelte$",
+                    "",
+                    "<BUILTIN_MODULES>",
+                    "<THIRD_PARTY_MODULES>",
+                    "",
+                    "^[$]",
+                    "^[.]",
+                    "",
+                    ".css$"
+                ],
+                "tailwindStylesheet": "./frontend/src/app.css"
+            }
+        },
+        {
+            "files": "*.{ts,js}",
+            "options": {
+                "plugins": ["@ianvs/prettier-plugin-sort-imports"],
+                "importOrder": [
+                    "<BUILTIN_MODULES>",
+                    "<THIRD_PARTY_MODULES>",
+                    "",
+                    "^[$]",
+                    "^[.]"
+                ]
+            }
+        },
+        { "files": "*.json", "options": { "objectWrap": "preserve" } }
+    ]
 }

@@ -31,7 +31,7 @@
         "editor.tabSize": 4
     },
     "files.associations": {
-        "*.css": "tailwindcss"
+        "**/frontend/**/*.css": "tailwindcss"
     },
     "editor.detectIndentation": false,
     "editor.formatOnSave": true,
@@ -50,8 +50,5 @@
     "python.testing.unittestEnabled": false,
     "ruff.fixAll": true,
     "ruff.importStrategy": "fromEnvironment",
-    "ruff.organizeImports": true,
-    "yaml.schemas": {
-        "https://squidfunk.github.io/mkdocs-material/schema.json": "mkdocs.yml"
-    }
+    "ruff.organizeImports": true
 }

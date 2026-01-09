@@ -472,7 +472,7 @@
                             <div
                                 class={`group flex items-start gap-2 border-l-2 px-2 py-0.5 pr-3 ${entryClass(entry.level)}`}>
                                 <span
-                                    class="hidden w-[54px] shrink-0 text-right text-[10px] text-slate-500 tabular-nums sm:inline-block">
+                                    class="hidden w-13.5 shrink-0 text-right text-[10px] text-slate-500 tabular-nums sm:inline-block">
                                     {formatTime(entry)}
                                 </span>
                                 <span
@@ -631,7 +631,7 @@
                                     <div
                                         class={`group flex items-start gap-2 border-l-2 px-2 py-0.5 pr-3 ${entryClass(entry.level)}`}>
                                         <span
-                                            class="hidden w-[54px] shrink-0 text-right text-[10px] text-slate-500 tabular-nums sm:inline-block">
+                                            class="hidden w-13.5 shrink-0 text-right text-[10px] text-slate-500 tabular-nums sm:inline-block">
                                             {formatTime(entry)}
                                         </span>
                                         <span
