@@ -153,6 +153,12 @@ class HistoryItemNotFoundError(HistoryError, KeyError):
     status_code = 404
 
 
+class HistoryPermissionError(HistoryError, PermissionError):
+    """The user does not have permission to perform the requested history operation."""
+
+    status_code = 403
+
+
 # Mappings errors
 class MappingError(AniBridgeError):
     """Base class for mapping data source or parsing errors."""

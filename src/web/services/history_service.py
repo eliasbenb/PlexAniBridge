@@ -1,6 +1,7 @@
 """Sync history service with TTL caching."""
 
 from collections import defaultdict
+from collections.abc import Sequence
 from functools import lru_cache
 from typing import TYPE_CHECKING, Any
 
@@ -12,13 +13,15 @@ from sqlalchemy.sql.functions import func
 
 from src import log
 from src.config.database import db
+from src.core.sync.stats import EntrySnapshot
 from src.exceptions import (
     HistoryItemNotFoundError,
+    HistoryPermissionError,
     ProfileNotFoundError,
     SchedulerNotInitializedError,
 )
 from src.models.db.pin import Pin
-from src.models.db.sync_history import SyncHistory
+from src.models.db.sync_history import SyncHistory, SyncOutcome
 from src.models.schemas.provider import ProviderMediaMetadata
 from src.web.state import get_app_state
 
@@ -66,6 +69,115 @@ class HistoryPage(BaseModel):
 
 class HistoryService:
     """Service to paginate and enrich sync history records."""
+
+    async def _build_history_items(
+        self,
+        profile: str,
+        rows: Sequence[SyncHistory],
+        *,
+        include_library_media: bool = True,
+        include_list_media: bool = True,
+    ) -> list[HistoryItem]:
+        """Convert ORM rows into API DTOs with optional metadata enrichment."""
+        if not rows:
+            return []
+
+        list_pairs: dict[str, set[str]] = defaultdict(set)
+        library_pairs: dict[tuple[str, str | None], set[str]] = defaultdict(set)
+        for row in rows:
+            if row.list_namespace and row.list_media_key:
+                list_pairs[row.list_namespace].add(row.list_media_key)
+            if row.library_namespace and row.library_media_key:
+                library_pairs[(row.library_namespace, row.library_section_key)].add(
+                    row.library_media_key
+                )
+
+        pin_map: dict[tuple[str, str], list[str]] = {}
+        if list_pairs:
+            namespaces = list(list_pairs.keys())
+            keys = {
+                key
+                for namespace in namespaces
+                for key in list_pairs.get(namespace, set())
+            }
+            if keys:
+                with db() as ctx:
+                    pin_rows = (
+                        ctx.session.query(Pin)
+                        .filter(
+                            Pin.profile_name == profile,
+                            Pin.list_namespace.in_(namespaces),
+                            Pin.list_media_key.in_(list(keys)),
+                        )
+                        .all()
+                    )
+                    pin_map = {
+                        (pin.list_namespace, pin.list_media_key): list(pin.fields or [])
+                        for pin in pin_rows
+                    }
+
+        list_metadata_map: dict[tuple[str, str], ProviderMediaMetadata] = {}
+        if include_list_media:
+            for namespace, keys in list_pairs.items():
+                if not keys:
+                    continue
+                metadata = await self._fetch_list_metadata_batch(
+                    profile, namespace, tuple(sorted(keys))
+                )
+                for key, payload in metadata.items():
+                    list_metadata_map[(namespace, key)] = payload
+
+        library_metadata_map: dict[tuple[str, str], ProviderMediaMetadata] = {}
+        if include_library_media:
+            for (namespace, section_key), keys in library_pairs.items():
+                if not keys:
+                    continue
+                metadata = await self._fetch_library_metadata_batch(
+                    profile, namespace, section_key, tuple(sorted(keys))
+                )
+                for key, payload in metadata.items():
+                    library_metadata_map[(namespace, key)] = payload
+
+        dto_items: list[HistoryItem] = []
+        for row in rows:
+            list_metadata = None
+            if row.list_namespace and row.list_media_key:
+                list_metadata = list_metadata_map.get(
+                    (row.list_namespace, row.list_media_key)
+                )
+            library_metadata = None
+            if row.library_namespace and row.library_media_key:
+                library_metadata = library_metadata_map.get(
+                    (row.library_namespace, row.library_media_key)
+                )
+
+            dto_items.append(
+                HistoryItem(
+                    id=row.id,
+                    profile_name=row.profile_name,
+                    library_namespace=row.library_namespace,
+                    library_section_key=row.library_section_key,
+                    library_media_key=row.library_media_key,
+                    list_namespace=row.list_namespace,
+                    list_media_key=row.list_media_key,
+                    animap_entry_id=row.animap_entry_id,
+                    media_kind=row.media_kind.value if row.media_kind else None,
+                    outcome=str(row.outcome),
+                    before_state=row.before_state,
+                    after_state=row.after_state,
+                    error_message=row.error_message,
+                    timestamp=row.timestamp.isoformat(),
+                    library_media=library_metadata,
+                    list_media=list_metadata,
+                    pinned_fields=(
+                        pin_map.get((row.list_namespace, row.list_media_key))
+                        if row.list_namespace and row.list_media_key
+                        else None
+                    ),
+                )
+            )
+
+        return dto_items
 
     def _get_bridge(self, profile: str) -> BridgeClient:
         """Return the bridge client for a specific profile."""
@@ -212,99 +324,12 @@ class HistoryService:
                 .limit(per_page)
             )
             rows = ctx.session.execute(stmt).scalars().all()
-            list_pairs: dict[str, set[str]] = defaultdict(set)
-            library_pairs: dict[tuple[str, str | None], set[str]] = defaultdict(set)
-            for row in rows:
-                if row.list_namespace and row.list_media_key:
-                    list_pairs[row.list_namespace].add(row.list_media_key)
-                if row.library_namespace and row.library_media_key:
-                    library_pairs[(row.library_namespace, row.library_section_key)].add(
-                        row.library_media_key
-                    )
-
-            pin_map: dict[tuple[str, str], list[str]] = {}
-            if list_pairs:
-                namespaces = list(list_pairs.keys())
-                keys = {
-                    key
-                    for namespace in namespaces
-                    for key in list_pairs.get(namespace, set())
-                }
-                if keys:
-                    pin_rows = (
-                        ctx.session.query(Pin)
-                        .filter(
-                            Pin.profile_name == profile,
-                            Pin.list_namespace.in_(namespaces),
-                            Pin.list_media_key.in_(list(keys)),
-                        )
-                        .all()
-                    )
-                    pin_map = {
-                        (pin.list_namespace, pin.list_media_key): list(pin.fields or [])
-                        for pin in pin_rows
-                    }
-
-        list_metadata_map: dict[tuple[str, str], ProviderMediaMetadata] = {}
-        if include_list_media:
-            for namespace, keys in list_pairs.items():
-                if not keys:
-                    continue
-                metadata = await self._fetch_list_metadata_batch(
-                    profile, namespace, tuple(sorted(keys))
-                )
-                for key, payload in metadata.items():
-                    list_metadata_map[(namespace, key)] = payload
-
-        library_metadata_map: dict[tuple[str, str], ProviderMediaMetadata] = {}
-        if include_library_media:
-            for (namespace, section_key), keys in library_pairs.items():
-                if not keys:
-                    continue
-                metadata = await self._fetch_library_metadata_batch(
-                    profile, namespace, section_key, tuple(sorted(keys))
-                )
-                for key, payload in metadata.items():
-                    library_metadata_map[(namespace, key)] = payload
-
-        dto_items: list[HistoryItem] = []
-        for row in rows:
-            list_metadata = None
-            if row.list_namespace and row.list_media_key:
-                list_metadata = list_metadata_map.get(
-                    (row.list_namespace, row.list_media_key)
-                )
-            library_metadata = None
-            if row.library_namespace and row.library_media_key:
-                library_metadata = library_metadata_map.get(
-                    (row.library_namespace, row.library_media_key)
-                )
-
-            dto_items.append(
-                HistoryItem(
-                    id=row.id,
-                    profile_name=row.profile_name,
-                    library_namespace=row.library_namespace,
-                    library_section_key=row.library_section_key,
-                    library_media_key=row.library_media_key,
-                    list_namespace=row.list_namespace,
-                    list_media_key=row.list_media_key,
-                    animap_entry_id=row.animap_entry_id,
-                    media_kind=row.media_kind.value if row.media_kind else None,
-                    outcome=str(row.outcome),
-                    before_state=row.before_state,
-                    after_state=row.after_state,
-                    error_message=row.error_message,
-                    timestamp=row.timestamp.isoformat(),
-                    library_media=library_metadata,
-                    list_media=list_metadata,
-                    pinned_fields=(
-                        pin_map.get((row.list_namespace, row.list_media_key))
-                        if row.list_namespace and row.list_media_key
-                        else None
-                    ),
-                )
-            )
+        dto_items = await self._build_history_items(
+            profile,
+            rows,
+            include_library_media=include_library_media,
+            include_list_media=include_list_media,
+        )
 
         page_obj = HistoryPage(
             items=dto_items,
@@ -373,8 +398,41 @@ class HistoryService:
             raise HistoryItemNotFoundError(
                 "Cannot undo history item without list media key"
             )
+        if row.profile_name != profile:
+            raise HistoryPermissionError("Profile mismatch for history item")
+        if row.list_namespace != list_provider.NAMESPACE:
+            raise HistoryPermissionError(
+                "History item belongs to a different list provider"
+            )
+        if row.library_namespace != bridge.library_provider.NAMESPACE:
+            raise HistoryPermissionError(
+                "History item belongs to a different library provider"
+            )
+        if row.outcome not in (SyncOutcome.SYNCED, SyncOutcome.DELETED):
+            raise HistoryPermissionError(
+                "Undo is only supported for synced or deleted items"
+            )
 
-        if not row.before_state:
+        before_snapshot = (
+            EntrySnapshot.from_dict(row.before_state) if row.before_state else None
+        )
+        after_snapshot = (
+            EntrySnapshot.from_dict(row.after_state) if row.after_state else None
+        )
+
+        if not row.before_state and not after_snapshot:
+            raise HistoryPermissionError("History item does not contain undo data")
+        if not before_snapshot and not row.list_media_key:
+            raise HistoryItemNotFoundError(
+                "Cannot undo history item without list media key"
+            )
+        if not before_snapshot and not bridge.profile_config.destructive_sync:
+            raise HistoryPermissionError(
+                "Cannot undo history item that requires deletion when destructive "
+                "sync is disabled"
+            )
+
+        if before_snapshot is None:
             log.success(f"Deleting list entry {row.list_media_key} as part of undo")
             if bridge.profile_config.dry_run:
                 log.info(
@@ -383,10 +441,83 @@ class HistoryService:
                 )
             else:
                 await list_provider.delete_entry(row.list_media_key)
+        else:
+            log.success(
+                f"Restoring list entry {before_snapshot.media_key} to previous state"
+            )
+            if bridge.profile_config.dry_run:
+                log.info(
+                    "Dry run enabled; skipping restoration of list entry "
+                    f"{before_snapshot.media_key}"
+                )
+            else:
+                entry = await list_provider.build_entry(before_snapshot.media_key)
+                entry.status = before_snapshot.status
+                entry.progress = before_snapshot.progress
+                entry.repeats = before_snapshot.repeats
+                entry.review = before_snapshot.review
+                entry.user_rating = before_snapshot.user_rating
+                entry.started_at = before_snapshot.started_at
+                entry.finished_at = before_snapshot.finished_at
+                await list_provider.update_entry(before_snapshot.media_key, entry)
 
-        # TODO: Implement undo logic on provider side
-        raise NotImplementedError(
-            "Undo operations are not supported with the provider abstraction."
+        with db() as ctx:
+            undo_row = SyncHistory(
+                profile_name=row.profile_name,
+                library_namespace=row.library_namespace,
+                library_section_key=row.library_section_key,
+                library_media_key=row.library_media_key,
+                list_namespace=row.list_namespace,
+                list_media_key=row.list_media_key,
+                animap_entry_id=row.animap_entry_id,
+                media_kind=row.media_kind,
+                outcome=SyncOutcome.UNDONE,
+                before_state=row.after_state,
+                after_state=row.before_state,
+            )
+            ctx.session.add(undo_row)
+            ctx.session.commit()
+            ctx.session.refresh(undo_row)
+
+        self._fetch_profile_stats.cache_clear()
+
+        dto_items = await self._build_history_items(profile, [undo_row])
+        return dto_items[0]
+
+    async def retry_item(self, profile: str, item_id: int) -> None:
+        """Retry a failed history item by re-triggering a targeted sync."""
+        log.info(f"Retrying history item id={item_id} for profile {profile}")
+
+        scheduler = get_app_state().scheduler
+        if not scheduler:
+            raise SchedulerNotInitializedError("Scheduler not available")
+
+        with db() as ctx:
+            row = (
+                ctx.session.query(SyncHistory)
+                .filter(SyncHistory.profile_name == profile, SyncHistory.id == item_id)
+                .first()
+            )
+        if not row:
+            raise HistoryItemNotFoundError("Not found")
+
+        bridge = self._get_bridge(profile)
+
+        if row.library_namespace != bridge.library_provider.NAMESPACE:
+            raise HistoryPermissionError(
+                "History item belongs to a different library provider"
+            )
+        if row.outcome not in (SyncOutcome.FAILED, SyncOutcome.NOT_FOUND):
+            raise HistoryPermissionError(
+                "Retry is only available for failed or not found items"
+            )
+        if not row.library_media_key:
+            raise HistoryPermissionError(
+                "Cannot retry history item without library media key"
+            )
+
+        await scheduler.trigger_sync(
+            profile, poll=False, library_keys=[row.library_media_key]
         )
 
     async def clear_profile_cache(self, profile: str) -> None:

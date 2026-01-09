@@ -43,6 +43,7 @@
     let openDiff: Record<number, boolean> = $state({});
     let currentSync: CurrentSync | null = $state(null);
     let isProfileRunning = $state(false);
+    let undoLoading: Record<number, boolean> = $state({});
     let retryLoading: Record<number, boolean> = $state({});
 
     let openPins: Record<number, boolean> = $state({});
@@ -148,22 +149,57 @@
         }
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    function canUndo(_item: HistoryItem): boolean {
-        // TODO: Implement undo logic on provider side
-        return false;
+    function canUndo(item: HistoryItem): boolean {
+        if (!item) return false;
+        if (!item.list_media_key || !item.list_namespace) return false;
+        return item.outcome === "synced" || item.outcome === "deleted";
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    function canRetry(_item: HistoryItem): boolean {
-        // TODO: Implement retry logic on provider side
-        return false;
+    async function undoHistory(item: HistoryItem) {
+        if (!canUndo(item) || undoLoading[item.id]) return;
+        undoLoading[item.id] = true;
+        try {
+            const res = await apiFetch(
+                `/api/history/${params.profile}/${item.id}/undo`,
+                { method: "POST" },
+            );
+            if (!res.ok) throw new Error("HTTP " + res.status);
+            const data = (await res.json()) as { item?: HistoryItem };
+            if (data?.item) {
+                items = [data.item, ...items];
+                knownIds.add(data.item.id);
+                stats[data.item.outcome] = (stats[data.item.outcome] || 0) + 1;
+            }
+            toast("Undo applied", "success");
+        } catch (e) {
+            toast("Undo failed", "error");
+            console.error(e);
+        } finally {
+            undoLoading[item.id] = false;
+        }
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    async function retryHistory(_item: HistoryItem) {
-        // TODO: Implement retry logic on provider side
-        toast("Retry is not available for provider-based history entries", "info");
+    function canRetry(item: HistoryItem): boolean {
+        if (!item) return false;
+        return item.outcome === "failed" || item.outcome === "not_found";
+    }
+
+    async function retryHistory(item: HistoryItem) {
+        if (!canRetry(item) || retryLoading[item.id]) return;
+        retryLoading[item.id] = true;
+        try {
+            const res = await apiFetch(
+                `/api/history/${params.profile}/${item.id}/retry`,
+                { method: "POST" },
+            );
+            if (!res.ok) throw new Error("HTTP " + res.status);
+            toast("Retry queued", "success");
+        } catch (e) {
+            toast("Retry failed", "error");
+            console.error(e);
+        } finally {
+            retryLoading[item.id] = false;
+        }
     }
 
     function canShowDiff(item: HistoryItem): boolean {
@@ -239,14 +275,6 @@
             delete pinDraftCounts[item.id];
             delete pinBusy[item.id];
         }
-    }
-
-    let undoLoading: Record<number, boolean> = $state({});
-
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    async function undoHistory(_item: HistoryItem) {
-        // TODO: Implement undo logic on provider side
-        toast("Undo is not available for provider-based history entries", "info");
     }
 
     let isNearTop = $state(true);

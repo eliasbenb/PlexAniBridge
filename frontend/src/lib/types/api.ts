@@ -278,6 +278,10 @@ export interface UndoResponse {
     item: HistoryItem;
 }
 
+export interface RetryResponse {
+    ok: boolean;
+}
+
 export interface PinFieldOption {
     value: string;
     label: string;
