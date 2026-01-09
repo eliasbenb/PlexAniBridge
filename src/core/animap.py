@@ -251,6 +251,8 @@ class AnimapClient:
 
                 descriptors[target_desc.key()] = target_desc
 
+                if ranges is None:
+                    continue
                 if not isinstance(ranges, dict):
                     log.warning(
                         "Descriptor $$'%s'$$ → $$'%s'$$ has non-object ranges; skipped",
