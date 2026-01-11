@@ -10,6 +10,7 @@ from anibridge.library import MediaKind
 from src.config.database import db
 from src.exceptions import (
     HistoryItemNotFoundError,
+    HistoryPermissionError,
     ProfileNotFoundError,
     SchedulerNotInitializedError,
 )
@@ -136,7 +137,7 @@ def history_env(monkeypatch: pytest.MonkeyPatch):
     bridge = DummyBridge(
         list_provider=list_provider,
         library_provider=library_provider,
-        profile_config=SimpleNamespace(dry_run=False),
+        profile_config=SimpleNamespace(dry_run=False, destructive_sync=False),
     )
     scheduler = SimpleNamespace(bridge_clients={"profile": bridge})
     state = get_app_state()
@@ -292,14 +293,14 @@ async def test_history_service_undo_item_requires_list_key(history_env):
 
 @pytest.mark.asyncio
 async def test_history_service_undo_item_deletes_entry_and_fails(history_env):
-    """undo_item deletes provider entries before raising NotImplementedError."""
+    """undo_item deletion raises permission error when destructive sync is disabled."""
     row_id = _seed_history_row(before_state=None)
     service = HistoryService()
 
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(HistoryPermissionError):
         await service.undo_item("profile", row_id)
 
-    assert history_env.list_provider.deleted_entries == ["lst1"]
+    assert history_env.list_provider.deleted_entries == []
 
 
 @pytest.mark.asyncio
