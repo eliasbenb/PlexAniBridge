@@ -19,7 +19,10 @@ __all__ = [
 _DEFAULT_LIBRARY_PROVIDER_MODULES: tuple[str, ...] = (
     "anibridge_plex_provider.library",
 )
-_DEFAULT_LIST_PROVIDER_MODULES: tuple[str, ...] = ("anibridge_anilist_provider.list",)
+_DEFAULT_LIST_PROVIDER_MODULES: tuple[str, ...] = (
+    "anibridge_anilist_provider.list",
+    "anibridge_mal_provider.list",
+)
 _LOADED_MODULES: set[str] = set()
 
 

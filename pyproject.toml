@@ -39,6 +39,7 @@ dependencies = [
     "anibridge-library-base>=0.1.1",
     "anibridge-list-base>=0.1.1",
     "anibridge-plex-provider>=0.1.1,<0.2.0",
+    "anibridge-mal-provider>=0.1.0,<0.2.0",
     "async-lru>=2.0.5",
     "bcrypt>=5.0.0",
     "cachetools>=6.2.3",
